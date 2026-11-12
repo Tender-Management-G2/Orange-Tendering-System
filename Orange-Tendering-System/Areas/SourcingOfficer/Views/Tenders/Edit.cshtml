@@ -1,0 +1,81 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Edit Tender
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management
+TRELLO TASK: Manage Tenders
+TRELLO URL: https://trello.com/c/e2e0QlHT
+
+PURPOSE:
+Edit a Draft tender’s details, requirements, items and
+first-round dates.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Tenders/Edit/{id?}
+
+FUTURE IMPLEMENTATION:
+- Allow edits only while Tender.Status = Draft and no round
+  is Open.
+- POST Edit with server validation; audit old/new values.
+
+DEPENDENCIES:
+Tenders, TenderItems, TenderRounds, Documents, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Edit Tender";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = "Change a tender that has not been published to suppliers yet.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>Published items are not rewritten</strong><p>Once a round has been opened to suppliers, the published items and requirements must not be silently changed: TenderItems are stored per tender, not per round. Whether items may change between rounds is an open decision (spec §21).</p></aside>
+
+<section class="ws-panel pg-panel">
+    <h2>Tender details</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-title-1">Title</label><input id="f-title-1" type="text" /></div>
+                <div class="pg-field pg-field-wide"><label for="f-description-2">Description</label><textarea id="f-description-2" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-requirements-3">Requirements</label><textarea id="f-requirements-3" rows="4"></textarea></div>
+            </div>
+        </fieldset>
+    </form>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-tender-items">
+    <div class="pg-panel-head"><h2 id="tbl-tender-items">Tender items</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Item</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"Tender items are not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Tender documents</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-add-tender-document-4">Add tender document</label><input id="f-add-tender-document-4" type="file" /></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save changes</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Details">Tender details</a></li>
+    </ul>
+</nav>

@@ -13,7 +13,7 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
     [Authorize(Roles = SystemRoles.SourcingOfficer)]
     public class InvitationsController : Controller
     {
-        // Supplier Invitations — Owner: Amal · Trello: Supplier Invitations
+        // Supplier Invitations — Owner: Amal · Trello: Supplier Invitations (https://trello.com/c/Qh7GKR8x)
         // GET /SourcingOfficer/Invitations/Index/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Index(int? id)
         {

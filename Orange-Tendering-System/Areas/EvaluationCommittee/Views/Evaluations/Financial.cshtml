@@ -6,7 +6,7 @@ PAGE: Financial Evaluation
 DEVELOPER OWNER: Tariq
 MODULE: Technical & Financial Evaluation Committee
 TRELLO TASK: Financial Evaluation
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/oqDGzKzR
 
 PURPOSE:
 A committee member enters financial scores and remarks, with
@@ -41,17 +41,44 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 <partial name="_PageHeader" />
 <partial name="_ScaffoldNotice" />
 
+<section class="ws-panel pg-panel" aria-labelledby="tbl-itemized-quotation">
+    <div class="pg-panel-head"><h2 id="tbl-itemized-quotation">Itemized quotation</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender item</th><th scope="col">Required qty</th><th scope="col">Offered qty</th><th scope="col">Unit price</th><th scope="col">Line total</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"Offer lines are not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
 <section class="ws-panel pg-panel">
-    <h2>Price summary</h2>
+    <h2>Costs and terms</h2>
     <dl class="pg-dl">
-        <div><dt>Supplier</dt><dd>—</dd></div>
-        <div><dt>Items total</dt><dd>—</dd></div>
-        <div><dt>Extra costs</dt><dd>—</dd></div>
-        <div><dt>Calculated total</dt><dd>—</dd></div>
         <div><dt>Currency</dt><dd>—</dd></div>
+        <div><dt>Items total</dt><dd>—</dd></div>
+        <div><dt>Taxes / fees</dt><dd>—</dd></div>
+        <div><dt>Shipping / transport</dt><dd>—</dd></div>
+        <div><dt>Installation</dt><dd>—</dd></div>
+        <div><dt>Maintenance</dt><dd>—</dd></div>
+        <div><dt>Other charges</dt><dd>—</dd></div>
+        <div><dt>Calculated total</dt><dd>—</dd></div>
         <div><dt>Payment terms</dt><dd>—</dd></div>
+        <div><dt>Offer valid until</dt><dd>—</dd></div>
+        <div><dt>Delivery (days)</dt><dd>—</dd></div>
     </dl>
 </section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-total-cost-comparison-eligible-offers">
+    <div class="pg-panel-head"><h2 id="tbl-total-cost-comparison-eligible-offers">Total cost comparison (eligible offers)</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Supplier</th><th scope="col">Currency</th><th scope="col">Items total</th><th scope="col">Extra costs</th><th scope="col">Calculated total</th><th scope="col">Delivery</th><th scope="col">Validity</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No eligible offers loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<aside class="pg-note"><strong>Currency</strong><p>Offers in different currencies cannot be compared until an exchange-rate policy is approved (spec §10.2).</p></aside>
 
 <section class="ws-panel pg-panel" aria-labelledby="tbl-financial-scoring">
     <div class="pg-panel-head"><h2 id="tbl-financial-scoring">Financial scoring</h2></div>
@@ -74,3 +101,10 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
         </fieldset>
     </form>
 </section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">Request a financial clarification</a></li>
+        <li><a asp-area="EvaluationCommittee" asp-controller="Evaluations" asp-action="Scores">Scores &amp; approval</a></li>
+    </ul>
+</nav>

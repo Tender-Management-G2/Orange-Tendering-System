@@ -14,7 +14,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
     [Authorize(Roles = SystemRoles.Admin)]
     public class DashboardController : Controller
     {
-        // Admin Dashboard — Owner: Rjoub · Trello: Admin Dashboard
+        // Admin Dashboard — Owner: Rjoub · Trello: Admin Dashboard (https://trello.com/c/55BjFqvf)
         // GET /Admin. TODO: build the view model from real data in a service.
         public IActionResult Index()
         {

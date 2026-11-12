@@ -63,10 +63,23 @@ Trello card covers it — team assignment required.
     </dl>
 </section>
 
+<section class="ws-panel pg-panel" aria-labelledby="tbl-committee-of-this-tender">
+    <div class="pg-panel-head"><h2 id="tbl-committee-of-this-tender">Committee of this tender</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Responsibility</th><th scope="col">Member</th><th scope="col">Scores entered</th><th scope="col">Vote in current round</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Committee members are not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<aside class="pg-note"><strong>Required composition</strong><p>Exactly four assigned members: Sourcing Manager, Requesting Department Representative, Financial Representative and Technical Representative. All four must approve the same evaluation round.</p></aside>
+
 <nav class="pg-links" aria-label="Related pages">
     <ul>
         <li><a asp-area="EvaluationCommittee" asp-controller="Criteria" asp-action="Index">Criteria &amp; weights</a></li>
         <li><a asp-area="EvaluationCommittee" asp-controller="Evaluations" asp-action="Technical">Technical evaluation</a></li>
         <li><a asp-area="EvaluationCommittee" asp-controller="Evaluations" asp-action="Financial">Financial evaluation</a></li>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">Ask a clarification</a></li>
     </ul>
 </nav>

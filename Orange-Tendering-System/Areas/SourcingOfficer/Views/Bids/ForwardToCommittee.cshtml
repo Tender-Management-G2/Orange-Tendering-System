@@ -1,12 +1,12 @@
 @*
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Forward Bids to Evaluation Committee
+PAGE: Forward Bids to Technical & Financial Committee
 
 DEVELOPER OWNER: Saja
 MODULE: Sourcing Officer / Bid Management
-TRELLO TASK: Forward Bids to Evaluation Committee
-TRELLO URL: Not provided — add from the Trello board
+TRELLO TASK: Forward Bids to Technical & Financial Committee
+TRELLO URL: https://trello.com/c/oYtRrID9
 
 PURPOSE:
 Check the minimum-offer rule for the round and forward it to
@@ -40,7 +40,7 @@ keep it in a service with tests.
 ===========================================================
 *@
 @{
-    ViewData["Title"] = "Forward Bids to Evaluation Committee";
+    ViewData["Title"] = "Forward Bids to Technical & Financial Committee";
     ViewData["WorkspaceSection"] = "Received Bids";
     ViewData["Description"] = "Send the round’s offers and the comparison report to the four-member Evaluation Committee.";
 }
@@ -59,6 +59,6 @@ keep it in a service with tests.
     </dl>
 </section>
 
-<aside class="pg-note"><strong>Minimum-offer rule</strong><p>Normally at least 3 submitted offers from 3 different suppliers are required; invitations do not count. After three unsuccessful tendering attempts, the approved exception allows proceeding with 2 offers. The exact attempt-counting convention is finalized in business logic.</p></aside>
+<aside class="pg-note"><strong>Minimum-offer rule</strong><p>Normally at least 3 submitted offers from 3 different suppliers are required; invitations do not count. After three unsuccessful tendering attempts, the approved exception allows proceeding with 2 offers. Whether the initial round counts among the three attempts must be confirmed by the team before coding (spec §21).</p></aside>
 
 <partial name="_ConfirmAction" model='new ConfirmActionModel("Forward to Evaluation Committee", "Send this round to the Evaluation Committee.", "Sets the round to SentToEvaluation, creates an Evaluation CommitteeRound and attaches the Officer’s comparison report.", false, false)' />

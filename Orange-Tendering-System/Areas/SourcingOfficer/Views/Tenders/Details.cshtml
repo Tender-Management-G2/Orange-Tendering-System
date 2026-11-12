@@ -1,0 +1,129 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Tender Details
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management
+TRELLO TASK: Manage Tenders
+TRELLO URL: https://trello.com/c/e2e0QlHT
+
+PURPOSE:
+Hub page for one tender, linking every later stage (rounds,
+invitations, bids, reports, committees, award).
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Tenders/Details/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load Tender with PurchaseRequest, TenderItems,
+  TenderRounds (+ invitation/bid counts), CommitteeMembers,
+  TenderReports, Documents.
+- Show AwardedBid and the latest report RecommendedBid
+  separately.
+
+DEPENDENCIES:
+Tenders, PurchaseRequests, TenderItems, TenderRounds,
+TenderInvitations, Bids, CommitteeMembers, TenderReports,
+Documents.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Tender Details";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = "Everything about one tender: source request, items, requirements, rounds, invitations, committees, reports and outcome.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Tender</h2>
+    <dl class="pg-dl">
+        <div><dt>Reference</dt><dd>—</dd></div>
+        <div><dt>Title</dt><dd>—</dd></div>
+        <div><dt>Status</dt><dd>—</dd></div>
+        <div><dt>Source purchase request</dt><dd>—</dd></div>
+        <div><dt>Department</dt><dd>—</dd></div>
+        <div><dt>Created by</dt><dd>—</dd></div>
+        <div><dt>Created</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Terms and requirements</h2>
+    <dl class="pg-dl">
+        <div><dt>Description</dt><dd>—</dd></div>
+        <div><dt>Mandatory requirements</dt><dd>—</dd></div>
+        <div><dt>Tender documents</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-official-tender-items">
+    <div class="pg-panel-head"><h2 id="tbl-official-tender-items">Official tender items</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Item</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Tender items are not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-tendering-rounds">
+    <div class="pg-panel-head"><h2 id="tbl-tendering-rounds">Tendering rounds</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Round #</th><th scope="col">Status</th><th scope="col">Opens</th><th scope="col">Deadline</th><th scope="col">Closed</th><th scope="col">Invited</th><th scope="col">Distinct submitted offers</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No rounds yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<div class="pg-grid">
+<section class="ws-panel pg-panel" aria-labelledby="tbl-committee-assignment">
+    <div class="pg-panel-head"><h2 id="tbl-committee-assignment">Committee assignment</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Committee</th><th scope="col">Member</th><th scope="col">Responsibility</th></tr></thead>
+            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No committee members assigned."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+<section class="ws-panel pg-panel" aria-labelledby="tbl-reports">
+    <div class="pg-panel-head"><h2 id="tbl-reports">Reports</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Report</th><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Submitted</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"No reports yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+</div>
+
+<section class="ws-panel pg-panel">
+    <h2>Outcome</h2>
+    <dl class="pg-dl">
+        <div><dt>Recommended offer (from the evaluation report)</dt><dd>—</dd></div>
+        <div><dt>Awarded offer</dt><dd>—</dd></div>
+        <div><dt>Awarded at</dt><dd>—</dd></div>
+        <div><dt>Closed</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<aside class="pg-note"><strong>Recommendation is not the award</strong><p>The recommended offer comes from TenderReport.RecommendedBidId. The award (Tender.AwardedBidId, AwardedAt) is recorded only after the Manager handoff and 4/4 Top Committee approval; then the tender is closed and participants are notified.</p></aside>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Edit">Edit tender</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Rounds">Rounds</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Timeline">Timeline &amp; closing</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="SelectSuppliers">Select suppliers</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Committees">Committees</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Index">Received bids</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index">Officer reports</a></li>
+    </ul>
+</nav>

@@ -9,7 +9,8 @@ TRELLO TASK: None — no dedicated Trello card
 TRELLO URL: —
 
 PURPOSE:
-Show the revision history of the supplier’s own offers.
+Show the revision history of the supplier’s own offers, with
+a downloadable personal offer history and summary.
 
 BUSINESS ACCESS:
 Supplier (own company only, Admin-approved)
@@ -19,9 +20,13 @@ ROUTE: /Supplier/Offers/History/{id?}
 FUTURE IMPLEMENTATION:
 - Own bids grouped by TenderInvitation, ordered by
   RevisionNumber.
+- Downloadable personal history/summary (PDF/Excel) for the
+  own company only (spec §16).
+- Show outcomes only after the award is final; never show
+  competitors’ prices or scores.
 
 DEPENDENCIES:
-Bids, TenderInvitations.
+Bids, TenderInvitations, Tenders.
 
 STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
@@ -40,12 +45,28 @@ prices or evaluations.
 <partial name="_PageHeader" />
 <partial name="_ScaffoldNotice" />
 
+<section class="pg-toolbar" aria-label="Export my offer history">
+    <button type="button" class="pg-btn" disabled title="PDF export is not implemented yet">Download PDF</button>
+    <button type="button" class="pg-btn" disabled title="Excel export is not implemented yet">Download Excel</button>
+    <span class="pg-hint">Export of my offer history is not implemented yet. Exports must contain only data this user may see.</span>
+</section>
+
 <section class="ws-panel pg-panel" aria-labelledby="tbl-revisions">
     <div class="pg-panel-head"><h2 id="tbl-revisions">Revisions</h2></div>
     <div class="pg-table-wrap">
         <table class="pg-table">
             <thead><tr><th scope="col">Tender</th><th scope="col">Revision</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Submitted</th></tr></thead>
             <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No offer revisions yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-outcome-summary">
+    <div class="pg-panel-head"><h2 id="tbl-outcome-summary">Outcome summary</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Invitation response</th><th scope="col">Offer submitted</th><th scope="col">Final outcome (published)</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"No completed tenders yet."' /></td></tr></tbody>
         </table>
     </div>
 </section>

@@ -34,7 +34,8 @@ namespace Orange_Tendering_System.ViewModels
                 new("Departments", "Departments", "Index", "building"),
                 new("Suppliers", "Suppliers", "Index", "layers"),
                 new("Settings", "Settings", "Index", "settings"),
-                new("Audit Logs", "AuditLogs", "Index", "list")
+                new("Audit Logs", "AuditLogs", "Index", "list"),
+                new("Analytics & Exports", "Analytics", "Index", "chart", "")
             ]),
             new("Department", "Department", SystemRoles.RequestingDepartment,
             [
@@ -53,7 +54,8 @@ namespace Orange_Tendering_System.ViewModels
                 new("Compliance", "Bids", "Compliance", "check"),
                 new("Comparison", "Bids", "Compare", "compare"),
                 new("Reports", "Reports", "Index", "report"),
-                new("Supplier Clarifications", "Clarifications", "Index", "chat")
+                new("Supplier Clarifications", "Clarifications", "Index", "chat"),
+                new("Analytics & Exports", "Analytics", "Index", "chart", "")
             ]),
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
             [
@@ -82,7 +84,8 @@ namespace Orange_Tendering_System.ViewModels
                 new("Pending Reports", "Reports", "Index", "request"),
                 new("Report Review", "Reports", "Review", "check"),
                 new("Forwarding", "Reports", "Forward", "send"),
-                new("Decision History", "Reports", "History", "history")
+                new("Decision History", "Reports", "History", "history"),
+                new("Analytics & Exports", "Analytics", "Index", "chart", "")
             ]),
             new("TopCommittee", "Top Committee", SystemRoles.TopCommittee,
             [
@@ -90,7 +93,8 @@ namespace Orange_Tendering_System.ViewModels
                 new("Evaluation Summary", "Decisions", "ReviewEvaluation", "report"),
                 new("Voting", "Decisions", "Decision", "vote"),
                 new("Decision History", "Decisions", "History", "history"),
-                new("Management Statistics", "Statistics", "Index", "chart")
+                new("Management Statistics", "Statistics", "Index", "chart"),
+                new("Analytics & Exports", "Analytics", "Index", "chart", "")
             ])
         ];
 

@@ -14,7 +14,7 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
     [Authorize(Roles = SystemRoles.SourcingOfficer)]
     public class DashboardController : Controller
     {
-        // Sourcing Officer Dashboard — Owner: Amal · Trello: Sourcing Officer Dashboard
+        // Sourcing Officer Dashboard — Owner: Amal · Trello: Sourcing Officer Dashboard (https://trello.com/c/VeRtD4Tn)
         // GET /SourcingOfficer. TODO: build the view model from real data in a service.
         public IActionResult Index()
         {

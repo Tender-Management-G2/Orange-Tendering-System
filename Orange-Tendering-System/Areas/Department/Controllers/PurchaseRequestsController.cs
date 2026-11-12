@@ -13,23 +13,30 @@ namespace Orange_Tendering_System.Areas.Department.Controllers
     [Authorize(Roles = SystemRoles.RequestingDepartment)]
     public class PurchaseRequestsController : Controller
     {
-        // My Purchase Requests — Owner: Doulat · Trello: My Purchase Requests
+        // My Purchase Requests — Owner: Doulat · Trello: My Purchase Requests (https://trello.com/c/SjSwbYUx)
         // GET /Department/PurchaseRequests. TODO: query the data in a service and pass a view model.
         public IActionResult Index()
         {
             return View();
         }
 
-        // Create Purchase Request — Owner: Doulat · Trello: Create Purchase Request
+        // Create Purchase Request — Owner: Doulat · Trello: Create Purchase Request (https://trello.com/c/vCxUl1Bb)
         // GET /Department/PurchaseRequests/Create. TODO: query the data in a service and pass a view model.
         public IActionResult Create()
         {
             return View();
         }
 
-        // Purchase Request Details & History — Owner: Doulat · Trello: Purchase Request Details & History
+        // Purchase Request Details & History — Owner: Doulat · Trello: Purchase Request Details & History (https://trello.com/c/IR3EpX2r)
         // GET /Department/PurchaseRequests/Details/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Details(int? id)
+        {
+            return View();
+        }
+
+        // Edit & Resubmit Purchase Request — Owner: Doulat · No Trello card
+        // GET /Department/PurchaseRequests/Edit/{id?}. TODO: load the record by id (NotFound when missing) and check access.
+        public IActionResult Edit(int? id)
         {
             return View();
         }

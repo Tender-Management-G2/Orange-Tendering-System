@@ -1,8 +1,10 @@
 # Team Handoff
 
 Who builds what, where the files are, and what to watch out for. Paths are relative to the project folder
-`Orange-Tendering-System/`. The full page list is in [PAGE_OWNERSHIP.md](PAGE_OWNERSHIP.md); every URL is in
-[ROUTE_MAP.md](ROUTE_MAP.md).
+`Orange-Tendering-System/`. The full page list (with Trello links) is in [PAGE_OWNERSHIP.md](PAGE_OWNERSHIP.md);
+every URL is in [ROUTE_MAP.md](ROUTE_MAP.md). **Business rules are in [`TenderingOrangeSystem.md`](../TenderingOrangeSystem.md)**
+— the single product specification. The coverage and database review is in
+[FINAL_SCAFFOLD_AND_DATABASE_AUDIT.md](FINAL_SCAFFOLD_AND_DATABASE_AUDIT.md). Local setup: [TEAM_SETUP.md](TEAM_SETUP.md).
 
 ## Before you start (everyone)
 
@@ -23,7 +25,7 @@ Who builds what, where the files are, and what to watch out for. Paths are relat
 
 | Area | Files |
 |---|---|
-| Department | `Areas/Department/Views/Dashboard/Index`, `PurchaseRequests/Index`, `Create`, `Details` |
+| Department | `Areas/Department/Views/Dashboard/Index`, `PurchaseRequests/Index`, `Create`, `Details`, `Edit` (edit & resubmit a returned request — no separate card) |
 | Officer review step | `Areas/SourcingOfficer/Views/PurchaseRequests/Review` (business user: Sourcing Officer) |
 | Top Committee | `Areas/TopCommittee/Views/Dashboard/Index`, `Decisions/ReviewEvaluation`, `Decision`, `History` |
 
@@ -39,14 +41,16 @@ Files: `Areas/SourcingManager/Views/Dashboard/Index`, `Reports/Index`, `Review`,
 `Forward`, `History`. The four decision pages share `Views/Shared/_ConfirmAction.cshtml`.
 Entities: `TenderReport` (versions via `VersionNumber` + `PreviousReportId`; decision fields `ReviewedByUserId`,
 `ReviewComment`, `ReviewedAt`), `CommitteeRound` (creating the Top round).
-Depends on: Officer full report (UNASSIGNED `SourcingOfficer/Reports`), Doulat (Top Committee voting).
-Rules: never edit committee scores or votes; a narrative correction is a **new** report version.
+Depends on: Officer full report (UNASSIGNED `SourcingOfficer/Reports/*`), Doulat (Top Committee voting).
+Rules: the Officer's submitted report is **read-only** for the Manager — to correct it, return it with a comment and
+the Officer submits a new version. The Manager edits only their **own draft executive summary** (Forward page, with
+preview). Never edit committee scores or votes. Decisions are stored on the exact report version reviewed.
 
 ## Developer 3 — Ahmad (Authentication, Biometrics, Database, GitHub)
 
 | Task | Where |
 |---|---|
-| User Registration | `Areas/Identity/Pages/Account/Register.cshtml(.cs)` — make it supplier registration (Pending `Supplier` + `Supplier` role) |
+| User Registration | `Areas/Identity/Pages/Account/Register.cshtml(.cs)` — make it supplier registration: the disabled company section (name, registration no., tax no., email, phone, address, legal documents) must create a Pending `Supplier` + `Documents` + `Supplier` role |
 | Login & Role Redirect | `Areas/Identity/Pages/Account/Login.cshtml(.cs)`, `Controllers/WorkspaceController` + `Views/Workspace/Index` |
 | Forgot / Reset Password | `Areas/Identity/Pages/Account/ForgotPassword`, `ResetPassword` (needs an `IEmailSender`) |
 | Fingerprint / Face | `Controllers/BiometricsController`, `Views/Biometrics/Fingerprint`, `Face`; disabled buttons on Login |
@@ -59,8 +63,8 @@ Rules: one authentication system (Identity); no fake biometric checks; no static
 
 ## Developer 4 — Amal (Tender Management)
 
-Files: `Areas/SourcingOfficer/Views/Dashboard/Index`, `PurchaseRequests/Index`, `Tenders/Index`, `Create`,
-`SelectSuppliers`, `Timeline`, `Rounds` (no card — confirm), `Invitations/Index`, and
+Files: `Areas/SourcingOfficer/Views/Dashboard/Index`, `PurchaseRequests/Index`, `Tenders/Index`, `Details`, `Edit`
+(both under "Manage Tenders"), `Create`, `SelectSuppliers`, `Timeline`, `Rounds` (no card — confirm), `Invitations/Index`, and
 `Areas/EvaluationCommittee/Views/Criteria/Index` (business user: Evaluation Committee).
 Entities: `Tender`, `TenderRound`, `TenderItem`, `TenderInvitation`, `EvaluationCriterion`, `CommitteeRound`.
 Depends on: Doulat (accepted requests), Saja (offers per round), Tariq (committee uses the criteria).
@@ -101,8 +105,14 @@ Admin has no committee vote.
 
 - **Supplier portal (12 pages)** — `Areas/Supplier/Views/*`. Without it no supplier can submit an offer, so the
   workflow cannot be demonstrated. Highest priority to assign.
-- **Officer Reports** — `Areas/SourcingOfficer/Views/Reports/Index` (comparison report and full report to the Manager).
+- **Officer Reports (7 pages)** — `Areas/SourcingOfficer/Views/Reports/Index`, `Comparison`, `Details`,
+  `EvaluationResult`, `SubmitToManager`, `Returned`, `History`. Without them the report hand-offs between Officer,
+  committee and Manager cannot be demonstrated.
+- **Committee Assignment** — `Areas/SourcingOfficer/Views/Tenders/Committees`. Also needs a **business-role decision**
+  (Sourcing Officer or Admin) and a small schema decision for member responsibility (see the audit report).
 - **Assigned Evaluations** — `Areas/EvaluationCommittee/Views/Evaluations/Index` (committee entry point).
+- **Reports, Analytics & Exports (6 pages)** — `Views/Analytics/*` (purchase requests, tenders, suppliers, bids &
+  evaluation, governance; PDF/Excel entry points).
 - **Management Statistics** — `Areas/TopCommittee/Views/Statistics/Index`.
 - **My Tasks + Voice Search** (mandatory feature) — `Views/Tasks/Index` and the disabled microphone in the topbar.
 - **Privacy Policy** text — `Views/Home/Privacy`.
@@ -125,6 +135,7 @@ Admin has no committee vote.
 | `_EmptyState` | `<partial name="_EmptyState" model='"No bids yet."' />` |
 | `_ConfirmAction` | Decision panel (`ConfirmActionModel`) for approve / reject / return / forward / vote |
 | `_ApprovalTracker` | Four-seat unanimous approval status (`"Evaluation Committee"` or `"Top Committee"`) |
+| Export bar | Disabled "Download PDF / Excel" buttons on report pages — see `Views/Analytics/*` |
 | CSS `pg-*` classes | Panels, tables, forms, badges, notes — see `wwwroot/css/workspace-pages.css` |
 
 ## Not implemented anywhere yet

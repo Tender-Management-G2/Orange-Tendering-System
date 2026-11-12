@@ -14,7 +14,7 @@ namespace Orange_Tendering_System.Areas.EvaluationCommittee.Controllers
     [Authorize(Roles = SystemRoles.EvaluationCommittee)]
     public class DashboardController : Controller
     {
-        // Committee Dashboard — Owner: Tariq · Trello: Committee Dashboard
+        // Committee Dashboard — Owner: Tariq · Trello: Committee Dashboard (https://trello.com/c/Z1VGmfZ7)
         // GET /EvaluationCommittee. TODO: build the view model from real data in a service.
         public IActionResult Index()
         {

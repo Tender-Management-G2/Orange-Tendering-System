@@ -1,0 +1,88 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Tender Reports
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Reports, Analytics & Exports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Tender report: draft/open/closed/awarded/cancelled tenders,
+participation, zero-bid rounds, deadlines, evaluation
+delays, tender history.
+
+BUSINESS ACCESS:
+Admin, Sourcing Officer, Sourcing Manager, Top Committee
+(exact audience per report to be confirmed; results must be
+role- and ownership-filtered)
+
+ROUTE: /Analytics/Tenders
+
+FUTURE IMPLEMENTATION:
+- Participation = submitted distinct suppliers / invitations
+  per TenderRound.
+- Delays from CommitteeRounds.StartedAt / CompletedAt.
+
+DEPENDENCIES:
+Tenders, TenderRounds, TenderInvitations, Bids,
+CommitteeRounds.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required report category (spec §16); no Trello card covers
+reports/exports — team assignment required. No PDF/Excel
+generation yet.
+===========================================================
+*@
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Tender Reports";
+    ViewData["WorkspaceSection"] = "Analytics & Exports";
+    ViewData["Description"] = "Tenders by status, participation rates, rounds with no bids, deadlines and evaluation delays.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search tender" aria-label="Search tender" disabled />
+    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Draft</option><option>Status: Bidding</option><option>Status: Evaluation</option><option>Status: ManagerReview</option><option>Status: TopCommitteeReview</option><option>Status: Awarded</option><option>Status: Rejected</option><option>Status: Cancelled</option></select>
+    <select aria-label="Period" disabled><option>Period: This month</option><option>Period: This quarter</option><option>Period: This year</option><option>Period: Custom</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="pg-toolbar" aria-label="Export tender reports">
+    <button type="button" class="pg-btn" disabled title="PDF export is not implemented yet">Download PDF</button>
+    <button type="button" class="pg-btn" disabled title="Excel export is not implemented yet">Download Excel</button>
+    <span class="pg-hint">Export of tender reports is not implemented yet. Exports must contain only data this user may see.</span>
+</section>
+
+<section class="pg-cards" aria-label="Summary">
+    <article class="pg-card"><span>Active tenders</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Awarded</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Failed rounds</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Rounds with zero bids</span><strong>—</strong><small>Not connected</small></article>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-participation-by-round">
+    <div class="pg-panel-head"><h2 id="tbl-participation-by-round">Participation by round</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Invited</th><th scope="col">Accepted</th><th scope="col">Submitted offers</th><th scope="col">Distinct suppliers</th><th scope="col">Outcome</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No tender data."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-evaluation-delays">
+    <div class="pg-panel-head"><h2 id="tbl-evaluation-delays">Evaluation delays</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Committee round</th><th scope="col">Started</th><th scope="col">Completed</th><th scope="col">Duration</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No evaluation data."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

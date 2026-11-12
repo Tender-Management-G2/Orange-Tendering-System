@@ -14,7 +14,7 @@ namespace Orange_Tendering_System.Areas.Department.Controllers
     [Authorize(Roles = SystemRoles.RequestingDepartment)]
     public class DashboardController : Controller
     {
-        // Department Dashboard — Owner: Doulat · Trello: Department Dashboard
+        // Department Dashboard — Owner: Doulat · Trello: Department Dashboard (https://trello.com/c/033sNEkN)
         // GET /Department. TODO: build the view model from real data in a service.
         public IActionResult Index()
         {

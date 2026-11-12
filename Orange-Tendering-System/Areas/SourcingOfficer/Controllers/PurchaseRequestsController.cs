@@ -13,14 +13,14 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
     [Authorize(Roles = SystemRoles.SourcingOfficer)]
     public class PurchaseRequestsController : Controller
     {
-        // Approved Purchase Requests — Owner: Amal · Trello: Approved Purchase Requests
+        // Approved Purchase Requests — Owner: Amal · Trello: Approved Purchase Requests (https://trello.com/c/bsQzN4ih)
         // GET /SourcingOfficer/PurchaseRequests. TODO: query the data in a service and pass a view model.
         public IActionResult Index()
         {
             return View();
         }
 
-        // Purchase Request Review / Approval — Owner: Doulat · Trello: Purchase Request Review / Approval
+        // Purchase Request Review / Approval — Owner: Doulat · Trello: Purchase Request Review / Approval (https://trello.com/c/cOYVH9co)
         // GET /SourcingOfficer/PurchaseRequests/Review/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Review(int? id)
         {

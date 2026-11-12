@@ -14,7 +14,7 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
     [Authorize(Roles = SystemRoles.TopCommittee)]
     public class DashboardController : Controller
     {
-        // Top Committee Dashboard — Owner: Doulat · Trello: Top Committee Dashboard
+        // Top Committee Dashboard — Owner: Doulat · Trello: Top Committee Dashboard (https://trello.com/c/8Z6bnMsb)
         // GET /TopCommittee. TODO: build the view model from real data in a service.
         public IActionResult Index()
         {

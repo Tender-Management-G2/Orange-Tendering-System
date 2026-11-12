@@ -11,14 +11,14 @@ namespace Orange_Tendering_System.Controllers
     [Authorize]
     public class BiometricsController : Controller
     {
-        // Fingerprint Registration & Login — Owner: Ahmad · Trello: Fingerprint Registration & Login
+        // Fingerprint Registration & Login — Owner: Ahmad · Trello: Fingerprint Registration & Login (https://trello.com/c/mQphpvOG)
         // GET /Biometrics/Fingerprint. TODO: query the data in a service and pass a view model.
         public IActionResult Fingerprint()
         {
             return View();
         }
 
-        // Face Registration & Recognition Login — Owner: Ahmad · Trello: Face Registration & Recognition Login
+        // Face Registration & Recognition Login — Owner: Ahmad · Trello: Face Registration & Recognition Login (https://trello.com/c/tWcVmtdC)
         // GET /Biometrics/Face. TODO: query the data in a service and pass a view model.
         public IActionResult Face()
         {

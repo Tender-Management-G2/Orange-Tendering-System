@@ -13,7 +13,7 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
     [Authorize(Roles = SystemRoles.SourcingOfficer)]
     public class ClarificationsController : Controller
     {
-        // Supplier Clarification Requests — Owner: Saja · Trello: Supplier Clarification Requests
+        // Supplier Clarification Requests — Owner: Saja · Trello: Supplier Clarification Requests (https://trello.com/c/oKUyoBCd)
         // GET /SourcingOfficer/Clarifications. TODO: query the data in a service and pass a view model.
         public IActionResult Index()
         {

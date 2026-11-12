@@ -19,11 +19,11 @@ Sourcing Officer
 ROUTE: /SourcingOfficer/Reports
 
 FUTURE IMPLEMENTATION:
-- Create/edit OfficerComparison and FullEvaluation
-  TenderReports (new VersionNumber + PreviousReportId on
-  resubmission).
-- Submit the full report to the Sourcing Manager; notify.
-- Show the Manager’s ReviewComment on returned versions.
+- List TenderReports of the Officer’s tenders
+  (OfficerComparison and FullEvaluation) with status and
+  reviewer decision.
+- Row actions: Details, Comparison (draft), Submit to
+  Manager, Returned.
 
 DEPENDENCIES:
 TenderReports, CommitteeRounds, Notifications, AuditLogs.
@@ -63,3 +63,13 @@ it — team assignment required.
         </table>
     </div>
 </section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Comparison">Write comparison report</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="EvaluationResult">Committee result received</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="SubmitToManager">Submit full report to Manager</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Returned">Returned reports</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="History">Report versions</a></li>
+    </ul>
+</nav>

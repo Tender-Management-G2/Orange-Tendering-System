@@ -6,7 +6,7 @@ PAGE: Manage Tenders
 DEVELOPER OWNER: Amal
 MODULE: Sourcing Officer / Tender Management
 TRELLO TASK: Manage Tenders
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/e2e0QlHT
 
 PURPOSE:
 List tenders with status, current tendering round and
@@ -19,8 +19,8 @@ ROUTE: /SourcingOfficer/Tenders
 
 FUTURE IMPLEMENTATION:
 - Query Tenders with their latest TenderRound.
-- Row actions: Timeline, Rounds, Select suppliers, Received
-  bids.
+- Row actions: Details, Edit (Draft only), Timeline, Rounds,
+  Select suppliers, Received bids.
 
 DEPENDENCIES:
 Tenders, TenderRounds, PurchaseRequests.
@@ -55,6 +55,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
 <nav class="pg-links" aria-label="Related pages">
     <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Details">Tender details</a></li>
         <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Rounds">Tender rounds</a></li>
         <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Timeline">Timeline &amp; closing</a></li>
         <li><a asp-area="SourcingOfficer" asp-controller="Invitations" asp-action="Index">Supplier invitations</a></li>

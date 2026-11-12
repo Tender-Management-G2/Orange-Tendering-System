@@ -1,0 +1,94 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Committee Assignment
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Committees (tender-specific membership)
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Assign the tender-specific Evaluation Committee (Sourcing
+Manager, Department, Financial and Technical
+representatives) and the separate four-member Top Committee.
+
+BUSINESS ACCESS:
+Business role NOT yet decided (Sourcing Officer or Admin) —
+placed in the Sourcing Officer area until the team decides.
+
+ROUTE: /SourcingOfficer/Tenders/Committees/{id?}
+
+FUTURE IMPLEMENTATION:
+- Decide who assigns committees (Sourcing Officer or Admin)
+  and move/authorize the page accordingly.
+- Store the member responsibility — needs a small schema
+  decision (see docs/FINAL_SCAFFOLD_AND_DATABASE_AUDIT.md,
+  CommitteeMember finding).
+- Validate exactly 4 per committee, the 4 Evaluation
+  responsibilities, and no overlap; freeze membership once a
+  committee round has votes.
+
+DEPENDENCIES:
+CommitteeMembers, AspNetUsers, AspNetUserRoles,
+CommitteeRounds.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required by the workflow (votes and scores need assigned
+members) but no Trello card or business role is defined —
+team decision required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Committee Assignment";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = "The four Evaluation Committee members and the four separate Top Committee members of this tender.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>Composition rules</strong><p>Evaluation Committee: exactly 4 — Sourcing Manager, Requesting Department Representative, Financial Representative, Technical Representative. Top Committee: exactly 4 other people. The same person cannot sit on both committees of one tender (enforced by the unique index on CommitteeMembers TenderId + UserId).</p></aside>
+
+<div class="pg-grid">
+<section class="ws-panel pg-panel" aria-labelledby="tbl-evaluation-committee">
+    <div class="pg-panel-head"><h2 id="tbl-evaluation-committee">Evaluation Committee</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Responsibility</th><th scope="col">Member</th><th scope="col">Assigned</th></tr></thead>
+            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No members assigned."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+<section class="ws-panel pg-panel" aria-labelledby="tbl-top-committee">
+    <div class="pg-panel-head"><h2 id="tbl-top-committee">Top Committee</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Seat</th><th scope="col">Member</th><th scope="col">Assigned</th></tr></thead>
+            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No members assigned."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+</div>
+
+<section class="ws-panel pg-panel">
+    <h2>Assign member</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-committee-1">Committee</label><select id="f-committee-1"><option>Evaluation</option><option>Top</option></select></div>
+                <div class="pg-field"><label for="f-responsibility-2">Responsibility</label><select id="f-responsibility-2"><option>Sourcing Manager</option><option>Department Representative</option><option>Financial Representative</option><option>Technical Representative</option><option>Top Committee member</option></select></div>
+                <div class="pg-field"><label for="f-user-3">User</label><select id="f-user-3"><option>Select a user with the matching role</option></select></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Assign member</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Details">Tender details</a></li>
+    </ul>
+</nav>

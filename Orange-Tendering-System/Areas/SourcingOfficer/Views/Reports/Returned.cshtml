@@ -1,0 +1,74 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Returned Report Review
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Sourcing Officer / Reports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Show reports returned by the Manager and prepare the
+corrected new version.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Reports/Returned/{id?}
+
+FUTURE IMPLEMENTATION:
+- Query TenderReports with Status = Returned for the
+  Officer’s tenders.
+- Create the corrected version; if scores must change, the
+  committee needs a new round instead.
+
+DEPENDENCIES:
+TenderReports, Notifications, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required report lifecycle step (spec §4.4, §4.6, §11); no
+Trello card covers it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Returned Report Review";
+    ViewData["WorkspaceSection"] = "Reports";
+    ViewData["Description"] = "Reports the Sourcing Manager returned to you, with the reason, and the new version you prepare.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-returned-reports">
+    <div class="pg-panel-head"><h2 id="tbl-returned-reports">Returned reports</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Report</th><th scope="col">Version</th><th scope="col">Returned by</th><th scope="col">Reason</th><th scope="col">Returned at</th></tr></thead>
+            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No returned reports."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Prepare corrected version</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="f-correction-notes-1">Correction notes</label><textarea id="f-correction-notes-1" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-corrected-content-2">Corrected content</label><textarea id="f-corrected-content-2" rows="4"></textarea></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Submit new version</button><button type="button" class="pg-btn">Save draft</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<aside class="pg-note"><strong>Versions</strong><p>A submitted version is never edited. A correction is a new TenderReport row (VersionNumber + 1, PreviousReportId = the returned version).</p></aside>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="History">Report versions</a></li>
+    </ul>
+</nav>

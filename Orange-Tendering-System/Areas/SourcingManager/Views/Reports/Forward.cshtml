@@ -6,7 +6,7 @@ PAGE: Forward to Top Committee
 DEVELOPER OWNER: Haya
 MODULE: Sourcing Manager Review
 TRELLO TASK: Forward to Top Committee
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/953NoZV0
 
 PURPOSE:
 Prepare the short executive summary and forward it to the
@@ -61,6 +61,11 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
             <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save summary draft</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
         </fieldset>
     </form>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Executive summary preview</h2>
+    <partial name="_EmptyState" model='"The preview of your draft summary, exactly as the Top Committee will see it, appears here."' />
 </section>
 
 <partial name="_ConfirmAction" model='new ConfirmActionModel("Forward to Top Committee", "Send the executive summary to the Top Committee.", "Creates an ExecutiveSummary report version and a Top CommitteeRound that needs 4/4 approval.", false, false)' />

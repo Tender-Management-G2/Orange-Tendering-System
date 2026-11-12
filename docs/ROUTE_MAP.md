@@ -6,7 +6,8 @@ Generated from the scaffold manifest. Area routes use `{area:exists}/{controller
 public and shared pages use the default route or attribute routes. Every listed route is a GET that returns a view
 unless noted.
 
-**Authorization today:** area controllers use `[Authorize(Roles = SystemRoles.X)]`; shared pages use `[Authorize]`.
+**Authorization today:** area controllers use `[Authorize(Roles = SystemRoles.X)]`; shared pages use `[Authorize]`;
+`AnalyticsController` is limited to Admin, Sourcing Officer, Sourcing Manager and Top Committee.
 Role checks are not enough for the final system — tender-specific membership, record ownership and workflow stage
 must also be checked when business logic is added.
 
@@ -30,10 +31,14 @@ must also be checked when business logic is added.
 | `/Department/PurchaseRequests` | Department/PurchaseRequestsController → Index | `Areas/Department/Views/PurchaseRequests/Index.cshtml` | Role: Requesting Department |
 | `/Department/PurchaseRequests/Create` | Department/PurchaseRequestsController → Create | `Areas/Department/Views/PurchaseRequests/Create.cshtml` | Role: Requesting Department |
 | `/Department/PurchaseRequests/Details/{id?}` | Department/PurchaseRequestsController → Details | `Areas/Department/Views/PurchaseRequests/Details.cshtml` | Role: Requesting Department |
+| `/Department/PurchaseRequests/Edit/{id?}` | Department/PurchaseRequestsController → Edit | `Areas/Department/Views/PurchaseRequests/Edit.cshtml` | Role: Requesting Department |
 | `/SourcingOfficer` | SourcingOfficer/DashboardController → Index | `Areas/SourcingOfficer/Views/Dashboard/Index.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/PurchaseRequests` | SourcingOfficer/PurchaseRequestsController → Index | `Areas/SourcingOfficer/Views/PurchaseRequests/Index.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/PurchaseRequests/Review/{id?}` | SourcingOfficer/PurchaseRequestsController → Review | `Areas/SourcingOfficer/Views/PurchaseRequests/Review.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/Tenders` | SourcingOfficer/TendersController → Index | `Areas/SourcingOfficer/Views/Tenders/Index.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Tenders/Details/{id?}` | SourcingOfficer/TendersController → Details | `Areas/SourcingOfficer/Views/Tenders/Details.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Tenders/Edit/{id?}` | SourcingOfficer/TendersController → Edit | `Areas/SourcingOfficer/Views/Tenders/Edit.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Tenders/Committees/{id?}` | SourcingOfficer/TendersController → Committees | `Areas/SourcingOfficer/Views/Tenders/Committees.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/Tenders/Create/{id?}` | SourcingOfficer/TendersController → Create | `Areas/SourcingOfficer/Views/Tenders/Create.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/Tenders/SelectSuppliers/{id?}` | SourcingOfficer/TendersController → SelectSuppliers | `Areas/SourcingOfficer/Views/Tenders/SelectSuppliers.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/Tenders/Timeline/{id?}` | SourcingOfficer/TendersController → Timeline | `Areas/SourcingOfficer/Views/Tenders/Timeline.cshtml` | Role: Sourcing Officer |
@@ -47,6 +52,12 @@ must also be checked when business logic is added.
 | `/SourcingOfficer/Bids/History/{id?}` | SourcingOfficer/BidsController → History | `Areas/SourcingOfficer/Views/Bids/History.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/Clarifications` | SourcingOfficer/ClarificationsController → Index | `Areas/SourcingOfficer/Views/Clarifications/Index.cshtml` | Role: Sourcing Officer |
 | `/SourcingOfficer/Reports` | SourcingOfficer/ReportsController → Index | `Areas/SourcingOfficer/Views/Reports/Index.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Reports/Comparison/{id?}` | SourcingOfficer/ReportsController → Comparison | `Areas/SourcingOfficer/Views/Reports/Comparison.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Reports/Details/{id?}` | SourcingOfficer/ReportsController → Details | `Areas/SourcingOfficer/Views/Reports/Details.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Reports/EvaluationResult/{id?}` | SourcingOfficer/ReportsController → EvaluationResult | `Areas/SourcingOfficer/Views/Reports/EvaluationResult.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Reports/SubmitToManager/{id?}` | SourcingOfficer/ReportsController → SubmitToManager | `Areas/SourcingOfficer/Views/Reports/SubmitToManager.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Reports/Returned/{id?}` | SourcingOfficer/ReportsController → Returned | `Areas/SourcingOfficer/Views/Reports/Returned.cshtml` | Role: Sourcing Officer |
+| `/SourcingOfficer/Reports/History/{id?}` | SourcingOfficer/ReportsController → History | `Areas/SourcingOfficer/Views/Reports/History.cshtml` | Role: Sourcing Officer |
 | `/Supplier` | Supplier/DashboardController → Index | `Areas/Supplier/Views/Dashboard/Index.cshtml` | Role: Supplier |
 | `/Supplier/Profile` | Supplier/ProfileController → Index | `Areas/Supplier/Views/Profile/Index.cshtml` | Role: Supplier |
 | `/Supplier/Invitations` | Supplier/InvitationsController → Index | `Areas/Supplier/Views/Invitations/Index.cshtml` | Role: Supplier |
@@ -88,6 +99,12 @@ must also be checked when business logic is added.
 | `/Notifications` | NotificationsController → Index | `Views/Notifications/Index.cshtml` | Any signed-in user ([Authorize]) |
 | `/Clarifications` | ClarificationsController → Index | `Views/Clarifications/Index.cshtml` | Any signed-in user ([Authorize]) |
 | `/Clarifications/Details/{id?}` | ClarificationsController → Details | `Views/Clarifications/Details.cshtml` | Any signed-in user ([Authorize]) |
+| `/Analytics` | AnalyticsController → Index | `Views/Analytics/Index.cshtml` | Roles: Admin, Sourcing Officer, Sourcing Manager, Top Committee |
+| `/Analytics/PurchaseRequests` | AnalyticsController → PurchaseRequests | `Views/Analytics/PurchaseRequests.cshtml` | Roles: Admin, Sourcing Officer, Sourcing Manager, Top Committee |
+| `/Analytics/Tenders` | AnalyticsController → Tenders | `Views/Analytics/Tenders.cshtml` | Roles: Admin, Sourcing Officer, Sourcing Manager, Top Committee |
+| `/Analytics/Suppliers` | AnalyticsController → Suppliers | `Views/Analytics/Suppliers.cshtml` | Roles: Admin, Sourcing Officer, Sourcing Manager, Top Committee |
+| `/Analytics/Evaluations` | AnalyticsController → Evaluations | `Views/Analytics/Evaluations.cshtml` | Roles: Admin, Sourcing Officer, Sourcing Manager, Top Committee |
+| `/Analytics/Governance` | AnalyticsController → Governance | `Views/Analytics/Governance.cshtml` | Roles: Admin, Sourcing Officer, Sourcing Manager, Top Committee |
 | `/` | Home → Index | `Views/Home/Index.cshtml` | Anonymous |
 | `/about` | Home → About | `Views/Home/About.cshtml` | Anonymous |
 | `/how-it-works` | Home → HowItWorks | `Views/Home/HowItWorks.cshtml` | Anonymous |
@@ -111,14 +128,15 @@ on real data:
 
 1. Supplier registers → `/Identity/Account/Register`; Admin approves → `/Admin/Suppliers/Review/{id}`.
 2. Department creates and submits a request → `/Department/PurchaseRequests/Create`.
-3. Officer reviews it → `/SourcingOfficer/PurchaseRequests/Review/{id}` (return once, then accept).
-4. Officer creates the tender and round 1 → `/SourcingOfficer/Tenders/Create`, invites suppliers → `/SourcingOfficer/Tenders/SelectSuppliers/{id}`.
+3. Officer reviews it → `/SourcingOfficer/PurchaseRequests/Review/{id}`; return it once, the department corrects and resubmits → `/Department/PurchaseRequests/Edit/{id}`; then accept.
+4. Officer creates the tender and round 1 → `/SourcingOfficer/Tenders/Create` (check `/SourcingOfficer/Tenders/Details/{id}`), assigns both committees → `/SourcingOfficer/Tenders/Committees/{id}`, invites suppliers → `/SourcingOfficer/Tenders/SelectSuppliers/{id}`.
 5. Suppliers accept and submit offers → `/Supplier/Invitations/Respond/{id}`, `/Supplier/Offers/Create/{id}`.
 6. Fewer than 3 offers → new round → `/SourcingOfficer/Tenders/Rounds/{id}`.
 7. Officer checks compliance and compares → `/SourcingOfficer/Bids/Compliance/{id}`, `/SourcingOfficer/Bids/Compare/{id}`.
-8. Officer forwards to the committee → `/SourcingOfficer/Bids/ForwardToCommittee/{id}`.
+8. Officer writes the comparison report → `/SourcingOfficer/Reports/Comparison/{id}` and forwards the round → `/SourcingOfficer/Bids/ForwardToCommittee/{id}`.
 9. Committee sets criteria, scores, approves 4/4 → `/EvaluationCommittee/Criteria/Index/{id}`, `…/Evaluations/Technical`, `…/Financial`, `…/Reports/Unified`.
-10. Officer submits the full report → `/SourcingOfficer/Reports`; Manager reviews, returns once, forwards → `/SourcingManager/Reports/Review/{id}`, `…/Forward/{id}`.
+10. Officer receives the result → `/SourcingOfficer/Reports/EvaluationResult/{id}` and submits it → `/SourcingOfficer/Reports/SubmitToManager/{id}`; Manager reviews and returns once → `/SourcingManager/Reports/Review/{id}`; Officer submits a new version → `/SourcingOfficer/Reports/Returned/{id}`; Manager forwards the executive summary → `/SourcingManager/Reports/Forward/{id}`.
 11. Top Committee votes 4/4 → `/TopCommittee/Decisions/Decision/{id}`; also test one rejection.
-12. Check `/Notifications`, `/Clarifications` and `/Admin/AuditLogs` show every step.
-13. Negative checks: wrong role → Access Denied; Supplier A cannot open Supplier B's invitation or offer by id.
+12. Award recorded and tender closed → `/SourcingOfficer/Tenders/Details/{id}` shows recommended vs awarded.
+13. Check `/Notifications`, `/Clarifications`, `/Analytics/Governance` and `/Admin/AuditLogs` show every step.
+14. Negative checks: wrong role → Access Denied; Supplier A cannot open Supplier B's invitation or offer by id.

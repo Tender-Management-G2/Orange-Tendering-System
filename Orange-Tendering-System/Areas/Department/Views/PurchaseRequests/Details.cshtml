@@ -6,7 +6,7 @@ PAGE: Purchase Request Details & History
 DEVELOPER OWNER: Doulat
 MODULE: Department / Purchase Requests
 TRELLO TASK: Purchase Request Details & History
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/IR3EpX2r
 
 PURPOSE:
 Show one request, its items and attachments, and the full
@@ -81,6 +81,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
 <nav class="pg-links" aria-label="Related pages">
     <ul>
+        <li><a asp-area="Department" asp-controller="PurchaseRequests" asp-action="Edit">Edit &amp; resubmit (returned requests)</a></li>
         <li><a asp-area="Department" asp-controller="PurchaseRequests" asp-action="Index">Back to my requests</a></li>
         <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">Clarifications</a></li>
     </ul>

@@ -1,0 +1,86 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Report Details
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Sourcing Officer / Reports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Read-only view of one report version (any type) with its
+status, reviewer decision and link to the previous version.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Reports/Details/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the TenderReport by id with Documents; check the
+  Officer owns the tender.
+
+DEPENDENCIES:
+TenderReports, Documents.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required report lifecycle step (spec §4.4, §4.6, §11); no
+Trello card covers it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Report Details";
+    ViewData["WorkspaceSection"] = "Reports";
+    ViewData["Description"] = "One report version exactly as it was submitted, with its review decision.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Report version</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender / round</dt><dd>—</dd></div>
+        <div><dt>Report type</dt><dd>—</dd></div>
+        <div><dt>Version</dt><dd>—</dd></div>
+        <div><dt>Status</dt><dd>—</dd></div>
+        <div><dt>Created by</dt><dd>—</dd></div>
+        <div><dt>Submitted</dt><dd>—</dd></div>
+        <div><dt>Previous version</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Review decision</h2>
+    <dl class="pg-dl">
+        <div><dt>Reviewed by</dt><dd>—</dd></div>
+        <div><dt>Decision</dt><dd>—</dd></div>
+        <div><dt>Comment</dt><dd>—</dd></div>
+        <div><dt>Reviewed at (UTC)</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Content</h2>
+    <partial name="_EmptyState" model='"Report content is not loaded."' />
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-attachments">
+    <div class="pg-panel-head"><h2 id="tbl-attachments">Attachments</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th></tr></thead>
+            <tbody><tr><td colspan="2"><partial name="_EmptyState" model='"No attachments."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="History">Report versions</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index">All reports</a></li>
+    </ul>
+</nav>

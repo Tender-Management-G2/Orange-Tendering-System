@@ -70,6 +70,15 @@ All in `workspace-pages.css`, without editing the ZIP files:
 - The sidebar brand was wider than the sidebar below ~1600 px → tighter spacing, no sidebar scrollbar.
 - Wide tables could widen the page on phones → tables scroll inside their panel.
 
+## Content corrections against the specification (audit, 13 Nov 2026)
+
+Text only; the layout and styling are unchanged:
+- `Views/Home/Index.cshtml` — the hero now states the required core message "Unified Platform for Sourcing &
+  Tender Management" (spec §15.1); the statistics caption no longer says "Sign in for verified statistics", because
+  public statistics are non-confidential counts, not login-only data.
+- `Views/Home/HowItWorks.cshtml` — step 2 no longer says criteria are set at tender creation; the Evaluation
+  Committee sets them (owner decision, spec §4.5).
+
 ## Open layout items
 
 - `team.json` has 4 placeholder members; the team has 7 (Tariq, Team Page — Doing).

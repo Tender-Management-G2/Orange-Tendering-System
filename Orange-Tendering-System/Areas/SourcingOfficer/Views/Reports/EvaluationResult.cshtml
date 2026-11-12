@@ -1,0 +1,72 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Committee Result Received
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Sourcing Officer / Reports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Show the approved FullEvaluation report and ranking that the
+Evaluation Committee returned to the Officer.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Reports/EvaluationResult/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the Approved Evaluation CommitteeRound of the tender
+  round and its FullEvaluation TenderReport
+  (RankingSnapshotJson).
+
+DEPENDENCIES:
+CommitteeRounds, CommitteeVotes, TenderReports.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required report lifecycle step (spec §4.4, §4.6, §11); no
+Trello card covers it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Committee Result Received";
+    ViewData["WorkspaceSection"] = "Reports";
+    ViewData["Description"] = "The Evaluation Committee’s approved full evaluation, returned to you after 4/4 approval.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Evaluation result</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender / round</dt><dd>—</dd></div>
+        <div><dt>Committee round</dt><dd>—</dd></div>
+        <div><dt>Approved on</dt><dd>—</dd></div>
+        <div><dt>Approvals (must be 4/4)</dt><dd>—</dd></div>
+        <div><dt>Recommended offer</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-ranking-snapshot-frozen">
+    <div class="pg-panel-head"><h2 id="tbl-ranking-snapshot-frozen">Ranking snapshot (frozen)</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Rank</th><th scope="col">Supplier</th><th scope="col">Technical</th><th scope="col">Financial</th><th scope="col">Final</th><th scope="col">Eligible</th></tr></thead>
+            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No approved evaluation result yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<aside class="pg-note"><strong>Read-only for the Officer</strong><p>The Officer checks completeness and forwards the report; scores and votes cannot be changed here. Problems go back to the committee through a clarification or a new committee round.</p></aside>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="SubmitToManager">Submit full report to Manager</a></li>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">Clarifications</a></li>
+    </ul>
+</nav>

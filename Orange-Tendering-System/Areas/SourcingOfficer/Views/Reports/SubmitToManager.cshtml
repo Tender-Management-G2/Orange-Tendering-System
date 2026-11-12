@@ -1,0 +1,71 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Submit Full Report to Sourcing Manager
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Sourcing Officer / Reports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+The Officer submits the full detailed report
+(FullEvaluation) to the Sourcing Manager.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Reports/SubmitToManager/{id?}
+
+FUTURE IMPLEMENTATION:
+- POST: submit the FullEvaluation version (SubmittedAt);
+  Tender.Status = ManagerReview; notify the Manager; audit.
+
+DEPENDENCIES:
+TenderReports, Tenders, Notifications, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required report lifecycle step (spec §4.4, §4.6, §11); no
+Trello card covers it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Submit Full Report to Sourcing Manager";
+    ViewData["WorkspaceSection"] = "Reports";
+    ViewData["Description"] = "Send the full detailed evaluation report to the Sourcing Manager.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Report to submit</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Report version</dt><dd>—</dd></div>
+        <div><dt>Evaluation round approved on</dt><dd>—</dd></div>
+        <div><dt>Recommended offer</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Cover note for the Manager</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="f-note-1">Note</label><textarea id="f-note-1" rows="4"></textarea><small class="pg-hint">Optional. The report itself is not edited here.</small></div>
+            </div>
+        </fieldset>
+    </form>
+</section>
+
+<partial name="_ConfirmAction" model='new ConfirmActionModel("Submit to Sourcing Manager", "Send this report version to the Sourcing Manager for review.", "Sets the report version to Submitted and the tender to ManagerReview; the Manager is notified.", false, false)' />
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="EvaluationResult">Committee result</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index">All reports</a></li>
+    </ul>
+</nav>

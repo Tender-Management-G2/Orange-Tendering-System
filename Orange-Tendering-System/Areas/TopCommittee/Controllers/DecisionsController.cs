@@ -13,21 +13,21 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
     [Authorize(Roles = SystemRoles.TopCommittee)]
     public class DecisionsController : Controller
     {
-        // Review Tender Evaluation — Owner: Doulat · Trello: Review Tender Evaluation
+        // Review Tender Evaluation — Owner: Doulat · Trello: Review Tender Evaluation (https://trello.com/c/EDdybTCg)
         // GET /TopCommittee/Decisions/ReviewEvaluation/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult ReviewEvaluation(int? id)
         {
             return View();
         }
 
-        // Committee Decision — Owner: Doulat · Trello: Committee Decision
+        // Committee Decision — Owner: Doulat · Trello: Committee Decision (https://trello.com/c/RtPahsxa)
         // GET /TopCommittee/Decisions/Decision/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Decision(int? id)
         {
             return View();
         }
 
-        // Committee Voting & Decision History — Owner: Doulat · Trello: Committee Voting & Decision History
+        // Committee Voting & Decision History — Owner: Doulat · Trello: Committee Voting & Decision History (https://trello.com/c/3NtWOXwd)
         // GET /TopCommittee/Decisions/History/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult History(int? id)
         {

@@ -1,0 +1,91 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Officer Comparison Report
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Sourcing Officer / Reports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Draft and submit the OfficerComparison report: submitted
+offers, compliance/exclusions, item and cost comparison,
+open clarifications.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Reports/Comparison/{id?}
+
+FUTURE IMPLEMENTATION:
+- Create/edit a Draft TenderReport (ReportType =
+  OfficerComparison) for the TenderRound.
+- Submit: Status = Submitted, SubmittedAt; it becomes
+  CommitteeRound.TenderReportId of the Evaluation round.
+
+DEPENDENCIES:
+TenderReports, Bids, BidItems, CommitteeRounds, Documents.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required report lifecycle step (spec §4.4, §4.6, §11); no
+Trello card covers it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Officer Comparison Report";
+    ViewData["WorkspaceSection"] = "Reports";
+    ViewData["Description"] = "Write the initial comparison report that goes to the Evaluation Committee with the round.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Round</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Round number</dt><dd>—</dd></div>
+        <div><dt>Submitted offers (distinct suppliers)</dt><dd>—</dd></div>
+        <div><dt>Compliant</dt><dd>—</dd></div>
+        <div><dt>Non-compliant (counted, not eligible)</dt><dd>—</dd></div>
+        <div><dt>Pending clarification</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-comparison-summary-from-bid-comparison">
+    <div class="pg-panel-head"><h2 id="tbl-comparison-summary-from-bid-comparison">Comparison summary (from Bid Comparison)</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Supplier</th><th scope="col">Compliance</th><th scope="col">Calculated total</th><th scope="col">Delivery days</th><th scope="col">Key deviations</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"Comparison data is not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Report content</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="f-summary-of-offers-1">Summary of offers</label><textarea id="f-summary-of-offers-1" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-compliance-and-exclusions-2">Compliance and exclusions</label><textarea id="f-compliance-and-exclusions-2" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-open-clarification-gaps-3">Open clarification gaps</label><textarea id="f-open-clarification-gaps-3" rows="4"></textarea></div>
+                <div class="pg-field"><label for="f-attachment-4">Attachment</label><input id="f-attachment-4" type="file" /></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Submit to Evaluation Committee</button><button type="button" class="pg-btn">Save draft</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<aside class="pg-note"><strong>Versions</strong><p>A submitted version is never edited. A correction is a new TenderReport row (VersionNumber + 1, PreviousReportId = the returned version).</p></aside>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Compare">Bid comparison</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="ForwardToCommittee">Forward round to the committee</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index">All reports</a></li>
+    </ul>
+</nav>

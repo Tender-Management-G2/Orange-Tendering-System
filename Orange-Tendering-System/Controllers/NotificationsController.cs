@@ -11,7 +11,7 @@ namespace Orange_Tendering_System.Controllers
     [Authorize]
     public class NotificationsController : Controller
     {
-        // Notifications — Owner: ALL TEAM · Trello: Clarifications, Notifications & Audit Trail
+        // Notifications — Owner: ALL TEAM · Trello: Clarifications, Notifications & Audit Trail (https://trello.com/c/N1OFBdNM)
         // GET /Notifications. TODO: query the data in a service and pass a view model.
         public IActionResult Index()
         {

@@ -6,7 +6,7 @@ PAGE: Technical Evaluation
 DEVELOPER OWNER: Tariq
 MODULE: Technical & Financial Evaluation Committee
 TRELLO TASK: Technical Evaluation
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/ocle0nNz
 
 PURPOSE:
 A committee member enters technical scores and remarks for
@@ -46,8 +46,37 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
         <div><dt>Tender</dt><dd>—</dd></div>
         <div><dt>Committee round</dt><dd>—</dd></div>
         <div><dt>Offer being scored</dt><dd>—</dd></div>
+        <div><dt>Compliance result</dt><dd>—</dd></div>
         <div><dt>Officer report version</dt><dd>—</dd></div>
     </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Technical proposal</h2>
+    <dl class="pg-dl">
+        <div><dt>Proposal text (Bid.TechnicalProposal)</dt><dd>—</dd></div>
+        <div><dt>Offered specifications per item</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-specifications-vs-requirements">
+    <div class="pg-panel-head"><h2 id="tbl-specifications-vs-requirements">Specifications vs requirements</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender item</th><th scope="col">Required specification</th><th scope="col">Offered specification</th><th scope="col">Deviation</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Offer lines are not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-evidence-documents-images-videos-and-sample-records">
+    <div class="pg-panel-head"><h2 id="tbl-evidence-documents-images-videos-and-sample-records">Evidence: documents, images, videos and sample records</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">File / record</th><th scope="col">Type</th><th scope="col">Uploaded</th><th scope="col">Open</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"No technical evidence attached to this offer."' /></td></tr></tbody>
+        </table>
+    </div>
 </section>
 
 <section class="ws-panel pg-panel" aria-labelledby="tbl-technical-scoring">
@@ -65,9 +94,19 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
     <form class="pg-form">
         <fieldset disabled>
             <div class="pg-form-grid">
-                <div class="pg-field pg-field-wide"><label for="f-technical-observations-1">Technical observations</label><textarea id="f-technical-observations-1" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-strengths-1">Strengths</label><textarea id="f-strengths-1" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-weaknesses-and-deviations-2">Weaknesses and deviations</label><textarea id="f-weaknesses-and-deviations-2" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-technical-non-compliance-grounds-3">Technical non-compliance grounds</label><textarea id="f-technical-non-compliance-grounds-3" rows="4"></textarea></div>
             </div>
             <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save technical scores</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
         </fieldset>
     </form>
 </section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">Request a technical clarification</a></li>
+        <li><a asp-area="EvaluationCommittee" asp-controller="Evaluations" asp-action="AiAnalysis">AI analysis (advisory)</a></li>
+        <li><a asp-area="EvaluationCommittee" asp-controller="Evaluations" asp-action="Scores">Scores &amp; approval</a></li>
+    </ul>
+</nav>

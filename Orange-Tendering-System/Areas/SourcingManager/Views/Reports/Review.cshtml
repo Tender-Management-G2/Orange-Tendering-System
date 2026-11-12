@@ -6,11 +6,11 @@ PAGE: Review Unified Evaluation Report
 DEVELOPER OWNER: Haya
 MODULE: Sourcing Manager Review
 TRELLO TASK: Review Unified Evaluation Report
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/IKQ7sZwo
 
 PURPOSE:
-The Manager reads the detailed report, corrects the
-permitted narrative and chooses the next action.
+The Manager reads the submitted detailed report and chooses:
+approve forwarding, return for correction, or reject.
 
 BUSINESS ACCESS:
 Sourcing Manager
@@ -18,10 +18,12 @@ Sourcing Manager
 ROUTE: /SourcingManager/Reports/Review/{id?}
 
 FUTURE IMPLEMENTATION:
-- Load the report with its RankingSnapshotJson read-only.
-- Narrative correction = new TenderReport row (VersionNumber
-  + 1, PreviousReportId).
-- Never update EvaluationScores or CommitteeVotes from here.
+- Load the submitted FullEvaluation version with its
+  RankingSnapshotJson, read-only.
+- Decisions are recorded on this exact version (Approve /
+  Return / Reject pages).
+- Never update the report, EvaluationScores or
+  CommitteeVotes from here.
 
 DEPENDENCIES:
 TenderReports, CommitteeRounds, EvaluationScores
@@ -38,7 +40,7 @@ or votes.
 @{
     ViewData["Title"] = "Review Unified Evaluation Report";
     ViewData["WorkspaceSection"] = "Report Review";
-    ViewData["Description"] = "Read the detailed report and correct the managerial narrative. Committee scores and votes are frozen.";
+    ViewData["Description"] = "Read the detailed report submitted by the Sourcing Officer. The report, committee scores and votes are read-only.";
 }
 <partial name="_PageHeader" />
 <partial name="_ScaffoldNotice" />
@@ -55,6 +57,11 @@ or votes.
     </dl>
 </section>
 
+<section class="ws-panel pg-panel">
+    <h2>Report content (read-only)</h2>
+    <partial name="_EmptyState" model='"Report content is not loaded."' />
+</section>
+
 <section class="ws-panel pg-panel" aria-labelledby="tbl-committee-result-frozen">
     <div class="pg-panel-head"><h2 id="tbl-committee-result-frozen">Committee result (frozen)</h2></div>
     <div class="pg-table-wrap">
@@ -65,17 +72,7 @@ or votes.
     </div>
 </section>
 
-<section class="ws-panel pg-panel">
-    <h2>Managerial narrative</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field pg-field-wide"><label for="f-report-narrative-1">Report narrative</label><textarea id="f-report-narrative-1" rows="4"></textarea><small class="pg-hint">A correction creates a new report version; the submitted version is kept.</small></div>
-            </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save as new version</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
+<aside class="pg-note"><strong>Submitted reports are immutable</strong><p>The Manager does not edit the Officer’s submitted report. To correct it, return it with a comment; the Officer submits a new version. The Manager edits only their own draft executive summary (Forward page).</p></aside>
 
 <nav class="pg-links" aria-label="Related pages">
     <ul>
@@ -83,5 +80,6 @@ or votes.
         <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Return">Return for review</a></li>
         <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Reject">Reject</a></li>
         <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Forward">Forward to Top Committee</a></li>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">Ask a clarification</a></li>
     </ul>
 </nav>

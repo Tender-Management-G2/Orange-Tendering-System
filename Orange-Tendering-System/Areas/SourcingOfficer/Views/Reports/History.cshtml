@@ -1,0 +1,57 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Report Versions
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Sourcing Officer / Reports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Version history of the tender’s reports (OfficerComparison,
+FullEvaluation, ExecutiveSummary).
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Reports/History/{id?}
+
+FUTURE IMPLEMENTATION:
+- Query TenderReports of the tender ordered by ReportType,
+  VersionNumber; follow PreviousReportId.
+
+DEPENDENCIES:
+TenderReports.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required report lifecycle step (spec §4.4, §4.6, §11); no
+Trello card covers it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Report Versions";
+    ViewData["WorkspaceSection"] = "Reports";
+    ViewData["Description"] = "Every version of every report of a tender, with who reviewed it and what they decided.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-versions">
+    <div class="pg-panel-head"><h2 id="tbl-versions">Versions</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Report</th><th scope="col">Version</th><th scope="col">Previous version</th><th scope="col">Status</th><th scope="col">Submitted</th><th scope="col">Reviewed by</th><th scope="col">Decision</th><th scope="col">Comment</th></tr></thead>
+            <tbody><tr><td colspan="8"><partial name="_EmptyState" model='"No report versions yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index">All reports</a></li>
+    </ul>
+</nav>

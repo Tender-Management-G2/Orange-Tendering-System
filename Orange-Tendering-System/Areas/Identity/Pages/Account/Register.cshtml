@@ -8,7 +8,7 @@ PAGE: Supplier Registration (ASP.NET Core Identity register)
 DEVELOPER OWNER: Ahmad
 MODULE: Authentication
 TRELLO TASK: User Registration
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/vYTVxn8o
 
 PURPOSE:
 Public self-registration. By the approved rules ONLY suppliers
@@ -60,16 +60,31 @@ Registration must not grant any internal role.
             <input asp-for="Input.ConfirmPassword" autocomplete="new-password" aria-required="true" />
             <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
 
-            @* TODO (Ahmad): bind these to RegisterModel.InputModel and save a Pending Supplier. Disabled until then. *@
+            @* TODO (Ahmad): bind these to RegisterModel.InputModel, save a Pending Supplier (Suppliers table) and the
+               uploaded legal documents (Documents.SupplierId, stored outside wwwroot). Disabled until then. *@
             <fieldset class="auth-fieldset" disabled>
                 <legend>Company details — not connected yet</legend>
+                <label for="contact-full-name">Your full name</label>
+                <input id="contact-full-name" />
                 <label for="company-name">Company name</label>
                 <input id="company-name" />
                 <label for="registration-number">Commercial registration number</label>
                 <input id="registration-number" />
+                <label for="tax-number">Tax number (where applicable)</label>
+                <input id="tax-number" />
+                <label for="company-email">Company email</label>
+                <input id="company-email" type="email" />
                 <label for="company-phone">Company phone</label>
                 <input id="company-phone" type="tel" />
+                <label for="company-address">Company address</label>
+                <input id="company-address" />
+                <label for="legal-documents">Commercial registration, licenses and legal documents</label>
+                <input id="legal-documents" type="file" multiple />
             </fieldset>
+
+            <div class="auth-fieldset" role="note">
+                <small><strong>After registration:</strong> your company stays <em>Pending</em> until the system administrator verifies its registration and legal documents, then marks it <em>Approved</em> (or <em>Rejected</em> with a reason). Only approved companies can be invited to tenders. Creating an account here does not yet create the company profile — that part is not implemented.</small>
+            </div>
 
             <button id="registerSubmit" type="submit" class="primary">Create Account →</button>
         </form>

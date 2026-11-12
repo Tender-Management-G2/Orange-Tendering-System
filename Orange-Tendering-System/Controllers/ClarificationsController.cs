@@ -11,14 +11,14 @@ namespace Orange_Tendering_System.Controllers
     [Authorize]
     public class ClarificationsController : Controller
     {
-        // Clarifications — Owner: ALL TEAM · Trello: Clarifications, Notifications & Audit Trail
+        // Clarifications — Owner: ALL TEAM · Trello: Clarifications, Notifications & Audit Trail (https://trello.com/c/N1OFBdNM)
         // GET /Clarifications. TODO: query the data in a service and pass a view model.
         public IActionResult Index()
         {
             return View();
         }
 
-        // Clarification Thread — Owner: ALL TEAM · Trello: Clarifications, Notifications & Audit Trail
+        // Clarification Thread — Owner: ALL TEAM · Trello: Clarifications, Notifications & Audit Trail (https://trello.com/c/N1OFBdNM)
         // GET /Clarifications/Details/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Details(int? id)
         {

@@ -6,7 +6,7 @@ PAGE: Purchase Request Review / Approval
 DEVELOPER OWNER: Doulat
 MODULE: Department / Purchase Requests (Sourcing Officer review step)
 TRELLO TASK: Purchase Request Review / Approval
-TRELLO URL: Not provided — add from the Trello board
+TRELLO URL: https://trello.com/c/cOYVH9co
 
 PURPOSE:
 The Sourcing Officer reviews a submitted request and
@@ -86,3 +86,10 @@ Officer decides here.
 </div>
 
 <partial name="_ConfirmAction" model='new ConfirmActionModel("Reject request", "Reject the request entirely.", "Sets the request to Rejected with your reason.", true, true)' />
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">Ask the department for clarification</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="PurchaseRequests" asp-action="Index">Back to requests</a></li>
+    </ul>
+</nav>
