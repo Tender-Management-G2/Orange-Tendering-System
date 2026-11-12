@@ -1,0 +1,53 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Role & Permission Management
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: Role & Permission Management
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show the seven system roles with their users, and assign or
+remove role membership.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Roles
+
+FUTURE IMPLEMENTATION:
+- Seed the seven roles first (Ahmad — Database
+  Implementation & Seed Data).
+- List roles with user counts (RoleManager / UserManager).
+- Add and remove users from roles; audit each change.
+- Do not add custom permission tables: use roles plus
+  resource checks.
+
+DEPENDENCIES:
+AspNetRoles, AspNetUserRoles, AspNetUsers, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Role & Permission Management";
+    ViewData["WorkspaceSection"] = "Roles";
+    ViewData["Description"] = "The seven system roles and who holds them.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>How permissions work</strong><p>The seven roles are defined in Models/SystemRoles.cs: Admin, Requesting Department, Sourcing Officer, Supplier, Evaluation Committee, Sourcing Manager and Top Committee. Every workspace controller checks the role. Committee scoring and voting also require tender-specific assignment (CommitteeMembers) — a role alone is never enough.</p></aside>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-roles">
+    <div class="pg-panel-head"><h2 id="tbl-roles">Roles</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Role</th><th scope="col">Purpose</th><th scope="col">Users</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Roles are not seeded in the database yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

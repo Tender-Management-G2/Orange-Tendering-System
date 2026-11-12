@@ -1,0 +1,51 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Supplier Offer History
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Supplier Portal
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Show the revision history of the supplier’s own offers.
+
+BUSINESS ACCESS:
+Supplier (own company only, Admin-approved)
+
+ROUTE: /Supplier/Offers/History/{id?}
+
+FUTURE IMPLEMENTATION:
+- Own bids grouped by TenderInvitation, ordered by
+  RevisionNumber.
+
+DEPENDENCIES:
+Bids, TenderInvitations.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Every query must be filtered by the signed-in user’s
+SupplierId. Never show other suppliers’ invitations, offers,
+prices or evaluations.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Supplier Offer History";
+    ViewData["WorkspaceSection"] = "My Offers";
+    ViewData["Description"] = "All revisions of your offers.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-revisions">
+    <div class="pg-panel-head"><h2 id="tbl-revisions">Revisions</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Revision</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Submitted</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No offer revisions yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

@@ -1,0 +1,50 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: How It Works
+
+DEVELOPER OWNER: Tariq
+MODULE: Public Site
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Explains the official procurement workflow step by step.
+
+BUSINESS ACCESS:
+Anonymous
+
+ROUTE: /how-it-works
+
+FUTURE IMPLEMENTATION:
+- Keep in sync with the approved workflow.
+
+DEPENDENCIES:
+None (static).
+
+STATUS:
+PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
+
+IMPORTANT:
+No dedicated Trello card — part of Tariq’s public site.
+===========================================================
+*@
+@{ ViewData["Title"] = "How It Works | Orange Sourcing";
+  var steps = new[] {
+    ("Purchase request", "Define the need.", "Describe the requirement and its business context to begin a structured request.", "Requesting Department"),
+    ("Create tender", "Shape the opportunity.", "Translate an approved requirement into a tender with scope, criteria, and submission requirements.", "Sourcing Officer"),
+    ("Supplier bidding", "Bring suppliers into the process.", "Eligible suppliers prepare technical proposals and financial bids for the tender.", "Supplier"),
+    ("Evaluation", "Review with perspective.", "Assess technical compliance and financial value. Consolidate weighted scores for committee review.", "Evaluation Committee"),
+    ("Approvals", "Make accountable decisions.", "Route evaluation outcomes through the appropriate management and committee review.", "Sourcing Manager · Top Committee"),
+    ("Award & closure", "Document the outcome.", "Record the authorized award decision and bring the tender lifecycle to a documented close.", "Award & Closure")
+  };
+}
+<main class="public-page workflow-page">
+  <section class="page-shell editorial-hero"><div class="page-overline"><span>HOW IT WORKS</span><span>THE DEFINED PROCUREMENT JOURNEY</span></div><h1>Every step.<br /><em>A clearer direction.</em></h1><p class="editorial-lead workflow-intro">Six purposeful stages connect a business need to an accountable procurement outcome.</p><p class="public-caption">This is the project’s defined workflow. Operational screens and approval authorization remain implementation work.</p></section>
+  <section class="page-shell workflow-editorial" aria-label="Six procurement stages">
+    @for (var i = 0; i < steps.Length; i++) { var step = steps[i];
+      <article class="workflow-chapter public-reveal"><span class="workflow-number">@((i + 1).ToString("00"))</span><div><span class="public-eyebrow">@step.Item1</span><h2>@step.Item2</h2><p>@step.Item3</p><span class="workflow-owner">@step.Item4</span></div><svg aria-hidden="true" viewBox="0 0 80 80"><path d="M10 40h60M50 20l20 20-20 20" /></svg></article>
+    }
+  </section>
+  <section class="page-shell public-next public-reveal"><span class="public-eyebrow">SEE THE JOURNEY IN MOTION</span><a href="@Url.Action("Index", "Home")#workflow">Follow the animated<br /><em>procurement workflow.</em><span aria-hidden="true">↗</span></a></section>
+</main>

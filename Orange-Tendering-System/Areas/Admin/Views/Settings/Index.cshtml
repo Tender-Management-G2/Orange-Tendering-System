@@ -1,0 +1,57 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: System Settings
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: System Settings
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show configuration values (environment, email delivery,
+upload limits) read from appsettings, not from a database
+table.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Settings
+
+FUTURE IMPLEMENTATION:
+- Bind an options class (e.g. DocumentStorageOptions) and
+  show its values.
+- Show whether an IEmailSender is configured.
+- Never print connection-string passwords or API keys.
+
+DEPENDENCIES:
+IConfiguration / options classes (no database table).
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Do not create a settings table only for this page.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "System Settings";
+    ViewData["WorkspaceSection"] = "Settings";
+    ViewData["Description"] = "Read-only view of the application configuration that matters to administrators.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>No settings table</strong><p>By design there is no SystemSettings table. This page reads configuration (appsettings.json, environment variables, user secrets) and shows it read-only. Secrets such as passwords or keys must never be displayed.</p></aside>
+
+<section class="ws-panel pg-panel">
+    <h2>Configuration</h2>
+    <dl class="pg-dl">
+        <div><dt>Environment</dt><dd>—</dd></div>
+        <div><dt>Database connection (server and database name only)</dt><dd>—</dd></div>
+        <div><dt>Email delivery</dt><dd>—</dd></div>
+        <div><dt>Document storage folder</dt><dd>—</dd></div>
+        <div><dt>Maximum upload size</dt><dd>—</dd></div>
+        <div><dt>Allowed file types</dt><dd>—</dd></div>
+    </dl>
+</section>

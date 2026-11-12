@@ -1,0 +1,58 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: My Submitted Offers
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Supplier Portal
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+List the supplier’s own offers (all revisions) and their
+status.
+
+BUSINESS ACCESS:
+Supplier (own company only, Admin-approved)
+
+ROUTE: /Supplier/Offers
+
+FUTURE IMPLEMENTATION:
+- Query Bids through TenderInvitation.SupplierId = the
+  user’s SupplierId.
+
+DEPENDENCIES:
+Bids, TenderInvitations.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Every query must be filtered by the signed-in user’s
+SupplierId. Never show other suppliers’ invitations, offers,
+prices or evaluations.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "My Submitted Offers";
+    ViewData["WorkspaceSection"] = "My Offers";
+    ViewData["Description"] = "Your draft and submitted offers.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-offers">
+    <div class="pg-panel-head"><h2 id="tbl-offers">Offers</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Revision</th><th scope="col">Status</th><th scope="col">Submitted</th><th scope="col">Total</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"Your company has no offers yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="Supplier" asp-controller="Offers" asp-action="History">Offer history</a></li>
+    </ul>
+</nav>

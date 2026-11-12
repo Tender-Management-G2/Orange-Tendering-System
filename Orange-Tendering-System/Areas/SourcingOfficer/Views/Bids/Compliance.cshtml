@@ -1,0 +1,88 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Bid Compliance Check
+
+DEVELOPER OWNER: Saja
+MODULE: Sourcing Officer / Bid Management
+TRELLO TASK: Bid Compliance Check
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+The Officer records the compliance result of one offer
+revision, with reasons and missing documents.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Bids/Compliance/{id?}
+
+FUTURE IMPLEMENTATION:
+- POST: set Bid.ComplianceStatus, ComplianceNotes,
+  MissingRequirements, ComplianceCheckedByUserId,
+  ComplianceCheckedAt (UTC).
+- Pending Clarification: open a Clarification linked to the
+  bid (BidId).
+- Audit the decision.
+
+DEPENDENCIES:
+Bids (compliance columns), Tenders.Requirements,
+Clarifications, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Bid Compliance Check";
+    ViewData["WorkspaceSection"] = "Compliance";
+    ViewData["Description"] = "Record whether an offer meets the tender’s mandatory requirements.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Compliance statuses</h2>
+    <div class="pg-badges"><span class="pg-badge">Not checked</span><span class="pg-badge is-ok">Compliant</span><span class="pg-badge is-bad">Non-Compliant</span><span class="pg-badge is-warn">Pending Clarification</span></div>
+    <p class="pg-hint">A non-compliant offer still counts as a received offer for the minimum-offer rule, but it cannot be recommended or awarded.</p>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Offer</h2>
+    <dl class="pg-dl">
+        <div><dt>Supplier</dt><dd>—</dd></div>
+        <div><dt>Tender / round</dt><dd>—</dd></div>
+        <div><dt>Revision</dt><dd>—</dd></div>
+        <div><dt>Submitted</dt><dd>—</dd></div>
+        <div><dt>Tender requirements</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Compliance decision</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-compliance-status-1">Compliance status</label><select id="f-compliance-status-1"><option>Compliant</option><option>Non-Compliant</option><option>Pending Clarification</option></select></div>
+                <div class="pg-field pg-field-wide"><label for="f-reasons-for-non-compliance-2">Reasons for non-compliance</label><textarea id="f-reasons-for-non-compliance-2" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-missing-documents-or-unmet-requirements-3">Missing documents or unmet requirements</label><textarea id="f-missing-documents-or-unmet-requirements-3" rows="4"></textarea></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save compliance review</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Review record</h2>
+    <dl class="pg-dl">
+        <div><dt>Reviewed by</dt><dd>—</dd></div>
+        <div><dt>Reviewed at (UTC)</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Clarifications" asp-action="Index">Ask the supplier for clarification</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Details">Offer details</a></li>
+    </ul>
+</nav>

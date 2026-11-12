@@ -1,0 +1,28 @@
+@*
+  OWNER: ALL TEAM — Integration
+  Shared confirmation panel for workflow decisions (approve, reject, return, forward, accept, decline, vote).
+  The form is disabled: there is no POST action yet. When implementing, add [HttpPost] + [ValidateAntiForgeryToken]
+  to the owning controller, check role + record ownership/assignment + workflow stage on the server,
+  write an AuditLog entry, and never overwrite earlier versions, votes or decisions.
+*@
+@model ConfirmActionModel
+<section class="ws-panel pg-panel pg-confirm @(Model.IsDestructive ? "is-destructive" : null)" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">@Model.ActionLabel</h2>
+    <p>@Model.Description</p>
+    <p class="pg-consequence"><strong>What this will do:</strong> @Model.Consequence</p>
+    <form class="pg-form">
+        <fieldset disabled>
+            @if (Model.RequiresComment)
+            {
+                <div class="pg-field">
+                    <label for="confirm-comment">Reason / comment (required)</label>
+                    <textarea id="confirm-comment" rows="4" placeholder="Explain the decision. It will be stored with the decision history."></textarea>
+                </div>
+            }
+            <div class="pg-actions">
+                <button type="submit" class="pg-btn @(Model.IsDestructive ? "pg-btn-danger" : "pg-btn-primary")">@Model.ActionLabel</button>
+                <span class="pg-hint">Not implemented yet — no record will change.</span>
+            </div>
+        </fieldset>
+    </form>
+</section>

@@ -484,3 +484,6 @@ $RECYCLE.BIN/
 # Claude Code (local AI assistant instructions and settings)
 CLAUDE.md
 .claude/
+
+# Local archives (e.g. the supplied layout ZIP, 130+ MB)
+*.zip

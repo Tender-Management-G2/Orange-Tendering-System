@@ -1,0 +1,65 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Notifications
+
+DEVELOPER OWNER: ALL TEAM
+MODULE: Clarifications, Notifications & Audit Trail
+TRELLO TASK: Clarifications, Notifications & Audit Trail
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show the signed-in user’s notifications.
+
+BUSINESS ACCESS:
+Any signed-in user (own notifications only)
+
+ROUTE: /Notifications
+
+FUTURE IMPLEMENTATION:
+- Query Notifications where UserId = current user (index
+  UserId + IsRead).
+- A NotificationService that every module calls on workflow
+  events.
+- Unread count badge on the bell icon.
+
+DEPENDENCIES:
+Notifications.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Notifications";
+    ViewData["WorkspaceSection"] = "Notifications";
+    ViewData["Description"] = "Messages about workflow events that concern you.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search notifications" aria-label="Search notifications" disabled />
+    <select aria-label="Show" disabled><option>Show: All</option><option>Show: Unread</option><option>Show: Read</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-notifications">
+    <div class="pg-panel-head"><h2 id="tbl-notifications">Notifications</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Title</th><th scope="col">Message</th><th scope="col">Received</th><th scope="col">Status</th><th scope="col">Link</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"You have no notifications."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Bulk actions</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Mark all as read</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>

@@ -1,0 +1,62 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Manage Tenders
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management
+TRELLO TASK: Manage Tenders
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+List tenders with status, current tendering round and
+deadlines.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Tenders
+
+FUTURE IMPLEMENTATION:
+- Query Tenders with their latest TenderRound.
+- Row actions: Timeline, Rounds, Select suppliers, Received
+  bids.
+
+DEPENDENCIES:
+Tenders, TenderRounds, PurchaseRequests.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Manage Tenders";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = "All tenders with their current round and stage.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search tenders" aria-label="Search tenders" disabled />
+    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Draft</option><option>Status: Bidding</option><option>Status: Evaluation</option><option>Status: OfficerReview</option><option>Status: ManagerReview</option><option>Status: TopCommitteeReview</option><option>Status: Awarded</option><option>Status: Rejected</option><option>Status: Cancelled</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-tenders">
+    <div class="pg-panel-head"><h2 id="tbl-tenders">Tenders</h2><a class="pg-btn pg-btn-primary" asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Create">Create tender</a></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Reference</th><th scope="col">Title</th><th scope="col">Purchase request</th><th scope="col">Current round</th><th scope="col">Status</th><th scope="col">Deadline</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No tenders are loaded yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Rounds">Tender rounds</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Timeline">Timeline &amp; closing</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Invitations" asp-action="Index">Supplier invitations</a></li>
+    </ul>
+</nav>

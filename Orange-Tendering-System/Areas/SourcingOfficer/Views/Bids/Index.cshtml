@@ -1,0 +1,67 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Received Bids
+
+DEVELOPER OWNER: Saja
+MODULE: Sourcing Officer / Bid Management
+TRELLO TASK: Received Bids
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+List the offers received for a tender round with their
+compliance status.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Bids/Index/{id?}
+
+FUTURE IMPLEMENTATION:
+- Query the latest Submitted Bid per TenderInvitation in the
+  selected TenderRound.
+- Quoted total = Σ(Quantity × UnitPrice) + extra costs
+  (calculated, not stored).
+- Row actions: Details, Compliance.
+
+DEPENDENCIES:
+Bids, BidItems, TenderInvitations, Suppliers, TenderRounds.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Only offers of the current round count; offers from earlier
+rounds are history.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Received Bids";
+    ViewData["WorkspaceSection"] = "Received Bids";
+    ViewData["Description"] = "Offers submitted by invited suppliers in the selected tendering round.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-cards" aria-label="Summary">
+    <article class="pg-card"><span>Invited suppliers</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Submitted offers</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Distinct suppliers</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Compliance pending</span><strong>—</strong><small>Not connected</small></article>
+</section>
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search supplier" aria-label="Search supplier" disabled />
+    <select aria-label="Compliance" disabled><option>Compliance: All</option><option>Compliance: Not checked</option><option>Compliance: Compliant</option><option>Compliance: Non-Compliant</option><option>Compliance: Pending Clarification</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-offers">
+    <div class="pg-panel-head"><h2 id="tbl-offers">Offers</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Supplier</th><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Revision</th><th scope="col">Submitted</th><th scope="col">Quoted total</th><th scope="col">Compliance</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="8"><partial name="_EmptyState" model='"No offers have been received for this round."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

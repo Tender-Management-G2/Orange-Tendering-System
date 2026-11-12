@@ -1,0 +1,38 @@
+[
+  {
+    "fullName": "Team member 01 — placeholder",
+    "role": "Actual project role to be provided",
+    "contributions": "Verified project responsibilities and contributions will appear here once supplied by the team.",
+    "image": null,
+    "gitHub": null,
+    "linkedIn": null,
+    "placeholder": true
+  },
+  {
+    "fullName": "Team member 02 — placeholder",
+    "role": "Actual project role to be provided",
+    "contributions": "Verified project responsibilities and contributions will appear here once supplied by the team.",
+    "image": null,
+    "gitHub": null,
+    "linkedIn": null,
+    "placeholder": true
+  },
+  {
+    "fullName": "Team member 03 — placeholder",
+    "role": "Actual project role to be provided",
+    "contributions": "Verified project responsibilities and contributions will appear here once supplied by the team.",
+    "image": null,
+    "gitHub": null,
+    "linkedIn": null,
+    "placeholder": true
+  },
+  {
+    "fullName": "Team member 04 — placeholder",
+    "role": "Actual project role to be provided",
+    "contributions": "Verified project responsibilities and contributions will appear here once supplied by the team.",
+    "image": null,
+    "gitHub": null,
+    "linkedIn": null,
+    "placeholder": true
+  }
+]

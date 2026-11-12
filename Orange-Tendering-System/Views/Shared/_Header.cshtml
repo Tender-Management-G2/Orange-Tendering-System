@@ -1,0 +1,36 @@
+@*
+  OWNER: Tariq — Shared Layout (public navbar, from the supplied layout ZIP)
+  Account links come from _LoginPartial (real ASP.NET Core Identity pages).
+*@
+@{
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentArea = ViewContext.RouteData.Values["area"]?.ToString();
+}
+<header class="site-header">
+    <a class="brand" href="@Url.Action("Index", "Home", new { area = "" })#home" aria-label="Orange home"><span class="logo" aria-hidden="true">orange<span>®</span></span><span class="brand-title">Sourcing & Tender<br />Management System</span></a>
+    <button class="menu" aria-label="Toggle navigation" aria-expanded="false" aria-controls="public-navigation">☰</button>
+    <nav id="public-navigation" aria-label="Main navigation">
+        @foreach (var item in new[] { ("Index", "Home"), ("About", "About"), ("Team", "Our Team"), ("HowItWorks", "How It Works"), ("Contact", "Contact") })
+        {
+            var selected = string.IsNullOrEmpty(currentArea) && currentController == "Home" && currentAction == item.Item1;
+            <a asp-area="" asp-controller="Home" asp-action="@item.Item1" class="@(selected ? "selected" : null)" aria-current="@(selected ? "page" : null)">@item.Item2</a>
+        }
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a class="nav-account-link" asp-area="" asp-controller="Workspace" asp-action="Index">My Workspace</a>
+        }
+        else
+        {
+            <a class="nav-account-link" asp-area="Identity" asp-page="/Account/Login">Employee Login</a>
+            <a class="nav-account-link" asp-area="Identity" asp-page="/Account/Register">Supplier Registration</a>
+        }
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Switch color theme" aria-pressed="false">
+        <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></svg><svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3a9 9 0 1 0 10.5 11Z" /></svg><span class="sr-only">Color theme</span>
+    </button>
+    <span class="sr-only" id="theme-status" role="status"></span>
+    <div class="account">
+        <partial name="_LoginPartial" />
+    </div>
+</header>

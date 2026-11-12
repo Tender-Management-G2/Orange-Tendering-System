@@ -1,0 +1,109 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Bid Details & Documents
+
+DEVELOPER OWNER: Saja
+MODULE: Sourcing Officer / Bid Management
+TRELLO TASK: Bid Details & Documents
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show a submitted offer revision with its item prices, costs,
+terms and attachments.
+
+BUSINESS ACCESS:
+Sourcing Officer (assigned committee members may later get a
+read-only view)
+
+ROUTE: /SourcingOfficer/Bids/Details/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the Bid with BidItems (TenderItem), Documents and
+  sibling revisions of the same invitation.
+- Protected document download that checks access on every
+  request.
+
+DEPENDENCIES:
+Bids, BidItems, TenderItems, Documents, TenderInvitations,
+Suppliers.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+An offer is never visible to other suppliers.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Bid Details & Documents";
+    ViewData["WorkspaceSection"] = "Received Bids";
+    ViewData["Description"] = "One supplier offer: prices, terms, documents and earlier revisions.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Offer</h2>
+    <dl class="pg-dl">
+        <div><dt>Supplier</dt><dd>—</dd></div>
+        <div><dt>Tender / round</dt><dd>—</dd></div>
+        <div><dt>Revision</dt><dd>—</dd></div>
+        <div><dt>Status</dt><dd>—</dd></div>
+        <div><dt>Submitted</dt><dd>—</dd></div>
+        <div><dt>Currency</dt><dd>—</dd></div>
+        <div><dt>Delivery days</dt><dd>—</dd></div>
+        <div><dt>Valid until</dt><dd>—</dd></div>
+        <div><dt>Payment terms</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-item-prices">
+    <div class="pg-panel-head"><h2 id="tbl-item-prices">Item prices</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender item</th><th scope="col">Offered quantity</th><th scope="col">Unit price</th><th scope="col">Line total</th><th scope="col">Offered specifications</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No item prices loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Costs</h2>
+    <dl class="pg-dl">
+        <div><dt>Shipping</dt><dd>—</dd></div>
+        <div><dt>Installation</dt><dd>—</dd></div>
+        <div><dt>Maintenance</dt><dd>—</dd></div>
+        <div><dt>Tax</dt><dd>—</dd></div>
+        <div><dt>Other</dt><dd>—</dd></div>
+        <div><dt>Calculated total</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<div class="pg-grid">
+<section class="ws-panel pg-panel" aria-labelledby="tbl-documents">
+    <div class="pg-panel-head"><h2 id="tbl-documents">Documents</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Uploaded</th><th scope="col">Download</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"No documents attached."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+<section class="ws-panel pg-panel" aria-labelledby="tbl-revisions">
+    <div class="pg-panel-head"><h2 id="tbl-revisions">Revisions</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Revision</th><th scope="col">Status</th><th scope="col">Submitted</th></tr></thead>
+            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No earlier revisions."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+</div>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Compliance">Compliance check</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Index">Back to received bids</a></li>
+    </ul>
+</nav>

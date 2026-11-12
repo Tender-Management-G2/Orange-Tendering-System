@@ -1,0 +1,56 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Committee Voting & Decision History
+
+DEVELOPER OWNER: Doulat
+MODULE: Top Committee
+TRELLO TASK: Committee Voting & Decision History
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show all Top Committee rounds and individual votes; earlier
+rounds are preserved.
+
+BUSINESS ACCESS:
+Top Committee member (assigned to the tender)
+
+ROUTE: /TopCommittee/Decisions/History/{id?}
+
+FUTURE IMPLEMENTATION:
+- Query CommitteeRounds (Top) with CommitteeVotes.
+
+DEPENDENCIES:
+CommitteeRounds, CommitteeVotes, CommitteeMembers.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Committee Voting & Decision History";
+    ViewData["WorkspaceSection"] = "Decision History";
+    ViewData["Description"] = "Every Top Committee round with its votes, including rejected rounds.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-committee-rounds">
+    <div class="pg-panel-head"><h2 id="tbl-committee-rounds">Committee rounds</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Summary version</th><th scope="col">Approvals</th><th scope="col">Rejections</th><th scope="col">Outcome</th><th scope="col">Completed</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No Top Committee rounds yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-votes">
+    <div class="pg-panel-head"><h2 id="tbl-votes">Votes</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Member</th><th scope="col">Vote</th><th scope="col">Comment</th><th scope="col">Voted at</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Select a round to see its votes."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

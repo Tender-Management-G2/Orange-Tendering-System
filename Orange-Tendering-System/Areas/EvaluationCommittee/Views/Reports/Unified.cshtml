@@ -1,0 +1,87 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Unified Evaluation Report
+
+DEVELOPER OWNER: Tariq
+MODULE: Technical & Financial Evaluation Committee
+TRELLO TASK: Unified Evaluation Report
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Consolidated evaluation report with the ranked
+recommendation, committee observations and the four
+approvals.
+
+BUSINESS ACCESS:
+Evaluation Committee member (assigned to the tender)
+
+ROUTE: /EvaluationCommittee/Reports/Unified/{id?}
+
+FUTURE IMPLEMENTATION:
+- Create the FullEvaluation TenderReport with
+  RankingSnapshotJson when the round is finalized.
+- POST vote: one CommitteeVote per member per round (unique
+  index).
+- When 4/4 Approve: CommitteeRound = Approved; return the
+  result to the Sourcing Officer.
+
+DEPENDENCIES:
+TenderReports, CommitteeRounds, CommitteeVotes,
+CommitteeMembers, EvaluationScores.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Unified Evaluation Report";
+    ViewData["WorkspaceSection"] = "Unified Report";
+    ViewData["Description"] = "The committee’s consolidated technical and financial report, the system recommendation and the 4/4 approval.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Report</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Committee round</dt><dd>—</dd></div>
+        <div><dt>Version</dt><dd>—</dd></div>
+        <div><dt>Status</dt><dd>—</dd></div>
+        <div><dt>Recommended offer</dt><dd>—</dd></div>
+        <div><dt>Prepared by</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-ranked-suppliers">
+    <div class="pg-panel-head"><h2 id="tbl-ranked-suppliers">Ranked suppliers</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Rank</th><th scope="col">Supplier</th><th scope="col">Technical</th><th scope="col">Financial</th><th scope="col">Final</th><th scope="col">Eligible</th></tr></thead>
+            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"Ranking not available — the scoring method is not finalized."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Committee observations</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="f-summary-of-the-evaluation-1">Summary of the evaluation</label><textarea id="f-summary-of-the-evaluation-1" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-reason-for-the-recommendation-2">Reason for the recommendation</label><textarea id="f-reason-for-the-recommendation-2" rows="4"></textarea></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save draft</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<partial name="_ApprovalTracker" model='"Evaluation Committee"' />
+
+<div class="pg-grid">
+<partial name="_ConfirmAction" model='new ConfirmActionModel("Approve evaluation round", "Approve the finalized scores and recommendation of this round.", "Records your Approve vote. The result moves on only when all 4 members approve the same round.", false, false)' />
+<partial name="_ConfirmAction" model='new ConfirmActionModel("Reject evaluation round", "Reject the round and send it back for correction.", "Records your Reject vote with a reason. A corrected evaluation needs a new round and four new approvals.", true, true)' />
+</div>
+
+<aside class="pg-note"><strong>Recommendation is not the award</strong><p>The recommended offer is stored on the report (RecommendedBidId). The award (Tender.AwardedBidId) is recorded only after 4/4 Top Committee approval.</p></aside>

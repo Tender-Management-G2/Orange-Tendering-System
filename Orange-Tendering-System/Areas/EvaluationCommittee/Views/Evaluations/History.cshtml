@@ -1,0 +1,59 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Evaluation History
+
+DEVELOPER OWNER: Tariq
+MODULE: Technical & Financial Evaluation Committee
+TRELLO TASK: Evaluation History
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show previous evaluation committee rounds with their
+criteria, votes and outcome.
+
+BUSINESS ACCESS:
+Evaluation Committee member (assigned to the tender)
+
+ROUTE: /EvaluationCommittee/Evaluations/History/{id?}
+
+FUTURE IMPLEMENTATION:
+- Query CommitteeRounds (Evaluation) for the tender round
+  with vote counts.
+- Read-only: earlier rounds are never edited.
+
+DEPENDENCIES:
+CommitteeRounds, CommitteeVotes, CommitteeMembers,
+TenderReports.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Evaluation History";
+    ViewData["WorkspaceSection"] = "History";
+    ViewData["Description"] = "Earlier evaluation rounds of this tender, including rejected ones.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-evaluation-rounds">
+    <div class="pg-panel-head"><h2 id="tbl-evaluation-rounds">Evaluation rounds</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Committee round</th><th scope="col">Status</th><th scope="col">Started</th><th scope="col">Completed</th><th scope="col">Approvals</th><th scope="col">Rejections</th><th scope="col">Report version</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No earlier evaluation rounds."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-votes-in-the-selected-round">
+    <div class="pg-panel-head"><h2 id="tbl-votes-in-the-selected-round">Votes in the selected round</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Member</th><th scope="col">Vote</th><th scope="col">Comment</th><th scope="col">Voted at</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Select a round to see its votes."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

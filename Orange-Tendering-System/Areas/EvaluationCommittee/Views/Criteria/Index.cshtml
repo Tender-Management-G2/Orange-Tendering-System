@@ -1,0 +1,102 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Evaluation Criteria & Weights
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management (criteria screen used by the Evaluation Committee)
+TRELLO TASK: Evaluation Criteria & Weights
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+The Evaluation Committee defines/confirms technical and
+financial criteria and their decimal weights for one
+evaluation round.
+
+BUSINESS ACCESS:
+Evaluation Committee (edit). The Sourcing Officer may later
+get a read-only view.
+
+ROUTE: /EvaluationCommittee/Criteria/Index/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load EvaluationCriteria for the CommitteeRound; only
+  assigned Evaluation Committee members may edit.
+- Freeze criteria once the round has scores or votes;
+  changes require a new CommitteeRound.
+- Officer read-only view: same data, no form (Sourcing
+  Officer area, later).
+
+DEPENDENCIES:
+EvaluationCriteria, CommitteeRounds (TechnicalWeight,
+FinancialWeight), CommitteeMembers.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Amal builds this page, but the Evaluation Committee is its
+business user. Do not hardcode 60/40, 25% per member or any
+unapproved formula.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Evaluation Criteria & Weights";
+    ViewData["WorkspaceSection"] = "Criteria & Weights";
+    ViewData["Description"] = "Technical and financial criteria, and their weights, decided by the Evaluation Committee for this evaluation round.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>Weights are the committee’s decision</strong><p>Weights are determined by the Evaluation Committee for each evaluation round. No formula, technical/financial split (e.g. 60/40) or per-member weight is built into the system.</p></aside>
+
+<div class="pg-grid">
+<section class="ws-panel pg-panel" aria-labelledby="tbl-technical-criteria">
+    <div class="pg-panel-head"><h2 id="tbl-technical-criteria">Technical criteria</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Criterion</th><th scope="col">Description</th><th scope="col">Weight</th><th scope="col">Max score</th><th scope="col">Order</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No technical criteria for this round."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+<section class="ws-panel pg-panel" aria-labelledby="tbl-financial-criteria">
+    <div class="pg-panel-head"><h2 id="tbl-financial-criteria">Financial criteria</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Criterion</th><th scope="col">Description</th><th scope="col">Weight</th><th scope="col">Max score</th><th scope="col">Order</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No financial criteria for this round."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+</div>
+
+<section class="ws-panel pg-panel">
+    <h2>Add criterion</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-name-1">Name</label><input id="f-name-1" type="text" /></div>
+                <div class="pg-field pg-field-wide"><label for="f-description-2">Description</label><textarea id="f-description-2" rows="4"></textarea></div>
+                <div class="pg-field"><label for="f-type-3">Type</label><select id="f-type-3"><option>Technical</option><option>Financial</option></select></div>
+                <div class="pg-field"><label for="f-weight-4">Weight</label><input id="f-weight-4" type="number" /><small class="pg-hint">Decimal, set by the committee.</small></div>
+                <div class="pg-field"><label for="f-max-score-5">Max score</label><input id="f-max-score-5" type="number" /><small class="pg-hint">Scale not decided yet.</small></div>
+                <div class="pg-field"><label for="f-display-order-6">Display order</label><input id="f-display-order-6" type="number" /></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Add criterion</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Round weights (optional)</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-technical-weight-7">Technical weight</label><input id="f-technical-weight-7" type="number" /></div>
+                <div class="pg-field"><label for="f-financial-weight-8">Financial weight</label><input id="f-financial-weight-8" type="number" /></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save round weights</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>

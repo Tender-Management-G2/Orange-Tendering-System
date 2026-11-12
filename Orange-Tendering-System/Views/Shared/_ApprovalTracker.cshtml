@@ -1,0 +1,20 @@
+@*
+  OWNER: ALL TEAM — Integration (used by Tariq's Evaluation Committee pages and Doulat's Top Committee pages)
+  Four-seat unanimous approval tracker. Model = committee name ("Evaluation Committee" or "Top Committee").
+  Future: bind the four CommitteeMembers of the tender and their CommitteeVotes for ONE CommitteeRound.
+  Rule: 4 of 4 Approve on the same round/report version. No majority, no 3/4, no automatic approval.
+*@
+@model string
+<section class="ws-panel pg-panel" aria-labelledby="approval-title">
+    <div class="pg-panel-head">
+        <h2 id="approval-title">@Model approval status</h2>
+        <span class="pg-badge">0 / 4 recorded</span>
+    </div>
+    <p class="pg-hint">Unanimous approval is required: all four assigned members must approve the same round. A single rejection blocks the round and starts a documented return path.</p>
+    <ol class="pg-seats">
+        @for (var seat = 1; seat <= 4; seat++)
+        {
+            <li><span class="pg-seat-number">@seat</span><div><strong>Member @seat — not assigned</strong><small>No vote recorded</small></div></li>
+        }
+    </ol>
+</section>

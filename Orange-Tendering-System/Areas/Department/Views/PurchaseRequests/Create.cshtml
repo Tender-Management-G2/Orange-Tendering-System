@@ -1,0 +1,84 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Create Purchase Request
+
+DEVELOPER OWNER: Doulat
+MODULE: Department / Purchase Requests
+TRELLO TASK: Create Purchase Request
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Form for a department employee to draft and submit a
+purchase request with its items and attachments.
+
+BUSINESS ACCESS:
+Requesting Department
+
+ROUTE: /Department/PurchaseRequests/Create
+
+FUTURE IMPLEMENTATION:
+- POST Create: save a Draft PurchaseRequest with
+  DepartmentId and CreatedByUserId from the signed-in user.
+- Add/remove PurchaseRequestItems rows (decimal quantity,
+  unit) with server-side validation.
+- Submit: Status = Submitted, SubmittedAt (UTC), and a new
+  PurchaseRequestReview with the next SubmissionNumber and
+  SubmittedSnapshotJson.
+- Upload attachments into Documents with PurchaseRequestId.
+
+DEPENDENCIES:
+PurchaseRequests, PurchaseRequestItems,
+PurchaseRequestReviews, Documents, Notifications, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+The request goes directly to the Sourcing Officer — there is
+no extra department approval stage.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Create Purchase Request";
+    ViewData["WorkspaceSection"] = "New Request";
+    ViewData["Description"] = "Describe what your department needs. The request goes directly to the Sourcing Officer.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Request</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-title-1">Title</label><input id="f-title-1" type="text" /></div>
+                <div class="pg-field pg-field-wide"><label for="f-justification-2">Justification</label><textarea id="f-justification-2" rows="4"></textarea><small class="pg-hint">Why the department needs this purchase.</small></div>
+                <div class="pg-field"><label for="f-priority-3">Priority</label><select id="f-priority-3"><option>Normal</option><option>Low</option><option>High</option><option>Urgent</option></select></div>
+                <div class="pg-field"><label for="f-needed-by-4">Needed by</label><input id="f-needed-by-4" type="date" /></div>
+            </div>
+        </fieldset>
+    </form>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-requested-items">
+    <div class="pg-panel-head"><h2 id="tbl-requested-items">Requested items</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Item / service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No items added. A request needs at least one item."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Attachments</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-supporting-documents-5">Supporting documents</label><input id="f-supporting-documents-5" type="file" /><small class="pg-hint">PDF, images or office files. Stored outside wwwroot.</small></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Submit to Sourcing Officer</button><button type="button" class="pg-btn">Save draft</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>

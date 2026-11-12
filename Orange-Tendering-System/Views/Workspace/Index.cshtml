@@ -1,0 +1,58 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: My Workspaces
+
+DEVELOPER OWNER: Ahmad
+MODULE: Authentication
+TRELLO TASK: User Login & Role Redirect
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Landing page after sign-in. Lists the workspaces of the
+user’s roles; will become the role redirect.
+
+BUSINESS ACCESS:
+Any signed-in user
+
+ROUTE: /Workspace
+
+FUTURE IMPLEMENTATION:
+- Redirect automatically when the user has exactly one
+  workspace role (after login).
+- Suppliers whose company is not Approved see a
+  pending-approval message instead.
+
+DEPENDENCIES:
+AspNetUserRoles, ApplicationUser, Suppliers.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "My Workspaces";
+    ViewData["WorkspaceSection"] = "My Workspace";
+    ViewData["Description"] = "The workspaces your roles give you access to.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="workspaces-title">
+    <h2 id="workspaces-title">Your workspaces</h2>
+    @{ var mine = WorkspaceNavigation.Workspaces.Where(w => User.IsInRole(w.Role)).ToList(); }
+    @if (mine.Count == 0)
+    {
+        <partial name="_EmptyState" model='"Your account has no workspace role yet. Roles are assigned by Admin (they are not seeded yet)."' />
+    }
+    else
+    {
+        <div class="pg-links"><ul>
+            @foreach (var w in mine)
+            {
+                <li><a asp-area="@w.Area" asp-controller="Dashboard" asp-action="Index">@w.Label</a></li>
+            }
+        </ul></div>
+    }
+</section>

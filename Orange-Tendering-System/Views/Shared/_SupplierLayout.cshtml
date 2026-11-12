@@ -1,0 +1,77 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+FILE: Supplier portal layout (horizontal navbar + footer)
+
+OWNER: Tariq — Shared Layout
+MODULE: Public Site & Shared Layout
+TRELLO TASK: Shared Layout & Responsive Design
+
+PURPOSE:
+Shell for the Supplier area. The supplied layout ZIP gives
+suppliers a deliberately different structure (top navbar and
+footer, no sidebar), so it stays a separate layout. Menu items
+come from ViewModels/WorkspaceNavigation.cs ("Supplier").
+
+SECURITY:
+The layout never shows other suppliers' data. Each supplier
+page must still filter every query by the signed-in user's
+SupplierId on the server (UI hiding is not authorization).
+
+STATUS:
+INTEGRATED. No business logic.
+===========================================================
+*@
+@{
+    Layout = null;
+    var workspace = WorkspaceNavigation.ForArea("Supplier")!;
+    var activeSection = ViewData["WorkspaceSection"] as string;
+    var pageTitle = ViewData["Title"]?.ToString() ?? "Supplier workspace";
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="color-scheme" content="dark light" />
+    <title>@pageTitle | Orange Sourcing</title>
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/css/workspace-shell.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="ws-shell ws-supplier" data-workspace-role="Supplier">
+    <a class="ws-skip" href="#workspace-main">Skip to main content</a>
+    <header class="ws-supplier-header">
+        <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span><span>Sourcing &amp; Tender<br />Management System</span></a>
+        <span class="ws-portal-label">Supplier Portal</span>
+        <button class="ws-icon-button ws-supplier-menu" type="button" aria-label="Toggle supplier navigation" aria-controls="supplier-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+        <nav id="supplier-navigation" class="ws-supplier-nav" aria-label="Supplier navigation">
+            @foreach (var item in workspace.Items)
+            {
+                var active = item.Label == activeSection;
+                <a class="ws-supplier-nav-item @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="Supplier" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
+            }
+        </nav>
+        <div class="ws-topbar-actions">
+            <a class="ws-icon-button" asp-area="" asp-controller="Notifications" asp-action="Index" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg></a>
+            <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
+            <partial name="_WorkspaceAccountMenu" />
+        </div>
+    </header>
+    <main id="workspace-main" class="ws-supplier-main" tabindex="-1">
+        <div class="pg-page">
+            @RenderBody()
+        </div>
+    </main>
+    <footer class="ws-supplier-footer">
+        <a class="ws-footer-brand" asp-area="" asp-controller="Home" asp-action="Index"><span class="ws-logo" aria-hidden="true">orange</span><span>Sourcing &amp; Tender Management System</span></a>
+        <nav aria-label="Supplier footer navigation"><a asp-area="" asp-controller="Home" asp-action="About">About</a><span aria-disabled="true" title="Terms of use have not been supplied">Terms of Use</span><a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy Policy</a><a asp-area="" asp-controller="Home" asp-action="Contact">Contact Us</a></nav>
+        <small>© @DateTime.UtcNow.Year Sourcing &amp; Tender Management System.</small>
+    </footer>
+    <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
+    <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

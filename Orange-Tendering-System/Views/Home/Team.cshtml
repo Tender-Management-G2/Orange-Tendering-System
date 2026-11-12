@@ -1,0 +1,74 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Team Page
+
+DEVELOPER OWNER: Tariq
+MODULE: Public Site
+TRELLO TASK: Team Page
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Team presentation driven by wwwroot/data/team.json (Trello
+status: Doing).
+
+BUSINESS ACCESS:
+Anonymous
+
+ROUTE: /team
+
+FUTURE IMPLEMENTATION:
+- Replace the four placeholder entries in team.json with the
+  seven verified team members (names, roles, photos, links).
+- Set placeholder = false for verified profiles.
+
+DEPENDENCIES:
+wwwroot/data/team.json, TeamMemberViewModel.
+
+STATUS:
+PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
+===========================================================
+*@
+@using Orange_Tendering_System.ViewModels
+@model IReadOnlyList<TeamMemberViewModel>
+@{ ViewData["Title"] = "Our Team | Orange Sourcing"; }
+<main class="public-page team-page">
+  <section class="page-shell editorial-hero team-page-intro"><div class="page-overline"><span>OUR TEAM</span><span>THE PEOPLE BEHIND THE SYSTEM</span></div><div class="team-title-layout"><h1>Different minds.<br /><em>One vision.</em></h1><div><p class="editorial-lead">A shared direction is built by people. Meet the contributors behind the Sourcing &amp; Tender Management System.</p><p class="public-caption">Team profiles await verified information. The entries below are clearly marked placeholders and do not establish the actual team size.</p></div></div><a href="#team-showcase" class="editorial-link">Meet the minds <span aria-hidden="true">↓</span></a></section>
+  @if (Model.Count > 0) {
+  <section id="team-showcase" class="editorial-team" aria-label="Editorial team showcase" data-member-count="@Model.Count">
+    <div class="editorial-team-stage">
+      <div class="team-stage-heading"><span class="public-eyebrow">BEHIND THE SYSTEM</span><span class="team-reading-hint">SCROLL TO EXPLORE · OR CHOOSE A PROFILE</span></div>
+      <div class="editorial-viewport" tabindex="0" aria-label="Team profiles; use the profile navigation below">
+        <div class="editorial-track">
+        @for (var i = 0; i < Model.Count; i++) { var member = Model[i]; var photo = !string.IsNullOrWhiteSpace(member.Image) && Url.IsLocalUrl(member.Image) ? member.Image : null;
+          <article class="editorial-member" id="member-@(i + 1)" aria-labelledby="member-title-@(i + 1)">
+            <div class="editorial-portrait">
+              <div class="portrait-placeholder" hidden="@(photo != null)"><span class="portrait-watermark" aria-hidden="true">@((i + 1).ToString("00"))</span><svg viewBox="0 0 200 250" aria-hidden="true"><circle cx="100" cy="75" r="33"/><path d="M35 245v-47c0-74 130-74 130 0v47"/></svg><span class="portrait-placeholder-label">PORTRAIT TO BE PROVIDED</span></div>
+              @if (photo != null) { <img src="@photo" alt="@member.FullName" loading="lazy" width="800" height="1000" /> }
+              <span class="portrait-caption">THE HUMAN SIDE OF THE SYSTEM</span>
+            </div>
+            <div class="editorial-member-copy"><div class="member-meta"><span class="editorial-member-number">@((i + 1).ToString("00"))</span><span>@(member.Placeholder ? "PROFILE AWAITING VERIFICATION" : "PROJECT CONTRIBUTOR")</span></div><h2 id="member-title-@(i + 1)">@member.FullName</h2><p class="editorial-member-role">@member.Role</p><div class="member-responsibility"><span class="public-eyebrow">RESPONSIBILITIES &amp; CONTRIBUTIONS</span><p>@member.Contributions</p></div>
+              <div class="editorial-socials">
+                @if (TeamMemberViewModel.ProfileUrl(member.GitHub) is string github) { <a href="@github" target="_blank" rel="noopener noreferrer" aria-label="@member.FullName on GitHub (opens a new tab)">GitHub ↗</a> }
+                @if (TeamMemberViewModel.ProfileUrl(member.LinkedIn) is string linkedin) { <a href="@linkedin" target="_blank" rel="noopener noreferrer" aria-label="@member.FullName on LinkedIn (opens a new tab)">LinkedIn ↗</a> }
+              </div>
+            </div>
+          </article>
+        }
+        </div>
+      </div>
+      <div class="editorial-team-controls"><div class="team-direction-controls"><button type="button" data-team-prev aria-label="Previous team member">←</button><button type="button" data-team-next aria-label="Next team member">→</button></div><div class="editorial-member-nav" role="group" aria-label="Choose a team member">@for(var i = 0; i < Model.Count; i++){<button type="button" data-team-index="@i" aria-controls="member-@(i + 1)" aria-label="View @Model[i].FullName">@((i + 1).ToString("00"))</button>}</div><span class="editorial-team-count" aria-hidden="true">01 / @Model.Count.ToString("00")</span><span class="sr-only" id="team-announcement" role="status"></span></div>
+    </div>
+  </section>
+  }
+  <section class="page-shell team-collective" aria-labelledby="collective-title"><div class="collective-heading public-reveal"><span class="public-eyebrow">THE COLLECTIVE</span><h2 id="collective-title">Individual perspectives.<br /><em>A shared ambition.</em></h2><p>One connected project, brought together through different responsibilities.</p></div>
+    <div class="collective-lineup">
+    @for(var i = 0; i < Model.Count; i++){var member=Model[i]; var photo=!string.IsNullOrWhiteSpace(member.Image)&&Url.IsLocalUrl(member.Image)?member.Image:null;
+      <a class="collective-person public-reveal" href="#member-@(i + 1)" data-team-jump="@i"><div class="collective-portrait">@if(photo != null){<img src="@photo" alt="" loading="lazy" width="400" height="500"/>}else{<span aria-hidden="true">@((i + 1).ToString("00"))</span><small>PORTRAIT PENDING</small>}</div><span class="collective-name">@member.FullName</span><span class="collective-role">@member.Role</span></a>
+    }
+    </div>
+    <p class="collective-signoff public-reveal">Different Minds. One Vision.<br /><em>One Powerful System.</em></p>
+  </section>
+  <section class="page-shell public-next public-reveal"><span class="public-eyebrow">START A CONVERSATION</span><a asp-action="Contact">A question.<br /><em>A new connection.</em><span aria-hidden="true">↗</span></a></section>
+</main>
+@section Scripts {<script type="module" src="~/js/editorial-team.js" asp-append-version="true"></script>}

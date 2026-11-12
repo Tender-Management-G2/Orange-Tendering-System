@@ -1,0 +1,87 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Review Unified Evaluation Report
+
+DEVELOPER OWNER: Haya
+MODULE: Sourcing Manager Review
+TRELLO TASK: Review Unified Evaluation Report
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+The Manager reads the detailed report, corrects the
+permitted narrative and chooses the next action.
+
+BUSINESS ACCESS:
+Sourcing Manager
+
+ROUTE: /SourcingManager/Reports/Review/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the report with its RankingSnapshotJson read-only.
+- Narrative correction = new TenderReport row (VersionNumber
+  + 1, PreviousReportId).
+- Never update EvaluationScores or CommitteeVotes from here.
+
+DEPENDENCIES:
+TenderReports, CommitteeRounds, EvaluationScores
+(read-only).
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Manager actions must not overwrite approved committee scores
+or votes.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Review Unified Evaluation Report";
+    ViewData["WorkspaceSection"] = "Report Review";
+    ViewData["Description"] = "Read the detailed report and correct the managerial narrative. Committee scores and votes are frozen.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Report</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Version</dt><dd>—</dd></div>
+        <div><dt>Submitted by</dt><dd>—</dd></div>
+        <div><dt>Submitted</dt><dd>—</dd></div>
+        <div><dt>Recommended offer</dt><dd>—</dd></div>
+        <div><dt>Evaluation round</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-committee-result-frozen">
+    <div class="pg-panel-head"><h2 id="tbl-committee-result-frozen">Committee result (frozen)</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Rank</th><th scope="col">Supplier</th><th scope="col">Final score</th><th scope="col">Eligible</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Committee result not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Managerial narrative</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="f-report-narrative-1">Report narrative</label><textarea id="f-report-narrative-1" rows="4"></textarea><small class="pg-hint">A correction creates a new report version; the submitted version is kept.</small></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save as new version</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Approve">Approve</a></li>
+        <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Return">Return for review</a></li>
+        <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Reject">Reject</a></li>
+        <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Forward">Forward to Top Committee</a></li>
+    </ul>
+</nav>

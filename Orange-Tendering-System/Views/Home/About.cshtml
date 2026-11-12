@@ -1,0 +1,66 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: About
+
+DEVELOPER OWNER: Tariq
+MODULE: Public Site
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Project purpose, challenges, solution and workflow.
+
+BUSINESS ACCESS:
+Anonymous
+
+ROUTE: /about
+
+FUTURE IMPLEMENTATION:
+- Review the wording with the team.
+
+DEPENDENCIES:
+None (static).
+
+STATUS:
+PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
+
+IMPORTANT:
+No dedicated Trello card — part of Tariq’s public site.
+===========================================================
+*@
+@{ ViewData["Title"] = "About Us | Orange Sourcing"; }
+<main class="public-page about-page" id="about-page">
+  <section class="editorial-hero page-shell">
+    <div class="page-overline"><span>ABOUT THE PLATFORM</span><span>01 / PURPOSE &amp; PERSPECTIVE</span></div>
+    <div class="about-title-layout">
+      <h1>Procurement.<br />With a clear<br /><em>sense of direction.</em></h1>
+      <div class="about-hero-note"><span class="editorial-rule"></span><p>From an initial requirement to a documented award. One shared framework for people, information, and decisions.</p><a class="editorial-link" href="#purpose">Discover our purpose <span aria-hidden="true">↓</span></a></div>
+    </div>
+    <div class="about-panorama public-reveal" role="img" aria-label="Orange office building with illuminated orange architecture"><span>STRUCTURE. CLARITY. CONNECTION.</span><span>THE ORANGE SOURCING PROJECT</span></div>
+  </section>
+  <section id="purpose" class="page-shell editorial-story public-reveal" aria-labelledby="purpose-title">
+    <span class="public-eyebrow">01 / THE PURPOSE</span>
+    <div><h2 id="purpose-title">Better decisions begin<br />with a clearer process.</h2><p class="editorial-lead">The Sourcing &amp; Tender Management System is designed to bring structure to the procurement journey, connecting purchase requests, tenders, bids, evaluations, and approval responsibilities.</p><p>The goal is practical: keep requirements understandable, decisions accountable, and the right people connected to the right procurement context.</p></div>
+  </section>
+  <section class="challenge-band" aria-labelledby="challenge-title">
+    <div class="page-shell challenge-layout"><div class="public-reveal"><span class="public-eyebrow">02 / THE CHALLENGE</span><h2 id="challenge-title">Less fragmentation.<br /><em>More shared context.</em></h2><p>Procurement involves different teams, different evidence, and decisions that depend on one another. A structured digital approach aims to reduce the gaps between them.</p></div>
+    <div class="challenge-list">
+      <article class="public-reveal"><span>01</span><div><h3>Scattered information</h3><p>Requirements, supplier responses, and clarification context need a defined place in the process.</p></div></article>
+      <article class="public-reveal"><span>02</span><div><h3>Complex responsibilities</h3><p>Requesters, sourcing officers, suppliers, evaluators, and approving committees have distinct responsibilities.</p></div></article>
+      <article class="public-reveal"><span>03</span><div><h3>Decisions that need evidence</h3><p>Technical compliance and financial value need to be considered together, with authorized human review.</p></div></article>
+    </div></div>
+  </section>
+  <section class="page-shell editorial-story public-reveal" aria-labelledby="solution-title">
+    <span class="public-eyebrow">03 / THE DIGITAL SOLUTION</span>
+    <div><h2 id="solution-title">A connected framework.<br /><em>A human decision.</em></h2><p class="editorial-lead">The project brings an ASP.NET Core MVC interface, Identity accounts, and an EF Core data model into one application.</p><p>Employee sign-in, pending supplier registration, database-backed contact inquiries, and authorized procurement statistics are implemented. The homepage’s role, evaluation, and communication explorers explain the intended experience using clearly marked demonstrations.</p>
+    <div class="implementation-note" role="note"><span class="public-eyebrow">PROJECT SCOPE</span><p>Operational procurement screens, workflow authorization, committee approvals, and supplier record isolation remain implementation work. Ollama insights are conceptual; no AI model is called by the public demonstration.</p></div></div>
+  </section>
+  <section class="page-shell about-workflow public-reveal" aria-labelledby="about-workflow-title">
+    <div class="editorial-section-heading"><span class="public-eyebrow">04 / THE DEFINED WORKFLOW</span><h2 id="about-workflow-title">Six stages.<br />One deliberate journey.</h2><a class="editorial-link" asp-action="HowItWorks">Explore the workflow <span aria-hidden="true">↗</span></a></div>
+    <ol class="workflow-ribbon"><li><span>01</span>Purchase request</li><li><span>02</span>Create tender</li><li><span>03</span>Supplier bidding</li><li><span>04</span>Evaluation</li><li><span>05</span>Approvals</li><li><span>06</span>Award &amp; closure</li></ol>
+    <p class="public-caption">The defined project workflow. Operational implementation is in progress.</p>
+  </section>
+  <section class="page-shell objectives" aria-labelledby="objectives-title"><span class="public-eyebrow">05 / OUR OBJECTIVES</span><h2 id="objectives-title" class="public-reveal">Built around what matters.</h2><div class="objectives-list"><article class="public-reveal"><span>01 / TRANSPARENCY</span><h3>Make responsibilities clear.</h3><p>A defined process for understanding who participates and how decisions should be documented.</p></article><article class="public-reveal"><span>02 / EFFICIENCY</span><h3>Keep context connected.</h3><p>A shared framework for requirements, tenders, supplier responses, and evaluations.</p></article><article class="public-reveal"><span>03 / COLLABORATION</span><h3>Connect with purpose.</h3><p>Clarification relationships designed around authorized people and procurement stages.</p></article></div></section>
+  <section class="page-shell public-next public-reveal"><span class="public-eyebrow">THE PEOPLE BEHIND THE PURPOSE</span><a asp-action="Team">Different minds.<br /><em>One shared vision.</em><span aria-hidden="true">↗</span></a></section>
+</main>

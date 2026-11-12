@@ -1,0 +1,56 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Edit Department
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: Department Management
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Form to rename, describe or deactivate a department.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Departments/Edit/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load by id; POST Edit; audit changes.
+
+DEPENDENCIES:
+Departments, PurchaseRequests, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Edit Department";
+    ViewData["WorkspaceSection"] = "Departments";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Department</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-name-1">Name</label><input id="f-name-1" type="text" /><small class="pg-hint">Must be unique.</small></div>
+                <div class="pg-field pg-field-wide"><label for="f-description-2">Description</label><textarea id="f-description-2" rows="4"></textarea></div>
+                <label class="pg-check"><input type="checkbox" id="f-active-3" /> Active</label>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save changes</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
+
+<aside class="pg-note"><strong>Keep history</strong><p>Departments with purchase requests cannot be deleted (Restrict foreign keys). Deactivate them instead.</p></aside>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="Admin" asp-controller="Departments" asp-action="Index">Back to departments</a></li>
+    </ul>
+</nav>

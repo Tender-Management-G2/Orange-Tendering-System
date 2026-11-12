@@ -1,51 +1,62 @@
-﻿<!DOCTYPE html>
+﻿@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+FILE: Public layout (public website + Identity account pages)
+
+OWNER: Tariq — Shared Layout
+MODULE: Public Site & Shared Layout
+TRELLO TASK: Shared Layout & Responsive Design
+
+PURPOSE:
+Shell for the public pages (Home, About, Team, How It Works,
+Contact) and for every ASP.NET Core Identity page (login,
+register, password reset, account management).
+Converted from the supplied layout ZIP (Views/Shared/_Layout).
+
+NOTES:
+- Workspace pages use _WorkspaceLayout or _SupplierLayout.
+- Identity pages set ViewData["IdentityPage"] (Areas/Identity/
+  Pages/_ViewStart.cshtml) to load identity.css, which styles
+  the default Identity UI markup without loading Bootstrap.
+
+STATUS:
+INTEGRATED. No business logic.
+===========================================================
+*@
+@{
+    var isIdentityPage = ViewData["IdentityPage"] is true;
+}
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Orange_Tendering_System</title>
-    <script type="importmap"></script>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/Orange_Tendering_System.styles.css" asp-append-version="true" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="description" content="Orange Sourcing & Tender Management System" />
+    <title>@(ViewData["Title"] ?? "Orange Sourcing & Tender Management System")</title>
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/css/styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/premium.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/experience.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/mvc.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/public-pages.css" asp-append-version="true" />
+    @if (isIdentityPage)
+    {
+        <link rel="stylesheet" href="~/css/identity.css" asp-append-version="true" />
+    }
+    @await RenderSectionAsync("Styles", required: false)
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Orange_Tendering_System</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
-                    <partial name="_LoginPartial" />
-                </div>
-            </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <partial name="_Icons" />
+    <partial name="_Header" />
+    <div id="main-content" class="@(isIdentityPage ? "identity-page" : null)">
+        @RenderBody()
     </div>
-
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - Orange_Tendering_System - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    <partial name="_Footer" />
+    <dialog aria-labelledby="dialog-title"><button class="close" aria-label="Close dialog">×</button><div class="dialog-content"></div></dialog>
     @await RenderSectionAsync("Scripts", required: false)
+    <script src="~/js/experience.js" asp-append-version="true"></script>
+    <script src="~/js/public-pages.js" asp-append-version="true"></script>
 </body>
 </html>

@@ -1,27 +1,27 @@
-﻿@using Microsoft.AspNetCore.Identity
+﻿@*
+  OWNER: Ahmad — Authentication (markup styled by Tariq's shared layout)
+  Sign-in state from ASP.NET Core Identity. Public registration is intended for suppliers only;
+  internal employee accounts are created by Admin (see Areas/Identity/Pages/Account/Register.cshtml).
+*@
+@using Microsoft.AspNetCore.Identity
 @using Orange_Tendering_System.Models.Entities
 @inject SignInManager<ApplicationUser> SignInManager
-@inject UserManager<ApplicationUser> UserManager
 
-<ul class="navbar-nav">
 @if (SignInManager.IsSignedIn(User))
 {
-    <li class="nav-item">
-        <a  class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Manage/Index" title="Manage">Hello @User.Identity?.Name!</a>
-    </li>
-    <li class="nav-item">
-        <form  class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })">
-            <button  type="submit" class="nav-link btn btn-link text-dark">Logout</button>
-        </form>
-    </li>
+    <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" method="post">
+        <button class="signin" type="submit">Sign Out</button>
+    </form>
+    <a class="register" asp-area="" asp-controller="Workspace" asp-action="Index" title="Signed in as @User.Identity?.Name">
+        <svg aria-hidden="true"><use href="#user" /></svg><span>My Workspace</span>
+    </a>
 }
 else
 {
-    <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Register">Register</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Login">Login</a>
-    </li>
+    <a class="signin" asp-area="Identity" asp-page="/Account/Login">
+        <svg aria-hidden="true"><use href="#user" /></svg>Employee Login
+    </a>
+    <a class="register" asp-area="Identity" asp-page="/Account/Register">
+        <svg aria-hidden="true"><use href="#user" /></svg><span>Supplier Registration</span>
+    </a>
 }
-</ul>

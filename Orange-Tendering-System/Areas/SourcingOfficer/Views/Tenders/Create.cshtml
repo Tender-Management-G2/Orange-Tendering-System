@@ -1,0 +1,83 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Create Tender
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management
+TRELLO TASK: Create Tender
+TRELLO URL: https://trello.com/c/907F6ufP
+
+PURPOSE:
+Allow the Sourcing Officer to create a tender from an
+eligible (Accepted) purchase request.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Tenders/Create/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the selected purchase request and its items.
+- Copy the items into TenderItems (the official items
+  suppliers price).
+- Configure tender details and round dates; validate
+  required fields and Deadline > OpensAt.
+- Save Tender (Draft) and TenderRound 1 using EF Core.
+- Continue with Supplier Selection for the round.
+
+DEPENDENCIES:
+Tenders, PurchaseRequests, PurchaseRequestItems,
+TenderRounds, TenderItems, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Do not invent tender approval rules or scoring formulas.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Create Tender";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = "Create a tender from an accepted purchase request and prepare its first tendering round.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Tender details</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-purchase-request-1">Purchase request</label><select id="f-purchase-request-1"><option>Select an accepted purchase request</option></select></div>
+                <div class="pg-field"><label for="f-title-2">Title</label><input id="f-title-2" type="text" /></div>
+                <div class="pg-field pg-field-wide"><label for="f-description-3">Description</label><textarea id="f-description-3" rows="4"></textarea></div>
+                <div class="pg-field pg-field-wide"><label for="f-requirements-4">Requirements</label><textarea id="f-requirements-4" rows="4"></textarea><small class="pg-hint">Mandatory documents and conditions suppliers must meet. Used later in the compliance check.</small></div>
+            </div>
+        </fieldset>
+    </form>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-tender-items-copied-from-the-purchase-request">
+    <div class="pg-panel-head"><h2 id="tbl-tender-items-copied-from-the-purchase-request">Tender items (copied from the purchase request)</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Item</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Select a purchase request to load its items."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>First tendering round</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-opens-at-5">Opens at</label><input id="f-opens-at-5" type="datetime-local" /></div>
+                <div class="pg-field"><label for="f-deadline-6">Deadline</label><input id="f-deadline-6" type="datetime-local" /></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save as draft</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>

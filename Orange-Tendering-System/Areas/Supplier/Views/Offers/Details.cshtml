@@ -1,0 +1,75 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Offer Details
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Supplier Portal
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Read-only view of one of the supplier’s own offers.
+
+BUSINESS ACCESS:
+Supplier (own company only, Admin-approved)
+
+ROUTE: /Supplier/Offers/Details/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load an own bid only. Never show compliance notes or
+  evaluation scores to the supplier.
+
+DEPENDENCIES:
+Bids, BidItems, Documents.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Every query must be filtered by the signed-in user’s
+SupplierId. Never show other suppliers’ invitations, offers,
+prices or evaluations.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Offer Details";
+    ViewData["WorkspaceSection"] = "My Offers";
+    ViewData["Description"] = "One of your offers as submitted.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Offer</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Round</dt><dd>—</dd></div>
+        <div><dt>Revision</dt><dd>—</dd></div>
+        <div><dt>Status</dt><dd>—</dd></div>
+        <div><dt>Submitted</dt><dd>—</dd></div>
+        <div><dt>Currency</dt><dd>—</dd></div>
+        <div><dt>Delivery (days)</dt><dd>—</dd></div>
+        <div><dt>Valid until</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-item-prices">
+    <div class="pg-panel-head"><h2 id="tbl-item-prices">Item prices</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender item</th><th scope="col">Quantity</th><th scope="col">Unit price</th><th scope="col">Line total</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Offer not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-documents">
+    <div class="pg-panel-head"><h2 id="tbl-documents">Documents</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th></tr></thead>
+            <tbody><tr><td colspan="2"><partial name="_EmptyState" model='"No documents attached."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

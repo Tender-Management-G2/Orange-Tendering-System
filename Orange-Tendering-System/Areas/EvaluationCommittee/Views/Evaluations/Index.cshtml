@@ -1,0 +1,72 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Assigned Evaluations
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Technical & Financial Evaluation Committee
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Entry point for a committee member: list assigned evaluation
+rounds and open the Officer’s comparison report.
+
+BUSINESS ACCESS:
+Evaluation Committee member (assigned to the tender)
+
+ROUTE: /EvaluationCommittee/Evaluations
+
+FUTURE IMPLEMENTATION:
+- Query CommitteeRounds (Evaluation, InProgress) where the
+  user is a CommitteeMember of the tender.
+- Show the round’s TenderReport (OfficerComparison)
+  read-only.
+
+DEPENDENCIES:
+CommitteeMembers, CommitteeRounds, TenderReports, Bids.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required by the workflow (committee entry point) but no
+Trello card covers it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Assigned Evaluations";
+    ViewData["WorkspaceSection"] = "Assigned Evaluations";
+    ViewData["Description"] = "Tenders assigned to you for evaluation, with the Officer’s comparison report.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-assigned-evaluation-rounds">
+    <div class="pg-panel-head"><h2 id="tbl-assigned-evaluation-rounds">Assigned evaluation rounds</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Tender round</th><th scope="col">Committee round</th><th scope="col">Eligible offers</th><th scope="col">Status</th><th scope="col">My scoring</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"You are not assigned to any evaluation round."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Officer’s comparison report</h2>
+    <dl class="pg-dl">
+        <div><dt>Report version</dt><dd>—</dd></div>
+        <div><dt>Prepared by</dt><dd>—</dd></div>
+        <div><dt>Submitted</dt><dd>—</dd></div>
+        <div><dt>Submitted offers</dt><dd>—</dd></div>
+        <div><dt>Eligible offers</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="EvaluationCommittee" asp-controller="Criteria" asp-action="Index">Criteria &amp; weights</a></li>
+        <li><a asp-area="EvaluationCommittee" asp-controller="Evaluations" asp-action="Technical">Technical evaluation</a></li>
+        <li><a asp-area="EvaluationCommittee" asp-controller="Evaluations" asp-action="Financial">Financial evaluation</a></li>
+    </ul>
+</nav>

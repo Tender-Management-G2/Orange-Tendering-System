@@ -1,0 +1,65 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Bid & Clarification History
+
+DEVELOPER OWNER: Saja
+MODULE: Sourcing Officer / Bid Management
+TRELLO TASK: Bid & Clarification History
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show the full revision history of an offer and its related
+clarification threads.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Bids/History/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load all Bids of the same TenderInvitation ordered by
+  RevisionNumber.
+- Load Clarifications where BidId belongs to those
+  revisions.
+
+DEPENDENCIES:
+Bids, Clarifications, ClarificationMessages.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Bid & Clarification History";
+    ViewData["WorkspaceSection"] = "Received Bids";
+    ViewData["Description"] = "All revisions of a supplier’s offer and the clarifications exchanged about it.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-offer-revisions">
+    <div class="pg-panel-head"><h2 id="tbl-offer-revisions">Offer revisions</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Revision</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Submitted</th><th scope="col">Compliance</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No revisions loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-clarifications">
+    <div class="pg-panel-head"><h2 id="tbl-clarifications">Clarifications</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Subject</th><th scope="col">With</th><th scope="col">Status</th><th scope="col">Opened</th><th scope="col">Closed</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No clarifications for this offer."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Clarifications" asp-action="Index">Supplier clarification requests</a></li>
+    </ul>
+</nav>

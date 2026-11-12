@@ -1,8 +1,601 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
-}
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Home / Landing Page
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+DEVELOPER OWNER: Tariq
+MODULE: Public Site & Shared Layout
+TRELLO TASK: Home / Landing Page
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Public landing page from the supplied layout: hero, workflow
+animation, role explorers and calls to action.
+
+BUSINESS ACCESS:
+Anonymous
+
+ROUTE: /
+
+FUTURE IMPLEMENTATION:
+- Replace clearly labelled demo explorers with real content
+  when available.
+- Bind the procurement overview to real, non-confidential,
+  role-filtered statistics.
+
+DEPENDENCIES:
+None (static).
+
+STATUS:
+PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
+===========================================================
+*@
+@{ ViewData["Title"] = "Orange | Sourcing & Tender Management System"; }
+<main id="home">
+      <section class="showcase" aria-label="Orange procurement platform">
+        <div
+          class="building"
+          role="img"
+          aria-label="Orange office building at dusk with orange illuminated architecture"
+        ></div>
+        <div class="ambient"></div>
+        <div class="hero">
+          <h1>
+            <span>Orange</span><strong>Sourcing & Tender</strong
+            ><span>Management System</span>
+          </h1>
+          <p>
+            A digital platform to streamline procurement, manage<br
+              class="desktop"
+            />
+            tenders, evaluate bids, and build trusted supplier partnerships.
+          </p>
+          <div class="hero-actions">
+            <a class="primary"  asp-area="Identity" asp-page="/Account/Register">
+              Get Started <span>→</span></a><button class="overview" data-dialog="overview">
+              <span class="play">▶</span>Watch Overview
+            </button>
+          </div>
+        </div>
+        <svg
+          class="back-wave"
+          viewBox="0 0 1672 370"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
+              <stop stop-color="#ff8500" stop-opacity=".5" />
+              <stop offset="1" stop-color="#ff6000" stop-opacity="0" />
+            </linearGradient>
+            <filter id="glow"><feGaussianBlur stdDeviation="5" /></filter>
+          </defs>
+          <path
+            d="M0 290C230 440 340 160 650 215S930 270 1150 144 1400 25 1510 100 1610 159 1672 180L1672 230C1470 180 1460 90 1310 130S1040 320 800 260 450 170 300 300 100 370 0 330Z"
+            fill="url(#ribbon)"
+          />
+          <path
+            d="M0 290C230 440 340 160 650 215S930 270 1150 144 1400 25 1510 100 1610 159 1672 180"
+            fill="none"
+            stroke="#ff7900"
+            stroke-width="3"
+            opacity=".7"
+          />
+        </svg>
+        <section
+          id="workflow"
+          class="workflow"
+          aria-label="Six stages of the tender workflow"
+        >
+          <div class="stage-list"></div>
+          <svg
+            class="track"
+            viewBox="0 0 1672 240"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <filter
+                id="lineGlow"
+                x="-50%"
+                y="-300%"
+                width="200%"
+                height="700%"
+              >
+                <feGaussianBlur stdDeviation="5" />
+              </filter>
+              <filter
+                id="pulseGlow"
+                x="-200%"
+                y="-200%"
+                width="500%"
+                height="500%"
+              >
+                <feGaussianBlur stdDeviation="9" />
+              </filter>
+            </defs>
+            <defs>
+              <path
+                id="route"
+                d="M-30 105C80 135 138 190 232 171S372 158 487 165 615 145 736 145 875 155 979 151 1115 134 1237 131 1400 130 1498 145 1620 169 1705 130"
+              />
+            </defs>
+            <use href="#route" class="route-glow" />
+            <use href="#route" class="route-base" />
+            <path class="pulse-tail" />
+            <g class="nodes"></g>
+            <circle class="pulse-halo" r="19" />
+            <circle class="pulse" r="5" />
+          </svg>
+        </section>
+        <div class="pagination" aria-label="Workflow animation controls">
+          <button
+            class="active"
+            aria-label="Play workflow"
+            title="Play workflow"
+          ></button><button aria-label="Pause workflow" title="Pause workflow"></button><button
+            aria-label="Restart workflow"
+            title="Restart workflow"
+          ></button>
+        </div>
+        <section class="features" aria-label="Platform features"></section>
+        <svg
+          class="footer-wave"
+          viewBox="0 0 1672 110"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="bottom">
+              <stop stop-color="#ff7900" />
+              <stop offset=".4" stop-color="#421d0b" />
+              <stop offset=".65" stop-color="#1c100b" />
+              <stop offset="1" stop-color="#ff6800" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0 42C160 165 220 28 418 43S790 136 1034 90 1420-5 1672 45V110H0Z"
+            fill="url(#bottom)"
+          />
+          <path
+            d="M0 42C160 165 220 28 418 43S790 136 1034 90 1420-5 1672 45"
+            fill="none"
+            stroke="#ff7900"
+            stroke-opacity=".7"
+            stroke-width="1.5"
+          />
+          <path
+            d="M0 63C170 165 250 45 455 66S820 150 1100 116 1430-9 1672 44V110H0Z"
+            fill="url(#bottom)"
+            opacity=".5"
+          />
+        </svg>
+      </section>
+      <section
+        id="story"
+        class="section story-section"
+        aria-labelledby="story-title"
+      >
+        <div class="section-heading reveal">
+          <div>
+            <span class="eyebrow">01 / THE PROCUREMENT JOURNEY</span>
+            <h2 id="story-title">
+              From intent to impact.<br /><span>Connected at every step.</span>
+            </h2>
+          </div>
+          <p>
+            Six purposeful stages. One clear path to a confident procurement
+            decision.
+          </p>
+        </div>
+        <div class="story-grid">
+          <div class="story-sticky">
+            <div class="orbit-visual" aria-hidden="true">
+              <svg viewBox="0 0 400 400">
+                <circle class="orbit-base" cx="200" cy="200" r="165" />
+                <circle
+                  class="orbit-progress"
+                  cx="200"
+                  cy="200"
+                  r="165"
+                  pathLength="1"
+                />
+                <circle cx="200" cy="200" r="125" />
+                <path d="M25 200h70m210 0h70M200 25v70m0 210v70" /></svg
+              ><span class="story-count">01</span
+              ><span class="orbit-label">PURCHASE REQUEST</span
+              ><span class="orbit-dot"></span>
+            </div>
+            <p class="sticky-caption">
+              A clear process.<br /><strong>A shared direction.</strong>
+            </p>
+          </div>
+          <div class="story-steps"></div>
+        </div>
+      </section>
+      <section
+        id="evaluation"
+        class="section evaluation-section"
+        aria-labelledby="evaluation-title"
+      >
+        <div class="section-heading reveal">
+          <div>
+            <span class="eyebrow">02 / INTELLIGENT EVALUATION</span>
+            <h2 id="evaluation-title">
+              More clarity.<br /><span>Better-informed decisions.</span>
+            </h2>
+          </div>
+          <p>
+            Compare technical merit and financial value side by side. Give your
+            committee a clear, consolidated view.
+          </p>
+        </div>
+        <div class="evaluation-console glass reveal">
+          <div class="console-bar">
+            <div>
+              <span class="status-dot"></span> Evaluation workspace
+              <span class="console-id">/ IT infrastructure tender</span>
+            </div>
+            <span class="demo-badge">ILLUSTRATIVE DEMO · SAMPLE DATA</span>
+          </div>
+          <div class="evaluation-layout">
+            <div class="comparison">
+              <div class="panel-title">
+                <h3>Supplier comparison</h3>
+                <span>03 sample bids</span>
+              </div>
+              <div class="weight-control">
+                <label for="technical-weight"
+                  >Technical weight
+                  <strong id="technical-value">60%</strong></label
+                ><input
+                  type="range"
+                  id="technical-weight"
+                  min="10"
+                  max="90"
+                  value="60"
+                  step="5"
+                /><span
+                  >Financial weight
+                  <strong id="financial-value">40%</strong></span
+                >
+              </div>
+              <p class="formula">
+                Weighted score = (technical × technical weight) + (financial ×
+                financial weight)
+              </p>
+              <div class="table-scroll">
+                <table>
+                  <caption class="sr-only">
+                    Illustrative supplier scores, recalculated as weights change
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Supplier</th>
+                      <th scope="col">Technical</th>
+                      <th scope="col">Financial</th>
+                      <th scope="col">Weighted</th>
+                      <th scope="col">Rank</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bid-table"></tbody>
+                </table>
+              </div>
+              <div class="chart-legend">
+                <span><i></i>Technical contribution</span
+                ><span><i></i>Financial contribution</span>
+              </div>
+              <div
+                id="score-chart"
+                class="score-chart"
+                aria-label="Weighted score comparison"
+              ></div>
+              <p id="rank-summary" class="sr-only" aria-live="polite"></p>
+            </div>
+            <aside class="insights-panel">
+              <div class="ai-mark">
+                <svg aria-hidden="true"><use href="#ai" /></svg
+                ><span>Ollama insights<small>CONCEPTUAL INTERFACE</small></span>
+              </div>
+              <span class="small-label">RECOMMENDATION SUPPORT</span>
+              <h3>Turn comparison into context.</h3>
+              <p id="ai-insight"></p>
+              <div class="human-decision">
+                <svg aria-hidden="true"><use href="#people" /></svg>
+                <div>
+                  <strong>Human committee decision</strong>
+                  <p>
+                    AI supports review. Authorized committees validate evidence,
+                    approve scores, and make award decisions.
+                  </p>
+                </div>
+              </div>
+              <button class="text-button" id="report-open">
+                View consolidated sample report <span>↗</span>
+              </button>
+              <p class="fineprint">
+                Sample scores and explanatory insights are computed locally for
+                this demo. No model is being called.
+              </p>
+            </aside>
+          </div>
+        </div>
+      </section>
+      <section
+        id="roles"
+        class="section roles-section explorer-section"
+        aria-label="Role Explorer"
+      >
+        <div class="section-heading reveal">
+          <div>
+            <span class="eyebrow">03 / GOVERNED BY DESIGN</span>
+            <h2>Clear roles.<br /><span>Confident collaboration.</span></h2>
+          </div>
+          <p>
+            Explore who does what, where they participate, and how
+            responsibilities stay distinct.
+          </p>
+        </div>
+        <div class="explorer-shell glass reveal">
+          <div class="explorer-toolbar">
+            <span
+              ><svg aria-hidden="true"><use href="#shield" /></svg> Role
+              Explorer</span
+            ><span class="quiet-tag">7 SYSTEM ROLES</span>
+          </div>
+          <div class="role-layout">
+            <div class="role-selector">
+              <span class="micro-label">CHOOSE A ROLE</span>
+              <div
+                class="role-tabs"
+                role="tablist"
+                aria-label="System roles"
+                aria-orientation="vertical"
+              ></div>
+            </div>
+            <div
+              class="role-panel"
+              id="role-panel"
+              role="tabpanel"
+              tabindex="0"
+            ></div>
+          </div>
+        </div>
+        <div class="access-notes reveal">
+          <div>
+            <svg aria-hidden="true"><use href="#shield" /></svg
+            ><span
+              ><strong>Role-scoped access</strong
+              ><small>Responsibilities define each workspace.</small></span
+            >
+          </div>
+          <div>
+            <svg aria-hidden="true"><use href="#user" /></svg
+            ><span
+              ><strong>Supplier isolation</strong
+              ><small>Each supplier’s own records only.</small></span
+            >
+          </div>
+          <div class="integration-note">
+            <span class="status-dot"></span
+            ><span>Identity roles are configured. Procurement workflow authorization remains implementation work.</span>
+          </div>
+        </div>
+      </section>
+      <section
+        id="clarifications"
+        class="section clarification-section explorer-section"
+        aria-label="Communication Explorer"
+      >
+        <div class="section-heading reveal">
+          <div>
+            <span class="eyebrow">04 / CLARIFICATIONS & INQUIRIES</span>
+            <h2>The right people.<br /><span>The right conversation.</span></h2>
+          </div>
+          <p>
+            Five authorized connections. Every clarification stays linked to its
+            procurement context.
+          </p>
+        </div>
+        <div class="communication-layout reveal">
+          <div class="connection-directory">
+            <div class="directory-heading">
+              <h3>Communication Explorer</h3>
+              <p>Select a connection to explore.</p>
+            </div>
+            <div
+              class="relationship-list"
+              aria-label="Authorized communication relationships"
+            ></div>
+            <div class="directory-note">
+              ↔ Bidirectional · Stage-restricted access
+            </div>
+          </div>
+          <div class="clarification-console glass">
+            <div class="console-bar">
+              <span
+                ><svg aria-hidden="true"><use href="#chat" /></svg> Conversation
+                preview</span
+              ><span class="demo-badge">ILLUSTRATIVE DEMO</span>
+            </div>
+            <div class="thread-panel">
+              <div class="thread-heading">
+                <div>
+                  <span class="small-label" id="thread-context"></span>
+                  <h3 id="thread-title"></h3>
+                </div>
+                <span id="thread-status" class="status-badge"></span>
+              </div>
+              <div class="participants" id="thread-participants"></div>
+              <div class="thread-messages"></div>
+              <div
+                class="status-switch"
+                role="group"
+                aria-label="Preview clarification status"
+              >
+                <span>Explore a status</span
+                ><button data-status="Pending" aria-pressed="false">
+                  Pending</button><button data-status="Answered" aria-pressed="true">
+                  Answered</button><button data-status="Resolved" aria-pressed="false">
+                  Resolved
+                </button>
+              </div>
+              <div class="thread-foot">
+                <span
+                  ><svg aria-hidden="true"><use href="#shield" /></svg>
+                  Authorized participants only</span
+                ><span>Demo · No messages sent</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section
+        id="analytics"
+        class="section analytics-section"
+        aria-label="Procurement Visibility"
+      >
+        <div class="section-heading reveal">
+          <div>
+            <span class="eyebrow">05 / PROCUREMENT VISIBILITY</span>
+            <h2>One view.<br /><span>A clearer perspective.</span></h2>
+          </div>
+          <p>
+            A dedicated view of tenders, suppliers, and procurement progress.
+            Ready for verified system data.
+          </p>
+        </div>
+        @* TODO (Tariq, with Admin/Top Committee owners): bind non-confidential, role-filtered statistics from the database.
+           The ZIP's insights script was not copied because its API endpoint does not exist in this project. *@
+        <div class="dashboard-shell glass reveal">
+          <div class="dashboard-toolbar">
+            <div>
+              <svg aria-hidden="true"><use href="#bars" /></svg
+              ><span
+                ><strong>Procurement overview</strong
+                ><small>System-wide visibility</small></span
+              >
+            </div>
+            <span class="connection-state"
+              ><i></i>Sign in for verified statistics</span
+            >
+          </div>
+          <div class="dashboard-body">
+            <div class="metric-grid">
+              <article class="metric">
+                <div class="metric-top">
+                  <svg aria-hidden="true"><use href="#layers" /></svg
+                  ><span class="metric-state">NOT CONNECTED</span>
+                </div>
+                <span>Active Tenders</span
+                ><strong aria-label="Not available">—</strong
+                ><small>Tenders currently in progress</small>
+              </article>
+              <article class="metric">
+                <div class="metric-top">
+                  <svg aria-hidden="true"><use href="#people" /></svg
+                  ><span class="metric-state">NOT CONNECTED</span>
+                </div>
+                <span>Approved Suppliers</span
+                ><strong aria-label="Not available">—</strong
+                ><small>Eligible supplier partnerships</small>
+              </article>
+              <article class="metric">
+                <div class="metric-top">
+                  <svg aria-hidden="true"><use href="#check" /></svg
+                  ><span class="metric-state">NOT CONNECTED</span>
+                </div>
+                <span>Completed Purchase Requests</span
+                ><strong aria-label="Not available">—</strong
+                ><small>Requests through completion</small>
+              </article>
+            </div>
+            <div class="analytics-grid">
+              <article class="analytics-panel">
+                <div class="panel-title">
+                  <h3>Tender Status Distribution</h3>
+                  <span class="quiet-tag">LIFECYCLE</span>
+                </div>
+                <div class="distribution-empty">
+                  <div class="empty-donut" aria-hidden="true">
+                    <span>—<small>No data</small></span>
+                  </div>
+                  <div class="distribution-legend">
+                    <span><i></i>Bidding<b>—</b></span
+                    ><span><i></i>Evaluation<b>—</b></span
+                    ><span><i></i>Approvals<b>—</b></span
+                    ><span><i></i>Closed<b>—</b></span>
+                  </div>
+                </div>
+                <p class="chart-caption">
+                  Distribution appears when verified tender data is connected.
+                </p>
+              </article>
+              <article class="analytics-panel">
+                <div class="panel-title">
+                  <h3>Procurement Activity</h3>
+                  <span class="quiet-tag">ACTIVITY</span>
+                </div>
+                <div class="activity-empty">
+                  <div class="chart-grid" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i>
+                  </div>
+                  <div class="activity-message">
+                    <svg aria-hidden="true"><use href="#bars" /></svg
+                    ><strong>Your activity, in focus.</strong
+                    ><span>Waiting for a verified data connection.</span>
+                  </div>
+                </div>
+                <p class="chart-caption">
+                  No sample activity or live statistics are displayed.
+                </p>
+              </article>
+            </div>
+            <div class="dashboard-empty-note">
+              <svg aria-hidden="true"><use href="#shield" /></svg
+              ><span
+                ><strong>Real insights start with real data.</strong> Metrics
+                are unavailable until the backend is connected.</span
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="about" class="home-editorial-previews section" aria-labelledby="home-preview-title">
+        <div class="section-heading reveal"><div><span class="eyebrow">06 / BEYOND THE PLATFORM</span><h2 id="home-preview-title">A clear purpose.<br /><span>A human perspective.</span></h2></div><p>Discover the project, the people behind it, and a place for your next question.</p></div>
+        <div class="home-preview-list">
+          <a class="home-preview reveal" asp-controller="Home" asp-action="About"><span class="home-preview-index">01 / ABOUT US</span><h3>Built for<br />a clearer journey.</h3><p>The purpose, principles, and defined workflow behind the platform.</p><span class="home-preview-link">Discover the platform <b aria-hidden="true">↗</b></span></a>
+          <a class="home-preview reveal" asp-controller="Home" asp-action="Team"><span class="home-preview-index">02 / OUR TEAM</span><h3>Different minds.<br />One vision.</h3><p>An editorial introduction to the people behind the system.</p><span class="home-preview-link">Meet the team <b aria-hidden="true">↗</b></span></a>
+          <a id="contact" class="home-preview reveal" asp-controller="Home" asp-action="Contact"><span class="home-preview-index">03 / CONTACT US</span><h3>Start a better<br />conversation.</h3><p>Questions about the project, supplier onboarding, or platform support.</p><span class="home-preview-link">Get in touch <b aria-hidden="true">↗</b></span></a>
+        </div>
+      </section>
+      <section id="suppliers" class="final-cta">
+        <svg
+          class="closing-waves"
+          viewBox="0 0 1600 500"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d="M-100 410C250 100 500 600 900 350S1400 200 1700 410" />
+          <path d="M-100 440C250 130 500 630 900 380S1400 230 1700 440" />
+          <path d="M-100 470C250 160 500 660 900 410S1400 260 1700 470" />
+        </svg>
+        <div class="reveal">
+          <span class="eyebrow">CONNECTED SOURCING. CONFIDENT DECISIONS.</span>
+          <h2>Your Next Procurement<br />Journey Starts Here.</h2>
+          <p>One platform to connect your teams, suppliers, and decisions.</p>
+          <div class="final-actions">
+            <a class="primary"  asp-area="Identity" asp-page="/Account/Login">
+              Employee Login <span>→</span></a><a class="overview"  asp-area="Identity" asp-page="/Account/Register">
+              Supplier Registration <span>↗</span>
+            </a>
+          </div>
+          <span class="cta-note"
+            >Employee sign-in · Supplier registration requires approval</span
+          >
+        </div>
+      </section>
+      
+    </main>
+
+@section Scripts {<script src="~/js/app.js" asp-append-version="true"></script><script src="~/js/sections.js" asp-append-version="true"></script>}

@@ -1,0 +1,70 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Face Registration & Recognition Login
+
+DEVELOPER OWNER: Ahmad
+MODULE: Authentication & Biometrics
+TRELLO TASK: Face Registration & Recognition Login
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Enrollment page for face-recognition sign-in; the sign-in
+entry point is on the Login page.
+
+BUSINESS ACCESS:
+Any signed-in user (enrolls their own account)
+
+ROUTE: /Biometrics/Face
+
+FUTURE IMPLEMENTATION:
+- Decide the face recognition provider and liveness method.
+- Implement enrollment and verification server-side; audit
+  attempts.
+- Enable the Login page button only when real verification
+  works.
+
+DEPENDENCIES:
+AspNetUsers, future biometric credential table, Login page,
+AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+No image-based fake authentication.
+===========================================================
+*@
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Face Registration & Recognition Login";
+    ViewData["WorkspaceSection"] = "My Workspace";
+    ViewData["Description"] = "Register face recognition sign-in for this account.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>Not implemented</strong><p>The camera is not used and no images are stored. A static photo must never be accepted as live face verification; liveness detection is required.</p></aside>
+
+<section class="ws-panel pg-panel">
+    <h2>Planned enrollment</h2>
+    <ol class="pg-steps">
+        <li><div><strong>Choose method</strong><small>Team decision on the face recognition provider</small></div></li>
+        <li><div><strong>Camera permission</strong><small>Ask the browser for camera access</small></div></li>
+        <li><div><strong>Liveness check</strong><small>Reject photos and recordings</small></div></li>
+        <li><div><strong>Register</strong><small>Store only what the provider requires, never raw face images</small></div></li>
+        <li><div><strong>Use at sign-in</strong><small>Login page face button</small></div></li>
+    </ol>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Register face recognition</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="f-device-name-1">Device name</label><input id="f-device-name-1" type="text" /></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Start face enrollment</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>

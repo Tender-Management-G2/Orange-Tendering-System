@@ -1,0 +1,70 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Supplier Selection
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management
+TRELLO TASK: Supplier Selection
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Select approved suppliers to invite to a specific tendering
+round.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Tenders/SelectSuppliers/{id?}
+
+FUTURE IMPLEMENTATION:
+- Query Suppliers with Status = Approved.
+- POST: create one TenderInvitation per selected supplier
+  for this TenderRound (unique TenderRoundId + SupplierId).
+- Notify invited supplier accounts; audit.
+
+DEPENDENCIES:
+Suppliers, TenderRounds, TenderInvitations, Notifications,
+AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Inviting three suppliers does not satisfy the three-offer
+rule; only submitted offers count.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Supplier Selection";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = "Choose which approved suppliers to invite to the current tendering round.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>Who can be invited</strong><p>Only Admin-approved, active suppliers. Each round has its own invitation list: a new round starts the selection from scratch, and a supplier can be invited once per round.</p></aside>
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search approved suppliers" aria-label="Search approved suppliers" disabled />
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-approved-suppliers">
+    <div class="pg-panel-head"><h2 id="tbl-approved-suppliers">Approved suppliers</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Select</th><th scope="col">Company</th><th scope="col">Registration no.</th><th scope="col">Previous invitations</th><th scope="col">Previous offers</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"Approved suppliers are not loaded yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Send invitations</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Invite selected suppliers</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>

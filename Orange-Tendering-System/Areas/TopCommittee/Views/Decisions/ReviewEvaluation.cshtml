@@ -1,0 +1,64 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Review Tender Evaluation
+
+DEVELOPER OWNER: Doulat
+MODULE: Top Committee
+TRELLO TASK: Review Tender Evaluation
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Top Committee members read the executive summary and key
+ranking before voting.
+
+BUSINESS ACCESS:
+Top Committee member (assigned to the tender)
+
+ROUTE: /TopCommittee/Decisions/ReviewEvaluation/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the CommitteeRound’s TenderReport (ExecutiveSummary).
+- Show only what the Top Committee is allowed to see.
+
+DEPENDENCIES:
+TenderReports, CommitteeRounds.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Review Tender Evaluation";
+    ViewData["WorkspaceSection"] = "Evaluation Summary";
+    ViewData["Description"] = "The Sourcing Manager’s short executive summary and the key comparison.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Executive summary</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Summary version</dt><dd>—</dd></div>
+        <div><dt>Forwarded by</dt><dd>—</dd></div>
+        <div><dt>Forwarded on</dt><dd>—</dd></div>
+        <div><dt>Recommended offer</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-key-comparison">
+    <div class="pg-panel-head"><h2 id="tbl-key-comparison">Key comparison</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Rank</th><th scope="col">Supplier</th><th scope="col">Final score</th><th scope="col">Calculated total</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Summary not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="TopCommittee" asp-controller="Decisions" asp-action="Decision">Go to voting</a></li>
+    </ul>
+</nav>

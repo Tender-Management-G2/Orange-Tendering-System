@@ -1,0 +1,20 @@
+@*
+  OWNER: Tariq — Shared Layout (account menu markup) · Ahmad — Authentication (sign-out, biometrics links)
+  Account dropdown used by _WorkspaceLayout and _SupplierLayout. Sign-out is the real Identity POST.
+*@
+@{
+    var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
+}
+<details class="ws-account">
+    <summary aria-label="Account menu"><span class="ws-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M3 22v-3c0-10 18-10 18 0v3" /></svg></span><span class="ws-account-label"><strong>@(User.Identity?.Name ?? "Signed-in user")</strong><small>@(workspace?.Label ?? "No workspace role")</small></span><svg class="ws-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
+    <div class="ws-account-menu">
+        <span class="ws-account-role">@(workspace?.Role ?? "No role assigned")</span>
+        <a asp-area="" asp-controller="Workspace" asp-action="Index">My workspaces</a>
+        <a asp-area="Identity" asp-page="/Account/Manage/Index">Account settings</a>
+        <a asp-area="" asp-controller="Biometrics" asp-action="Fingerprint">Fingerprint sign-in</a>
+        <a asp-area="" asp-controller="Biometrics" asp-action="Face">Face recognition sign-in</a>
+        <a asp-area="" asp-controller="Home" asp-action="Index">Public website ↗</a>
+        <button class="ws-icon-button ws-theme-toggle" type="button" aria-label="Switch color theme" aria-pressed="false" title="Switch color theme"><svg class="ws-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2" /></svg><svg class="ws-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15A9 9 0 0 1 9 3a9 9 0 1 0 11 12Z" /></svg></button>
+        <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" method="post"><button type="submit">Sign out</button></form>
+    </div>
+</details>

@@ -1,0 +1,86 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Supplier Details
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: Supplier Administration
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Read-only profile of a supplier company: accounts, documents
+and invitation history.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Suppliers/Details/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load Supplier with linked ApplicationUsers, Documents and
+  TenderInvitations.
+
+DEPENDENCIES:
+Suppliers, AspNetUsers, Documents, TenderInvitations, Bids.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Supplier Details";
+    ViewData["WorkspaceSection"] = "Suppliers";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Company</h2>
+    <dl class="pg-dl">
+        <div><dt>Company name</dt><dd>—</dd></div>
+        <div><dt>Registration number</dt><dd>—</dd></div>
+        <div><dt>Status</dt><dd>—</dd></div>
+        <div><dt>Reviewed by</dt><dd>—</dd></div>
+        <div><dt>Reviewed at</dt><dd>—</dd></div>
+        <div><dt>Review notes</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<div class="pg-grid">
+<section class="ws-panel pg-panel" aria-labelledby="tbl-login-accounts">
+    <div class="pg-panel-head"><h2 id="tbl-login-accounts">Login accounts</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Active</th></tr></thead>
+            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No accounts linked to this company."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+<section class="ws-panel pg-panel" aria-labelledby="tbl-documents">
+    <div class="pg-panel-head"><h2 id="tbl-documents">Documents</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Expires</th><th scope="col">Verification</th></tr></thead>
+            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"No documents uploaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+</div>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-invitation-history">
+    <div class="pg-panel-head"><h2 id="tbl-invitation-history">Invitation history</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Invited</th><th scope="col">Response</th><th scope="col">Offer submitted</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No invitations yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="Admin" asp-controller="Suppliers" asp-action="Review">Review registration</a></li>
+        <li><a asp-area="Admin" asp-controller="Suppliers" asp-action="Index">Back to suppliers</a></li>
+    </ul>
+</nav>

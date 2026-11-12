@@ -1,0 +1,64 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Forward Bids to Evaluation Committee
+
+DEVELOPER OWNER: Saja
+MODULE: Sourcing Officer / Bid Management
+TRELLO TASK: Forward Bids to Evaluation Committee
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Check the minimum-offer rule for the round and forward it to
+the Evaluation Committee.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Bids/ForwardToCommittee/{id?}
+
+FUTURE IMPLEMENTATION:
+- Count DISTINCT suppliers with a Submitted bid in this
+  TenderRound only.
+- Apply the 3-offer rule (or the 2-offer exception) in a
+  tested service.
+- Require 4 assigned Evaluation Committee members and a
+  submitted OfficerComparison report.
+- POST: update statuses, create the CommitteeRound, notify
+  members, audit.
+
+DEPENDENCIES:
+TenderRounds, TenderInvitations, Bids, CommitteeMembers,
+CommitteeRounds, TenderReports, Notifications.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Do not implement the counting or forwarding in the view;
+keep it in a service with tests.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Forward Bids to Evaluation Committee";
+    ViewData["WorkspaceSection"] = "Received Bids";
+    ViewData["Description"] = "Send the round’s offers and the comparison report to the four-member Evaluation Committee.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Round summary</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Round number</dt><dd>—</dd></div>
+        <div><dt>Submitted offers from distinct suppliers</dt><dd>—</dd></div>
+        <div><dt>Minimum required for this round</dt><dd>—</dd></div>
+        <div><dt>Comparison report version</dt><dd>—</dd></div>
+        <div><dt>Evaluation Committee members assigned</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<aside class="pg-note"><strong>Minimum-offer rule</strong><p>Normally at least 3 submitted offers from 3 different suppliers are required; invitations do not count. After three unsuccessful tendering attempts, the approved exception allows proceeding with 2 offers. The exact attempt-counting convention is finalized in business logic.</p></aside>
+
+<partial name="_ConfirmAction" model='new ConfirmActionModel("Forward to Evaluation Committee", "Send this round to the Evaluation Committee.", "Sets the round to SentToEvaluation, creates an Evaluation CommitteeRound and attaches the Officer’s comparison report.", false, false)' />

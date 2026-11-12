@@ -1,0 +1,42 @@
+﻿@page
+@model AccessDeniedModel
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Access Denied (ASP.NET Core Identity)
+
+DEVELOPER OWNER: Ahmad
+MODULE: Authentication
+TRELLO TASK: User Login & Role Redirect (shared error pages:
+  ALL TEAM — Final Bug Fixing & Demo Preparation)
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Shown by the Identity cookie handler when a signed-in user
+opens a page their role does not allow (HTTP 403).
+
+BUSINESS ACCESS:
+Any signed-in user.
+
+FUTURE IMPLEMENTATION:
+- Optionally log the denied attempt in AuditLogs (path only).
+
+DEPENDENCIES:
+[Authorize(Roles = ...)] on every workspace controller.
+
+STATUS:
+EXISTING IDENTITY PAGE, restyled.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Access denied";
+}
+<section class="section auth-section">
+    <div class="glass auth-card">
+        <span class="eyebrow">ACCESS DENIED</span>
+        <h1>You do not have access to this page.</h1>
+        <p>Your account does not have the role required for this workspace. If you believe this is wrong, contact the system administrator.</p>
+        <a class="primary" asp-area="" asp-controller="Workspace" asp-action="Index">Go to my workspace →</a>
+        <a class="auth-link" asp-area="" asp-controller="Home" asp-action="Index">Back to homepage ↗</a>
+    </div>
+</section>

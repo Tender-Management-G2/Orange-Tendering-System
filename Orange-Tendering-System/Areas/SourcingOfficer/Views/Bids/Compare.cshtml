@@ -1,0 +1,70 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Bid Comparison
+
+DEVELOPER OWNER: Saja
+MODULE: Sourcing Officer / Bid Management
+TRELLO TASK: Bid Comparison
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Compare submitted offers side by side and separate eligible
+(compliant) offers from excluded ones.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Bids/Compare/{id?}
+
+FUTURE IMPLEMENTATION:
+- Build the comparison from the latest Submitted Bid per
+  supplier in the round.
+- Calculate totals in a service (never stored).
+- Feed the Officer’s comparison report (TenderReports,
+  ReportType = OfficerComparison).
+
+DEPENDENCIES:
+Bids, BidItems, TenderItems, TenderReports.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+No ranking or scoring here — scoring belongs to the
+Evaluation Committee.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Bid Comparison";
+    ViewData["WorkspaceSection"] = "Comparison";
+    ViewData["Description"] = "Side-by-side view of the offers in a round; basis of the Officer’s comparison report.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-cards" aria-label="Summary">
+    <article class="pg-card"><span>Submitted offers</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Eligible (compliant)</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Excluded (non-compliant)</span><strong>—</strong><small>Not connected</small></article>
+    <article class="pg-card"><span>Pending clarification</span><strong>—</strong><small>Not connected</small></article>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-side-by-side-comparison">
+    <div class="pg-panel-head"><h2 id="tbl-side-by-side-comparison">Side-by-side comparison</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Supplier</th><th scope="col">Compliance</th><th scope="col">Items total</th><th scope="col">Extra costs</th><th scope="col">Calculated total</th><th scope="col">Delivery days</th><th scope="col">Valid until</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No offers to compare in this round."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<aside class="pg-note"><strong>Submitted vs eligible</strong><p>All submitted offers count toward the minimum-offer rule. Only compliant offers are eligible to be scored, recommended and awarded.</p></aside>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index">Officer reports</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="ForwardToCommittee">Forward to Evaluation Committee</a></li>
+    </ul>
+</nav>

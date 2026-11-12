@@ -1,0 +1,76 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Financial Evaluation
+
+DEVELOPER OWNER: Tariq
+MODULE: Technical & Financial Evaluation Committee
+TRELLO TASK: Financial Evaluation
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+A committee member enters financial scores and remarks, with
+the offer’s calculated price summary.
+
+BUSINESS ACCESS:
+Evaluation Committee member (assigned to the tender)
+
+ROUTE: /EvaluationCommittee/Evaluations/Financial/{id?}
+
+FUTURE IMPLEMENTATION:
+- Price summary calculated from BidItems and the bid’s cost
+  columns.
+- POST EvaluationScores for financial criteria (same rules
+  as technical).
+- Price normalization method is undecided — do not invent
+  one.
+
+DEPENDENCIES:
+EvaluationCriteria (Type = Financial), EvaluationScores,
+Bids, BidItems.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Financial Evaluation";
+    ViewData["WorkspaceSection"] = "Financial Evaluation";
+    ViewData["Description"] = "Score each eligible offer against the financial criteria of this round.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Price summary</h2>
+    <dl class="pg-dl">
+        <div><dt>Supplier</dt><dd>—</dd></div>
+        <div><dt>Items total</dt><dd>—</dd></div>
+        <div><dt>Extra costs</dt><dd>—</dd></div>
+        <div><dt>Calculated total</dt><dd>—</dd></div>
+        <div><dt>Currency</dt><dd>—</dd></div>
+        <div><dt>Payment terms</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-financial-scoring">
+    <div class="pg-panel-head"><h2 id="tbl-financial-scoring">Financial scoring</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Criterion</th><th scope="col">Weight</th><th scope="col">Max score</th><th scope="col">My score</th><th scope="col">Remarks</th></tr></thead>
+            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"Financial criteria for this round are not loaded."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Observations</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="f-financial-observations-1">Financial observations</label><textarea id="f-financial-observations-1" rows="4"></textarea></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save financial scores</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>

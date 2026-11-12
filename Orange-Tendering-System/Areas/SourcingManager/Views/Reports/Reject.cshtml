@@ -1,0 +1,58 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Reject Evaluation Report
+
+DEVELOPER OWNER: Haya
+MODULE: Sourcing Manager Review
+TRELLO TASK: Reject Evaluation Report
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Reject the detailed report. The decision is stored on the
+report version it applies to.
+
+BUSINESS ACCESS:
+Sourcing Manager
+
+ROUTE: /SourcingManager/Reports/Reject/{id?}
+
+FUTURE IMPLEMENTATION:
+- POST Reject: set ReviewedByUserId, ReviewComment,
+  ReviewedAt and the report Status on this version only.
+- Notify the Sourcing Officer; write AuditLogs.
+- Never change committee scores or votes.
+
+DEPENDENCIES:
+TenderReports, Notifications, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Reject Evaluation Report";
+    ViewData["WorkspaceSection"] = "Report Review";
+    ViewData["Description"] = "Reject the detailed report. Earlier versions and decisions stay in history.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Report</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Version</dt><dd>—</dd></div>
+        <div><dt>Submitted by</dt><dd>—</dd></div>
+        <div><dt>Submitted</dt><dd>—</dd></div>
+        <div><dt>Recommended offer</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<partial name="_ConfirmAction" model='new ConfirmActionModel("Reject Evaluation Report", "Reject the detailed report.", "Sets the report version to Rejected with your reason. The decision stays in history.", true, true)' />
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Review">Back to review</a></li>
+    </ul>
+</nav>

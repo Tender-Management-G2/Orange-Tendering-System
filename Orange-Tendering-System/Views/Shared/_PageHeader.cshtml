@@ -1,0 +1,35 @@
+@*
+  OWNER: Tariq — Shared Layout
+  Page title + breadcrumb for workspace pages. Reads ViewData["Title"], ViewData["Description"] and
+  ViewData["WorkspaceSection"]. Breadcrumb: workspace dashboard › section › page.
+*@
+@{
+    var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
+    var title = ViewData["Title"]?.ToString() ?? "Untitled page";
+    var sectionLabel = ViewData["WorkspaceSection"] as string;
+    var description = ViewData["Description"] as string;
+}
+<header class="pg-header">
+    <nav class="pg-breadcrumb" aria-label="Breadcrumb">
+        <ol>
+            @if (workspace is not null)
+            {
+                <li><a asp-area="@workspace.Area" asp-controller="Dashboard" asp-action="Index">@workspace.Label</a></li>
+            }
+            else
+            {
+                <li><a asp-area="" asp-controller="Workspace" asp-action="Index">Workspace</a></li>
+            }
+            @if (!string.IsNullOrEmpty(sectionLabel) && sectionLabel != title && sectionLabel != "Dashboard")
+            {
+                <li>@sectionLabel</li>
+            }
+            <li aria-current="page">@title</li>
+        </ol>
+    </nav>
+    <h1 class="pg-title">@title</h1>
+    @if (!string.IsNullOrEmpty(description))
+    {
+        <p class="pg-description">@description</p>
+    }
+</header>

@@ -1,0 +1,43 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Contact
+
+DEVELOPER OWNER: Tariq
+MODULE: Public Site
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Contact form; ContactController currently answers 501 so
+nothing is claimed as sent.
+
+BUSINESS ACCESS:
+Anonymous
+
+ROUTE: /contact
+
+FUTURE IMPLEMENTATION:
+- Decide whether inquiries are stored (no table in the
+  approved schema) or emailed.
+
+DEPENDENCIES:
+ContactController, contact.js.
+
+STATUS:
+PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
+
+IMPORTANT:
+No dedicated Trello card — part of Tariq’s public site.
+===========================================================
+*@
+@{ ViewData["Title"] = "Contact Us | Orange Sourcing"; }
+<main class="public-page contact-page page-shell">
+  <div class="page-overline"><span>CONTACT US</span><span>THE NEXT STEP STARTS HERE</span></div>
+  <div class="contact-editorial-layout">
+    <section class="contact-editorial-intro" aria-labelledby="contact-title"><span class="public-eyebrow">LET’S CONNECT</span><h1 id="contact-title">Good questions.<br /><em>Clearer<br />possibilities.</em></h1><p class="editorial-lead">Questions about the platform, supplier onboarding, or the procurement journey? Give your inquiry a place to begin.</p><div class="contact-channels"><span class="public-eyebrow">A CONVERSATION WITH PURPOSE</span><p>Platform inquiries<br />Supplier onboarding<br />Project support</p></div><div class="contact-service-note"><span class="contact-service-marker" aria-hidden="true"></span><p>Inquiries are saved only after the server confirms database persistence. Email delivery is not configured.</p></div><a class="editorial-link" asp-action="HowItWorks">Looking for the workflow? <span aria-hidden="true">↗</span></a></section>
+    <div class="contact-form-surface public-reveal"><div class="contact-form-heading"><span class="public-eyebrow">YOUR INQUIRY</span><h2>What’s on your mind?</h2><p>Fields marked * are required.</p></div><partial name="_ContactForm" /></div>
+  </div>
+  <div class="contact-bottom-line"><span>STRUCTURED SOURCING. HUMAN CONNECTION.</span><a asp-action="About">Discover the platform ↗</a></div>
+</main>
+@section Scripts {<script src="~/js/contact.js" asp-append-version="true" defer></script>}

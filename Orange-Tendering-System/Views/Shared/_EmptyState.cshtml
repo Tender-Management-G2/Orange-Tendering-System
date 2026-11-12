@@ -1,0 +1,10 @@
+@*
+  OWNER: ALL TEAM — Integration
+  Honest empty state. Model = message, e.g. <partial name="_EmptyState" model='"No bids received yet."' />
+  Never replace it with sample records or invented totals.
+*@
+@model string
+<div class="pg-empty">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM3 7l3-4h12l3 4M9 12h6" /></svg>
+    <p>@Model</p>
+</div>

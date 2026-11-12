@@ -1,0 +1,82 @@
+﻿@page
+@model RegisterModel
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Supplier Registration (ASP.NET Core Identity register)
+
+DEVELOPER OWNER: Ahmad
+MODULE: Authentication
+TRELLO TASK: User Registration
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Public self-registration. By the approved rules ONLY suppliers
+register publicly; internal employee accounts are created by
+Admin (Areas/Admin/Users/Create).
+
+BUSINESS ACCESS:
+Anonymous visitors (supplier companies).
+
+FUTURE IMPLEMENTATION:
+- Extend RegisterModel.InputModel with full name and the
+  company fields shown (disabled) below.
+- In one transaction: create the ApplicationUser, create a
+  Supplier with Status = Pending, set ApplicationUser.SupplierId,
+  and add the "Supplier" role (SystemRoles.Supplier).
+- Never let a public user choose a role or an internal
+  department. Admin approves the supplier later.
+- Notify Admin and write an AuditLog entry.
+
+DEPENDENCIES:
+AspNetUsers, ApplicationUser, Suppliers, AspNetUserRoles,
+Admin Supplier Review page, Notifications, AuditLogs.
+
+STATUS:
+ACCOUNT CREATION WORKS (existing Identity, email + password
+only). Supplier company profile is NOT IMPLEMENTED.
+
+IMPORTANT:
+Registration must not grant any internal role.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Supplier Registration";
+}
+<section class="section auth-section">
+    <div class="glass auth-card">
+        <span class="eyebrow">SUPPLIER ONBOARDING</span>
+        <h1>Register your company</h1>
+        <p>Public registration is for supplier companies. Internal employee accounts are created by the system administrator. New supplier accounts stay pending until Admin approval.</p>
+        <form id="registerForm" asp-route-returnUrl="@Model.ReturnUrl" method="post">
+            <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+            <label asp-for="Input.Email">Email</label>
+            <input asp-for="Input.Email" autocomplete="username" aria-required="true" />
+            <span asp-validation-for="Input.Email" class="field-error"></span>
+            <label asp-for="Input.Password">Password</label>
+            <input asp-for="Input.Password" autocomplete="new-password" aria-required="true" />
+            <span asp-validation-for="Input.Password" class="field-error"></span>
+            <label asp-for="Input.ConfirmPassword">Confirm Password</label>
+            <input asp-for="Input.ConfirmPassword" autocomplete="new-password" aria-required="true" />
+            <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
+
+            @* TODO (Ahmad): bind these to RegisterModel.InputModel and save a Pending Supplier. Disabled until then. *@
+            <fieldset class="auth-fieldset" disabled>
+                <legend>Company details — not connected yet</legend>
+                <label for="company-name">Company name</label>
+                <input id="company-name" />
+                <label for="registration-number">Commercial registration number</label>
+                <input id="registration-number" />
+                <label for="company-phone">Company phone</label>
+                <input id="company-phone" type="tel" />
+            </fieldset>
+
+            <button id="registerSubmit" type="submit" class="primary">Create Account →</button>
+        </form>
+        <a class="auth-link" asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">Already registered? Sign in ↗</a>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

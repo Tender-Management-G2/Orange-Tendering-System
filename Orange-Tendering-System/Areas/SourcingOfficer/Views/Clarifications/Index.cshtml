@@ -1,0 +1,63 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Supplier Clarification Requests
+
+DEVELOPER OWNER: Saja
+MODULE: Sourcing Officer / Bid Management
+TRELLO TASK: Supplier Clarification Requests
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Officer ↔ supplier clarification threads about tenders and
+offers.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Clarifications
+
+FUTURE IMPLEMENTATION:
+- Query Clarifications between the Officer and supplier
+  users (TenderId or BidId set).
+- New clarification form; thread view is the shared
+  Clarifications/Details page.
+
+DEPENDENCIES:
+Clarifications, ClarificationMessages, Documents,
+Notifications.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Supplier Clarification Requests";
+    ViewData["WorkspaceSection"] = "Supplier Clarifications";
+    ViewData["Description"] = "Questions exchanged between you and suppliers about tenders and offers.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search subject or supplier" aria-label="Search subject or supplier" disabled />
+    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Open</option><option>Status: Answered</option><option>Status: Closed</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-supplier-clarifications">
+    <div class="pg-panel-head"><h2 id="tbl-supplier-clarifications">Supplier clarifications</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Subject</th><th scope="col">Supplier</th><th scope="col">Tender / offer</th><th scope="col">Status</th><th scope="col">Opened</th><th scope="col">Last message</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No supplier clarifications yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Details">Open a thread</a></li>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Index">All my clarifications</a></li>
+    </ul>
+</nav>

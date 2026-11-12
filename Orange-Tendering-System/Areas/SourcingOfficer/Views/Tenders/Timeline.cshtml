@@ -1,0 +1,64 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Tender Timeline & Closing
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management
+TRELLO TASK: Tender Timeline & Closing
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show the tender’s timeline and close the bidding window of
+the current round.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Tenders/Timeline/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the tender and its current TenderRound.
+- POST Close: Status = Closed, ClosedAt; audit.
+- Show the count of distinct suppliers with Submitted bids
+  in this round only.
+
+DEPENDENCIES:
+Tenders, TenderRounds, TenderInvitations, Bids.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Tender Timeline & Closing";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = "Dates of the current round and the action to close bidding.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Current round</h2>
+    <dl class="pg-dl">
+        <div><dt>Tender</dt><dd>—</dd></div>
+        <div><dt>Round number</dt><dd>—</dd></div>
+        <div><dt>Opens</dt><dd>—</dd></div>
+        <div><dt>Deadline</dt><dd>—</dd></div>
+        <div><dt>Closed</dt><dd>—</dd></div>
+        <div><dt>Submitted offers (distinct suppliers)</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Tender timeline</h2>
+    <ol class="pg-steps">
+        <li><div><strong>Draft</strong><small>Tender and items prepared</small></div></li>
+        <li><div><strong>Round opened</strong><small>Suppliers invited</small></div></li>
+        <li><div><strong>Deadline</strong><small>Bidding closes</small></div></li>
+        <li><div><strong>Offers checked</strong><small>Minimum-offer rule applied</small></div></li>
+        <li><div><strong>Next step</strong><small>Sent to evaluation, or a new round is started</small></div></li>
+    </ol>
+</section>
+
+<partial name="_ConfirmAction" model='new ConfirmActionModel("Close bidding round", "Close the current round so no new offers can be submitted.", "Sets TenderRound.Status to Closed and ClosedAt (UTC).", false, false)' />

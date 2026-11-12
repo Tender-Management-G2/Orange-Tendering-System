@@ -1,0 +1,65 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Officer Reports
+
+DEVELOPER OWNER: UNASSIGNED — Team assignment required
+MODULE: Sourcing Officer / Reports
+TRELLO TASK: None — no dedicated Trello card
+TRELLO URL: —
+
+PURPOSE:
+Officer’s report workspace: the initial comparison report
+(to the Evaluation Committee) and, after evaluation, the
+full report submitted to the Sourcing Manager.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Reports
+
+FUTURE IMPLEMENTATION:
+- Create/edit OfficerComparison and FullEvaluation
+  TenderReports (new VersionNumber + PreviousReportId on
+  resubmission).
+- Submit the full report to the Sourcing Manager; notify.
+- Show the Manager’s ReviewComment on returned versions.
+
+DEPENDENCIES:
+TenderReports, CommitteeRounds, Notifications, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Required by the approved workflow but no Trello card covers
+it — team assignment required.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Officer Reports";
+    ViewData["WorkspaceSection"] = "Reports";
+    ViewData["Description"] = "Your comparison reports for the Evaluation Committee and the full reports you submit to the Sourcing Manager.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Officer report flow</h2>
+    <ol class="pg-steps">
+        <li><div><strong>Comparison report</strong><small>Prepared from the bid comparison and sent with the round to the Evaluation Committee</small></div></li>
+        <li><div><strong>Evaluation result</strong><small>Returns to you after the committee’s 4/4 approval</small></div></li>
+        <li><div><strong>Full report</strong><small>You submit it to the Sourcing Manager</small></div></li>
+        <li><div><strong>Returned?</strong><small>A correction creates a new version; submitted versions are never overwritten</small></div></li>
+    </ol>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-reports">
+    <div class="pg-panel-head"><h2 id="tbl-reports">Reports</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Report type</th><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Submitted</th><th scope="col">Reviewer decision</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No reports yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

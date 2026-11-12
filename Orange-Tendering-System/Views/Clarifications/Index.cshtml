@@ -1,0 +1,64 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Clarifications
+
+DEVELOPER OWNER: ALL TEAM
+MODULE: Clarifications, Notifications & Audit Trail
+TRELLO TASK: Clarifications, Notifications & Audit Trail
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Cross-role clarification inbox for the signed-in user.
+
+BUSINESS ACCESS:
+Any signed-in user (own threads only)
+
+ROUTE: /Clarifications
+
+FUTURE IMPLEMENTATION:
+- Query Clarifications where FromUserId or ToUserId =
+  current user.
+- New thread form enforcing the allowed role pairs + stage +
+  record ownership on the server.
+
+DEPENDENCIES:
+Clarifications, ClarificationMessages, Notifications,
+AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Clarifications";
+    ViewData["WorkspaceSection"] = "Clarifications";
+    ViewData["Description"] = "Your clarification threads with other roles.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<aside class="pg-note"><strong>Allowed conversations</strong><p>Department ↔ Sourcing Officer, Sourcing Officer ↔ Evaluation Committee, Evaluation Committee ↔ Sourcing Manager, Sourcing Manager ↔ Top Committee, Sourcing Officer ↔ Supplier. Each thread is linked to a purchase request, tender or offer.</p></aside>
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search subject" aria-label="Search subject" disabled />
+    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Open</option><option>Status: Answered</option><option>Status: Closed</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-my-clarifications">
+    <div class="pg-panel-head"><h2 id="tbl-my-clarifications">My clarifications</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Subject</th><th scope="col">With</th><th scope="col">Linked to</th><th scope="col">Status</th><th scope="col">Opened</th><th scope="col">Last message</th></tr></thead>
+            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"You have no clarification threads."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="" asp-controller="Clarifications" asp-action="Details">Open a thread</a></li>
+    </ul>
+</nav>

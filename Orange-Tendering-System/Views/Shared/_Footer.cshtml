@@ -1,0 +1,41 @@
+@* OWNER: Tariq — Shared Layout (public footer, from the supplied layout ZIP) *@
+<footer class="enterprise-footer">
+        <div class="footer-top">
+          <div class="footer-identity">
+            <a class="brand" href="@Url.Action("Index", "Home", new { area = "" })#home" aria-label="Orange home"
+              ><span class="logo" aria-hidden="true">orange<span>®</span></span
+              ><span class="brand-title"
+                >Sourcing & Tender<br />Management System</span
+              ></a
+            >
+            <p>
+              A connected procurement journey.<br />From purchase request to
+              award and closure.
+            </p>
+          </div>
+          <nav aria-label="Footer public navigation">
+            <span class="micro-label">EXPLORE</span><a href="@Url.Action("Index", "Home", new { area = "" })#home">Home</a
+            ><a asp-area="" asp-controller="Home" asp-action="HowItWorks">How It Works</a>
+            <a asp-area="" asp-controller="Home" asp-action="About">About Us</a>
+            <a asp-area="" asp-controller="Home" asp-action="Team">Our Team</a>
+            <a asp-area="" asp-controller="Home" asp-action="Contact">Contact Us</a>
+          </nav>
+          <nav aria-label="Footer system navigation">
+            <span class="micro-label">THE SYSTEM</span
+            ><a href="@Url.Action("Index", "Home", new { area = "" })#roles">Roles & Permissions</a
+            ><a href="@Url.Action("Index", "Home", new { area = "" })#clarifications">Clarifications & Inquiries</a
+            ><a href="@Url.Action("Index", "Home", new { area = "" })#evaluation">Bid Evaluation</a
+            ><a href="@Url.Action("Index", "Home", new { area = "" })#analytics">Procurement Visibility</a>
+          </nav>
+        </div>
+        <div class="footer-bottom">
+          <span
+            >© 2026 Sourcing & Tender Management System.<br /><small
+              >Independent project presentation · ASP.NET Core MVC 10 implementation</small
+            ></span
+          ><span class="attribution"
+            >Orange branding shown for project demonstration.<br />No official
+            company affiliation is claimed.</span
+          ><a href="@Url.Action("Index", "Home", new { area = "" })#home">Back to top ↑</a>
+        </div>
+      </footer>

@@ -1,0 +1,62 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Supplier Invitations
+
+DEVELOPER OWNER: Amal
+MODULE: Sourcing Officer / Tender Management
+TRELLO TASK: Supplier Invitations
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Track invitations per round: pending, accepted or declined,
+and whether an offer was submitted.
+
+BUSINESS ACCESS:
+Sourcing Officer
+
+ROUTE: /SourcingOfficer/Invitations/Index/{id?}
+
+FUTURE IMPLEMENTATION:
+- Query TenderInvitations with Supplier and TenderRound,
+  filtered by tender/round.
+- Show whether a Submitted bid exists for each invitation.
+
+DEPENDENCIES:
+TenderInvitations, Suppliers, TenderRounds, Bids.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Supplier Invitations";
+    ViewData["WorkspaceSection"] = "Invitations";
+    ViewData["Description"] = "Invitations sent in each tendering round and how suppliers responded.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search supplier or tender" aria-label="Search supplier or tender" disabled />
+    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Pending</option><option>Status: Accepted</option><option>Status: Declined</option></select>
+    <select aria-label="Round" disabled><option>Round: Current round</option><option>Round: All rounds</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-invitations">
+    <div class="pg-panel-head"><h2 id="tbl-invitations">Invitations</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Supplier</th><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Invited</th><th scope="col">Status</th><th scope="col">Responded</th><th scope="col">Offer</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No invitations are loaded yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="SelectSuppliers">Select suppliers</a></li>
+        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Index">Received bids</a></li>
+    </ul>
+</nav>

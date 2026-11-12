@@ -1,0 +1,34 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Not Found / HTTP status page
+
+DEVELOPER OWNER: ALL TEAM
+MODULE: Shared / Integration
+TRELLO TASK: Final Bug Fixing & Demo Preparation
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Friendly page for 404 Not Found and other empty error
+responses (Program.cs: UseStatusCodePagesWithReExecute).
+
+BUSINESS ACCESS:
+Everyone.
+
+STATUS:
+INTEGRATED. No business logic.
+===========================================================
+*@
+@model int
+@{
+    var notFound = Model == 404;
+    ViewData["Title"] = notFound ? "Page not found" : $"Request could not be completed ({Model})";
+}
+<section class="section auth-section">
+    <div class="glass auth-card">
+        <span class="eyebrow">ERROR @Model</span>
+        <h1>@(notFound ? "This page does not exist." : "We could not complete this request.")</h1>
+        <p>@(notFound ? "The address may be mistyped, or the page has not been built yet." : "No successful operation is confirmed. Please go back and try again.")</p>
+        <a class="primary" asp-area="" asp-controller="Home" asp-action="Index">Back to homepage →</a>
+    </div>
+</section>

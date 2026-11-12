@@ -1,0 +1,54 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Evaluation Reports List
+
+DEVELOPER OWNER: Haya
+MODULE: Sourcing Manager Review
+TRELLO TASK: Evaluation Reports List
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+List detailed evaluation reports submitted by the Officer
+for managerial review.
+
+BUSINESS ACCESS:
+Sourcing Manager
+
+ROUTE: /SourcingManager/Reports
+
+FUTURE IMPLEMENTATION:
+- Query TenderReports (ReportType = FullEvaluation) by
+  status.
+- Row action: Review.
+
+DEPENDENCIES:
+TenderReports, Tenders, AspNetUsers.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Evaluation Reports List";
+    ViewData["WorkspaceSection"] = "Pending Reports";
+    ViewData["Description"] = "Detailed evaluation reports submitted to you by the Sourcing Officer.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" placeholder="Search tender" aria-label="Search tender" disabled />
+    <select aria-label="Status" disabled><option>Status: Submitted</option><option>Status: Returned</option><option>Status: Rejected</option><option>Status: Accepted</option></select>
+    <span class="pg-hint">Search and filters are not implemented yet.</span>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-reports">
+    <div class="pg-panel-head"><h2 id="tbl-reports">Reports</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Report</th><th scope="col">Version</th><th scope="col">Submitted by</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
+            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No reports are waiting for review."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>

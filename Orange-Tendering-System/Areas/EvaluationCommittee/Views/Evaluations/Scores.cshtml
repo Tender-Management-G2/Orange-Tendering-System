@@ -1,0 +1,71 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Committee Scoring & Consolidation
+
+DEVELOPER OWNER: Tariq
+MODULE: Technical & Financial Evaluation Committee
+TRELLO TASK: Committee Scoring & Consolidation
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Show individual member scores, the consolidated evaluation
+and ranking, and the 4/4 approval status of the round.
+
+BUSINESS ACCESS:
+Evaluation Committee member (assigned to the tender)
+
+ROUTE: /EvaluationCommittee/Evaluations/Scores/{id?}
+
+FUTURE IMPLEMENTATION:
+- Scoring service: deterministic, explainable calculation
+  from EvaluationScores + EvaluationCriteria weights once
+  approved.
+- Block finalization on missing scores, ties or an undecided
+  formula.
+- Bind the approval tracker to CommitteeVotes of this
+  CommitteeRound.
+
+DEPENDENCIES:
+EvaluationScores, EvaluationCriteria, CommitteeMembers,
+CommitteeVotes, CommitteeRounds.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+The system recommends; it never awards. Ollama never
+decides.
+===========================================================
+*@
+@{
+    ViewData["Title"] = "Committee Scoring & Consolidation";
+    ViewData["WorkspaceSection"] = "Scores";
+    ViewData["Description"] = "Each member’s scores, the consolidated result and the four-member approval status.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-individual-member-scores">
+    <div class="pg-panel-head"><h2 id="tbl-individual-member-scores">Individual member scores</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Supplier</th><th scope="col">Criterion</th><th scope="col">Member 1</th><th scope="col">Member 2</th><th scope="col">Member 3</th><th scope="col">Member 4</th></tr></thead>
+            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No scores entered yet."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-consolidated-evaluation">
+    <div class="pg-panel-head"><h2 id="tbl-consolidated-evaluation">Consolidated evaluation</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Rank</th><th scope="col">Supplier</th><th scope="col">Technical score</th><th scope="col">Financial score</th><th scope="col">Final score</th><th scope="col">Eligible</th></tr></thead>
+            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"The ranking appears only after the scoring method is finalized and all scores are entered."' /></td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<aside class="pg-note"><strong>Scoring method not decided</strong><p>The weighting method, aggregation of the four members’ scores and tie handling are open decisions. When any of them is missing, the system must block finalization instead of guessing.</p></aside>
+
+<partial name="_ApprovalTracker" model='"Evaluation Committee"' />

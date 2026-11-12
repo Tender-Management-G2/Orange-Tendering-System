@@ -1,0 +1,71 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Clarification Thread
+
+DEVELOPER OWNER: ALL TEAM
+MODULE: Clarifications, Notifications & Audit Trail
+TRELLO TASK: Clarifications, Notifications & Audit Trail
+TRELLO URL: Not provided — add from the Trello board
+
+PURPOSE:
+Read and reply to one clarification thread, with
+attachments.
+
+BUSINESS ACCESS:
+The two participants of the thread
+
+ROUTE: /Clarifications/Details/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the thread only if the user is FromUser or ToUser.
+- POST reply: ClarificationMessage (+ Documents with
+  ClarificationMessageId); update Status; notify the other
+  participant.
+
+DEPENDENCIES:
+Clarifications, ClarificationMessages, Documents,
+Notifications.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Clarification Thread";
+    ViewData["WorkspaceSection"] = "Clarifications";
+    ViewData["Description"] = "Messages of one clarification thread.";
+}
+<partial name="_PageHeader" />
+<partial name="_ScaffoldNotice" />
+
+<section class="ws-panel pg-panel">
+    <h2>Thread</h2>
+    <dl class="pg-dl">
+        <div><dt>Subject</dt><dd>—</dd></div>
+        <div><dt>Linked to</dt><dd>—</dd></div>
+        <div><dt>From</dt><dd>—</dd></div>
+        <div><dt>To</dt><dd>—</dd></div>
+        <div><dt>Status</dt><dd>—</dd></div>
+        <div><dt>Opened</dt><dd>—</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Messages</h2>
+    <partial name="_EmptyState" model='"No messages are loaded yet."' />
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Reply</h2>
+    <form class="pg-form">
+        <fieldset disabled>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="f-message-1">Message</label><textarea id="f-message-1" rows="4"></textarea></div>
+                <div class="pg-field"><label for="f-attachment-2">Attachment</label><input id="f-attachment-2" type="file" /></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send reply</button><button type="button" class="pg-btn">Mark as resolved</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+        </fieldset>
+    </form>
+</section>
