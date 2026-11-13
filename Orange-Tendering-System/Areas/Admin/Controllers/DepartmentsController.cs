@@ -3,9 +3,14 @@
 // Module: Administration
 // Purpose: MVC endpoints for the Departments pages of the Admin workspace.
 // Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
+using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Areas.Admin.Controllers
 {
@@ -13,25 +18,142 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
     [Authorize(Roles = SystemRoles.Admin)]
     public class DepartmentsController : Controller
     {
-        // Department Management — Owner: Rjoub · Trello: Department Management (https://trello.com/c/KHRsEmzE)
-        // GET /Admin/Departments. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
+        private readonly AdminService _adminService;
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public DepartmentsController(
+            AdminService adminService,
+            UserManager<ApplicationUser> userManager)
         {
-            return View();
+            _adminService = adminService;
+            _userManager = userManager;
         }
 
-        // Create Department — Owner: Rjoub · Trello: Department Management (https://trello.com/c/KHRsEmzE)
-        // GET /Admin/Departments/Create. TODO: query the data in a service and pass a view model.
+        // GET: /Admin/Departments
+        [HttpGet]
+        public async Task<IActionResult> Index()
+        {
+            var departments =
+                await _adminService.GetDepartmentsAsync();
+
+            return View(departments);
+        }
+
+        // GET: /Admin/Departments/Create
+        [HttpGet]
         public IActionResult Create()
         {
-            return View();
+            return View(new CreateDepartmentViewModel());
         }
 
-        // Edit Department — Owner: Rjoub · Trello: Department Management (https://trello.com/c/KHRsEmzE)
-        // GET /Admin/Departments/Edit/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Edit(int? id)
+        // POST: /Admin/Departments/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(
+            CreateDepartmentViewModel model)
         {
-            return View();
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var adminId = _userManager.GetUserId(User);
+
+            if (string.IsNullOrEmpty(adminId))
+            {
+                return Challenge();
+            }
+
+            var created = await _adminService
+                .CreateDepartmentAsync(model, adminId);
+
+            if (!created)
+            {
+                ModelState.AddModelError(
+                    nameof(model.Name),
+                    "A department with this name already exists.");
+
+                return View(model);
+            }
+
+            TempData["SuccessMessage"] =
+                "Department created successfully.";
+
+            return RedirectToAction(nameof(Index));
         }
+
+
+        // GET: /Admin/Departments/Edit/5
+        [HttpGet]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var department =
+                await _adminService.GetDepartmentForEditAsync(id);
+
+            if (department == null)
+            {
+                return NotFound();
+            }
+
+            return View(department);
+        }
+
+
+        // POST: /Admin/Departments/Edit/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(
+            int id,
+            EditDepartmentViewModel model)
+        {
+            if (id != model.Id)
+            {
+                return BadRequest();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var adminId = _userManager.GetUserId(User);
+
+            if (string.IsNullOrEmpty(adminId))
+            {
+                return Challenge();
+            }
+
+            var result = await _adminService
+                .UpdateDepartmentAsync(model, adminId);
+
+            if (result == "NotFound")
+            {
+                return NotFound();
+            }
+
+            if (result == "Duplicate")
+            {
+                ModelState.AddModelError(
+                    nameof(model.Name),
+                    "A department with this name already exists.");
+
+                return View(model);
+            }
+
+            if (result == "InvalidName")
+            {
+                ModelState.AddModelError(
+                    nameof(model.Name),
+                    "Department name must contain 2 to 100 characters.");
+
+                return View(model);
+            }
+
+            TempData["SuccessMessage"] =
+                "Department updated successfully.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
     }
 }

@@ -30,41 +30,171 @@ STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 ===========================================================
 *@
+
+@model UserDetailsViewModel
+
 @{
     ViewData["Title"] = "User Details";
     ViewData["WorkspaceSection"] = "Users";
-    ViewData["Description"] = "Account information, roles and recent audited changes for one user.";
+    ViewData["Description"] =
+        "Account information, roles and recent audited changes.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
+<!-- User Information -->
 <section class="ws-panel pg-panel">
-    <h2>Account</h2>
-    <dl class="pg-dl">
-        <div><dt>Full name</dt><dd>—</dd></div>
-        <div><dt>Email</dt><dd>—</dd></div>
-        <div><dt>Role(s)</dt><dd>—</dd></div>
-        <div><dt>Department</dt><dd>—</dd></div>
-        <div><dt>Supplier company</dt><dd>—</dd></div>
-        <div><dt>Status</dt><dd>—</dd></div>
-        <div><dt>Email confirmed</dt><dd>—</dd></div>
-        <div><dt>Locked out until</dt><dd>—</dd></div>
-    </dl>
-</section>
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-recent-audit-entries">
-    <div class="pg-panel-head"><h2 id="tbl-recent-audit-entries">Recent audit entries</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Date (UTC)</th><th scope="col">Action</th><th scope="col">Entity</th><th scope="col">Changed by</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"No audit entries are loaded yet."' /></td></tr></tbody>
-        </table>
+    <div class="pg-panel-head">
+        <h2>Account Information</h2>
+
+        <a class="pg-btn pg-btn-primary"
+           asp-area="Admin"
+           asp-controller="Users"
+           asp-action="Edit"
+           asp-route-id="@Model.Id">
+            Edit User
+        </a>
     </div>
+
+    <dl class="pg-dl">
+
+        <div>
+            <dt>Full Name</dt>
+            <dd>@Model.FullName</dd>
+        </div>
+
+        <div>
+            <dt>Email</dt>
+            <dd>@Model.Email</dd>
+        </div>
+
+        <div>
+            <dt>Role(s)</dt>
+            <dd>@Model.Roles</dd>
+        </div>
+
+        <div>
+            <dt>Department</dt>
+            <dd>@Model.DepartmentName</dd>
+        </div>
+
+        <div>
+            <dt>Supplier Company</dt>
+            <dd>@Model.SupplierName</dd>
+        </div>
+
+        <div>
+            <dt>Account Status</dt>
+            <dd>
+                @if (Model.IsActive)
+                {
+                    <span class="pg-status">Active</span>
+                }
+                else
+                {
+                    <span class="pg-status">Inactive</span>
+                }
+            </dd>
+        </div>
+
+        <div>
+            <dt>Email Confirmed</dt>
+            <dd>@(Model.EmailConfirmed ? "Yes" : "No")</dd>
+        </div>
+
+        <div>
+            <dt>Locked Out Until</dt>
+            <dd>
+                @(Model.LockoutEnd.HasValue
+                    ? Model.LockoutEnd.Value.ToString("yyyy-MM-dd HH:mm")
+                    : "—")
+            </dd>
+        </div>
+
+    </dl>
+
 </section>
 
+<!-- Recent Audit Logs -->
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <h2>Recent Audit Entries</h2>
+    </div>
+
+    <div class="pg-table-wrap">
+
+        <table class="pg-table">
+
+            <thead>
+                <tr>
+                    <th>Date (UTC)</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Changed By</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (!Model.RecentActivities.Any())
+                {
+                    <tr>
+                        <td colspan="4">
+                            No audit entries found for this account.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var activity in Model.RecentActivities)
+                    {
+                        <tr>
+                            <td>
+                                @activity.CreatedAt.ToString(
+                                    "yyyy-MM-dd HH:mm")
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @activity.Action
+                                </span>
+                            </td>
+
+                            <td>@activity.EntityName</td>
+
+                            <td>@activity.ChangedBy</td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+<!-- Navigation -->
 <nav class="pg-links" aria-label="Related pages">
     <ul>
-        <li><a asp-area="Admin" asp-controller="Users" asp-action="Edit">Edit user</a></li>
-        <li><a asp-area="Admin" asp-controller="Users" asp-action="Index">Back to users</a></li>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Edit"
+               asp-route-id="@Model.Id">
+                Edit User
+            </a>
+        </li>
+
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index">
+                Back to Users
+            </a>
+        </li>
     </ul>
 </nav>

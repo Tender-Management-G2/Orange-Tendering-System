@@ -28,59 +28,311 @@ STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 ===========================================================
 *@
+
+@model SupplierDetailsViewModel
+
 @{
     ViewData["Title"] = "Supplier Details";
     ViewData["WorkspaceSection"] = "Suppliers";
+    ViewData["Description"] =
+        "Review supplier company information, documents and invitation history.";
 }
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
+<partial name="_PageHeader" />
+
+<!-- Company Information -->
 <section class="ws-panel pg-panel">
-    <h2>Company</h2>
+
+    <div class="pg-panel-head">
+        <h2>Company Information</h2>
+
+        <a class="pg-btn pg-btn-primary"
+           asp-area="Admin"
+           asp-controller="Suppliers"
+           asp-action="Review"
+           asp-route-id="@Model.Id">
+            Review Supplier
+        </a>
+    </div>
+
     <dl class="pg-dl">
-        <div><dt>Company name</dt><dd>—</dd></div>
-        <div><dt>Registration number</dt><dd>—</dd></div>
-        <div><dt>Status</dt><dd>—</dd></div>
-        <div><dt>Reviewed by</dt><dd>—</dd></div>
-        <div><dt>Reviewed at</dt><dd>—</dd></div>
-        <div><dt>Review notes</dt><dd>—</dd></div>
+
+        <div>
+            <dt>Company Name</dt>
+            <dd>@Model.CompanyName</dd>
+        </div>
+
+        <div>
+            <dt>Registration Number</dt>
+            <dd>@Model.RegistrationNumber</dd>
+        </div>
+
+        <div>
+            <dt>Tax Number</dt>
+            <dd>@(Model.TaxNumber ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Email</dt>
+            <dd>@Model.Email</dd>
+        </div>
+
+        <div>
+            <dt>Phone</dt>
+            <dd>@(Model.Phone ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Address</dt>
+            <dd>@(Model.Address ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Registration Date (UTC)</dt>
+            <dd>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+        </div>
+
+        <div>
+            <dt>Status</dt>
+            <dd>
+                <span class="pg-status">
+                    @Model.Status
+                </span>
+            </dd>
+        </div>
+
+        <div>
+            <dt>Reviewed By</dt>
+            <dd>@(Model.ReviewedBy ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Reviewed At (UTC)</dt>
+            <dd>
+                @(Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")
+                    ?? "—")
+            </dd>
+        </div>
+
+        <div>
+            <dt>Review Notes</dt>
+            <dd>@(Model.ReviewNotes ?? "—")</dd>
+        </div>
+
     </dl>
 </section>
 
+<!-- Accounts and Documents -->
 <div class="pg-grid">
-<section class="ws-panel pg-panel" aria-labelledby="tbl-login-accounts">
-    <div class="pg-panel-head"><h2 id="tbl-login-accounts">Login accounts</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Active</th></tr></thead>
-            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No accounts linked to this company."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-<section class="ws-panel pg-panel" aria-labelledby="tbl-documents">
-    <div class="pg-panel-head"><h2 id="tbl-documents">Documents</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Expires</th><th scope="col">Verification</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"No documents uploaded."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
+
+    <!-- Supplier Accounts -->
+    <section class="ws-panel pg-panel">
+
+        <div class="pg-panel-head">
+            <h2>Login Accounts</h2>
+        </div>
+
+        <div class="pg-table-wrap">
+            <table class="pg-table">
+
+                <thead>
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @if (!Model.Accounts.Any())
+                    {
+                        <tr>
+                            <td colspan="3">
+                                No accounts linked to this company.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var account in Model.Accounts)
+                        {
+                            <tr>
+                                <td>@account.FullName</td>
+                                <td>@account.Email</td>
+                                <td>
+                                    <span class="pg-status">
+                                        @(account.IsActive
+                                            ? "Active"
+                                            : "Inactive")
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+
+            </table>
+        </div>
+    </section>
+
+    <!-- Supplier Documents -->
+    <section class="ws-panel pg-panel">
+
+        <div class="pg-panel-head">
+            <h2>Legal Documents</h2>
+        </div>
+
+        <div class="pg-table-wrap">
+            <table class="pg-table">
+
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Type</th>
+                        <th>Expires</th>
+                        <th>Verification</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @if (!Model.Documents.Any())
+                    {
+                        <tr>
+                            <td colspan="4">
+                                No documents uploaded.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var document in Model.Documents)
+                        {
+                            <tr>
+                                <td>@document.FileName</td>
+
+                                <td>
+                                    @(document.DocumentType ?? "—")
+                                </td>
+
+                                <td>
+                                    @(document.ExpiresAt?.ToString("yyyy-MM-dd")
+                                        ?? "—")
+                                </td>
+
+                                <td>
+                                    <span class="pg-status">
+                                        @document.VerificationStatus
+                                    </span>
+
+                                    @if (!string.IsNullOrWhiteSpace(
+                                        document.VerificationNotes))
+                                    {
+                                        <details>
+                                            <summary>Notes</summary>
+                                            <p>@document.VerificationNotes</p>
+                                        </details>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+
+            </table>
+        </div>
+    </section>
+
 </div>
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-invitation-history">
-    <div class="pg-panel-head"><h2 id="tbl-invitation-history">Invitation history</h2></div>
+<!-- Tender Invitation History -->
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <h2>Tender Invitation History</h2>
+    </div>
+
     <div class="pg-table-wrap">
+
         <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Invited</th><th scope="col">Response</th><th scope="col">Offer submitted</th></tr></thead>
-            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No invitations yet."' /></td></tr></tbody>
+
+            <thead>
+                <tr>
+                    <th>Tender</th>
+                    <th>Round</th>
+                    <th>Invited (UTC)</th>
+                    <th>Response</th>
+                    <th>Offer Submitted</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (!Model.Invitations.Any())
+                {
+                    <tr>
+                        <td colspan="5">
+                            No invitations yet.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var invitation in Model.Invitations)
+                    {
+                        <tr>
+                            <td>
+                                @invitation.TenderTitle
+                                <small>
+                                    (#@invitation.TenderId)
+                                </small>
+                            </td>
+
+                            <td>@invitation.RoundNumber</td>
+
+                            <td>
+                                @invitation.InvitedAt.ToString(
+                                    "yyyy-MM-dd HH:mm")
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @invitation.Status
+                                </span>
+                            </td>
+
+                            <td>
+                                @(invitation.OfferSubmitted
+                                    ? "Yes"
+                                    : "No")
+                            </td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
         </table>
+
     </div>
 </section>
 
+<!-- Navigation -->
 <nav class="pg-links" aria-label="Related pages">
     <ul>
-        <li><a asp-area="Admin" asp-controller="Suppliers" asp-action="Review">Review registration</a></li>
-        <li><a asp-area="Admin" asp-controller="Suppliers" asp-action="Index">Back to suppliers</a></li>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Suppliers"
+               asp-action="Review"
+               asp-route-id="@Model.Id">
+                Review Registration
+            </a>
+        </li>
+
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Suppliers"
+               asp-action="Index">
+                Back to Suppliers
+            </a>
+        </li>
     </ul>
 </nav>

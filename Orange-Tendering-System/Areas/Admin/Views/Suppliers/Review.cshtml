@@ -37,39 +37,319 @@ Only Approved, active suppliers may be invited or submit
 offers.
 ===========================================================
 *@
+
+@using Orange_Tendering_System.Models.Entities
+@model SupplierDetailsViewModel
+
 @{
     ViewData["Title"] = "Supplier Registration Review";
     ViewData["WorkspaceSection"] = "Suppliers";
-    ViewData["Description"] = "Check a supplier’s registration and legal documents, then approve or reject it.";
+    ViewData["Description"] =
+        "Verify legal documents and manage supplier approval.";
 }
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
+<partial name="_PageHeader" />
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["SuccessMessage"]
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["ErrorMessage"]
+    </div>
+}
+
+<!-- Company Information -->
 <section class="ws-panel pg-panel">
-    <h2>Company</h2>
+    <div class="pg-panel-head">
+        <h2>Supplier Registration</h2>
+
+        <span class="pg-status">@Model.Status</span>
+    </div>
+
     <dl class="pg-dl">
-        <div><dt>Company name</dt><dd>—</dd></div>
-        <div><dt>Registration number</dt><dd>—</dd></div>
-        <div><dt>Tax number</dt><dd>—</dd></div>
-        <div><dt>Email</dt><dd>—</dd></div>
-        <div><dt>Phone</dt><dd>—</dd></div>
-        <div><dt>Address</dt><dd>—</dd></div>
-        <div><dt>Registered at</dt><dd>—</dd></div>
-        <div><dt>Current status</dt><dd>—</dd></div>
+        <div>
+            <dt>Company Name</dt>
+            <dd>@Model.CompanyName</dd>
+        </div>
+
+        <div>
+            <dt>Registration Number</dt>
+            <dd>@Model.RegistrationNumber</dd>
+        </div>
+
+        <div>
+            <dt>Tax Number</dt>
+            <dd>@(Model.TaxNumber ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Email</dt>
+            <dd>@Model.Email</dd>
+        </div>
+
+        <div>
+            <dt>Phone</dt>
+            <dd>@(Model.Phone ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Address</dt>
+            <dd>@(Model.Address ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Registered At (UTC)</dt>
+            <dd>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+        </div>
+
+        <div>
+            <dt>Reviewed By</dt>
+            <dd>@(Model.ReviewedBy ?? "—")</dd>
+        </div>
+
+        <div>
+            <dt>Review Notes</dt>
+            <dd>@(Model.ReviewNotes ?? "—")</dd>
+        </div>
     </dl>
 </section>
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-legal-documents">
-    <div class="pg-panel-head"><h2 id="tbl-legal-documents">Legal documents</h2></div>
+<!-- Legal Documents -->
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head">
+        <h2>Legal Document Verification</h2>
+        <p>Review company registration and legal documents.</p>
+    </div>
+
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Uploaded</th><th scope="col">Expires</th><th scope="col">Verification</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No documents uploaded by this supplier."' /></td></tr></tbody>
+            <thead>
+                <tr>
+                    <th>Document</th>
+                    <th>Type</th>
+                    <th>Expiry</th>
+                    <th>Status</th>
+                    <th>Verification</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (!Model.Documents.Any())
+                {
+                    <tr>
+                        <td colspan="5">
+                            No documents uploaded.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var document in Model.Documents)
+                    {
+                        <tr>
+                            <td>@document.FileName</td>
+
+                            <td>@(document.DocumentType ?? "—")</td>
+
+                            <td>
+                                @(document.ExpiresAt?.ToString("yyyy-MM-dd")
+                                    ?? "—")
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @document.VerificationStatus
+                                </span>
+                            </td>
+
+                            <td>
+                                @if (Model.Status != "Approved")
+                                {
+                                    <form asp-area="Admin"
+                                          asp-controller="Suppliers"
+                                          asp-action="VerifyDocument"
+                                          method="post"
+                                          class="pg-form">
+
+                                        @Html.AntiForgeryToken()
+
+                                        <input type="hidden"
+                                               name="SupplierId"
+                                               value="@Model.Id" />
+
+                                        <input type="hidden"
+                                               name="DocumentId"
+                                               value="@document.Id" />
+
+                                        <div class="pg-field">
+                                            <label>
+                                                Verification Status
+                                            </label>
+
+                                            <select name="Status"
+                                                    class="form-control"
+                                                    required>
+                                                <option value="Pending">
+                                                    Pending
+                                                </option>
+                                                <option value="Verified">
+                                                    Verified
+                                                </option>
+                                                <option value="Rejected">
+                                                    Rejected
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="pg-field">
+                                            <label>Verification Notes</label>
+
+                                            <textarea name="Notes"
+                                                      class="form-control"
+                                                      maxlength="1000"
+                                                      rows="2"
+                                                      placeholder="Add review notes">@document.VerificationNotes</textarea>
+                                        </div>
+
+                                        <button type="submit"
+                                                class="pg-btn pg-btn-primary">
+                                            Save Verification
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span>
+                                        Verification locked while approved.
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
         </table>
     </div>
 </section>
 
-<div class="pg-grid">
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Approve supplier", "Approve this company so it can be invited to tenders.", "Sets Supplier.Status to Approved and records you as the reviewer.", false, false)' />
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Reject or suspend supplier", "Reject the registration or suspend an approved supplier.", "Sets the status to Rejected or Suspended with your reason. The company can no longer be invited.", true, true)' />
-</div>
+<!-- Supplier Decision -->
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head">
+        <h2>Supplier Decision</h2>
+        <p>
+            Approval and rejection decisions are recorded
+            in the audit history.
+        </p>
+    </div>
+
+    <form asp-area="Admin"
+          asp-controller="Suppliers"
+          asp-action="SubmitReview"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden"
+               name="SupplierId"
+               value="@Model.Id" />
+
+        <div class="pg-form-grid">
+
+            <div class="pg-field">
+                <label for="decision">Decision</label>
+
+                <select id="decision"
+                        name="Decision"
+                        class="form-control"
+                        required>
+
+                    @if (Model.Status == "Pending")
+                    {
+                        <option value="Approved">Approve</option>
+                        <option value="Rejected">Reject</option>
+                    }
+                    else if (Model.Status == "Approved")
+                    {
+                        <option value="Suspended">Suspend</option>
+                    }
+                    else if (Model.Status == "Suspended")
+                    {
+                        <option value="Approved">
+                            Restore Approval
+                        </option>
+                    }
+                    else
+                    {
+                        <option value="">
+                            No available decision
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <div class="pg-field pg-field-wide">
+                <label for="reviewNotes">
+                    Review Notes / Reason
+                </label>
+
+                <textarea id="reviewNotes"
+                          name="ReviewNotes"
+                          class="form-control"
+                          rows="4"
+                          maxlength="1000"
+                          placeholder="Record the reason or justification"></textarea>
+
+                <small class="pg-hint">
+                    A reason is required for rejection
+                    and suspension.
+                </small>
+            </div>
+        </div>
+
+        @if (Model.Status == "Pending" ||
+             Model.Status == "Approved" ||
+             Model.Status == "Suspended")
+        {
+            <div class="pg-actions">
+                <button type="submit"
+                        class="pg-btn pg-btn-primary">
+                    Submit Decision
+                </button>
+            </div>
+        }
+        else
+        {
+            <p>
+                This registration was rejected.
+                A new review requires a resubmission workflow.
+            </p>
+        }
+    </form>
+</section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Suppliers"
+               asp-action="Details"
+               asp-route-id="@Model.Id">
+                Supplier Details
+            </a>
+        </li>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Suppliers"
+               asp-action="Index">
+                Back to Suppliers
+            </a>
+        </li>
+    </ul>
+</nav>

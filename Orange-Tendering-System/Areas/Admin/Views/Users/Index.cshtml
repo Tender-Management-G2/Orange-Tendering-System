@@ -37,27 +37,113 @@ Internal accounts are created only by Admin, never through
 public registration.
 ===========================================================
 *@
+
+@model List<UserListViewModel>
+
 @{
     ViewData["Title"] = "User Management";
     ViewData["WorkspaceSection"] = "Users";
-    ViewData["Description"] = "Internal employee accounts and supplier login accounts, with roles, department or company, and status.";
+    ViewData["Description"] =
+        "Manage employee and supplier accounts.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search by name or email" aria-label="Search by name or email" disabled />
-    <select aria-label="Role" disabled><option>Role: All</option><option>Role: Admin</option><option>Role: Requesting Department</option><option>Role: Sourcing Officer</option><option>Role: Supplier</option><option>Role: Evaluation Committee</option><option>Role: Sourcing Manager</option><option>Role: Top Committee</option></select>
-    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Active</option><option>Status: Inactive</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
+<section class="ws-panel pg-panel">
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-accounts">
-    <div class="pg-panel-head"><h2 id="tbl-accounts">Accounts</h2><a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Users" asp-action="Create">Create user</a></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Full name</th><th scope="col">Email</th><th scope="col">Role(s)</th><th scope="col">Department / Company</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No user accounts are loaded yet."' /></td></tr></tbody>
-        </table>
+    <div class="pg-panel-head">
+        <div>
+            <h2>User Accounts</h2>
+            <p>
+                Total Users: @(Model?.Count ?? 0)
+            </p>
+        </div>
+
+        <a class="pg-btn pg-btn-primary"
+           asp-area="Admin"
+           asp-controller="Users"
+           asp-action="Create">
+            Create User
+        </a>
     </div>
+
+    <div class="pg-table-wrap">
+
+        <table class="pg-table">
+
+            <thead>
+                <tr>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Role(s)</th>
+                    <th>Department / Company</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            No user accounts found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var user in Model)
+                    {
+                        <tr>
+                            <td>@user.FullName</td>
+
+                            <td>@user.Email</td>
+
+                            <td>@user.Roles</td>
+
+                            <td>@user.DepartmentOrCompany</td>
+
+                            <td>
+                                @if (user.IsActive)
+                                {
+                                    <span class="pg-status">
+                                        Active
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="pg-status">
+                                        Inactive
+                                    </span>
+                                }
+                            </td>
+
+                            <td>
+                                <a class="pg-btn"
+                                   asp-area="Admin"
+                                   asp-controller="Users"
+                                   asp-action="Details"
+                                   asp-route-id="@user.Id">
+                                    Details
+                                </a>
+
+                                <a class="pg-btn"
+                                   asp-area="Admin"
+                                   asp-controller="Users"
+                                   asp-action="Edit"
+                                   asp-route-id="@user.Id">
+                                    Edit
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
+        </table>
+
+    </div>
+
 </section>
