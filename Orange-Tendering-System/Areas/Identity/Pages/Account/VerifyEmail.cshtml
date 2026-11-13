@@ -10,13 +10,6 @@
     <div class="glass auth-card">
         <span class="eyebrow">SUPPLIER ONBOARDING</span>
         <h1>Verify Email</h1>
-        @if (Model.Verified)
-        {
-            <p role="status">Email verified. Your company is awaiting administrator approval.</p>
-            <a class="auth-link" asp-page="./Login">Return to sign in</a>
-        }
-        else
-        {
             <p>Your supplier application is not submitted for administrator review until this code is verified.</p>
             <p>If you already started an application, your uploaded documents are saved. You can request a new code here without registering again.</p>
             @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
@@ -42,7 +35,6 @@
                 <input type="hidden" name="email" value="@Model.Input.Email" />
                 <button type="submit" class="overview">Send a new code</button>
             </form>
-        }
     </div>
 </section>
 @section Scripts { <partial name="_ValidationScriptsPartial" /> }

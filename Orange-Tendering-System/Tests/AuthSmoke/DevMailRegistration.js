@@ -68,13 +68,15 @@ const verification = await fetch(base + '/Identity/Account/VerifyEmail', {
     'Input.Email': email, 'Input.Code': code, '__RequestVerificationToken': verifyToken
   })
 });
-const verificationHtml = await verification.text();
-if (!verificationHtml.includes('Email verified. Your company is awaiting administrator approval.')) {
-  const errors = [...verificationHtml.matchAll(/class="[^"]*(?:validation-summary|field-error)[^"]*"[^>]*>([^<]+)/g)].map(match => match[1]);
-  throw new Error(`OTP verification returned ${verification.status}; allow=${verification.headers.get('allow')}; title=${verificationHtml.match(/<title>([^<]+)/)?.[1]}; errors=${errors.join('; ')}`);
-}
+saveCookies(verification);
+const pendingUrl = verification.headers.get('location');
+if (verification.status !== 302 || !pendingUrl?.includes('PendingApproval'))
+  throw new Error(`OTP verification did not redirect to Pending Approval (HTTP ${verification.status})`);
+const pending = await fetch(new URL(pendingUrl, base), { redirect: 'manual', headers: { Cookie: cookies() } });
+if (pending.status !== 200 || !(await pending.text()).includes('Tender invitations and bids become available after your company is approved.'))
+  throw new Error(`Identity cookie did not open Pending Approval (HTTP ${pending.status})`);
 
-process.stdout.write('PASS supplier registration, local SMTP delivery, and OTP verification\n');
+process.stdout.write('PASS supplier registration, local SMTP delivery, OTP verification, and pending sign-in\n');
 }
 
 main().catch(error => { process.stderr.write(error.message + '\n'); process.exitCode = 1; });

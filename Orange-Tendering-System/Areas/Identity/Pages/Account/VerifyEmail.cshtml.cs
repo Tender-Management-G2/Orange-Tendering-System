@@ -12,13 +12,13 @@ namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
 public class VerifyEmailModel(
     UserManager<ApplicationUser> users,
+    SignInManager<ApplicationUser> signIn,
     ApplicationDbContext db,
     IEmailSender emailSender,
     ILogger<VerifyEmailModel> logger) : PageModel
 {
     private const string Purpose = "SupplierEmailOtp";
     [BindProperty] public InputModel Input { get; set; } = new();
-    public bool Verified { get; private set; }
 
     public class InputModel
     {
@@ -81,8 +81,8 @@ public class VerifyEmailModel(
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         logger.LogInformation("Supplier email verified for user {UserId}.", user.Id);
-        Verified = true;
-        return Page();
+        await signIn.SignInAsync(user, isPersistent: false);
+        return RedirectToPage("./PendingApproval");
     }
 
     public async Task<IActionResult> OnPostResendAsync(string email)

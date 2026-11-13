@@ -1,0 +1,17 @@
+@page
+@model PendingApprovalModel
+@{
+    ViewData["Title"] = "Pending Approval";
+}
+<section class="section auth-section">
+    <div class="glass auth-card">
+        <span class="eyebrow">SUPPLIER ONBOARDING</span>
+        <h1>Pending Approval</h1>
+        <p role="status">Your email is verified and your supplier application has been sent for administrator review.</p>
+        <p>You are signed in. You can return later with your email and password; you do not need another registration code. Tender invitations and bids become available after your company is approved.</p>
+        <a class="auth-link" asp-area="" asp-controller="Home" asp-action="Index">Return to homepage</a>
+        <form asp-page="./Logout" method="post">
+            <button type="submit" class="overview">Sign out</button>
+        </form>
+    </div>
+</section>

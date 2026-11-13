@@ -107,6 +107,7 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseMiddleware<FirstLoginGate>();
+app.UseMiddleware<SupplierApprovalGate>();
 app.UseAuthorization();
 
 app.MapStaticAssets();
