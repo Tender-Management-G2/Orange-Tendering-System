@@ -447,20 +447,56 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXERlY2lzaW9uc1xTZWxlY3RSb3VuZC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Decisions/SummaryPdf.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXERlY2lzaW9uc1xTdW1tYXJ5UGRmLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Reports/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFJlcG9ydHNcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Reports/Pdf.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFJlcG9ydHNcUGRmLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_Clarifications.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfQ2xhcmlmaWNhdGlvbnMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ManagerSummary.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfTWFuYWdlclN1bW1hcnkuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ManagerSummaryStyles.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfTWFuYWdlclN1bW1hcnlTdHlsZXMuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_Messages.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfTWVzc2FnZXMuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportAnalysis.cshtml]
-build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0QW5hbHlzaXMuY3NodG1s
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportBars.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0QmFycy5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportAnalysisScripts.cshtml]
-build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0QW5hbHlzaXNTY3JpcHRzLmNzaHRtbA==
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportDonut.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0RG9udXQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportIcon.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0SWNvbi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportingContent.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0aW5nQ29udGVudC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportLine.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0TGluZS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_ReportStyles.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFNoYXJlZFxfUmVwb3J0U3R5bGVzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Shared/_TopStyles.cshtml]
@@ -473,6 +509,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Statistics/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFN0YXRpc3RpY3NcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/Statistics/System.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVG9wQ29tbWl0dGVlXFZpZXdzXFN0YXRpc3RpY3NcU3lzdGVtLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/user/Desktop/Orange-Tendering-System/Orange-Tendering-System/Areas/TopCommittee/Views/_ViewImports.cshtml]

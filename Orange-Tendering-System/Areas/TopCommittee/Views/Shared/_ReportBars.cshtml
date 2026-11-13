@@ -1,0 +1,40 @@
+@model ReportChart
+@{
+    var max = Model.Points.Select(p => p.Count).DefaultIfEmpty().Max();
+    var scale = Math.Max(5, (int)Math.Ceiling(max / 5m) * 5);
+}
+<section class="tc-panel"><h2>@Model.Title</h2>
+@if (Model.Points.Count == 0 || max == 0) { <div class="tc-empty">No activity recorded for this chart.</div> }
+else if (Model.Horizontal)
+{
+    var height = Model.Points.Count * 39 + 42;
+    <svg class="tc-chart" viewBox="0 0 560 @height" role="img" aria-label="@Model.Title">
+    @for (var tick = 0; tick <= 5; tick++)
+    { var x = 180 + tick * 66; <line x1="@x" y1="9" x2="@x" y2="@(height-29)" /><g><text x="@x" y="@(height-8)" text-anchor="middle">@((scale / 5) * tick)</text></g> }
+    @for (var i = 0; i < Model.Points.Count; i++)
+    {
+        var point = Model.Points[i]; var y = 16 + i * 39; var width = point.Count * 330d / scale;
+        <g><text x="170" y="@(y+17)" text-anchor="end"><title>@point.Label</title>@(point.Label.Length > 24 ? point.Label[..21] + "…" : point.Label)</text></g>
+        <rect x="180" y="@y" width="@ReportFormat.Number(width)" height="25" rx="2" fill="@point.Color" />
+        <g><text class="tc-value" x="@ReportFormat.Number(188+width)" y="@(y+17)">@point.Count</text></g>
+    }
+    </svg>
+}
+else
+{
+    var width = 410d / Model.Points.Count;
+    <svg class="tc-chart" viewBox="0 0 490 290" role="img" aria-label="@Model.Title">
+    @for (var tick = 0; tick <= 5; tick++)
+    { var y = 220 - tick * 38; <line x1="48" y1="@y" x2="475" y2="@y" /><g><text x="38" y="@(y+4)" text-anchor="end">@((scale / 5) * tick)</text></g> }
+    @for (var i = 0; i < Model.Points.Count; i++)
+    {
+        var point = Model.Points[i]; var x = 55 + i * width; var height = point.Count * 190d / scale;
+        var words = point.Label.Split(' ', 2);
+        <rect x="@ReportFormat.Number(x+width*.12)" y="@ReportFormat.Number(220-height)" width="@ReportFormat.Number(width*.7)" height="@ReportFormat.Number(height)" rx="2" fill="@point.Color" />
+        <g><text class="tc-value" x="@ReportFormat.Number(x+width*.47)" y="@ReportFormat.Number(211-height)" text-anchor="middle">@point.Count</text></g>
+        <g><text x="@ReportFormat.Number(x+width*.47)" y="240" text-anchor="middle"><tspan x="@ReportFormat.Number(x+width*.47)">@words[0]</tspan>@if (words.Length > 1) { <tspan x="@ReportFormat.Number(x+width*.47)" dy="15">@words[1]</tspan> }</text></g>
+    }
+    </svg>
+}
+</section>
+

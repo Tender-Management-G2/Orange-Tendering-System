@@ -1,3 +1,4 @@
+@inject Microsoft.AspNetCore.Mvc.Razor.IRazorViewEngine SummaryViewEngine
 @model RoundDetails
 @{
     var request = Model.Tender.PurchaseRequest;
@@ -6,6 +7,7 @@
     ViewData["Description"] = $"{Model.Tender.Title} · tender round {Model.Round.TenderRound.RoundNumber} · committee round {Model.Round.RoundNumber}.";
 }
 <partial name="_PageHeader" /><partial name="_Messages" />
+<partial name="_ManagerSummary" model="Model" />
 @if (Model.Round.TenderReport is { ReportType: not ReportType.ExecutiveSummary } linkedReport)
 { <aside class="pg-note"><strong>The linked report is an evaluation report, not the Manager's executive summary.</strong><p>Recorded report type: @linkedReport.ReportType. You can review the available information, but an actual submitted ExecutiveSummary from the responsible Manager is still required for AI report analysis and voting.</p></aside> }
 <nav class="pg-links"><ul><li><a asp-action="Decision" asp-route-id="@Model.Round.Id">Committee voting</a></li><li><a asp-action="History" asp-route-id="@Model.Round.Id">Decision history</a></li><li><a asp-controller="Dashboard" asp-action="Index">Dashboard</a></li></ul></nav>
@@ -16,7 +18,6 @@
 <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Requested item</th><th>Quantity</th><th>Unit</th><th>Specifications</th></tr></thead><tbody>@foreach (var item in request.Items) { <tr><td>@item.Name</td><td>@item.Quantity.ToString("0.###")</td><td>@item.Unit</td><td style="white-space:pre-wrap">@item.Specifications</td></tr> }</tbody></table></div>
 </section>
 <section class="ws-panel pg-panel"><h2>Tender information</h2><dl class="pg-dl"><div><dt>Reference</dt><dd>T-@Model.Tender.Id</dd></div><div><dt>Status</dt><dd>@Model.Tender.Status</dd></div><div><dt>Created</dt><dd>@CommitteeDisplay.Date(Model.Tender.CreatedAt)</dd></div><div><dt>Opens</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderRound.OpensAt)</dd></div><div><dt>Deadline</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderRound.Deadline)</dd></div><div><dt>Closed</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderRound.ClosedAt)</dd></div></dl><h3>Description</h3><p style="white-space:pre-wrap">@Model.Tender.Description</p><h3>Requirements / recorded terms</h3><p style="white-space:pre-wrap">@Model.Tender.Requirements</p></section>
-<section class="ws-panel pg-panel"><h2>Sourcing Manager recommendation</h2><dl class="pg-dl"><div><dt>Responsible Manager</dt><dd>@(Model.Manager?.FullName ?? "Not verified")</dd></div><div><dt>Executive summary version</dt><dd>@Model.Round.TenderReport?.VersionNumber</dd></div><div><dt>Report status</dt><dd>@Model.Round.TenderReport?.Status</dd></div><div><dt>Recommended supplier</dt><dd>@Model.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</dd></div><div><dt>Submitted</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderReport?.SubmittedAt)</dd></div></dl><p style="white-space:pre-wrap">@Model.Round.TenderReport?.Content</p></section>
 <section class="ws-panel pg-panel"><h2>Supplier comparison — current submitted offers</h2><p class="pg-hint">Raw member scores are listed below and are not weighted totals. No currency conversion, normalization, ranking formula or member weighting is invented.</p>
 <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Supplier</th><th>Total price</th><th>Currency</th><th>Delivery (days)</th><th>Technical raw scores</th><th>Financial raw scores</th><th>Compliance</th><th>Recommendation</th></tr></thead><tbody>
 @foreach (var bid in Model.Bids)
@@ -68,7 +69,7 @@
 }
 @if (Model.Documents.Count == 0) { <tr><td colspan="4">No supporting document records.</td></tr> }
 </tbody></table></div></section>
-<partial name="_ReportAnalysis" model="Model" />
+@if (SummaryViewEngine.FindView(ViewContext, "_ReportAnalysis", false).Success) { <partial name="_ReportAnalysis" model="Model" /> }
 <partial name="_VotingStatus" model="Model" /><partial name="_Clarifications" model="Model" />
-@section Styles { <partial name="_TopStyles" /> }
-@section Scripts { <partial name="_ReportAnalysisScripts" /> }
+@section Styles { <partial name="_TopStyles" /><partial name="_ManagerSummaryStyles" /> }
+@section Scripts { @if (SummaryViewEngine.FindView(ViewContext, "_ReportAnalysisScripts", false).Success) { <partial name="_ReportAnalysisScripts" /> } }

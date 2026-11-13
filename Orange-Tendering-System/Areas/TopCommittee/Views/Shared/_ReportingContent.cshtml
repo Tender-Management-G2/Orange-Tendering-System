@@ -1,0 +1,59 @@
+@model ReportingPage
+@{
+    var data = Model.Data;
+    var kpis = Model.FullSystem
+        ? new[] { ("Purchase Requests", data.Requests, "requests", "#ff7900", "#fff0e4"), ("Tenders", data.Tenders, "tenders", "#087dff", "#eaf3ff"), ("Suppliers", data.Suppliers, "suppliers", "#8846ee", "#f3eaff"), ("Bids (Total)", data.Bids, "awards", "#f79800", "#fff3df"), ("Evaluations", data.Evaluations, "votes", "#20b437", "#eaf9eb") }
+        : new[] { ("Total Suppliers", data.Suppliers, "suppliers", "#087dff", "#eaf3ff"), ("Total Tenders", data.Tenders, "tenders", "#087dff", "#eaf3ff"), ("Awarded Contracts", data.Awards, "awards", "#ff7900", "#fff0e4"), ("Purchase Requests", data.Requests, "requests", "#20b437", "#eaf9eb"), ("Completed Votes", data.CompletedVotes, "votes", "#ff3c58", "#fff0f2") };
+    var performance = data.SupplierRows.OrderByDescending(s => s.Awards).ThenByDescending(s => s.Transactions).ThenBy(s => s.Name).Take(5).ToList();
+    var frequency = data.SupplierRows.OrderByDescending(s => s.Transactions).ThenBy(s => s.Name).Take(5).Select(s => new ReportPoint(s.Name, s.Transactions, "#087dff")).ToList();
+}
+<div class="tc-reports">
+<header class="tc-report-head"><div class="tc-title-group"><div class="tc-title-icon" aria-hidden="true"><svg viewBox="0 0 42 42"><rect x="2" y="28" width="7" height="12"/><rect x="12" y="20" width="7" height="20"/><rect x="22" y="10" width="7" height="30"/><rect x="32" y="2" width="7" height="38"/></svg></div><div><h1>@Model.Title</h1><p>@Model.Subtitle</p></div></div>
+<div class="tc-export">
+<a asp-controller="@(Model.FullSystem ? "Statistics" : "Reports")" asp-action="ExportPdf"><span style="color:#f43b3b"><partial name="_ReportIcon" model='"tenders"' /></span>Export PDF</a>
+<a asp-controller="@(Model.FullSystem ? "Statistics" : "Reports")" asp-action="ExportExcel"><span style="color:#168139"><partial name="_ReportIcon" model='"tenders"' /></span>Export Excel</a>
+</div></header>
+<section class="tc-kpis" aria-label="Report totals">
+@foreach (var item in kpis)
+{ <article class="tc-kpi"><div class="tc-kpi-icon" style="--tc-color:@item.Item4;--tc-tint:@item.Item5"><partial name="_ReportIcon" model="item.Item3" /></div><div><span>@item.Item1</span><strong>@item.Item2.ToString("N0")</strong></div></article> }
+</section>
+@if (Model.FullSystem)
+{
+    <div class="tc-row-three">
+        <partial name="_ReportDonut" model='new ReportChart("Purchase Requests by Status", data.RequestStatuses, "Requests")' />
+        <partial name="_ReportDonut" model='new ReportChart("Tenders by Status", data.TenderStatuses, "Tenders")' />
+        <partial name="_ReportBars" model='new ReportChart("Suppliers by Status", data.SupplierStatuses)' />
+    </div>
+    <div class="tc-row-two">
+        <partial name="_ReportLine" model="data.Months" />
+        <section class="tc-panel"><h2>System Summary</h2><div class="tc-table-wrap"><table class="tc-table tc-system-table"><thead><tr><th>Module</th><th class="tc-numeric">Total</th><th>Key Insight</th></tr></thead><tbody>
+        @foreach (var row in data.Summary) { <tr><td>@row.Module</td><td class="tc-numeric"><strong>@row.Total.ToString("N0")</strong></td><td>@row.Insight</td></tr> }
+        </tbody></table></div></section>
+    </div>
+}
+else
+{
+    <div class="tc-row-three">
+        <partial name="_ReportDonut" model='new ReportChart("Tenders by Status", data.TenderStatuses, "Tenders")' />
+        <partial name="_ReportBars" model='new ReportChart("Purchase Requests by Status", data.RequestStatuses)' />
+        <section class="tc-panel"><h2>Supplier Performance (Top 5)</h2><div class="tc-table-wrap"><table class="tc-table"><thead><tr><th>Supplier</th><th class="tc-numeric">Transactions</th><th class="tc-numeric">Awards</th><th class="tc-numeric">Success Rate</th></tr></thead><tbody>
+        @foreach (var supplier in performance) { <tr><td>@supplier.Name</td><td class="tc-numeric">@supplier.Transactions</td><td class="tc-numeric">@supplier.Awards</td><td class="tc-numeric"><span class="tc-rate">@ReportFormat.Percent(supplier.SuccessRate)</span></td></tr> }
+        @if (performance.Count == 0) { <tr><td colspan="4">No supplier statistics available.</td></tr> }
+        </tbody></table></div><p class="tc-notes">Ranked by awards, then submitted-offer transactions. Success rate = awards / transactions; unavailable for zero or inconsistent denominators.</p></section>
+    </div>
+    <div class="tc-row-two">
+        <partial name="_ReportBars" model='new ReportChart("Supplier Transaction Frequency", frequency, Horizontal: true)' />
+        <section class="tc-panel"><h2>Key Metrics</h2><table class="tc-table tc-key-table"><tbody>
+            <tr><td>Supplier Participation Rate</td><td class="tc-numeric">@ReportFormat.Percent(data.ParticipationRate)</td></tr>
+            <tr><td>Tenders with Zero Bids</td><td class="tc-numeric">@data.ZeroBidTenders</td></tr>
+            <tr><td>Average Evaluation Delay</td><td class="tc-numeric">@ReportFormat.Days(data.EvaluationDays)</td></tr>
+            <tr><td>Average Purchase Request Approval Duration</td><td class="tc-numeric">@ReportFormat.Days(data.RequestApprovalDays)</td></tr>
+        </tbody></table><p class="tc-notes">Evaluation delay is measured as elapsed time from StartedAt to CompletedAt for completed evaluation rounds. No planned deadline or SLA is stored, so overdue-vs-target delay cannot be calculated. Request approval duration uses each request's latest accepted submission, SubmittedAt to ReviewedAt. Missing valid timestamps show —.</p></section>
+    </div>
+}
+@if (ViewData["ReportExport"] is true) { <footer class="tc-report-footer"><span>Orange Sourcing &amp; Tender Management System</span><span>Generated @CommitteeDisplay.Date(data.GeneratedAt)</span></footer> }
+<nav class="tc-report-nav" aria-label="Reporting pages">
+@if (Model.FullSystem) { <a asp-controller="Reports" asp-action="Index">← Back to Reports &amp; Analytics</a> }
+else { <a asp-controller="Statistics" asp-action="FullSystem">Full System Statistics →</a> }
+</nav>
+</div>

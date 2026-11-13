@@ -1,0 +1,3 @@
+@model RoundDetails
+@{ Layout = null; ViewData["SummaryExport"] = true; }
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><title>Sourcing Manager Summary — T-@Model.Tender.Id</title><partial name="_ManagerSummaryStyles" /><style>@@page{size:A4 portrait;margin:15mm}body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:#fff}*{box-sizing:border-box}</style></head><body><partial name="_ManagerSummary" model="Model" /></body></html>

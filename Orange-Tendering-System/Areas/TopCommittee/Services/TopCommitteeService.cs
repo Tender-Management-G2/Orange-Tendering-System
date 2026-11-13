@@ -23,6 +23,7 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
             .ThenInclude(b => b!.TenderInvitation).ThenInclude(i => i.Supplier)
         .Include(r => r.TenderReport).ThenInclude(r => r!.RecommendedBid)
             .ThenInclude(b => b!.TenderInvitation).ThenInclude(i => i.Supplier)
+        .Include(r => r.TenderReport).ThenInclude(r => r!.RecommendedBid).ThenInclude(b => b!.Items)
         .Include(r => r.Votes).ThenInclude(v => v.CommitteeMember).ThenInclude(m => m.User);
 
     public async Task<RoundDetails?> Load(string userId, int id)

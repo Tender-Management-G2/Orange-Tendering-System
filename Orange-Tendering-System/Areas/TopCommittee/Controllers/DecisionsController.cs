@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc.Razor;
+using Orange_Tendering_System.Areas.TopCommittee.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +13,7 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
 [Area("TopCommittee"), Authorize(Roles = SystemRoles.TopCommittee)]
 public sealed class DecisionsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
-    IWebHostEnvironment environment, ILogger<DecisionsController> logger) : TopCommitteeControllerBase(db, users)
+    IWebHostEnvironment environment, ILogger<DecisionsController> logger, IRazorViewEngine views) : TopCommitteeControllerBase(db, users)
 {
     public async Task<IActionResult> ReviewEvaluation(int? id, string? search = null, CommitteeRoundStatus? status = null, int page = 1)
     {
@@ -96,6 +98,30 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             Rounds = await query.OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id)
                 .Skip((page - 1) * 20).Take(20).AsSplitQuery().ToListAsync()
         });
+    }
+    [HttpGet]
+    public async Task<IActionResult> SummaryPdf(int id, CancellationToken cancellationToken)
+    {
+        var user = await ActiveUser();
+        if (user is null) return Forbid();
+        // Load enforces membership for this specific committee round, including direct URL requests.
+        var details = await Committee.Load(user.Id, id);
+        if (details is null || details.Round.TenderReport is not
+            { ReportType: ReportType.ExecutiveSummary, SubmittedAt: not null, Status: not ReportStatus.Draft })
+            return NotFound();
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        try
+        {
+            var pdf = await ReportingExport.PdfView(this, views, details,
+                "/Areas/TopCommittee/Views/Decisions/SummaryPdf.cshtml", environment.ContentRootPath, cancellationToken);
+            return File(pdf, "application/pdf", $"Manager-Summary-T{details.Tender.Id}-R{details.Round.TenderReport.Id}-V{details.Round.TenderReport.VersionNumber}.pdf");
+        }
+        catch (InvalidOperationException exception)
+        {
+            logger.LogWarning(exception, "Manager summary PDF export failed for committee round {RoundId}", id);
+            return Problem(title: "Summary PDF unavailable", detail: "The summary could not be exported. Please try again or contact support.", statusCode: 503);
+        }
     }
     public async Task<IActionResult> Download(int id, int roundId)
     {

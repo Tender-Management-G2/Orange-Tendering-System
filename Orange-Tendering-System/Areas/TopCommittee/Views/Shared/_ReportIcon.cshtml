@@ -1,0 +1,12 @@
+@model string
+@{
+    var path = Model switch
+    {
+        "suppliers" => "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3a4 4 0 0 1 0 8M22 21v-2a4 4 0 0 0-3-3.87M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+        "requests" => "M2 3h3l3 13h12l2-10H6M9 21h.01M19 21h.01",
+        "awards" => "M8 3h8v7a4 4 0 0 1-8 0zM8 5H4v3c0 3 4 3 4 3M16 5h4v3c0 3-4 3-4 3M12 14v7M8 22h8",
+        "votes" => "M8 4h8v4H8zM6 6H4v16h16V6h-2M8 15l3 3 5-7",
+        _ => "M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h8"
+    };
+}
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="@path" /></svg>

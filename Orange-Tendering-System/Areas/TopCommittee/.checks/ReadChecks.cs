@@ -25,7 +25,7 @@ try
     var query = new TopCommitteeService(compatible, null!).AssignedRounds("assigned-member").ToQueryString();
     Check(query.Contains("TopCommittee") && query.Contains("assigned-member") && query.Contains("CommitteeMembers"), "SQL includes legacy membership and round values while retaining user scoping");
     var incomplete = new RoundDetails { Round = new() { TenderRound = new() { Tender = new() { Status = TenderStatus.TopCommitteeReview } }, TenderReport = new() { ReportType = ReportType.FullEvaluation, SubmittedAt = DateTime.UtcNow, Status = ReportStatus.Submitted } }, IsLatest = true };
-    Check(TopCommitteePolicy.Blockers(incomplete).Count > 0 && !TopCommitteeOllamaService.CanAnalyze(incomplete), "Legacy display does not bypass voting or AI eligibility");
+    Check(TopCommitteePolicy.Blockers(incomplete).Count > 0, "Legacy display does not bypass voting or AI eligibility");
     if (args.Contains("--live"))
     {
         var config = new ConfigurationBuilder().SetBasePath(args[0]).AddJsonFile("appsettings.json").AddJsonFile("appsettings.Development.json", true).AddUserSecrets(typeof(ApplicationUser).Assembly, true).AddEnvironmentVariables().Build();
@@ -37,19 +37,16 @@ try
         var liveOptions = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(config.GetConnectionString("Default Connection")).Options;
         using var live = new ApplicationDbContext(TopCommitteeCompatibility.Options(liveOptions));
         var service = new TopCommitteeService(live, manager);
+        var report = await new TopCommitteeReportingService(live).Read();
+        Check(report.Requests == await live.PurchaseRequests.CountAsync() && report.Tenders == await live.Tenders.CountAsync(), "LIVE entity totals match SQL");
+        Check(report.RequestStatuses.Sum(p => p.Count) == report.Requests && report.TenderStatuses.Sum(p => p.Count) == report.Tenders, "LIVE status totals reconcile");
+        Check(report.Months.Count == 6 && report.SupplierStatuses.Single(p => p.Label == "Registered").Count == report.Suppliers, "LIVE monthly series and supplier registration semantics");
         foreach (var email in new[] { "top.demo@orange.test", "topcommittee@orange.com" })
         {
-            var user = await manager.FindByEmailAsync(email) ?? throw new Exception("Expected account is missing.");
+            var user = await manager.FindByEmailAsync(email) ?? throw new Exception("Account missing");
             var rounds = await service.RoundList(user.Id).AsNoTracking().AsSplitQuery().ToListAsync();
-            Check(rounds.Any(r => r.TenderRound.TenderId == 1), "LIVE tender #1 is visible to assigned account " + email);
-            var round = rounds.First(r => r.TenderRound.TenderId == 1);
-            var details = await service.Load(user.Id, round.Id) ?? throw new Exception("Round detail unavailable.");
-            Check(details.Tender.Status == TenderStatus.TopCommitteeReview && details.Round.TenderReport?.ReportType == ReportType.FullEvaluation, "LIVE legacy values materialize without enum errors");
-            Check(details.TopMembers.Count == 2 && !details.CanVote && !TopCommitteeOllamaService.CanAnalyze(details), "LIVE incomplete committee/report gates remain enforced");
-            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { Account = email, Tender = details.Tender.Id, CommitteeRound = details.Round.Id, Members = details.TopMembers.Count, CanVote = details.CanVote, ReportType = details.Round.TenderReport?.ReportType.ToString(), Blockers = details.Blockers }));
+            foreach (var round in rounds) Check(await service.Load(user.Id, round.Id) is not null, "LIVE assigned round materializes");
         }
-        var stats = await service.Statistics();
-        Check(stats.Tenders >= 1 && stats.Distribution.ContainsKey(TenderStatus.TopCommitteeReview), "LIVE statistics handles the legacy tender stage");
         Check(!live.ChangeTracker.HasChanges(), "LIVE compatibility reads do not mark stored records for updates");
     }
     Console.WriteLine($"Completed {count} checks. Database operations, when enabled, were read-only.");

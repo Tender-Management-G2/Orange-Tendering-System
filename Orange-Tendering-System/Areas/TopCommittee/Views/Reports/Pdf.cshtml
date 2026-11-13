@@ -1,0 +1,6 @@
+@model ReportingPage
+@{ Layout = null; ViewData["ReportExport"] = true; }
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><title>@Model.Title</title><partial name="_ReportStyles" /><style>@@page{size:A4 landscape;margin:12mm}body{margin:0;background:#fff;color:#141c29;font-family:'Segoe UI',Arial,sans-serif}.tc-reports{width:100%;zoom:.85}.tc-export,.tc-report-nav{display:none!important}.tc-reports{gap:10px}.tc-panel{padding:12px}.tc-donut-body{grid-template-columns:minmax(80px,.9fr) 1.1fr;min-height:140px}.tc-donut{max-width:112px}.tc-legend{grid-template-columns:1fr;gap:5px}.tc-legend>div{flex-wrap:nowrap}.tc-legend b{margin-left:auto}.tc-chart{max-height:190px}.tc-panel h2{margin-bottom:10px}.tc-key-table td{padding:9px 5px}.tc-notes{margin-top:4px;line-height:1.5}.tc-empty{min-height:140px}</style></head><body><partial name="_ReportingContent" model="Model" /></body></html>
+
+
+

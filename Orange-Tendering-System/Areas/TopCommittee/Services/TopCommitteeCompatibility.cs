@@ -22,6 +22,9 @@ public static class TopCommitteeCompatibility
             value => CommitteeStorage(value), value => ReadCommittee(value));
         builder.Entity<CommitteeMember>().Property(m => m.CommitteeType).HasConversion(committee);
         builder.Entity<CommitteeRound>().Property(r => r.CommitteeType).HasConversion(committee);
+        builder.Entity<CommitteeMember>().Property(m => m.Responsibility).HasConversion(
+            new ValueConverter<CommitteeResponsibility?, string?>(
+                value => value.HasValue ? value.Value.ToString() : null, value => ReadResponsibility(value)));
         builder.Entity<Tender>().Property(t => t.Status).HasConversion(new ValueConverter<TenderStatus, string>(
             value => value.ToString(), value => ReadTenderStatus(value)));
         builder.Entity<TenderReport>().Property(r => r.ReportType).HasConversion(new ValueConverter<ReportType, string>(
@@ -34,6 +37,9 @@ public static class TopCommitteeCompatibility
         ? TenderStatus.TopCommitteeReview : Enum.Parse<TenderStatus>(value);
     public static ReportType ReadReportType(string value) => value == "UnifiedEvaluation"
         ? ReportType.FullEvaluation : Enum.Parse<ReportType>(value);
+    public static CommitteeResponsibility? ReadResponsibility(string? value) => value is null or
+        "Top Committee Member 1" or "Top Committee Member 2" or "Top Committee Member 3" or "Top Committee Member 4"
+        ? null : Enum.Parse<CommitteeResponsibility>(value);
 }
 
 // The replacement gets its own EF internal service provider/model cache; the shared model is untouched.

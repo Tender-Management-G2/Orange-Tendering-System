@@ -1,0 +1,24 @@
+@model IReadOnlyList<ActivityMonth>
+@{
+    var highest = Model.SelectMany(m => new[] { m.Requests, m.Tenders, m.Bids, m.Evaluations }).DefaultIfEmpty().Max();
+    var scale = Math.Max(5, (int)Math.Ceiling(highest / 5m) * 5);
+    var series = new[] { ("Purchase Requests", "#087dff", Model.Select(m => m.Requests).ToArray()), ("Tenders", "#ff8a00", Model.Select(m => m.Tenders).ToArray()), ("Bids", "#20ac32", Model.Select(m => m.Bids).ToArray()), ("Evaluations", "#8251ff", Model.Select(m => m.Evaluations).ToArray()) };
+}
+<section class="tc-panel"><h2>Monthly Activity Overview</h2>
+@if (highest == 0) { <div class="tc-empty">No activity in the current six-month window.</div> }
+else
+{
+    <svg class="tc-chart" viewBox="0 0 650 260" role="img" aria-label="Monthly activity across the system">
+    @for (var tick = 0; tick <= 5; tick++) { var y = 215-tick*38; <line x1="45" y1="@y" x2="625" y2="@y" /><g><text x="35" y="@(y+4)" text-anchor="end">@((scale/5)*tick)</text></g> }
+    @for (var i = 0; i < Model.Count; i++) { <g><text x="@(55+i*110)" y="245" text-anchor="middle">@Model[i].Label</text></g> }
+    @foreach (var item in series)
+    {
+        var points = string.Join(" ", item.Item3.Select((value, i) => $"{55+i*110},{ReportFormat.Number(215-value*190d/scale)}"));
+        <polyline points="@points" stroke="@item.Item2" stroke-width="3" />
+        @for (var i = 0; i < item.Item3.Length; i++) { <circle cx="@(55+i*110)" cy="@ReportFormat.Number(215-item.Item3[i]*190d/scale)" r="4" stroke="@item.Item2" stroke-width="2"><title>@item.Item1 · @Model[i].Label: @item.Item3[i]</title></circle> }
+    }
+    </svg>
+}
+<div class="tc-chart-legend">@foreach (var item in series) { <span><i style="background:@item.Item2" aria-hidden="true"></i>@item.Item1</span> }</div>
+<p class="tc-notes">Last six calendar months in UTC; the current month is partial. Creation dates are used, with StartedAt for evaluation rounds.</p></section>
+
