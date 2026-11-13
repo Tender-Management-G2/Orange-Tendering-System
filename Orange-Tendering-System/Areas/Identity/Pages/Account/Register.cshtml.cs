@@ -22,6 +22,7 @@ public class RegisterModel(
     [BindProperty] public IFormFile? CommercialRegistrationCertificate { get; set; }
     [BindProperty] public IFormFile? TaxCertificate { get; set; }
     [BindProperty] public List<IFormFile> LegalDocuments { get; set; } = [];
+    public IReadOnlyList<string> Categories => SupplierCategories.All;
 
     public class InputModel
     {
@@ -30,6 +31,7 @@ public class RegisterModel(
         [Required, StringLength(100, MinimumLength = 8), DataType(DataType.Password)] public string Password { get; set; } = string.Empty;
         [Required, Compare(nameof(Password)), DataType(DataType.Password)] public string ConfirmPassword { get; set; } = string.Empty;
         [Required, StringLength(200)] public string CompanyName { get; set; } = string.Empty;
+        [Required, StringLength(80)] public string Category { get; set; } = string.Empty;
         [Required, StringLength(80)] public string RegistrationNumber { get; set; } = string.Empty;
         [StringLength(80)] public string? TaxNumber { get; set; }
         [Required, EmailAddress, StringLength(256)] public string CompanyEmail { get; set; } = string.Empty;
@@ -39,6 +41,8 @@ public class RegisterModel(
 
     public async Task<IActionResult> OnPostAsync()
     {
+        if (!SupplierCategories.All.Contains(Input.Category))
+            ModelState.AddModelError("Input.Category", "Choose one of the listed supplier categories.");
         if (CommercialRegistrationCertificate == null)
             ModelState.AddModelError(nameof(CommercialRegistrationCertificate), "Commercial registration certificate is required.");
         if (!string.IsNullOrWhiteSpace(Input.TaxNumber) && TaxCertificate == null)
@@ -74,6 +78,7 @@ public class RegisterModel(
             var supplier = new Orange_Tendering_System.Models.Entities.Supplier
             {
                 CompanyName = Input.CompanyName.Trim(), RegistrationNumber = registration,
+                Category = SupplierCategories.All.Contains(Input.Category) ? Input.Category : SupplierCategories.Other,
                 TaxNumber = Input.TaxNumber?.Trim(), Email = Input.CompanyEmail.Trim(),
                 Phone = Input.CompanyPhone.Trim(), Address = Input.CompanyAddress.Trim(),
                 Status = SupplierStatus.Pending, CreatedAt = DateTime.UtcNow
