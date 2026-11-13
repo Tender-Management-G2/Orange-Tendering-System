@@ -1,0 +1,56 @@
+@* Independent SourcingOfficer role layout. *@
+@{
+    Layout = null;
+    var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
+    var label = workspace?.Label ?? "Workspace";
+    var pageTitle = ViewData["Title"]?.ToString() ?? $"{label} workspace";
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="color-scheme" content="dark light" />
+    <title>@pageTitle | Orange Sourcing</title>
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/css/workspace-shell.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="ws-shell ws-internal" data-workspace-role="@(workspace?.Role ?? "Signed-in user")">
+    <a class="ws-skip" href="#workspace-main">Skip to main content</a>
+    <aside class="ws-sidebar" id="workspace-navigation" aria-label="@label workspace navigation">
+        <div class="ws-sidebar-brand">
+            <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span><span>Sourcing &amp; Tender<br />Management System</span></a>
+            <button class="ws-icon-button ws-nav-close" type="button" aria-label="Close navigation">×</button>
+        </div>
+        <partial name="_Sidebar" />
+        <div class="ws-sidebar-bottom"><span class="ws-role-label">@label</span><a asp-area="" asp-controller="Home" asp-action="Contact">Contact support <span aria-hidden="true">↗</span></a></div>
+        <div class="ws-sidebar-architecture" aria-hidden="true"></div>
+    </aside>
+    <button class="ws-backdrop" type="button" aria-label="Close navigation" hidden></button>
+    <div class="ws-stage">
+        <header class="ws-topbar">
+            <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+            @* TODO (UNASSIGNED — Voice Search, mandatory feature): connect search + SpeechRecognition here and on Tasks/Index. *@
+            <div class="ws-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Workspace search is not available yet" disabled title="Search is not implemented yet" /></div>
+            <div class="ws-topbar-actions">
+                <button type="button" class="ws-icon-button ws-utility-disabled" disabled aria-label="Voice search is not implemented yet" title="Voice search is not implemented yet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                <a class="ws-icon-button" asp-area="" asp-controller="Notifications" asp-action="Index" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg></a>
+                <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
+                <partial name="_WorkspaceAccountMenu" />
+            </div>
+        </header>
+        <main id="workspace-main" class="ws-main" tabindex="-1">
+            <div class="pg-page">
+                @RenderBody()
+            </div>
+        </main>
+        <footer class="ws-internal-footer"><span>© @DateTime.UtcNow.Year Sourcing &amp; Tender Management System · Academic project</span><a asp-area="" asp-controller="Home" asp-action="HowItWorks">How the workflow works ↗</a></footer>
+    </div>
+    <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
+    <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

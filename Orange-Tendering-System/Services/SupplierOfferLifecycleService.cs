@@ -61,6 +61,9 @@ public sealed partial class SupplierOfferService
     public async Task<bool> UpdateDraftAsync(string userId, int id, SupplierDraftOfferInputModel input)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var tenderId = await OwnOffers(userId).Where(b => b.Id == id).Select(b => (int?)b.TenderInvitation.TenderRound.TenderId).SingleOrDefaultAsync();
+        if (!tenderId.HasValue) return false;
+        await context.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={tenderId.Value}").SingleAsync();
         var bid = await OwnOffers(userId).Include(b => b.Items).SingleOrDefaultAsync(b => b.Id == id);
         if (bid == null || bid.Status != BidStatus.Draft) return false;
         if (!await AvailableInvitations(userId, bid.TenderInvitationId).AnyAsync()) return false;
@@ -83,35 +86,13 @@ public sealed partial class SupplierOfferService
 
     public async Task<string?> SubmitAsync(string userId, int id)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var bid = await OwnOffers(userId).Include(b => b.Items)
-            .Include(b => b.TenderInvitation).ThenInclude(i => i.TenderRound).SingleOrDefaultAsync(b => b.Id == id);
-        if (bid == null || bid.Status != BidStatus.Draft
-            || !await AvailableInvitations(userId, bid.TenderInvitationId).AnyAsync())
-            return "The draft is unavailable or the submission period has closed.";
-        if (string.IsNullOrWhiteSpace(bid.TechnicalProposal) || bid.DeliveryDays == null
-            || bid.Items.Count == 0 || bid.Items.Any(i => i.Quantity <= 0 || i.UnitPrice <= 0))
-            return "Before submitting, complete the technical proposal, delivery days and positive item quantities and prices.";
-        if (bid.ValidUntil.HasValue && bid.ValidUntil.Value.Date < DateTime.UtcNow.Date)
-            return "The offer validity date has passed.";
-        var expectedIds = await context.TenderItems
-            .Where(i => i.TenderId == bid.TenderInvitation.TenderRound.TenderId)
-            .Select(i => i.Id).ToListAsync();
-        if (!expectedIds.OrderBy(i => i).SequenceEqual(bid.Items.Select(i => i.TenderItemId).OrderBy(i => i)))
-            return "Tender items changed. Please contact the Sourcing Officer before submitting.";
-
-        bid.Status = BidStatus.Submitted;
-        bid.SubmittedAt = DateTime.UtcNow;
-        AddOfferAudit(userId, id, "SubmitOffer");
-        context.Notifications.Add(new Notification
+        try
         {
-            UserId = bid.TenderInvitation.InvitedByUserId, Title = "Supplier offer submitted",
-            Message = $"Offer #{bid.Id} has been submitted.", Link = $"/SourcingOfficer/Bids/Details/{bid.Id}",
-            CreatedAt = DateTime.UtcNow
-        });
-        await context.SaveChangesAsync();
-        await transaction.CommitAsync();
-        return null;
+            await workflow.SubmitDraft(id, new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+                [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId)], "SupplierPortal")));
+            return null;
+        }
+        catch (WorkflowException e) { return e.Message; }
     }
 
     public async Task<List<SupplierHistoryRow>?> GetHistoryAsync(string userId, int id)
@@ -140,10 +121,10 @@ public sealed partial class SupplierOfferService
         UserId = userId, EntityName = nameof(Bid), EntityId = id.ToString(), Action = action, CreatedAt = DateTime.UtcNow
     });
 
-    private static SupplierOfferDetailsViewModel ToDetails(Bid bid)
+    private SupplierOfferDetailsViewModel ToDetails(Bid bid)
     {
         var round = bid.TenderInvitation.TenderRound;
-        var now = DateTime.UtcNow;
+        var now = workflow.Now;
         return new SupplierOfferDetailsViewModel
         {
             Id = bid.Id, InvitationId = bid.TenderInvitationId, TenderTitle = round.Tender.Title,

@@ -491,3 +491,9 @@ CLAUDE.md
 # Private supplier attachments (metadata is stored in SQL Server).
 Orange-Tendering-System/App_Data/SupplierUploads/
 .build/
+
+# Protected tender uploads are operational data, never source assets.
+/Orange-Tendering-System/App_Data/TenderDocuments/
+# Generated PDF layout artifacts are reproducible, not production business records.
+/tmp/pdfs/
+/output/pdf/
