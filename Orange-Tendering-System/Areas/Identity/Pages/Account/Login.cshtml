@@ -45,7 +45,7 @@ Do not add a second authentication system next to Identity.
     <div class="glass auth-card">
         <span class="eyebrow">YOUR PROCUREMENT WORKSPACE</span>
         <h1>Sign In</h1>
-        <p>Employees sign in with their email and password. Approved suppliers sign in with face recognition.</p>
+        <p>Employees sign in with their email and password. Approved suppliers sign in with face recognition or a fingerprint / passkey.</p>
 
         @* Supplier biometric sign-in (Ahmad): BiometricsController verifies the live face (or the WebAuthn passkey)
            and issues the same Identity cookie. Only Approved supplier companies can sign in this way. *@
@@ -54,12 +54,12 @@ Do not add a second authentication system next to Identity.
             <label for="faceEmail">Supplier email</label>
             <input id="faceEmail" type="email" autocomplete="username" />
             <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
-            <button type="button" id="btnFaceLogin" class="primary">Sign in with face recognition</button>
+            <button type="button" id="btnFaceLogin" class="primary">Login with Face Recognition</button>
             <div id="facePanel" class="bio-face-panel bio-hidden">
                 <video id="faceVideo" playsinline muted autoplay></video>
                 <div id="faceHint" class="bio-face-hint"></div>
             </div>
-            <button type="button" id="btnPasskeyLogin" class="overview">Fingerprint / passkey (demo)</button>
+            <button type="button" id="btnPasskeyLogin" class="overview">Login with Fingerprint / Passkey</button>
             <small>The camera picture stays on this device; only face measurements are checked. The passkey option uses your device's own fingerprint, face unlock or PIN, or a phone via QR code; this site cannot tell which one was used.</small>
             <small>Company still awaiting approval? Sign in below with your password to see your application.</small>
         </fieldset>

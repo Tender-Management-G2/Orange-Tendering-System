@@ -561,8 +561,9 @@ namespace Orange_Tendering_System.Services
                 SupplierId = null,
                 IsActive = model.IsActive,
 
-                // Confirmation is handled by Authentication module
-                EmailConfirmed = false
+                // Admin-created employees receive a password here, with no email
+                // confirmation flow. Identity requires a confirmed account to sign in.
+                EmailConfirmed = true
             };
 
             await using var transaction =

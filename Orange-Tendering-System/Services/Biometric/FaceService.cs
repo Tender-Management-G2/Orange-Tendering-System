@@ -10,7 +10,7 @@ using Orange_Tendering_System.Models.Entities;
 namespace Orange_Tendering_System.Services.Biometric;
 
 /// <summary>
-/// Face sign-in with instant capture. The browser turns a few camera frames into 128-number descriptors
+/// Face sign-in with five-second capture. The browser turns a few camera frames into 128-number descriptors
 /// (face-api.js); the server issues a one-time token per attempt (so a captured request cannot be replayed),
 /// checks the samples are valid and from one face, and compares them with the templates enrolled for the account.
 ///
@@ -164,6 +164,10 @@ public class FaceService(
                 !double.IsFinite(sample.T) || sample.T < 0)
                 return "The face samples are not valid.";
         }
+
+        if (samples[^1].T - samples[0].T < 5000 ||
+            samples.Zip(samples.Skip(1)).Any(pair => pair.Second.T <= pair.First.T))
+            return "Look at the camera continuously for 5 seconds, then try again.";
 
         double largest = 0;
         for (var i = 0; i < samples.Count; i++)

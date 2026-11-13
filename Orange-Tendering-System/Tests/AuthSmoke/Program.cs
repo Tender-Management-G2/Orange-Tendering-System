@@ -422,6 +422,40 @@ using (var employee = Client(factory))
     Check(employeeLogin.Headers.Location?.ToString() == "/Department", "activated employee enters assigned workspace");
 }
 
+// The Admin Create User screen supplies the password directly. Its accounts must
+// already be confirmed because that screen has no email confirmation step.
+var adminCreatedEmail = $"admin-created-{suffix}@example.test";
+using (var scope = factory.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var departmentId = await db.Departments.Where(d => d.Name == "Auth Test Department " + suffix)
+        .Select(d => d.Id).SingleAsync();
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var created = await scope.ServiceProvider.GetRequiredService<AdminService>().CreateUserAsync(
+        new CreateUserViewModel
+        {
+            FullName = "Admin Created Employee", Email = adminCreatedEmail,
+            Password = supplierPassword, Role = SystemRoles.RequestingDepartment,
+            DepartmentId = departmentId, IsActive = true
+        }, adminId);
+    Check(created.Succeeded, "Admin Create User saves the employee");
+    var account = await db.Users.SingleAsync(u => u.Email == adminCreatedEmail);
+    Check(account.EmailConfirmed, "Admin-created employee is confirmed for password sign-in");
+}
+using (var adminCreated = Client(factory))
+{
+    var token = await Token(adminCreated, "/Identity/Account/Login");
+    var response = await adminCreated.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = adminCreatedEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = token
+    }));
+    Check(response.StatusCode == HttpStatusCode.Redirect && response.Headers.Location?.ToString() == "/Department",
+        "Admin-created employee signs in with the assigned role");
+    Check((await adminCreated.GetAsync("/Department")).StatusCode == HttpStatusCode.OK,
+        "Admin-created employee keeps an authenticated session");
+}
+
 var forgotToken = await Token(admin, "/Identity/Account/ForgotPassword");
 var forgot = await admin.PostAsync("/Identity/Account/ForgotPassword", Form(new()
 {
@@ -528,6 +562,16 @@ using (var scope = factory.Services.CreateScope())
 }
 
 await BiometricChecks.Run(() => Client(factory), Token, Check, factory.Services, suffix);
+
+using (var productionFactory = CreateFactory().WithWebHostBuilder(builder => builder.UseEnvironment("Production")))
+using (var production = Client(productionFactory))
+{
+    foreach (var path in new[] { "/fingerprint-demo", "/fingerprint-demo/register-options", "/fingerprint-demo/register", "/fingerprint-demo/login-options", "/fingerprint-demo/verify", "/fingerprint-demo/reset", "/face-demo" })
+    {
+        Check((await production.GetAsync(path)).StatusCode == HttpStatusCode.NotFound, "Production GET " + path + " returns 404");
+        Check((await production.PostAsync(path, new StringContent("{}"))).StatusCode == HttpStatusCode.NotFound, "Production POST " + path + " returns 404");
+    }
+}
 
 Console.WriteLine("Authentication smoke checks passed.");
 

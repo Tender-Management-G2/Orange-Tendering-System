@@ -73,32 +73,34 @@ static class BiometricChecks
         var regResponse = await Post(session, csrf, "/Biometrics/PasskeyRegisterOptions", new { password });
         check(regResponse.StatusCode == HttpStatusCode.OK, "passkey registration options issued");
         var reg = await regResponse.Content.ReadFromJsonAsync<JsonElement>();
-        check(reg.GetProperty("options").GetProperty("authenticatorSelection").GetProperty("userVerification").GetString() == "required",
+        check(reg.GetProperty("authenticatorSelection").GetProperty("userVerification").GetString() == "required",
             "registration demands user verification (fingerprint/PIN)");
+        check(!reg.GetProperty("authenticatorSelection").TryGetProperty("authenticatorAttachment", out var attachment) || attachment.ValueKind == JsonValueKind.Null,
+            "registration permits phone authenticators rather than forcing platform-only");
 
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var credentialId = RandomNumberGenerator.GetBytes(32);
-        var challenge = reg.GetProperty("options").GetProperty("challenge").GetString()!;
+        var challenge = reg.GetProperty("challenge").GetString()!;
 
         // Authenticator that did not verify the user must be refused.
-        var noUv = await Post(session, csrf, "/Biometrics/PasskeyRegister", Attestation(reg.GetProperty("token").GetString()!, challenge, credentialId, key, flags: 0x41));
+        var noUv = await Post(session, csrf, "/Biometrics/PasskeyRegister", Attestation("", challenge, credentialId, key, flags: 0x41));
         check(noUv.StatusCode == HttpStatusCode.BadRequest, "registration without user verification refused");
 
         var reg2 = await (await Post(session, csrf, "/Biometrics/PasskeyRegisterOptions", new { password })).Content.ReadFromJsonAsync<JsonElement>();
-        var token2 = reg2.GetProperty("token").GetString()!;
-        var challenge2 = reg2.GetProperty("options").GetProperty("challenge").GetString()!;
+        var token2 = "";
+        var challenge2 = reg2.GetProperty("challenge").GetString()!;
         var wrongOrigin = await Post(session, csrf, "/Biometrics/PasskeyRegister", Attestation(token2, challenge2, credentialId, key, origin: "https://evil.example"));
         check(wrongOrigin.StatusCode == HttpStatusCode.BadRequest, "registration from a foreign origin refused");
         var reg3 = await (await Post(session, csrf, "/Biometrics/PasskeyRegisterOptions", new { password })).Content.ReadFromJsonAsync<JsonElement>();
-        var good = Attestation(reg3.GetProperty("token").GetString()!, reg3.GetProperty("options").GetProperty("challenge").GetString()!, credentialId, key);
+        var good = Attestation("", reg3.GetProperty("challenge").GetString()!, credentialId, key);
         check((await Post(session, csrf, "/Biometrics/PasskeyRegister", good)).StatusCode == HttpStatusCode.OK, "fingerprint device registered (public key only)");
         check((await Post(session, csrf, "/Biometrics/PasskeyRegister", good)).StatusCode == HttpStatusCode.BadRequest, "registration challenge cannot be replayed");
 
         using (var scope = services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var row = await db.UserPasskeyCredentials.AsNoTracking().SingleAsync(c => c.UserId == userId);
-            check(row.PublicKey.Length > 40 && row.CredentialId == Base64Url.Encode(credentialId), "only the public key and credential id are stored");
+            var row = await db.UserPasskeys.AsNoTracking().SingleAsync(c => c.UserId == userId);
+            check(row.Data.PublicKey.Length > 40 && row.CredentialId.SequenceEqual(credentialId), "only the public key and credential id are stored");
         }
 
         // ---- Fingerprint sign-in ----
@@ -107,13 +109,9 @@ static class BiometricChecks
         {
             var t = await token(client, "/Identity/Account/Login");
             var opts = await (await Post(client, t, "/Biometrics/PasskeyLoginOptions", new { })).Content.ReadFromJsonAsync<JsonElement>();
-            var ch = opts.GetProperty("options").GetProperty("challenge").GetString()!;
+            var ch = opts.GetProperty("challenge").GetString()!;
             var (cd, ad, sig) = mutate(ch, Array.Empty<byte>());
-            return await Post(client, t, "/Biometrics/PasskeyLogin", new
-            {
-                token = opts.GetProperty("token").GetString(), id = Base64Url.Encode(id ?? credentialId),
-                clientDataJson = cd, authenticatorData = Base64Url.Encode(ad), signature = Base64Url.Encode(sig), userHandle = Base64Url.Encode(Encoding.UTF8.GetBytes(userId))
-            });
+            return await Post(client, t, "/Biometrics/PasskeyLogin", Assertion(id ?? credentialId, cd, ad, sig, userId));
         }
         (string, byte[], byte[]) Sign(string ch, byte flags = 0x05, string type = "webauthn.get", string origin = Origin, bool tamper = false)
         {
@@ -143,8 +141,8 @@ static class BiometricChecks
         // Replay of a previously valid assertion must fail (challenge is one-time).
         var replayTok = await token(attacker, "/Identity/Account/Login");
         var replayOpts = await (await Post(attacker, replayTok, "/Biometrics/PasskeyLoginOptions", new { })).Content.ReadFromJsonAsync<JsonElement>();
-        var (rcd, rad, rsig) = Sign(replayOpts.GetProperty("options").GetProperty("challenge").GetString()!);
-        object Body() => new { token = replayOpts.GetProperty("token").GetString(), id = Base64Url.Encode(credentialId), clientDataJson = rcd, authenticatorData = Base64Url.Encode(rad), signature = Base64Url.Encode(rsig) };
+        var (rcd, rad, rsig) = Sign(replayOpts.GetProperty("challenge").GetString()!);
+        object Body() => Assertion(credentialId, rcd, rad, rsig, userId);
         check((await Post(attacker, replayTok, "/Biometrics/PasskeyLogin", Body())).StatusCode == HttpStatusCode.OK, "valid assertion accepted once");
         using var replayer = newClient();
         var replayCsrf = await token(replayer, "/Identity/Account/Login");
@@ -171,7 +169,7 @@ static class BiometricChecks
         check((await Post(session, csrf, "/Biometrics/FaceEnroll", FaceBody(await FaceChallenge(session, csrf, "/Biometrics/FaceEnrollChallenge", new { password }), face, null, twoPeople))).StatusCode == HttpStatusCode.BadRequest,
             "samples from two different faces in one capture are not enrolled");
         check((await Post(session, csrf, "/Biometrics/FaceEnroll", FaceBody(await FaceChallenge(session, csrf, "/Biometrics/FaceEnrollChallenge", new { password }), face, null))).StatusCode == HttpStatusCode.OK,
-            "an instantly captured face is enrolled");
+            "a five-second face capture is enrolled");
         using (var faceAnonymous = newClient())
         {
             var faceCsrf = await token(faceAnonymous, "/Identity/Account/Login");
@@ -188,6 +186,7 @@ static class BiometricChecks
         }
         await SupplierFaceChecks(newClient, token, check, services, suffix);
         await FaceDemoChecks(newClient, token, check, services);
+        await FingerprintDemoChecks(newClient, token, check, services);
         using (var guardScope = services.CreateScope())
         {
             var store = guardScope.ServiceProvider.GetRequiredService<ChallengeStore>();
@@ -195,7 +194,6 @@ static class BiometricChecks
             var consumed = 0;
             Parallel.For(0, 100, _ => { if (store.Consume(once, "parallel-test") != null) Interlocked.Increment(ref consumed); });
             check(consumed == 1, "parallel challenge consumption is atomic");
-            check(!WebAuthnVerifier.IsSupportedKey(new byte[] { 0xa0 }), "malformed COSE map fails closed without an exception");
         }
 
         var removed = await Post(session, csrf, "/Biometrics/PasskeyRemove?id=" + (await FirstPasskeyId(services, userId)), new { });
@@ -234,6 +232,7 @@ static class BiometricChecks
         var email = $"bio-supplier-{suffix}@example.test";
         var password = "F!f6" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         int companyId;
+        string userId;
         using (var scope = services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -245,6 +244,7 @@ static class BiometricChecks
             var account = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true, IsActive = true, FullName = "Face supplier", SupplierId = company.Id };
             check((await users.CreateAsync(account, password)).Succeeded && (await users.AddToRoleAsync(account, SystemRoles.Supplier)).Succeeded,
                 "verified pending supplier fixture created");
+            userId = account.Id;
         }
 
         async Task<HttpResponseMessage> PasswordLogin(HttpClient client) =>
@@ -264,12 +264,41 @@ static class BiometricChecks
         var enrolled = await Post(pending, csrf, "/Biometrics/FaceEnroll", FaceBody(await FaceChallenge(pending, csrf, "/Biometrics/FaceEnrollChallenge", new { password }), face, null));
         check(enrolled.StatusCode == HttpStatusCode.OK, "pending supplier enrolls a face during registration");
         var completed = await (await pending.GetAsync("/Identity/Account/PendingApproval?faceRegistered=true")).Content.ReadAsStringAsync();
-        check(completed.Contains("Face registered successfully") && completed.Contains("<h1>Pending Approval</h1>") && completed.Contains("id=\"btnPasskeyRegister\""),
-            "after face registration the supplier reaches Pending Approval");
+        check(completed.Contains("Face registered successfully") && completed.Contains("<h1>Fingerprint / Passkey Registration</h1>") && completed.Contains("id=\"btnPasskeyRegister\""),
+            "after face registration the supplier reaches Passkey Registration");
         check((await pending.GetAsync("/Biometrics/Face")).Headers.Location?.ToString().Contains("PendingApproval") == true,
             "other biometric pages stay closed to a pending supplier");
         check((await pending.GetAsync("/Supplier")).Headers.Location?.ToString().Contains("PendingApproval") == true,
             "face enrollment does not open the Supplier workspace before approval");
+
+        // Resume in a new browser session: same account, same face, remaining passkey step.
+        using var resumed = newClient();
+        await PasswordLogin(resumed);
+        var resumedPage = await (await resumed.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
+        check(resumedPage.Contains("<h1>Fingerprint / Passkey Registration</h1>"), "interrupted enrollment resumes at passkey step without replacing the face");
+        using var phoneKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var phoneId = RandomNumberGenerator.GetBytes(32);
+        var creation = await (await Post(pending, csrf, "/Biometrics/PasskeyRegisterOptions", new { password })).Content.ReadFromJsonAsync<JsonElement>();
+        check((await Post(pending, csrf, "/Biometrics/PasskeyRegister", Attestation("", creation.GetProperty("challenge").GetString()!, phoneId, phoneKey))).StatusCode == HttpStatusCode.OK,
+            "pending supplier registers a real signed-credential passkey on the same account");
+        var allDone = await (await pending.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
+        check(allDone.Contains("<h1>Pending Approval</h1>") && allDone.Contains("Fingerprint / Passkey Registered Successfully"), "both enrollment steps complete before pending approval confirmation");
+        using (var scope = services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            check(await db.Users.CountAsync(u => u.Email == email) == 1 && await db.FaceTemplates.AnyAsync(f => f.UserId == userId) &&
+                await db.UserPasskeys.AnyAsync(p => p.UserId == userId), "resumed supplier has one account containing both face and passkey");
+        }
+        uint phoneCounter = 1;
+        async Task<HttpResponseMessage> PhoneLogin(HttpClient client)
+        {
+            var t = await token(client, "/Identity/Account/Login");
+            var opts = await (await Post(client, t, "/Biometrics/PasskeyLoginOptions", new { })).Content.ReadFromJsonAsync<JsonElement>();
+            return await Post(client, t, "/Biometrics/PasskeyLogin", SignedAssertion(opts, phoneId, phoneKey, userId, phoneCounter++));
+        }
+        using var pendingPhone = newClient();
+        check((await PhoneLogin(pendingPhone)).StatusCode == HttpStatusCode.Unauthorized &&
+            (await pendingPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.Redirect, "valid passkey cannot sign in a pending supplier");
 
         using var visitor = newClient();
         var visitorCsrf = await token(visitor, "/Identity/Account/Login");
@@ -287,11 +316,65 @@ static class BiometricChecks
         var approvedBody = await approvedFace.Content.ReadFromJsonAsync<JsonElement>();
         check(approvedFace.StatusCode == HttpStatusCode.OK && approvedBody.GetProperty("redirect").GetString() == "/Supplier" &&
               (await visitor.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier signs in with face and opens the Supplier workspace");
+        using var approvedPhone = newClient();
+        var approvedPasskey = await PhoneLogin(approvedPhone);
+        check(approvedPasskey.StatusCode == HttpStatusCode.OK && (await approvedPasskey.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("redirect").GetString() == "/Supplier" &&
+            (await approvedPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier signs in independently with passkey and opens dashboard");
 
         using var passwordOnly = newClient();
         var refused = await PasswordLogin(passwordOnly);
         check(refused.StatusCode == HttpStatusCode.OK && (await refused.Content.ReadAsStringAsync()).Contains("Supplier accounts sign in with face recognition") &&
               (await passwordOnly.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK, "approved supplier with face enrolled cannot bypass it with the password");
+        foreach (var status in new[] { SupplierStatus.Rejected, SupplierStatus.Suspended })
+        {
+            using var scope = services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Suppliers.Where(s => s.Id == companyId).ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, status));
+            using var deniedPhone = newClient();
+            check((await PhoneLogin(deniedPhone)).StatusCode == HttpStatusCode.Unauthorized &&
+                (await deniedPhone.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK, status + " supplier is denied despite a valid passkey");
+        }
+    }
+
+    static async Task FingerprintDemoChecks(Func<HttpClient> newClient, Func<HttpClient, string, Task<string>> token,
+        Action<bool, string> check, IServiceProvider services)
+    {
+        using var client = newClient();
+        var csrf = await token(client, "/fingerprint-demo");
+        check((await Post(client, csrf, "/fingerprint-demo/login-options", new { })).StatusCode == HttpStatusCode.BadRequest,
+            "fingerprint demo reports no registered passkey");
+        var options = await (await Post(client, csrf, "/fingerprint-demo/register-options", new { })).Content.ReadFromJsonAsync<JsonElement>();
+        check((await Post(client, csrf, "/fingerprint-demo/register", new { credentialJson = "not-json" })).StatusCode == HttpStatusCode.BadRequest,
+            "malformed demo registration is rejected");
+        options = await (await Post(client, csrf, "/fingerprint-demo/register-options", new { })).Content.ReadFromJsonAsync<JsonElement>();
+        Base64Url.TryDecode(options.GetProperty("user").GetProperty("id").GetString(), out var handle);
+        var userId = Encoding.UTF8.GetString(handle);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var id = RandomNumberGenerator.GetBytes(32);
+        check((await Post(client, csrf, "/fingerprint-demo/register", Attestation("", options.GetProperty("challenge").GetString()!, id, key))).StatusCode == HttpStatusCode.OK,
+            "fingerprint demo validates and stores real test attestation");
+        for (uint count = 1; count <= 3; count++)
+        {
+            var opts = await (await Post(client, csrf, "/fingerprint-demo/login-options", new { })).Content.ReadFromJsonAsync<JsonElement>();
+            check((await Post(client, csrf, "/fingerprint-demo/verify", SignedAssertion(opts, id, key, userId, count))).StatusCode == HttpStatusCode.OK,
+                "fingerprint demo repeated signed assertion " + count + " succeeds");
+        }
+        check((await Post(client, csrf, "/fingerprint-demo/verify", new { credentialJson = "{}" })).StatusCode == HttpStatusCode.BadRequest,
+            "fingerprint demo fake verification cannot report success");
+        using var otherBrowser = newClient();
+        var otherToken = await token(otherBrowser, "/fingerprint-demo");
+        check((await Post(otherBrowser, otherToken, "/fingerprint-demo/login-options", new { })).StatusCode == HttpStatusCode.BadRequest,
+            "demo credential is isolated from another browser");
+        using var normalLogin = newClient();
+        var loginToken = await token(normalLogin, "/Identity/Account/Login");
+        var loginOptions = await (await Post(normalLogin, loginToken, "/Biometrics/PasskeyLoginOptions", new { })).Content.ReadFromJsonAsync<JsonElement>();
+        check((await Post(normalLogin, loginToken, "/Biometrics/PasskeyLogin", SignedAssertion(loginOptions, id, key, userId, 4))).StatusCode == HttpStatusCode.Unauthorized,
+            "demo passkey cannot sign in through the real login endpoint");
+        check((await client.GetAsync("/Supplier")).StatusCode == HttpStatusCode.Redirect, "demo verification creates no dashboard session");
+        await Post(client, csrf, "/fingerprint-demo/reset", new { });
+        check((await Post(client, csrf, "/fingerprint-demo/login-options", new { })).StatusCode == HttpStatusCode.BadRequest, "demo reset removes server credential");
+        var reused = await (await Post(client, csrf, "/fingerprint-demo/register-options", new { })).Content.ReadFromJsonAsync<JsonElement>();
+        check(reused.GetProperty("user").GetProperty("id").GetString() == options.GetProperty("user").GetProperty("id").GetString(), "demo reset reuses its test account");
     }
 
     // Development-only /face-demo: real capture checks + matching, but no account, no sign-in and no stored templates.
@@ -352,7 +435,7 @@ static class BiometricChecks
         var random = new Random();
         return Enumerable.Range(0, count).Select(i => (object)new
         {
-            t = i * 40,
+            t = i * 2500,
             v = face.Select(x => x + (float)(random.NextDouble() * 0.01 - 0.005)).ToArray()
         }).ToArray();
     }
@@ -363,10 +446,10 @@ static class BiometricChecks
     static object FaceBody(JsonElement challenge, float[] face, string? email, object[]? descriptors = null) =>
         new { token = challenge.GetProperty("token").GetString(), email, replace = true, descriptors = descriptors ?? Samples(face) };
 
-    static async Task<long> FirstPasskeyId(IServiceProvider services, string userId)
+    static async Task<string> FirstPasskeyId(IServiceProvider services, string userId)
     {
         using var scope = services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().UserPasskeyCredentials.Where(c => c.UserId == userId).Select(c => c.Id).FirstAsync();
+        return Base64Url.Encode(await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().UserPasskeys.Where(c => c.UserId == userId).Select(c => c.CredentialId).FirstAsync());
     }
 
     static string Csrf(string html) =>
@@ -410,9 +493,22 @@ static class BiometricChecks
         var clientData = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { type = "webauthn.create", challenge, origin, crossOrigin = false }));
         return new
         {
-            token = tokenValue, id = Base64Url.Encode(credentialId), clientDataJson = Base64Url.Encode(clientData),
-            attestationObject = Base64Url.Encode(obj.ToArray()), label = "Software test authenticator"
+            credentialJson = JsonSerializer.Serialize(new { id = Base64Url.Encode(credentialId), rawId = Base64Url.Encode(credentialId), type = "public-key", response = new { clientDataJSON = Base64Url.Encode(clientData), attestationObject = Base64Url.Encode(obj.ToArray()), transports = new[] { "hybrid" } }, clientExtensionResults = new { } }), label = "Software test authenticator"
         };
+    }
+
+    static object Assertion(byte[] id, string clientData, byte[] authData, byte[] signature, string userId) => new
+    {
+        credentialJson = JsonSerializer.Serialize(new { id = Base64Url.Encode(id), rawId = Base64Url.Encode(id), type = "public-key",
+            response = new { clientDataJSON = clientData, authenticatorData = Base64Url.Encode(authData), signature = Base64Url.Encode(signature), userHandle = Base64Url.Encode(Encoding.UTF8.GetBytes(userId)) }, clientExtensionResults = new { } })
+    };
+
+    static object SignedAssertion(JsonElement options, byte[] id, ECDsa key, string userId, uint counter)
+    {
+        var clientData = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { type = "webauthn.get", challenge = options.GetProperty("challenge").GetString(), origin = Origin, crossOrigin = false }));
+        var authData = AuthData(0x05, counter);
+        var signature = key.SignData(authData.Concat(SHA256.HashData(clientData)).ToArray(), HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+        return Assertion(id, Base64Url.Encode(clientData), authData, signature, userId);
     }
 
     static byte[] CborText(string s) => CborHead(3, Encoding.UTF8.GetBytes(s));

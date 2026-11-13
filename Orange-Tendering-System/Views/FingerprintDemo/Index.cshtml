@@ -1,0 +1,25 @@
+@model int
+@{ ViewData["Title"] = "Fingerprint / Passkey Demo"; }
+<section class="section auth-section">
+    <div class="glass auth-card" id="passkey-demo-root">
+        <span class="eyebrow">DEVELOPMENT TEST</span>
+        <h1>Fingerprint / Passkey Demo</h1>
+        <p>Register once, then verify repeatedly using your phone. This test never signs you in or opens a supplier dashboard.</p>
+        <p>In the browser prompt, choose a phone or tablet and scan its QR code. Keep Bluetooth enabled on both devices. Your phone may use fingerprint, face unlock or PIN.</p>
+        @Html.AntiForgeryToken()
+        <button id="btnPasskeyDemoRegister" type="button" class="primary">Register Test Passkey</button>
+        <button id="btnPasskeyDemoVerify" type="button" class="overview">Verify Fingerprint / Passkey</button>
+        <button id="btnPasskeyDemoReset" type="button" class="overview">Reset Demo</button>
+        <div id="passkeyDemoResult" class="bio-status" role="status" aria-live="polite">Ready</div>
+        <dl>
+            <dt>Browser WebAuthn support</dt><dd id="passkeyDemoSupport">Checking…</dd>
+            <dt>Registration / credential availability</dt><dd id="passkeyDemoCount">@Model registered</dd>
+            <dt>Authentication status</dt><dd id="passkeyDemoAuth">Not attempted</dd>
+            <dt>Time taken</dt><dd id="passkeyDemoTime">—</dd>
+        </dl>
+        <p>Reset removes this browser's test credentials from the server. Delete any retained passkey separately in your phone or password manager. Use the same browser profile to reuse this test account.</p>
+        <a href="/face-demo">Test face recognition</a>
+    </div>
+</section>
+@section Styles { <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" /> }
+@section Scripts { <script src="~/js/biometric.js" asp-append-version="true"></script> }
