@@ -1,44 +1,17 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Doulat
-// Module: Department / Purchase Requests
-// Purpose: MVC endpoints for the PurchaseRequests pages of the Requesting Department workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
-
-namespace Orange_Tendering_System.Areas.Department.Controllers
+using Orange_Tendering_System.Services;
+namespace Orange_Tendering_System.Areas.Department.Controllers;
+[Area("Department"), Authorize(Roles=SystemRoles.RequestingDepartment), AutoValidateAntiforgeryToken]
+public class PurchaseRequestsController(PurchaseRequestService service) : Controller
 {
-    [Area("Department")]
-    [Authorize(Roles = SystemRoles.RequestingDepartment)]
-    public class PurchaseRequestsController : Controller
-    {
-        // My Purchase Requests — Owner: Doulat · Trello: My Purchase Requests (https://trello.com/c/SjSwbYUx)
-        // GET /Department/PurchaseRequests. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
-        {
-            return View();
-        }
-
-        // Create Purchase Request — Owner: Doulat · Trello: Create Purchase Request (https://trello.com/c/vCxUl1Bb)
-        // GET /Department/PurchaseRequests/Create. TODO: query the data in a service and pass a view model.
-        public IActionResult Create()
-        {
-            return View();
-        }
-
-        // Purchase Request Details & History — Owner: Doulat · Trello: Purchase Request Details & History (https://trello.com/c/IR3EpX2r)
-        // GET /Department/PurchaseRequests/Details/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Details(int? id)
-        {
-            return View();
-        }
-
-        // Edit & Resubmit Purchase Request — Owner: Doulat · No Trello card
-        // GET /Department/PurchaseRequests/Edit/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Edit(int? id)
-        {
-            return View();
-        }
-    }
+ public async Task<IActionResult> Index()=>View(await service.List(User,false));
+ public IActionResult Create()=>View();
+ [HttpPost] public async Task<IActionResult> Create(string title,string justification,string itemName,decimal quantity,string unit,string specifications="")
+ { try { if(!ModelState.IsValid) throw new WorkflowException("Invalid request."); var id=await service.Submit(title,justification,itemName,quantity,unit,specifications,User);return RedirectToAction(nameof(Details),new{id}); }
+ catch(WorkflowException e){ModelState.AddModelError("",e.Message);return View();} }
+ public async Task<IActionResult> Details(int id)
+ { try { return View(await service.Read(id,User,false)); } catch(WorkflowException) { return NotFound(); } }
+ public IActionResult Edit(int id)=>RedirectToAction(nameof(Details),new{id});
 }

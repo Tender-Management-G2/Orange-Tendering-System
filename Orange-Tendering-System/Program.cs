@@ -41,6 +41,7 @@ builder.Services.AddTransient<SmtpEmailSender>();
 builder.Services.AddTransient<IEmailSender>(services => services.GetRequiredService<SmtpEmailSender>());
 builder.Services.AddScoped<EmployeeProvisioning>();
 builder.Services.AddControllersWithViews();
+builder.Services.AddBiometrics(builder.Configuration);
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierProfileService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierInvitationService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierOfferService>();
@@ -51,6 +52,7 @@ builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDashboardSer
 builder.Services.Configure<TenderApprovalPolicy>(builder.Configuration.GetSection("TenderApprovalPolicy"));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TenderWorkflowService>();
+builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.Configure<ReportSigningOptions>(builder.Configuration.GetSection("ReportSigning"));
 builder.Services.Configure<ReportRevisionPolicy>(builder.Configuration.GetSection("ReportRevisionPolicy"));
 builder.Services.Configure<ReportPdfOptions>(builder.Configuration.GetSection("ReportPdf"));

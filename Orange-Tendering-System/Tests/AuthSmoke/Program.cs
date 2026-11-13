@@ -21,6 +21,8 @@ using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Services;
 using System.Security.Claims;
 
+if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
+
 var connection = Environment.GetEnvironmentVariable("AUTH_TEST_CONNECTION")
     ?? throw new InvalidOperationException("Set AUTH_TEST_CONNECTION to a migrated, isolated test database.");
 if (!new SqlConnectionStringBuilder(connection).InitialCatalog.StartsWith("OrangeAuthCheck_", StringComparison.OrdinalIgnoreCase))
@@ -28,6 +30,8 @@ if (!new SqlConnectionStringBuilder(connection).InitialCatalog.StartsWith("Orang
 var root = Environment.GetEnvironmentVariable("AUTH_PROJECT_ROOT")
     ?? throw new InvalidOperationException("Set AUTH_PROJECT_ROOT to the web project directory.");
 var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(5)).ToLowerInvariant();
+var isolatedContentRoot = Path.Combine(Path.GetTempPath(), "OrangeAuthCheck_Files_" + suffix);
+Directory.CreateDirectory(isolatedContentRoot);
 var adminEmail = $"admin-{suffix}@example.test";
 var supplierEmail = $"supplier-{suffix}@example.test";
 var adminPassword = "A!a1" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
@@ -394,12 +398,75 @@ using (var scope = secondFactory.Services.CreateScope())
     Check(await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Roles.CountAsync() == 7,
         "role seed is idempotent");
 
+// Exercise every real role dashboard with real Identity cookies and SQL Server rows.
+// The database-name guard above keeps these accounts out of the application database.
+string? officerId = null;
+foreach (var workspace in Orange_Tendering_System.ViewModels.WorkspaceNavigation.Workspaces)
+{
+    var email = $"role-{workspace.Area.ToLowerInvariant()}-{suffix}@example.test";
+    using (var scope = factory.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var account = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true,
+            IsActive = true, FullName = "Isolated dashboard verification" };
+        if (workspace.Role == SystemRoles.Supplier)
+        {
+            var company = new Supplier { CompanyName = "Isolated role check " + suffix,
+                Email = email, RegistrationNumber = "ROLE-" + suffix, Status = SupplierStatus.Approved };
+            db.Suppliers.Add(company); await db.SaveChangesAsync(); account.SupplierId = company.Id;
+        }
+        if (workspace.Role == SystemRoles.RequestingDepartment)
+        {
+            var department = new Department { Name = "Isolated dashboard " + suffix };
+            db.Departments.Add(department); await db.SaveChangesAsync(); account.DepartmentId = department.Id;
+        }
+        Check((await users.CreateAsync(account, supplierPassword)).Succeeded, workspace.Role + " test account created");
+        Check((await users.AddToRoleAsync(account, workspace.Role)).Succeeded, workspace.Role + " assigned");
+        if (workspace.Role == SystemRoles.SourcingOfficer) officerId = account.Id;
+    }
+    using var roleClient = Client(factory);
+    var roleToken = await Token(roleClient, "/Identity/Account/Login");
+    var roleLogin = await roleClient.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = email, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = roleToken
+    }));
+    Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString() == "/" + workspace.Area,
+        workspace.Role + " login routes to its dashboard");
+    Check((await roleClient.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.OK,
+        workspace.Role + " dashboard renders with authenticated cookie");
+    if (workspace.Role != SystemRoles.Admin)
+        Check((await roleClient.GetAsync("/Admin")).StatusCode != HttpStatusCode.OK, workspace.Role + " cannot enter Admin");
+    using var anonymous = Client(factory);
+    Check((await anonymous.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.Redirect,
+        workspace.Role + " dashboard blocks anonymous access");
+}
+using (var scope = factory.Services.CreateScope())
+{
+    var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var workflow = scope.ServiceProvider.GetRequiredService<TenderWorkflowService>();
+    var officer = (await users.FindByIdAsync(officerId!))!;
+    Check(await workflow.IsOfficer(officer), "one active Sourcing Officer has global management authority");
+    var extra = new ApplicationUser { UserName = $"extra-officer-{suffix}@example.test", Email = $"extra-officer-{suffix}@example.test", EmailConfirmed = true,
+        IsActive = true, FullName = "Isolated duplicate-officer guard check" };
+    Check((await users.CreateAsync(extra)).Succeeded && (await users.AddToRoleAsync(extra, SystemRoles.SourcingOfficer)).Succeeded,
+        "duplicate Officer fixture exists only in isolated SQL database");
+    Check(!await workflow.IsOfficer(officer) && !await workflow.IsOfficer(extra), "multiple active Officers fail closed");
+    extra.IsActive = false; Check((await users.UpdateAsync(extra)).Succeeded, "duplicate Officer deactivated");
+    Check(await workflow.IsOfficer(officer), "single active Officer authority restored");
+}
+
 Console.WriteLine("Authentication smoke checks passed.");
 
 WebApplicationFactory<Orange_Tendering_System.WebAppMarker> CreateFactory() => new WebApplicationFactory<Orange_Tendering_System.WebAppMarker>().WithWebHostBuilder(builder =>
 {
-    builder.UseContentRoot(root).UseEnvironment("Development");
-    builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+    // Razor pages are compiled into the app. Keep synthetic registration uploads out of
+    // the real application's App_Data while loading the real application's settings.
+    builder.UseContentRoot(isolatedContentRoot).UseEnvironment("Development");
+    builder.ConfigureAppConfiguration((_, config) => config
+        .AddJsonFile(Path.Combine(root, "appsettings.json"), optional: false)
+        .AddInMemoryCollection(new Dictionary<string, string?>
     {
         ["ConnectionStrings:Default Connection"] = connection,
         ["BootstrapAdmin:Email"] = adminEmail,
