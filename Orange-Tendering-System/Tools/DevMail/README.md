@@ -33,6 +33,8 @@ The web project defaults to `Smtp:Mode=LocalInbox` in `appsettings.Development.j
 
 Real delivery is verified only after the recipient observes the email in Gmail and completes verification. SMTP acceptance or a passing build alone is insufficient.
 
+Registration first saves a provisional account and uploaded documents so that a code can be resent. It is not submitted to Admin review, cannot be approved, and cannot sign in until the contact email is verified. If you already started registration, use **Already started? Verify your email or request a new code** on the registration page. Server validation errors keep the selected files in the open browser form so you can correct a field without attaching them again.
+
 ## Local inbox mode
 
 For synthetic testing, remove the `Smtp` override from User Secrets or set `Mode` to `LocalInbox` with the default loopback host, no username or password, then run `node Tools/DevMail/server.js`. The inbox is at http://127.0.0.1:8025/. It binds only to loopback and stores messages in memory until the process stops.

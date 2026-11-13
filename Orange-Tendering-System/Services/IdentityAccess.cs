@@ -21,10 +21,10 @@ public static class IdentityAccess
         var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
         var user = await db.Users.AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => new { u.IsActive, u.SupplierId, SupplierStatus = u.Supplier == null ? null : (SupplierStatus?)u.Supplier.Status })
+            .Select(u => new { u.IsActive, u.EmailConfirmed, u.SupplierId, SupplierStatus = u.Supplier == null ? null : (SupplierStatus?)u.Supplier.Status })
             .SingleOrDefaultAsync();
 
-        if (user is { IsActive: true } &&
+        if (user is { IsActive: true, EmailConfirmed: true } &&
             (context.Principal.IsInRole(SystemRoles.Supplier)
                 ? user.SupplierId != null && user.SupplierStatus == SupplierStatus.Approved
                 : user.SupplierId == null || user.SupplierStatus == SupplierStatus.Approved))

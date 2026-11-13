@@ -182,7 +182,9 @@ public sealed class InternalDashboardService(ApplicationDbContext db)
         switch (role)
         {
             case SystemRoles.Admin:
-                foreach (var s in await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Pending).OrderBy(s => s.CreatedAt).Take(take).ToListAsync())
+                foreach (var s in await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Pending &&
+                    (!db.Users.Any(u => u.SupplierId == s.Id) || db.Users.Any(u => u.SupplierId == s.Id && u.EmailConfirmed)))
+                    .OrderBy(s => s.CreatedAt).Take(take).ToListAsync())
                     list.Add(new DashboardTask("Review supplier registration", s.CompanyName, "Pending", "/Admin/Suppliers"));
                 break;
             case SystemRoles.RequestingDepartment:

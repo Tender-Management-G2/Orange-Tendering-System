@@ -58,7 +58,7 @@ public class LoginModel(
         var supplierAllowed = (!isSupplier && user.SupplierId == null) ||
             (user.SupplierId != null && await db.Suppliers
                 .AnyAsync(s => s.Id == user.SupplierId && s.Status == SupplierStatus.Approved));
-        if (!user.IsActive || !supplierAllowed)
+        if (!user.IsActive || !user.EmailConfirmed || !supplierAllowed)
         {
             logger.LogWarning("Identity sign-in denied by account state for user {UserId}.", user.Id);
             ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");

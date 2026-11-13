@@ -19,6 +19,7 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Services;
+using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
@@ -128,15 +129,36 @@ using (var scope = factory.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var company = await db.Suppliers.SingleAsync(s => s.RegistrationNumber == "CR-" + suffix);
     var user = await db.Users.SingleAsync(u => u.Email == supplierEmail);
-    Check(company.Status == SupplierStatus.Pending && user.SupplierId == company.Id && !user.EmailConfirmed,
-        "pending supplier, linked unconfirmed Identity user");
+    Check(company.Status == SupplierStatus.Pending && user.SupplierId == company.Id && !user.EmailConfirmed && !user.IsActive,
+        "provisional supplier and inactive unconfirmed Identity user");
     Check(await db.Documents.CountAsync(d => d.SupplierId == company.Id) == 2, "supplier document metadata stored");
     Check(await db.UserRoles.CountAsync(r => r.UserId == user.Id) == 1, "supplier has one role");
+    Check(!await db.Notifications.AnyAsync(n => n.Link == "/Admin/Suppliers/Review/" + company.Id),
+        "unverified application does not notify Admin");
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.GetSupplierDetailsAsync(company.Id) == null &&
+        !(await review.GetSuppliersAsync(null, null)).Suppliers.Any(s => s.Id == company.Id),
+        "unverified supplier is not in Admin review");
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    Check(await review.ReviewSupplierAsync(new SupplierReviewDecisionViewModel
+    { SupplierId = company.Id, Decision = SupplierStatus.Approved }, adminId) == "EmailUnverified",
+        "Admin cannot approve an unverified supplier");
+    var adminPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+        [new Claim(ClaimTypes.NameIdentifier, adminId)], "test"));
+    var workflowReview = scope.ServiceProvider.GetRequiredService<SupplierReviewService>();
+    Check(!(await workflowReview.List(adminPrincipal)).Any(s => s.Id == company.Id),
+        "workflow review hides unverified supplier");
+    var workflowDenied = false;
+    try { await workflowReview.Decide(company.Id, true, "Document review", adminPrincipal); }
+    catch (WorkflowException e) { workflowDenied = e.Message.Contains("verify", StringComparison.OrdinalIgnoreCase); }
+    Check(workflowDenied, "workflow review cannot approve an unverified supplier");
 }
 var duplicateToken = await Token(supplier, "/Identity/Account/Register");
 var duplicate = await supplier.PostAsync("/Identity/Account/Register",
-    RegistrationContent(supplierEmail, supplierPassword, suffix, duplicateToken));
-Check(duplicate.StatusCode == HttpStatusCode.OK, "duplicate supplier registration rejected");
+    Form(new() { ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = duplicateToken }));
+Check(duplicate.StatusCode == HttpStatusCode.Redirect && duplicate.Headers.Location?.ToString().Contains("VerifyEmail") == true,
+    "unverified supplier resumes OTP without reuploading files");
 var message = mail.Messages.Last(m => m.Subject.Contains("Verify"));
 Check(message.To == supplierEmail, "OTP sent through IEmailSender");
 var otp = Regex.Match(message.Body, @"\b\d{6}\b").Value;
@@ -157,7 +179,13 @@ Check((await verified.Content.ReadAsStringAsync()).Contains("awaiting administra
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    Check(await db.Users.Where(u => u.Email == supplierEmail).Select(u => u.EmailConfirmed).SingleAsync(), "Identity email confirmed");
+    var user = await db.Users.SingleAsync(u => u.Email == supplierEmail);
+    Check(user.EmailConfirmed && user.IsActive, "verified supplier contact activated");
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.GetSupplierDetailsAsync(user.SupplierId!.Value) != null,
+        "verified supplier enters Admin review");
+    Check(await db.Notifications.AnyAsync(n => n.Link == "/Admin/Suppliers/Review/" + user.SupplierId),
+        "Admin notified only after OTP verification");
 }
 var replay = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new()
 {

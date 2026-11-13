@@ -17,6 +17,8 @@
         }
         else
         {
+            <p>Your supplier application is not submitted for administrator review until this code is verified.</p>
+            <p>If you already started an application, your uploaded documents are saved. You can request a new code here without registering again.</p>
             @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
             {
                 <p>Development mode sends verification codes to the <a href="http://127.0.0.1:8025/" target="_blank" rel="noopener noreferrer">local mail inbox</a>, not to your Gmail inbox. Enter the latest code from that page. It expires in 10 minutes.</p>

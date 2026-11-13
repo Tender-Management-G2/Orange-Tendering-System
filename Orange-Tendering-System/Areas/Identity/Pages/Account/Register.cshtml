@@ -11,11 +11,13 @@
         <span class="eyebrow">SUPPLIER ONBOARDING</span>
         <h1>Register your company</h1>
         <p>Registration is for supplier companies. Your company can participate only after administrator approval.</p>
+        <p><a class="auth-link" asp-page="./VerifyEmail">Already started? Verify your email or request a new code</a></p>
         @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
         {
             <p class="auth-note">Local development: start <code>node Tools/DevMail/server.js</code> and read verification emails at <a href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">the local inbox</a>.</p>
         }
         <form id="registerForm" method="post" enctype="multipart/form-data">
+            <div id="registrationErrors" class="validation-summary" role="alert" aria-live="polite"></div>
             <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
             <fieldset class="auth-fieldset">
                 <legend>Contact account</legend>
@@ -72,10 +74,13 @@
                 <input asp-for="LegalDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg" />
                 <span asp-validation-for="LegalDocuments" class="field-error"></span>
             </fieldset>
-            <p class="auth-note">After email verification, your company remains Pending until an administrator reviews its details and documents.</p>
-            <button id="registerSubmit" type="submit" class="primary">Submit registration →</button>
+            <p class="auth-note">First, verify your email with the code we send. Your application is submitted for administrator review only after verification.</p>
+            <button id="registerSubmit" type="submit" class="primary">Send verification code →</button>
         </form>
         <a class="auth-link" asp-page="./Login">Already registered? Sign in</a>
     </div>
 </section>
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/supplier-registration.js" asp-append-version="true"></script>
+}
