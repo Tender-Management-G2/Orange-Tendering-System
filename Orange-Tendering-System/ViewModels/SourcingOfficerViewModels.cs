@@ -38,9 +38,10 @@ public sealed class SourcingOfficerBidsViewModel
 
 public sealed record OfferRoundSummaryViewModel(
     int RoundId, int TenderId, int RoundNumber, string TenderTitle,
-    TenderRoundStatus Status, int CompliantOffers, int EvaluationMembers)
+    TenderRoundStatus Status, int CompliantOffers, int EvaluationMembers, int MinimumOffers = 3,
+    int PreviousFailedAttempts = 0)
 {
-    public bool CanForward => Status == TenderRoundStatus.Open && CompliantOffers >= 3 && EvaluationMembers == 4;
+    public bool CanForward => Status == TenderRoundStatus.Open && CompliantOffers >= MinimumOffers && EvaluationMembers == 4;
 }
 
 public sealed class OfficerReportsViewModel
@@ -52,7 +53,22 @@ public sealed class OfficerReportsViewModel
 public sealed class OfficerReportActionModel
 {
     public int RoundId { get; set; }
+    public int MinimumRequiredOffers { get; set; } = 3;
+    public int PreviousFailedAttempts { get; set; }
     public string? Comment { get; set; }
     public List<int> BidIds { get; set; } = [];
     public List<Bid> Bids { get; set; } = [];
 }
+
+public sealed class TenderRoundsViewModel
+{
+    public int TenderId { get; set; }
+    public string TenderTitle { get; set; } = "";
+    public List<TenderRoundRowViewModel> Rounds { get; set; } = [];
+    public bool CanStartNextRound { get; set; }
+    public string? NextRoundMessage { get; set; }
+}
+
+public sealed record TenderRoundRowViewModel(
+    int Id, int RoundNumber, TenderRoundStatus Status, DateTime? OpensAt, DateTime? Deadline,
+    int Invitations, int SubmittedOffers, int DistinctSuppliers);

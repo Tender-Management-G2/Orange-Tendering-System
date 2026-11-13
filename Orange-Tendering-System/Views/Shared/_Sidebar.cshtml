@@ -26,6 +26,6 @@
     {
         var item = WorkspaceNavigation.SharedItems[i];
         var active = item.Label == activeSection;
-        <a class="ws-nav-item @(i == 0 ? "ws-nav-support" : null) @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
+        <a class="ws-nav-item @(item.Label == "Notifications" ? "ws-nav-support" : null) @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
     }
 </nav>

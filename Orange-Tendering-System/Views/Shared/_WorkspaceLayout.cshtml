@@ -50,6 +50,10 @@ until implemented. Notifications link to the shared page shell.
     <script src="~/js/theme-init.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/workspace-shell.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
+    @if (workspace?.Area == "SourcingOfficer")
+    {
+        <link rel="stylesheet" href="~/css/sourcing-officer.css" asp-append-version="true" />
+    }
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="ws-shell ws-internal" data-workspace-role="@(workspace?.Role ?? "Signed-in user")">
@@ -67,10 +71,9 @@ until implemented. Notifications link to the shared page shell.
     <div class="ws-stage">
         <header class="ws-topbar">
             <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
-            @* TODO (UNASSIGNED — Voice Search, mandatory feature): connect search + SpeechRecognition here and on Tasks/Index. *@
-            <div class="ws-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Workspace search is not available yet" disabled title="Search is not implemented yet" /></div>
+            <div class="ws-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" data-workspace-search placeholder="Search this page…" aria-label="Search visible page records" /></div>
             <div class="ws-topbar-actions">
-                <button type="button" class="ws-icon-button ws-utility-disabled" disabled aria-label="Voice search is not implemented yet" title="Voice search is not implemented yet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                <button type="button" class="ws-icon-button ws-voice-search" aria-label="Start voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
                 <a class="ws-icon-button" asp-area="" asp-controller="Notifications" asp-action="Index" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg></a>
                 <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
                 <partial name="_WorkspaceAccountMenu" />
@@ -84,6 +87,7 @@ until implemented. Notifications link to the shared page shell.
         <footer class="ws-internal-footer"><span>© @DateTime.UtcNow.Year Sourcing &amp; Tender Management System · Academic project</span><a asp-area="" asp-controller="Home" asp-action="HowItWorks">How the workflow works ↗</a></footer>
     </div>
     <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
+    <span id="workspace-search-status" class="ws-sr-only" role="status" aria-live="polite"></span>
     <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

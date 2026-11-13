@@ -1,64 +1,39 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Clarifications
-
-DEVELOPER OWNER: ALL TEAM
-MODULE: Clarifications, Notifications & Audit Trail
-TRELLO TASK: Clarifications, Notifications & Audit Trail
-TRELLO URL: https://trello.com/c/N1OFBdNM
-
-PURPOSE:
-Cross-role clarification inbox for the signed-in user.
-
-BUSINESS ACCESS:
-Any signed-in user (own threads only)
-
-ROUTE: /Clarifications
-
-FUTURE IMPLEMENTATION:
-- Query Clarifications where FromUserId or ToUserId =
-  current user.
-- New thread form enforcing the allowed role pairs + stage +
-  record ownership on the server.
-
-DEPENDENCIES:
-Clarifications, ClarificationMessages, Notifications,
-AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
+@model IReadOnlyList<Orange_Tendering_System.Models.Entities.Clarification>
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Clarifications";
     ViewData["WorkspaceSection"] = "Clarifications";
-    ViewData["Description"] = "Your clarification threads with other roles.";
+    ViewData["Description"] = "Messages and questions connected to your work.";
+    var search = ViewData["Search"]?.ToString();
+    var status = ViewData["Status"]?.ToString();
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<aside class="pg-note"><strong>Allowed conversations</strong><p>Department ↔ Sourcing Officer, Sourcing Officer ↔ Evaluation Committee, Evaluation Committee ↔ Sourcing Manager, Sourcing Manager ↔ Top Committee, Sourcing Officer ↔ Supplier. Each thread is linked to a purchase request, tender or offer.</p></aside>
-
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search subject" aria-label="Search subject" disabled />
-    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Open</option><option>Status: Answered</option><option>Status: Closed</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
-
+@if (TempData["ClarificationMessage"] is string message) { <p class="pg-note" role="status">@message</p> }
+<form asp-area="" asp-controller="Clarifications" asp-action="Index" method="get" class="pg-toolbar" aria-label="Search clarifications">
+    <input type="search" name="search" value="@search" maxlength="200" placeholder="Search subject, message or person" aria-label="Search clarifications" />
+    <select name="status" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        @foreach (var item in Enum.GetValues<Orange_Tendering_System.Models.Entities.ClarificationStatus>())
+        {
+            <option value="@item" selected="@(status == item.ToString())">@item</option>
+        }
+    </select>
+    <button type="submit" class="pg-btn pg-btn-primary">Search</button>
+    <a asp-area="" asp-controller="Clarifications" asp-action="Index" class="pg-btn">Reset</a>
+</form>
 <section class="ws-panel pg-panel" aria-labelledby="tbl-my-clarifications">
     <div class="pg-panel-head"><h2 id="tbl-my-clarifications">My clarifications</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Subject</th><th scope="col">With</th><th scope="col">Linked to</th><th scope="col">Status</th><th scope="col">Opened</th><th scope="col">Last message</th></tr></thead>
-            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"You have no clarification threads."' /></td></tr></tbody>
-        </table>
-    </div>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th>Subject</th><th>With</th><th>Linked to</th><th>Status</th><th>Opened</th><th>Last message</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var thread in Model)
+        {
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var other = thread.FromUserId == userId ? thread.ToUser?.UserName : thread.FromUser?.UserName;
+            var linked = thread.Bid?.TenderInvitation?.TenderRound?.Tender?.Title ?? thread.Tender?.Title ?? thread.PurchaseRequest?.Title ?? "General";
+            <tr><td>@thread.Subject</td><td>@other</td><td>@linked</td><td>@thread.Status</td><td>@thread.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</td><td>@(thread.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault()?.SentAt.ToLocalTime().ToString("d MMM yyyy h:mm tt") ?? "—")</td><td><a asp-area="" asp-controller="Clarifications" asp-action="Details" asp-route-id="@thread.Id" class="pg-btn">Open</a></td></tr>
+        }
+        @if (Model.Count == 0) { <tr><td colspan="7">No clarification threads found.</td></tr> }
+        </tbody>
+    </table></div>
 </section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="" asp-controller="Clarifications" asp-action="Details">Open a thread</a></li>
-    </ul>
-</nav>

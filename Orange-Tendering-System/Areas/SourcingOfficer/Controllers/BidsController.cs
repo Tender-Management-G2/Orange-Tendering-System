@@ -19,12 +19,29 @@ public class BidsController(ApplicationDbContext db) : Controller
             .Include(b => b.TenderInvitation).ThenInclude(i => i.TenderRound).ThenInclude(r => r.Tender)
             .Where(b => b.Status == BidStatus.Submitted && (!id.HasValue || b.TenderInvitation.TenderRound.TenderId == id))
             .OrderByDescending(b => b.SubmittedAt).ToListAsync();
-        var roundIds = offers.Select(b => b.TenderInvitation.TenderRoundId).Distinct().ToList();
+        return View(new SourcingOfficerBidsViewModel
+        {
+            Offers = offers,
+            Rounds = await GetRoundSummariesAsync(id)
+        });
+    }
+
+    public async Task<IActionResult> Forwarding() => View(new SourcingOfficerBidsViewModel
+    {
+        Rounds = await GetRoundSummariesAsync()
+    });
+
+    private async Task<List<OfferRoundSummaryViewModel>> GetRoundSummariesAsync(int? tenderId = null)
+    {
+        var roundIds = await db.Bids.AsNoTracking()
+            .Where(b => b.Status == BidStatus.Submitted
+                && (!tenderId.HasValue || b.TenderInvitation.TenderRound.TenderId == tenderId))
+            .Select(b => b.TenderInvitation.TenderRoundId).Distinct().ToListAsync();
         var rounds = await db.TenderRounds.AsNoTracking().Where(r => roundIds.Contains(r.Id))
-            .Select(r => new { r.Id, r.TenderId, r.RoundNumber, TenderTitle = r.Tender.Title, r.Status })
-            .ToListAsync();
+            .Select(r => new { r.Id, r.TenderId, r.RoundNumber, TenderTitle = r.Tender.Title, r.Status }).ToListAsync();
         var compliantCounts = await db.Bids.AsNoTracking()
-            .Where(b => roundIds.Contains(b.TenderInvitation.TenderRoundId) && b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.Compliant)
+            .Where(b => roundIds.Contains(b.TenderInvitation.TenderRoundId)
+                && b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.Compliant)
             .GroupBy(b => b.TenderInvitation.TenderRoundId)
             .Select(g => new { RoundId = g.Key, Count = g.Select(b => b.TenderInvitation.SupplierId).Distinct().Count() })
             .ToDictionaryAsync(x => x.RoundId, x => x.Count);
@@ -33,12 +50,16 @@ public class BidsController(ApplicationDbContext db) : Controller
             .Where(m => tenderIds.Contains(m.TenderId) && m.CommitteeType == CommitteeType.Evaluation)
             .GroupBy(m => m.TenderId).Select(g => new { TenderId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.TenderId, x => x.Count);
-        return View(new SourcingOfficerBidsViewModel
+
+        var summaries = new List<OfferRoundSummaryViewModel>();
+        foreach (var round in rounds)
         {
-            Offers = offers,
-            Rounds = rounds.Select(r => new OfferRoundSummaryViewModel(r.Id, r.TenderId, r.RoundNumber, r.TenderTitle,
-                r.Status, compliantCounts.GetValueOrDefault(r.Id), memberCounts.GetValueOrDefault(r.TenderId))).ToList()
-        });
+            var failedAttempts = await CountFailedAttemptsAsync(round.TenderId, round.RoundNumber);
+            summaries.Add(new OfferRoundSummaryViewModel(round.Id, round.TenderId, round.RoundNumber,
+                round.TenderTitle, round.Status, compliantCounts.GetValueOrDefault(round.Id),
+                memberCounts.GetValueOrDefault(round.TenderId), failedAttempts >= 2 ? 2 : 3, failedAttempts));
+        }
+        return summaries;
     }
 
     public async Task<IActionResult> Details(int id)
@@ -97,7 +118,12 @@ public class BidsController(ApplicationDbContext db) : Controller
         if (round == null) return NotFound();
         var bids = await db.Bids.AsNoTracking().Include(b => b.TenderInvitation).ThenInclude(i => i.Supplier).Include(b => b.Items)
             .Where(b => b.TenderInvitation.TenderRoundId == id && b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.Compliant).OrderBy(b => b.Id).ToListAsync();
-        return View(new OfficerReportActionModel { RoundId = id, Bids = bids });
+        var failedAttempts = await CountFailedAttemptsAsync(round.TenderId, round.RoundNumber);
+        return View(new OfficerReportActionModel
+        {
+            RoundId = id, Bids = bids, PreviousFailedAttempts = failedAttempts,
+            MinimumRequiredOffers = failedAttempts >= 2 ? 2 : 3
+        });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -106,12 +132,21 @@ public class BidsController(ApplicationDbContext db) : Controller
         var round = await db.TenderRounds.Include(r => r.Tender).SingleOrDefaultAsync(r => r.Id == model.RoundId);
         if (round == null) return NotFound();
         if (round.Status != TenderRoundStatus.Open) return BadRequest();
-        var eligible = await db.Bids.Include(b => b.TenderInvitation).Where(b => b.TenderInvitation.TenderRoundId == round.Id && b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.Compliant && model.BidIds.Contains(b.Id)).ToListAsync();
-        var offerCount = await db.Bids.Where(b => b.TenderInvitation.TenderRoundId == round.Id && b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.Compliant).Select(b => b.TenderInvitation.SupplierId).Distinct().CountAsync();
-        if (eligible.Count == 0 || eligible.Select(b => b.TenderInvitation.SupplierId).Distinct().Count() != eligible.Count) ModelState.AddModelError(nameof(model.BidIds), "Select at least one compliant offer, once per supplier.");
-        if (offerCount < 3) ModelState.AddModelError(nameof(model.BidIds), "The round does not meet the 3 compliant offer minimum.");
+        var failedAttempts = await CountFailedAttemptsAsync(round.TenderId, round.RoundNumber);
+        var minimumOffers = failedAttempts >= 2 ? 2 : 3;
+        var selectedIds = model.BidIds?.Distinct().ToList() ?? [];
+        var allEligible = await db.Bids.Include(b => b.TenderInvitation).ThenInclude(i => i.Supplier)
+            .Include(b => b.Items)
+            .Where(b => b.TenderInvitation.TenderRoundId == round.Id && b.Status == BidStatus.Submitted
+                && b.ComplianceStatus == ComplianceStatus.Compliant)
+            .OrderBy(b => b.Id).ToListAsync();
+        var eligible = allEligible.Where(b => selectedIds.Contains(b.Id)).ToList();
+        if (eligible.Count == 0 || eligible.Select(b => b.TenderInvitation.SupplierId).Distinct().Count() != eligible.Count)
+            ModelState.AddModelError(nameof(model.BidIds), "Select compliant offers from different suppliers.");
+        if (eligible.Select(b => b.TenderInvitation.SupplierId).Distinct().Count() < minimumOffers)
+            ModelState.AddModelError(nameof(model.BidIds), $"Select at least {minimumOffers} compliant offers from different suppliers. The minimum is reduced to 2 only after 2 previous failed attempts.");
         if (await db.CommitteeMembers.CountAsync(m => m.TenderId == round.TenderId && m.CommitteeType == CommitteeType.Evaluation) != 4) ModelState.AddModelError(nameof(model.BidIds), "Assign all four evaluation committee members first.");
-        if (!ModelState.IsValid) { model.Bids = eligible; return View(model); }
+        if (!ModelState.IsValid) { model.Bids = allEligible; model.BidIds = selectedIds; model.MinimumRequiredOffers = minimumOffers; model.PreviousFailedAttempts = failedAttempts; return View(model); }
         var now = DateTime.UtcNow;
         var nextVersion = (await db.TenderReports.Where(r => r.TenderRoundId == round.Id && r.ReportType == ReportType.OfficerComparison).Select(r => (int?)r.VersionNumber).MaxAsync() ?? 0) + 1;
         var report = new TenderReport { TenderRoundId = round.Id, ReportType = ReportType.OfficerComparison, VersionNumber = nextVersion, Content = model.Comment?.Trim() ?? "Officer compliance review and selected offers.", RankingSnapshotJson = System.Text.Json.JsonSerializer.Serialize(eligible.Select(b => new { b.Id, b.ComplianceStatus, Supplier = b.TenderInvitation.SupplierId })), Status = ReportStatus.Submitted, CreatedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value, CreatedAt = now, SubmittedAt = now };
@@ -124,5 +159,18 @@ public class BidsController(ApplicationDbContext db) : Controller
         await db.SaveChangesAsync();
         TempData["CommitteeForwarded"] = "Selected compliant offers were sent to the Technical & Financial Evaluation Committee.";
         return RedirectToAction("Index", "Reports");
+    }
+
+    private async Task<int> CountFailedAttemptsAsync(int tenderId, int beforeRoundNumber)
+    {
+        var previousRounds = await db.TenderRounds.AsNoTracking()
+            .Where(r => r.TenderId == tenderId && r.RoundNumber < beforeRoundNumber
+                && r.Status == TenderRoundStatus.Failed)
+            .Include(r => r.Invitations).ThenInclude(i => i.Bids)
+            .ToListAsync();
+
+        return previousRounds.Count(r => r.Invitations.Count > 0
+            && r.Invitations.Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted))
+                .Select(i => i.SupplierId).Distinct().Count() < 3);
     }
 }

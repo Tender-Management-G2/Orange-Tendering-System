@@ -19,7 +19,6 @@ namespace Orange_Tendering_System.ViewModels
         // Shown under every internal role's menu.
         public static readonly IReadOnlyList<NavItem> SharedItems =
         [
-            new("My Tasks", "Tasks", "Index", "check", ""),
             new("Clarifications", "Clarifications", "Index", "chat", ""),
             new("Notifications", "Notifications", "Index", "bell", "")
         ];
@@ -49,8 +48,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Requests", "PurchaseRequests", "Index", "request"),
                 new("Tenders", "Tenders", "Index", "tender"),
                 new("Received Bids", "Bids", "Index", "layers"),
-                new("Reports", "Reports", "Index", "report"),
-                  new("Supplier Clarifications", "Clarifications", "Index", "chat")
+                new("Reports", "Reports", "Index", "report")
             ]),
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
             [
