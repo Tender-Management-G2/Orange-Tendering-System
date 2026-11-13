@@ -24,6 +24,7 @@ using System.Security.Claims;
 
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
+if (args.Contains("--seed-lifecycle")) { await LifecycleFixture.Run(); return; }
 if (args.Contains("--final-decision-checks")) { await FinalDecisionChecks.Run(); return; }
 if (args.Contains("--clarification-checks")) { await ClarificationChecks.Run(); return; }
 if (args.Contains("--smtp-mode-checks")) { SmtpModeChecks.Run(); return; }

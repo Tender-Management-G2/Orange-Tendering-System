@@ -181,7 +181,7 @@ public partial class TenderWorkflowService
             if (s.State == SessionState.Scheduled && s.OpenedAt == null && Now >= s.StartsAt && Now < s.EndsAt)
             {
                 s.OpenedAt = Now;
-                foreach (var member in await Members(id, CommitteeType.Evaluation)) Notify(member.UserId, id, "Evaluation scoring is open", $"Scoring opened as scheduled and closes automatically at {s.EndsAt:u}. Only the four assigned members may submit scores.");
+                foreach (var member in await Members(id, CommitteeType.Evaluation)) NotifyMeeting(member.UserId, id, "Evaluation scoring is open", $"Scoring opened as scheduled and closes automatically at {s.EndsAt:u}. Only the four assigned members may submit scores.");
                 await NotifyOfficer(id, "Evaluation scoring opened", $"Scoring opened as scheduled and closes automatically at {s.EndsAt:u}.");
                 db.AuditLogs.Add(new AuditLog { EntityName = "Tender", EntityId = id.ToString(), Action = "EvaluationAutoOpened", CreatedAt = Now });
                 await db.SaveChangesAsync(ct);
