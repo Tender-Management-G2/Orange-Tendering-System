@@ -1,10 +1,18 @@
 @model Orange_Tendering_System.Models.Entities.TenderReport
 @using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.ViewModels
+@using System.Text.Json
 
 @{
     ViewData["Title"] = "Review Unified Evaluation Report";
     ViewData["WorkspaceSection"] = "Report Review";
     ViewData["Description"] = "Read the submitted report, committee scores and recommendation.";
+
+    var ranking = string.IsNullOrWhiteSpace(Model.RankingSnapshotJson)
+        ? []
+        : JsonSerializer.Deserialize<List<RankingSnapshotRow>>(
+            Model.RankingSnapshotJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
 }
 
 <partial name="_PageHeader" />
@@ -103,19 +111,27 @@
             </thead>
 
             <tbody>
-                <tr>
-                    <td colspan="4">
-                        @if (string.IsNullOrWhiteSpace(Model.RankingSnapshotJson))
-                        {
+                @if (!ranking.Any())
+                {
+                    <tr>
+                        <td colspan="4">
                             <partial name="_EmptyState"
                                      model='"Committee result not loaded."' />
-                        }
-                        else
-                        {
-                            <pre style="white-space: pre-wrap; overflow-wrap: anywhere;">@Model.RankingSnapshotJson</pre>
-                        }
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var row in ranking)
+                    {
+                        <tr>
+                            <td>@row.Rank</td>
+                            <td>@row.Supplier</td>
+                            <td>@row.FinalScore.ToString("N2")</td>
+                            <td>@(row.Eligible ? "Yes" : "No")</td>
+                        </tr>
+                    }
+                }
             </tbody>
         </table>
     </div>
