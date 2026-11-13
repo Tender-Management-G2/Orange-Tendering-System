@@ -255,8 +255,9 @@ public static class DemoDataSeeder
         }
         await db.SaveChangesAsync();
 
+        var thirdRoundId = tender.Rounds.Single(r => r.RoundNumber == 3).Id;   // evaluated in memory: EF cannot translate a navigation lookup inside the query
         var thirdRoundBid = await db.Bids.Include(b => b.TenderInvitation)
-            .FirstAsync(b => b.TenderInvitation.TenderRoundId == tender.Rounds.Single(r => r.RoundNumber == 3).Id);
+            .FirstAsync(b => b.TenderInvitation.TenderRoundId == thirdRoundId);
         if (!await db.Clarifications.AnyAsync(c => c.BidId == thirdRoundBid.Id && c.Subject == "DEMO - Supplier asks about delivery terms"))
         {
             var supplierUser = await db.Users.SingleAsync(u => u.SupplierId == thirdRoundBid.TenderInvitation.SupplierId && u.IsActive);
