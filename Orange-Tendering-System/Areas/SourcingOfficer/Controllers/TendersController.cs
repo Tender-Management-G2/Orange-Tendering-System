@@ -10,7 +10,7 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
-//[Authorize(Roles = SystemRoles.SourcingOfficer)]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
 public class TendersController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index() => View(await db.Tenders.AsNoTracking().Include(t => t.PurchaseRequest).Include(t => t.Rounds).OrderByDescending(t => t.CreatedAt).ToListAsync());

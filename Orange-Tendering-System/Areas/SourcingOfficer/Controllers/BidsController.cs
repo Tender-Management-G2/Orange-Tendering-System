@@ -1,3 +1,8 @@
+// ORANGE TENDER MANAGEMENT SYSTEM
+// Owner: Saja
+// Module: Sourcing Officer / Bid Management
+// Purpose: MVC endpoints for the Bids pages of the Sourcing Officer workspace.
+// Compatibility GET routes: use the persisted, authorized weighted workflow.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +14,7 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
-//[Authorize(Roles = SystemRoles.SourcingOfficer)]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
 public class BidsController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index(int? id)
@@ -125,4 +130,6 @@ public class BidsController(ApplicationDbContext db) : Controller
         TempData["CommitteeForwarded"] = "Selected compliant offers were sent to the Technical & Financial Evaluation Committee.";
         return RedirectToAction("Index", "Reports");
     }
+
+    public IActionResult History(int? id) => RedirectToAction("Index", "Workflow");
 }

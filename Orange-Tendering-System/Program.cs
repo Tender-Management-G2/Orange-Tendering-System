@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services;
+using Orange_Tendering_System.Services.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +47,29 @@ builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierOfferService
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierCommunicationService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDocumentService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDashboardService>();
+
+builder.Services.Configure<TenderApprovalPolicy>(builder.Configuration.GetSection("TenderApprovalPolicy"));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<TenderWorkflowService>();
+builder.Services.Configure<ReportSigningOptions>(builder.Configuration.GetSection("ReportSigning"));
+builder.Services.Configure<ReportRevisionPolicy>(builder.Configuration.GetSection("ReportRevisionPolicy"));
+builder.Services.Configure<ReportPdfOptions>(builder.Configuration.GetSection("ReportPdf"));
+builder.Services.AddSingleton<OrangeReportRenderer>();
+builder.Services.AddScoped<IReportCertificateProvider, StoreReportCertificateProvider>();
+builder.Services.AddScoped<ReportCryptography>();
+builder.Services.AddScoped<ReportDocumentService>();
+builder.Services.Configure<OllamaSettings>(builder.Configuration.GetSection("Ollama"));
+builder.Services.AddHttpClient<OllamaBidAnalysisService>();
+builder.Services.AddScoped<ProtectedDocumentStore>();
+builder.Services.Configure<ZoomOptions>(builder.Configuration.GetSection("Zoom"));
+builder.Services.AddHttpClient<ZoomMeetingService>();
+builder.Services.AddScoped<EvaluationSchedulingService>();
+builder.Services.Configure<ExternalInvitationOptions>(builder.Configuration.GetSection("ExternalInvitations"));
+builder.Services.AddSingleton<IExternalInvitationChannel, SmtpInvitationChannel>();
+builder.Services.AddScoped<ExternalInvitationDispatcher>();
+builder.Services.AddScoped<SupplierReviewService>();
+builder.Services.AddHostedService<EvaluationDeadlineWorker>();
+
 
 var app = builder.Build();
 

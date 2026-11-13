@@ -1,18 +1,20 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Controllers;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
-//[Authorize(Roles = SystemRoles.SourcingOfficer)]
-public class ReportsController(ApplicationDbContext db) : Controller
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
+public class ReportsController(ApplicationDbContext db, TenderWorkflowService workflow) : ReportControllerBase(workflow)
 {
-    public async Task<IActionResult> Index()
+    public new async Task<IActionResult> Index()
     {
         var reports = await db.TenderReports.AsNoTracking().Include(r => r.TenderRound).ThenInclude(r => r.Tender)
             .Where(r => r.ReportType == ReportType.FullEvaluation || r.ReportType == ReportType.OfficerComparison)
@@ -81,4 +83,16 @@ public class ReportsController(ApplicationDbContext db) : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    public IActionResult Comparison(int? id) => RedirectToAction("Index", "Workflow");
+    public IActionResult EvaluationResult(int? id) => RedirectToAction("Index", "Workflow");
+    public IActionResult Returned(int? id) => RedirectToAction("Index", "Workflow");
+    public IActionResult History(int? id) => RedirectToAction("Index", "Workflow");
+
+    [HttpPost]
+    public Task<IActionResult> Forward(int id) => Execute(id, async () =>
+    {
+        var report = await Workflow.ReviewReport(id, User);
+        TenderWorkflowService.Require(report.IsCurrent, "Only the current finalized report can be forwarded.");
+        await Workflow.Forward(report.Tender.Id, User);
+    });
 }

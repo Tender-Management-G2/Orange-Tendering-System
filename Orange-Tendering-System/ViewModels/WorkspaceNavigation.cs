@@ -56,6 +56,7 @@ namespace Orange_Tendering_System.ViewModels
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Invitations", "Invitations", "Index", "mail"),
+                new("Weighted Tenders", "Workflow", "Index", "tender"),
                 new("My Offers", "Offers", "Index", "layers"),
                 new("Documents", "Documents", "Index", "folder"),
                 new("Profile", "Profile", "Index", "user"),
@@ -78,7 +79,7 @@ namespace Orange_Tendering_System.ViewModels
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Pending Reports", "Reports", "Index", "request"),
-                new("Report Review", "Reports", "Review", "check"),
+                new("Report Review", "Reports", "Index", "check"),
                 new("Forwarding", "Reports", "Forward", "send"),
                 new("Decision History", "Reports", "History", "history"),
                 new("Analytics & Exports", "Analytics", "Index", "chart", "")
