@@ -2,6 +2,7 @@
 @model VerifyEmailModel
 @inject IWebHostEnvironment HostEnvironment
 @inject IConfiguration Configuration
+@using Orange_Tendering_System.Services
 @{
     ViewData["Title"] = "Verify Email";
 }
@@ -16,8 +17,7 @@
         }
         else
         {
-            @if (HostEnvironment.IsDevelopment() &&
-                (Configuration["Smtp:Host"] == "127.0.0.1" || Configuration["Smtp:Host"] == "localhost"))
+            @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
             {
                 <p>Development mode sends verification codes to the <a href="http://127.0.0.1:8025/" target="_blank" rel="noopener noreferrer">local mail inbox</a>, not to your Gmail inbox. Enter the latest code from that page. It expires in 10 minutes.</p>
             }

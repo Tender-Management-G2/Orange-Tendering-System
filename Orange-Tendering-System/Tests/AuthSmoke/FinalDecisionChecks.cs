@@ -50,7 +50,7 @@ public static class FinalDecisionChecks
         {
             b.UseContentRoot(root).UseEnvironment("Development");
             b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
-            { ["Smtp:Host"] = "smtp.test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "noreply@example.test" }));
+            { ["Smtp:Mode"] = "Smtp", ["Smtp:Host"] = "smtp.test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "noreply@example.test", ["Smtp:Username"] = "unused", ["Smtp:Password"] = "unused" }));
             b.ConfigureTestServices(s => { s.RemoveAll<IEmailSender>(); s.AddSingleton<IEmailSender>(mail); });
         });
 

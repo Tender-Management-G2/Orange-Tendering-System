@@ -145,9 +145,11 @@ public class RegisterModel(
         catch (Exception exception) when (exception is DbUpdateException or IOException or InvalidOperationException or FormatException or System.Net.Mail.SmtpException)
         {
             await transaction.RollbackAsync();
-            logger.LogError(exception, "Supplier registration failed.");
-            var localMail = environment.IsDevelopment() &&
-                (configuration["Smtp:Host"] == "127.0.0.1" || configuration["Smtp:Host"] == "localhost");
+            if (exception is System.Net.Mail.SmtpException smtpException)
+                logger.LogWarning("Supplier email delivery failed with SMTP status {Status}.", smtpException.StatusCode);
+            else
+                logger.LogError(exception, "Supplier registration failed.");
+            var localMail = environment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(configuration);
             var deliveryFailed = exception is System.Net.Mail.SmtpException ||
                 (exception is InvalidOperationException && !SmtpEmailSender.IsConfigured(configuration));
             var message = deliveryFailed && localMail

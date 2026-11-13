@@ -91,15 +91,7 @@ dotnet run --launch-profile https
 
 ## Authentication setup on Ahmad branch
 
-Apply `20261113091517_AddAuthenticationState` only to your verified local database. It adds three `AspNetUsers` columns and keeps the 30-table schema. For local Development registration, run `node Tools/DevMail/server.js` from the web project directory, then read OTP email at `http://127.0.0.1:8025`. No SMTP credentials are needed for this local inbox. For real email delivery, configure SMTP in User Secrets or environment variables, never tracked configuration:
-
-```powershell
-dotnet user-secrets set "Smtp:Host" "your-smtp-host"
-dotnet user-secrets set "Smtp:Port" "587"
-dotnet user-secrets set "Smtp:From" "verified-sender@example.test"
-dotnet user-secrets set "Smtp:Username" "your-smtp-user"
-dotnet user-secrets set "Smtp:Password" "your-private-smtp-password"
-```
+Apply `20261113091517_AddAuthenticationState` only to your verified local database. It adds three `AspNetUsers` columns and keeps the 30-table schema. Development defaults to `Smtp:Mode=LocalInbox`: run `node Tools/DevMail/server.js` from the web project directory and read test OTP mail at `http://127.0.0.1:8025`. For delivery to a real Gmail inbox, set `Smtp:Mode=Smtp` and Gmail sender credentials in the web project's Visual Studio User Secrets, then restart the app. See [the exact Gmail setup and delivery test](../Orange-Tendering-System/Tools/DevMail/README.md). Never commit credentials or OTPs.
 
 For a brand-new local installation only, optionally set `BootstrapAdmin:Email`, `BootstrapAdmin:Password`, and `BootstrapAdmin:FullName` at runtime. The Admin account requires a password change at first sign-in. Never commit those values. Real SMTP must support STARTTLS; the Development inbox accepts unauthenticated email only on loopback. Supplier documents are stored under the application's ignored `App_Data/SupplierDocuments` directory outside `wwwroot`; back this directory up and protect it in deployment. The app needs write permission there.
 
