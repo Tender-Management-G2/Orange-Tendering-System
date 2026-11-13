@@ -4,13 +4,18 @@
   the current area's menu, or (on shared pages) the menu of the user's first workspace role.
   The active item is the one whose label equals ViewData["WorkspaceSection"].
 *@
+@inject Orange_Tendering_System.Services.TenderWorkflowService Workflow
 @{
+    // Policy-aware navigation: the weighted-evaluation links are only offered to roles that can actually open them.
+    var canWorkflow = User.IsInRole(SystemRoles.SourcingOfficer) || User.IsInRole(SystemRoles.EvaluationCommittee) || User.IsInRole(SystemRoles.SourcingManager) || User.IsInRole(SystemRoles.TopCommittee);
+    var canApproveWeights = false;
+    try { canApproveWeights = canWorkflow && await Workflow.WeightApprover(await Workflow.Actor(User)); } catch { canApproveWeights = false; }
     var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
     var activeSection = ViewData["WorkspaceSection"] as string;
 }
 <nav class="ws-primary-nav" aria-label="@(workspace?.Label ?? "Workspace") navigation">
-    <a class="ws-nav-item" asp-area="" asp-controller="Workflow" asp-action="Index"><span>Weighted Evaluation</span></a>
-    <a class="ws-nav-item" asp-area="EvaluationCommittee" asp-controller="WeightApprovals" asp-action="Index"><span>Weight Approvals</span></a>
+    @if (canWorkflow) { <a class="ws-nav-item" asp-area="" asp-controller="Workflow" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>Weighted Evaluation</span></a> }
+    @if (canApproveWeights) { <a class="ws-nav-item" asp-area="EvaluationCommittee" asp-controller="WeightApprovals" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg><span>Weight Approvals</span></a> }
     @if (workspace is not null)
     {
         foreach (var item in workspace.Items)

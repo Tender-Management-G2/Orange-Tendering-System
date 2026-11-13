@@ -228,6 +228,12 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<int>("EmailOtpFailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EmailOtpSentAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -241,12 +247,6 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("EmailOtpFailedAttempts")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("EmailOtpSentAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<bool>("MustChangePassword")
                         .HasColumnType("bit");
@@ -1081,6 +1081,36 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.ToTable("ExternalSupplierInvitation");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.FaceTemplate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("ProtectedTemplate")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("FaceTemplates");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -1905,6 +1935,51 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.ToTable("TenderRounds");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.UserPasskeyCredential", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CredentialId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("DeviceLabel")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<long>("SignCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CredentialId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserPasskeyCredentials");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.WeightProposal", b =>
                 {
                     b.Property<int>("Id")
@@ -2469,6 +2544,17 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Navigation("TenderRound");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.FaceTemplate", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Notification", b =>
                 {
                     b.HasOne("Orange_Tendering_System.Models.Entities.ApplicationUser", "User")
@@ -2764,6 +2850,17 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Tender");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.UserPasskeyCredential", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.WeightProposal", b =>

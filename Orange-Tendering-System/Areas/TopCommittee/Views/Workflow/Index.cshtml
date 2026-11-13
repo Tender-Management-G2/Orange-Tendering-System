@@ -1,7 +1,24 @@
 @model List<Orange_Tendering_System.ViewModels.WorkflowListRow>
-@{ ViewData["Title"] = "Weighted Tender Evaluation"; ViewData["WorkspaceSection"] = "Weighted Evaluation"; var area=ViewContext.RouteData.Values["area"]?.ToString(); var controller=ViewContext.RouteData.Values["controller"]?.ToString(); }
-<h1>Weighted Tender Evaluation</h1>
-<p>Requirements → four proposals → formal weight approval → bidding → compliance → evaluation → recommendation → final approval and award.</p>
-@if(area=="SourcingOfficer") { <p><a asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create">Prepare tender from an accepted Purchase Request</a></p> }
-@if(Model.Count==0) { <p>No authorized tenders are assigned to this account.</p> }
-@foreach(var row in Model) { <section class="ws-panel pg-panel"><h2><a asp-area="@area" asp-controller="@controller" asp-action="Details" asp-route-id="@row.TenderId">@row.Title</a></h2><p>#@row.TenderId · @row.Status</p></section> }
+@{
+    ViewData["Title"] = "Weighted Tender Evaluation"; ViewData["WorkspaceSection"] = "Weighted Evaluation";
+    ViewData["Description"] = "Requirements, four proposals, formal weight approval, bidding, compliance, evaluation, recommendation, final approval and award.";
+    var area = ViewContext.RouteData.Values["area"]?.ToString(); var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+}
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel" aria-labelledby="wf-title">
+    <div class="pg-panel-head"><h2 id="wf-title">Tenders</h2>
+        @if (area == "SourcingOfficer") { <a class="pg-btn pg-btn-primary" data-no-modal asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create">+ Prepare tender from an accepted request</a> }
+    </div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model)
+            {
+                <tr><td>T-@row.TenderId.ToString("0000")</td><td><strong>@row.Title</strong></td><td>@row.Status</td><td><a class="pg-btn" data-no-modal asp-area="@area" asp-controller="@controller" asp-action="Details" asp-route-id="@row.TenderId">Open workflow</a></td></tr>
+            }
+            @if (Model.Count == 0) { <tr><td colspan="4"><partial name="_EmptyState" model='"No authorized tenders are assigned to this account."' /></td></tr> }
+            </tbody>
+        </table>
+    </div>
+</section>

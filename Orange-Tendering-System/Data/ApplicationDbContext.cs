@@ -38,6 +38,10 @@ namespace Orange_Tendering_System.Data
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+        // Biometric sign-in (fingerprint passkeys and face templates)
+        public DbSet<UserPasskeyCredential> UserPasskeyCredentials => Set<UserPasskeyCredential>();
+        public DbSet<FaceTemplate> FaceTemplates => Set<FaceTemplate>();
+
         private void ProtectReportHistory()
         {
             ChangeTracker.DetectChanges();

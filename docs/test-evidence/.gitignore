@@ -1,0 +1,8 @@
+# Local browser evidence is delivered locally and must not be pushed accidentally.
+screenshots/
+logs/
+events-*.jsonl
+results.json
+report.html
+summary.json
+__pycache__/

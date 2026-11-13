@@ -1,59 +1,17 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: My Purchase Requests
-
-DEVELOPER OWNER: Doulat
-MODULE: Department / Purchase Requests
-TRELLO TASK: My Purchase Requests
-TRELLO URL: https://trello.com/c/SjSwbYUx
-
-PURPOSE:
-List the department’s purchase requests with status and the
-latest Sourcing Officer decision.
-
-BUSINESS ACCESS:
-Requesting Department (own department only)
-
-ROUTE: /Department/PurchaseRequests
-
-FUTURE IMPLEMENTATION:
-- Query PurchaseRequests where DepartmentId = the user’s
-  department.
-- Show the latest PurchaseRequestReview decision and
-  comment.
-- Row actions: Details; Edit & resubmit for Draft/Returned.
-
-DEPENDENCIES:
-PurchaseRequests, PurchaseRequestReviews, Departments.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "My Purchase Requests";
-    ViewData["WorkspaceSection"] = "My Requests";
-    ViewData["Description"] = "Purchase requests created by your department, with their review status.";
-}
+@model List<Orange_Tendering_System.Models.Entities.PurchaseRequest>
+@{ ViewData["Title"] = "My purchase requests"; ViewData["WorkspaceSection"] = "My Requests"; ViewData["Description"] = "Track every request your department has submitted."; }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search by title or reference" aria-label="Search by title or reference" disabled />
-    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Draft</option><option>Status: Submitted</option><option>Status: Returned</option><option>Status: Rejected</option><option>Status: Accepted</option></select>
-    <select aria-label="Priority" disabled><option>Priority: All</option><option>Priority: Low</option><option>Priority: Normal</option><option>Priority: High</option><option>Priority: Urgent</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-purchase-requests">
-    <div class="pg-panel-head"><h2 id="tbl-purchase-requests">Purchase requests</h2><a class="pg-btn pg-btn-primary" asp-area="Department" asp-controller="PurchaseRequests" asp-action="Create">New request</a></div>
+<section class="ws-panel pg-panel" aria-labelledby="pr-title">
+    <div class="pg-panel-head"><h2 id="pr-title">Requests</h2><a class="pg-btn pg-btn-primary" asp-action="Create">+ New purchase request</a></div>
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Reference</th><th scope="col">Title</th><th scope="col">Priority</th><th scope="col">Needed by</th><th scope="col">Status</th><th scope="col">Last submitted</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"Your department has no purchase requests yet."' /></td></tr></tbody>
+            <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <tbody>
+            @foreach (var p in Model)
+            {
+                <tr><td>PR-@p.Id.ToString("0000")</td><td><strong>@p.Title</strong></td><td>@p.Status</td><td><a class="pg-btn" asp-action="Details" asp-route-id="@p.Id">Details</a></td></tr>
+            }
+            </tbody>
         </table>
     </div>
 </section>
-
-<aside class="pg-note"><strong>Returned requests</strong><p>A request returned by the Sourcing Officer shows the Officer’s comment. Edit and resubmit it; every submission is kept in PurchaseRequestReviews.</p></aside>

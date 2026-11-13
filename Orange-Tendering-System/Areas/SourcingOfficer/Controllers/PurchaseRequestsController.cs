@@ -8,7 +8,7 @@ using Orange_Tendering_System.Models.Entities;
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
-//[Authorize(Roles = SystemRoles.SourcingOfficer)]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
 public class PurchaseRequestsController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index() => View(await db.PurchaseRequests.AsNoTracking()

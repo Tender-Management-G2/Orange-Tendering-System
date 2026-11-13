@@ -11,7 +11,7 @@ namespace Orange_Tendering_System.Controllers;
 public abstract class ReportControllerBase(TenderWorkflowService workflow) : Controller
 {
     protected TenderWorkflowService Workflow => workflow;
-    public IActionResult Index() => RedirectToAction("Index", "Workflow");
+    public virtual Task<IActionResult> Index() => Task.FromResult<IActionResult>(RedirectToAction("Index", "Workflow"));
     public async Task<IActionResult> Review(int id) { PrivateResponse(); return View(await workflow.ReviewReport(id, User)); }
     private void PrivateResponse()
     {

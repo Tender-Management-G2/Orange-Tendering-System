@@ -1,8 +1,23 @@
 @model Orange_Tendering_System.Models.Entities.Supplier
 @using Orange_Tendering_System.Models.Entities
-@{ ViewData["Title"]="Supplier registration review"; }
-<h1>@Model.CompanyName</h1><p>@Model.Status | @Model.Email | Registration @Model.RegistrationNumber</p>
-<div asp-validation-summary="All" role="alert"></div>
-<ul>@foreach(var doc in Model.Documents) { <li><a asp-area="Admin" asp-controller="Suppliers" asp-action="Document" asp-route-id="@doc.Id">@doc.FileName</a> | @doc.VerificationStatus</li> }</ul>
-@if(Model.Status==SupplierStatus.Pending) { <form asp-area="Admin" asp-controller="Suppliers" asp-action="Review" asp-route-id="@Model.Id" method="post"><label>Document verification findings and reason<textarea name="notes" maxlength="1000" required></textarea></label><p>Review the stored legal document before deciding. Approval alone does not confirm the account's email.</p><button name="approve" value="true">Approve supplier registration</button> <button name="approve" value="false">Reject registration</button></form> }
-<p>@Model.ReviewNotes | @Model.ReviewedByUserId | @Model.ReviewedAt?.ToString("u")</p>
+@{ ViewData["Title"] = Model.CompanyName; ViewData["WorkspaceSection"] = "Suppliers"; ViewData["Description"] = "Supplier registration review."; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <dl class="ui-facts">
+        <div><dt>Status</dt><dd>@Model.Status</dd></div>
+        <div><dt>Email</dt><dd>@Model.Email</dd></div>
+        <div><dt>Registration number</dt><dd>@Model.RegistrationNumber</dd></div>
+    </dl>
+    <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+    <h3>Legal documents</h3>
+    @if (!Model.Documents.Any()) { <p class="pg-hint">No documents were uploaded.</p> }
+    <ul class="ui-timeline">@foreach (var doc in Model.Documents) { <li><a data-no-modal asp-area="Admin" asp-controller="Suppliers" asp-action="Document" asp-route-id="@doc.Id">@doc.FileName</a><span>@doc.VerificationStatus</span></li> }</ul>
+    @if (Model.Status == SupplierStatus.Pending)
+    {
+        <form asp-area="Admin" asp-controller="Suppliers" asp-action="Review" asp-route-id="@Model.Id" method="post" class="pg-form">
+            <div class="pg-field pg-field-wide"><label for="notes">Document verification findings and reason</label><textarea id="notes" name="notes" maxlength="1000" required></textarea><small class="pg-hint">Review the stored legal document before deciding. Approval alone does not confirm the account's email.</small></div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary" name="approve" value="true">Approve supplier registration</button><button type="submit" class="pg-btn pg-btn-danger" name="approve" value="false">Reject registration</button></div>
+        </form>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.ReviewNotes)) { <p class="pg-hint">Reviewed @Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm") UTC: @Model.ReviewNotes</p> }
+</section>

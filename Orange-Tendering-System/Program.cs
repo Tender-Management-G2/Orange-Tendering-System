@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
@@ -10,8 +10,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("Default Connection") ?? throw new InvalidOperationException("Connection string 'Default Connection' not found.");
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<Orange_Tendering_System.Services.NotificationPushInterceptor>();
+builder.Services.AddDbContext<ApplicationDbContext>((services, options) =>
+    options.UseSqlServer(connectionString)
+        .AddInterceptors(services.GetRequiredService<Orange_Tendering_System.Services.NotificationPushInterceptor>()));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 // AddRoles puts the user's Identity roles into the sign-in cookie, which [Authorize(Roles = ...)] on the
@@ -41,6 +44,7 @@ builder.Services.AddTransient<SmtpEmailSender>();
 builder.Services.AddTransient<IEmailSender>(services => services.GetRequiredService<SmtpEmailSender>());
 builder.Services.AddScoped<EmployeeProvisioning>();
 builder.Services.AddControllersWithViews();
+builder.Services.AddBiometrics(builder.Configuration);
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierProfileService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierInvitationService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierOfferService>();
@@ -51,6 +55,8 @@ builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDashboardSer
 builder.Services.Configure<TenderApprovalPolicy>(builder.Configuration.GetSection("TenderApprovalPolicy"));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TenderWorkflowService>();
+builder.Services.AddScoped<PurchaseRequestService>();
+builder.Services.AddScoped<InternalDashboardService>();
 builder.Services.Configure<ReportSigningOptions>(builder.Configuration.GetSection("ReportSigning"));
 builder.Services.Configure<ReportRevisionPolicy>(builder.Configuration.GetSection("ReportRevisionPolicy"));
 builder.Services.Configure<ReportPdfOptions>(builder.Configuration.GetSection("ReportPdf"));
@@ -109,6 +115,7 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
 
+app.MapHub<Orange_Tendering_System.Hubs.NotificationHub>("/hubs/notifications");
 app.MapRazorPages()
    .WithStaticAssets();
 

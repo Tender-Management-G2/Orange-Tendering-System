@@ -10,7 +10,7 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
-//[Authorize(Roles = SystemRoles.SourcingOfficer)]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
 public class DashboardController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index()

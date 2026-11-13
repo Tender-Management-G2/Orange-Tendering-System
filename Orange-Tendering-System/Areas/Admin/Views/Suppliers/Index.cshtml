@@ -1,4 +1,17 @@
 @model List<Orange_Tendering_System.Models.Entities.Supplier>
-@{ ViewData["Title"]="Supplier registration reviews"; }
-<h1>Supplier registration reviews</h1>
-@foreach(var company in Model) { <section class="ws-panel pg-panel"><a asp-area="Admin" asp-controller="Suppliers" asp-action="Review" asp-route-id="@company.Id">@company.CompanyName</a><p>@company.Status | @company.Email</p></section> }
+@{ ViewData["Title"] = "Supplier registration reviews"; ViewData["WorkspaceSection"] = "Suppliers"; ViewData["Description"] = "Verify legal documents and approve, reject or suspend supplier companies."; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel" aria-labelledby="sup-title">
+    <div class="pg-panel-head"><h2 id="sup-title">Companies</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Company</th><th scope="col">Email</th><th scope="col">Registration no.</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <tbody>
+            @foreach (var company in Model)
+            {
+                <tr><td><strong>@company.CompanyName</strong></td><td>@company.Email</td><td>@company.RegistrationNumber</td><td>@company.Status</td><td><a class="pg-btn" asp-area="Admin" asp-controller="Suppliers" asp-action="Review" asp-route-id="@company.Id">Review</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>

@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model LoginModel
 @*
 ===========================================================
@@ -18,8 +18,10 @@ One Identity email/password sign-in for employees and approved suppliers.
 BUSINESS ACCESS:
 Anonymous visitors.
 
-FUTURE IMPLEMENTATION:
-- Fingerprint and face sign-in remain disabled until a real verification flow exists.
+BIOMETRIC SIGN-IN:
+- Fingerprint (WebAuthn passkey) and face recognition (live camera
+  challenge, password required) are wired to BiometricsController and
+  wwwroot/js/biometric.js. They issue the same Identity cookie.
 
 DEPENDENCIES:
 AspNetUsers, ApplicationUser, Supplier, SignInManager,
@@ -27,7 +29,7 @@ Biometrics pages, AuditLogs.
 
 STATUS:
 Identity sign-in, role redirect, account-state checks, and lockout are implemented.
-Biometric sign-in is deferred.
+Biometric sign-in is implemented (see Controllers/BiometricsController.cs).
 
 IMPORTANT:
 Do not add a second authentication system next to Identity.
@@ -53,11 +55,17 @@ Do not add a second authentication system next to Identity.
             <button id="login-submit" type="submit" class="primary">Sign In →</button>
         </form>
 
-        @* Biometric entry points — Ahmad. Disabled until a real verification flow exists. *@
-        <div class="auth-biometric" aria-label="Biometric sign-in">
-            <small>Biometric sign-in (not implemented yet)</small>
-            <button type="button" class="overview" disabled title="Fingerprint sign-in is not implemented yet">Sign in with fingerprint</button>
-            <button type="button" class="overview" disabled title="Face recognition sign-in is not implemented yet">Sign in with face recognition</button>
+        @* Biometric sign-in (Ahmad): Identity cookie issued by BiometricsController after a verified fingerprint passkey
+           (WebAuthn) only. Camera face recognition is not an authentication factor. *@
+        <div class="auth-biometric" id="bio-root" data-return-url="@Model.ReturnUrl" aria-label="Biometric sign-in">
+            <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
+            <button type="button" id="btnPasskeyLogin" class="overview">Sign in with fingerprint</button>
+            <button type="button" id="btnFaceLogin" data-bio-disabled="true" class="overview" disabled title="Face Login is disabled pending secure server-verifiable identity proof">Sign in with face recognition</button>
+            <small>Passkeys use your device's authenticator (fingerprint, PIN or device face unlock). This application does not receive physical fingerprint data. Camera-based Face Login is disabled until secure server-verifiable proof is implemented and verified.</small>
+            <div id="facePanel" class="bio-face-panel bio-hidden">
+                <video id="faceVideo" playsinline muted autoplay></video>
+                <div id="faceHint" class="bio-face-hint"></div>
+            </div>
         </div>
 
         <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
@@ -66,6 +74,10 @@ Do not add a second authentication system next to Identity.
     </div>
 </section>
 
+@section Styles {
+    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+}
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
 }

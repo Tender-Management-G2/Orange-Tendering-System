@@ -1,70 +1,50 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Face Registration & Recognition Login
-
-DEVELOPER OWNER: Ahmad
-MODULE: Authentication & Biometrics
-TRELLO TASK: Face Registration & Recognition Login
-TRELLO URL: https://trello.com/c/tWcVmtdC
-
-PURPOSE:
-Enrollment page for face-recognition sign-in; the sign-in
-entry point is on the Login page.
-
-BUSINESS ACCESS:
-Any signed-in user (enrolls their own account)
-
-ROUTE: /Biometrics/Face
-
-FUTURE IMPLEMENTATION:
-- Decide the face recognition provider and liveness method.
-- Implement enrollment and verification server-side; audit
-  attempts.
-- Enable the Login page button only when real verification
-  works.
-
-DEPENDENCIES:
-AspNetUsers, future biometric credential table, Login page,
-AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-No image-based fake authentication.
-===========================================================
-*@
+@model BiometricManageViewModel
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Face Registration & Recognition Login";
     ViewData["WorkspaceSection"] = "My Workspace";
-    ViewData["Description"] = "Register face recognition sign-in for this account.";
+    ViewData["Description"] = "Camera-based authentication is disabled pending a verified server-side identity proof.";
 }
+@section Styles { <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" /> }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<aside class="pg-note"><strong>Not implemented</strong><p>The camera is not used and no images are stored. A static photo must never be accepted as live face verification; liveness detection is required.</p></aside>
+<div id="bio-root" data-return-url="">
+    @Html.AntiForgeryToken()
+    <div id="bio-status" class="bio-status bio-status--info" role="status">
+        Face enrollment and login are disabled. Browser descriptors, liveness measurements and JavaScript verification decisions are untrusted. Existing encrypted samples are retained for your control but cannot authorize a login.
+    </div>
 
-<section class="ws-panel pg-panel">
-    <h2>Planned enrollment</h2>
-    <ol class="pg-steps">
-        <li><div><strong>Choose method</strong><small>Team decision on the face recognition provider</small></div></li>
-        <li><div><strong>Camera permission</strong><small>Ask the browser for camera access</small></div></li>
-        <li><div><strong>Liveness check</strong><small>Reject photos and recordings</small></div></li>
-        <li><div><strong>Register</strong><small>Store only what the provider requires, never raw face images</small></div></li>
-        <li><div><strong>Use at sign-in</strong><small>Login page face button</small></div></li>
-    </ol>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Register face recognition</h2>
-    <form class="pg-form">
-        <fieldset disabled>
+    <section class="ws-panel pg-panel">
+        <h2>Face recognition</h2>
+        <p>
+            @if (Model.FaceTemplateCount == 0)
+            {
+                <span class="pg-hint">No face registered yet.</span>
+            }
+            else
+            {
+                <span>@Model.FaceTemplateCount encrypted face sample(s) stored.</span>
+            }
+        </p>
+        <div class="pg-form">
             <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-device-name-1">Device name</label><input id="f-device-name-1" type="text" /></div>
+                <div class="pg-field"><label for="bioPassword">Current password</label><input id="bioPassword" type="password" autocomplete="current-password" /><small class="pg-hint">Re-checked before your face is registered.</small></div>
             </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Start face enrollment</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
+            <label class="pg-hint"><input id="faceReplace" type="checkbox" checked /> Replace my existing face samples</label>
+            <div class="pg-actions">
+                <button id="btnFaceEnroll" data-bio-disabled="true" type="button" disabled class="pg-btn pg-btn-primary">Face enrollment unavailable</button>
+                @if (Model.FaceTemplateCount > 0)
+                {
+                    <button id="btnFaceRemove" type="button" class="pg-btn pg-btn-danger">Remove stored samples</button>
+                }
+            </div>
+        </div>
+    </section>
+
+    <div id="facePanel" class="bio-face-panel bio-hidden">
+        <video id="faceVideo" playsinline muted autoplay></video>
+        <div id="faceHint" class="bio-face-hint"></div>
+    </div>
+</div>
+
+@section Scripts { <script src="~/js/biometric.js" asp-append-version="true"></script> }

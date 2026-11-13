@@ -14,7 +14,7 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 [Authorize(Roles = SystemRoles.SourcingOfficer)]
 public class ReportsController(ApplicationDbContext db, TenderWorkflowService workflow) : ReportControllerBase(workflow)
 {
-    public new async Task<IActionResult> Index()
+    public override async Task<IActionResult> Index()
     {
         var reports = await db.TenderReports.AsNoTracking().Include(r => r.TenderRound).ThenInclude(r => r.Tender)
             .Where(r => r.ReportType == ReportType.FullEvaluation || r.ReportType == ReportType.OfficerComparison)

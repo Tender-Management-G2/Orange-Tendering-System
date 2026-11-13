@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
-//[Authorize(Roles = SystemRoles.SourcingOfficer)]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
 public class ClarificationsController(ApplicationDbContext db) : Controller
 {
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
