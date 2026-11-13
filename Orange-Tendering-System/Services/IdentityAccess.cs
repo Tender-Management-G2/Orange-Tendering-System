@@ -39,6 +39,14 @@ public static class IdentityAccess
 // Pending suppliers have an Identity cookie, but protected workspaces are for approved suppliers.
 public sealed class SupplierApprovalGate(RequestDelegate next)
 {
+    // Registration step: a verified pending supplier sets up face / passkey sign-in from the Pending Approval page.
+    // BiometricsController re-checks the password and account state on each of these.
+    private static readonly string[] PendingEnrollmentPaths =
+    [
+        "/Biometrics/FaceEnrollChallenge", "/Biometrics/FaceEnroll",
+        "/Biometrics/PasskeyRegisterOptions", "/Biometrics/PasskeyRegister"
+    ];
+
     public async Task InvokeAsync(HttpContext context, ApplicationDbContext db)
     {
         var endpoint = context.GetEndpoint();
@@ -49,7 +57,8 @@ public sealed class SupplierApprovalGate(RequestDelegate next)
             context.User.Identity?.IsAuthenticated == true &&
             context.User.IsInRole(SystemRoles.Supplier) &&
             !path.StartsWithSegments("/Identity/Account/PendingApproval", StringComparison.OrdinalIgnoreCase) &&
-            !path.StartsWithSegments("/Identity/Account/Logout", StringComparison.OrdinalIgnoreCase))
+            !path.StartsWithSegments("/Identity/Account/Logout", StringComparison.OrdinalIgnoreCase) &&
+            !PendingEnrollmentPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)))
         {
             var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             var approved = await db.Users.AsNoTracking().AnyAsync(u => u.Id == userId &&

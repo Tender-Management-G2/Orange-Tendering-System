@@ -3,16 +3,14 @@
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Face Registration & Recognition Login";
     ViewData["WorkspaceSection"] = "My Workspace";
-    ViewData["Description"] = "Camera-based authentication is disabled pending a verified server-side identity proof.";
+    ViewData["Description"] = "Register or replace the face you use to sign in. The camera picture stays on this device.";
 }
 @section Styles { <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" /> }
 <partial name="_PageHeader" />
 
 <div id="bio-root" data-return-url="">
     @Html.AntiForgeryToken()
-    <div id="bio-status" class="bio-status bio-status--info" role="status">
-        Face enrollment and login are disabled. Browser descriptors, liveness measurements and JavaScript verification decisions are untrusted. Existing encrypted samples are retained for your control but cannot authorize a login.
-    </div>
+    <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
 
     <section class="ws-panel pg-panel">
         <h2>Face recognition</h2>
@@ -32,7 +30,7 @@
             </div>
             <label class="pg-hint"><input id="faceReplace" type="checkbox" checked /> Replace my existing face samples</label>
             <div class="pg-actions">
-                <button id="btnFaceEnroll" data-bio-disabled="true" type="button" disabled class="pg-btn pg-btn-primary">Face enrollment unavailable</button>
+                <button id="btnFaceEnroll" type="button" class="pg-btn pg-btn-primary">Register face</button>
                 @if (Model.FaceTemplateCount > 0)
                 {
                     <button id="btnFaceRemove" type="button" class="pg-btn pg-btn-danger">Remove stored samples</button>

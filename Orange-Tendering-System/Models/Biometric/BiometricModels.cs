@@ -25,7 +25,7 @@ public class BiometricOptions
     /// </summary>
     public int PasskeyChallengeSeconds { get; set; } = 300;
 
-    /// <summary>Legacy compatibility setting only. Ignored: all face authentication is disabled regardless of this value.</summary>
+    /// <summary>Legacy setting, not used: face sign-in is email + live face (suppliers use the password only for setup).</summary>
     public bool FaceLoginRequiresPassword { get; set; } = true;
 
     public int MaxFaceTemplatesPerUser { get; set; } = 10;
@@ -83,21 +83,11 @@ public class PasskeyLoginRequest
     public string? ReturnUrl { get; set; }
 }
 
-// ---------- Face recognition with liveness ----------
-
-/// <summary>One measurement of the live video: eye openness, head yaw and mouth openness.</summary>
-public class FaceFrame
-{
-    /// <summary>Milliseconds since the challenge started.</summary>
-    public double T { get; set; }
-
-    public double Ear { get; set; }
-    public double Yaw { get; set; }
-    public double Mar { get; set; }
-}
+// ---------- Face recognition (instant capture, no liveness) ----------
 
 public class FaceDescriptorSample
 {
+    /// <summary>Milliseconds since capture started.</summary>
     public double T { get; set; }
 
     /// <summary>The 128-number face descriptor produced in the browser.</summary>
@@ -109,10 +99,9 @@ public class FaceSubmission
     public string Token { get; set; } = string.Empty;
     public string? Email { get; set; }
 
-    /// <summary>Legacy field, ignored. Face authentication is disabled for every submission.</summary>
+    /// <summary>Legacy field, ignored (the enrollment password is checked when the challenge is issued).</summary>
     public string? Password { get; set; }
 
-    public List<FaceFrame> Frames { get; set; } = [];
     public List<FaceDescriptorSample> Descriptors { get; set; } = [];
 
     /// <summary>Enrolment only: replace the templates already stored instead of adding to them.</summary>
@@ -121,23 +110,29 @@ public class FaceSubmission
     public string? ReturnUrl { get; set; }
 }
 
-/// <summary>Limits shared by the browser (to guide the user) and the server (to verify the evidence).</summary>
-public class LivenessThresholds
-{
-    public double EarClosed { get; set; } = 0.20;
-    public double EarOpen { get; set; } = 0.26;
-    public double YawCenter { get; set; } = 0.08;
-    public double YawTurn { get; set; } = 0.15;
-    public double MarClosed { get; set; } = 0.20;
-    public double MarOpen { get; set; } = 0.40;
-}
+/// <summary>
+/// Result of comparing live face samples with enrolled templates (FaceService.Match). Used by sign-in and,
+/// with its numbers shown, by the development-only /face-demo page.
+/// </summary>
+/// <param name="BestDistances">For each live sample, the distance to its closest enrolled template.</param>
+public record FaceMatch(bool Matched, IReadOnlyList<double> BestDistances, double AverageDistance,
+    int MatchingSamples, int RequiredSamples, double Threshold);
 
+/// <summary>A one-time token for one face attempt, so a captured submission cannot be replayed.</summary>
 public class FaceChallengeResponse
 {
     public string Token { get; set; } = string.Empty;
-    public string[] Actions { get; set; } = [];
     public int ExpiresInSeconds { get; set; }
-    public LivenessThresholds Thresholds { get; set; } = new();
+}
+
+// ---------- Development-only face demo (/face-demo) ----------
+
+public class FaceDemoViewModel
+{
+    /// <summary>Number of samples of the current test face kept in memory (0 = none registered).</summary>
+    public int TestFaceSamples { get; set; }
+
+    public double Threshold { get; set; }
 }
 
 // ---------- Manage page ----------

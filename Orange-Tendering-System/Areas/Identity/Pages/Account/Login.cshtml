@@ -19,9 +19,12 @@ BUSINESS ACCESS:
 Anonymous visitors.
 
 BIOMETRIC SIGN-IN:
-- Fingerprint (WebAuthn passkey) and face recognition (live camera
-  challenge, password required) are wired to BiometricsController and
+- Face recognition (email + live camera challenge) and fingerprint
+  (WebAuthn passkey, demo) are wired to BiometricsController and
   wwwroot/js/biometric.js. They issue the same Identity cookie.
+- An Approved supplier who has enrolled face/passkey cannot use the
+  password form (Login.cshtml.cs); pending suppliers can, to reach
+  Pending Approval and finish face setup.
 
 DEPENDENCIES:
 AspNetUsers, ApplicationUser, Supplier, SignInManager,
@@ -42,31 +45,39 @@ Do not add a second authentication system next to Identity.
     <div class="glass auth-card">
         <span class="eyebrow">YOUR PROCUREMENT WORKSPACE</span>
         <h1>Sign In</h1>
-        <p>Use an account provisioned for this system. Supplier accounts require Admin approval.</p>
-        <form id="account" method="post">
-            <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-            <label asp-for="Input.Email">Email</label>
-            <input asp-for="Input.Email" autocomplete="username" aria-required="true" />
-            <span asp-validation-for="Input.Email" class="field-error"></span>
-            <label asp-for="Input.Password">Password</label>
-            <input asp-for="Input.Password" autocomplete="current-password" aria-required="true" />
-            <span asp-validation-for="Input.Password" class="field-error"></span>
-            <label class="auth-check"><input asp-for="Input.RememberMe" /> @Html.DisplayNameFor(m => m.Input.RememberMe)</label>
-            <button id="login-submit" type="submit" class="primary">Sign In →</button>
-        </form>
+        <p>Employees sign in with their email and password. Approved suppliers sign in with face recognition.</p>
 
-        @* Biometric sign-in (Ahmad): Identity cookie issued by BiometricsController after a verified fingerprint passkey
-           (WebAuthn) only. Camera face recognition is not an authentication factor. *@
-        <div class="auth-biometric" id="bio-root" data-return-url="@Model.ReturnUrl" aria-label="Biometric sign-in">
+        @* Supplier biometric sign-in (Ahmad): BiometricsController verifies the live face (or the WebAuthn passkey)
+           and issues the same Identity cookie. Only Approved supplier companies can sign in this way. *@
+        <fieldset class="auth-fieldset auth-biometric" id="bio-root" data-return-url="@Model.ReturnUrl" aria-label="Supplier sign-in">
+            <legend>Suppliers</legend>
+            <label for="faceEmail">Supplier email</label>
+            <input id="faceEmail" type="email" autocomplete="username" />
             <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
-            <button type="button" id="btnPasskeyLogin" class="overview">Sign in with fingerprint</button>
-            <button type="button" id="btnFaceLogin" data-bio-disabled="true" class="overview" disabled title="Face Login is disabled pending secure server-verifiable identity proof">Sign in with face recognition</button>
-            <small>Passkeys use your device's authenticator (fingerprint, PIN or device face unlock). This application does not receive physical fingerprint data. Camera-based Face Login is disabled until secure server-verifiable proof is implemented and verified.</small>
+            <button type="button" id="btnFaceLogin" class="primary">Sign in with face recognition</button>
             <div id="facePanel" class="bio-face-panel bio-hidden">
                 <video id="faceVideo" playsinline muted autoplay></video>
                 <div id="faceHint" class="bio-face-hint"></div>
             </div>
-        </div>
+            <button type="button" id="btnPasskeyLogin" class="overview">Fingerprint / passkey (demo)</button>
+            <small>The camera picture stays on this device; only face measurements are checked. The passkey option uses your device's own fingerprint, face unlock or PIN, or a phone via QR code; this site cannot tell which one was used.</small>
+            <small>Company still awaiting approval? Sign in below with your password to see your application.</small>
+        </fieldset>
+
+        <form id="account" method="post">
+            <fieldset class="auth-fieldset">
+                <legend>Employees (and pending suppliers)</legend>
+                <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+                <label asp-for="Input.Email">Email</label>
+                <input asp-for="Input.Email" autocomplete="username" aria-required="true" />
+                <span asp-validation-for="Input.Email" class="field-error"></span>
+                <label asp-for="Input.Password">Password</label>
+                <input asp-for="Input.Password" autocomplete="current-password" aria-required="true" />
+                <span asp-validation-for="Input.Password" class="field-error"></span>
+                <label class="auth-check"><input asp-for="Input.RememberMe" /> @Html.DisplayNameFor(m => m.Input.RememberMe)</label>
+                <button id="login-submit" type="submit" class="primary">Sign In →</button>
+            </fieldset>
+        </form>
 
         <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
         <a class="auth-link" asp-page="./Register">Register as a supplier ↗</a>

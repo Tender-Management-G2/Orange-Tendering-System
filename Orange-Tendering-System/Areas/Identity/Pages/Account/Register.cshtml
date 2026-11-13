@@ -10,7 +10,8 @@
     <div class="glass auth-card auth-card-wide">
         <span class="eyebrow">SUPPLIER ONBOARDING</span>
         <h1>Register your company</h1>
-        <p>Registration is for supplier companies. Your company can participate only after administrator approval.</p>
+        <partial name="_RegistrationSteps" model="1" />
+        <p>Registration is for supplier companies. After your details, you verify your email and register your face for sign-in. Your company can participate only after administrator approval.</p>
         <p><a class="auth-link" asp-page="./VerifyEmail">Already started? Verify your email or request a new code</a></p>
         @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
         {
