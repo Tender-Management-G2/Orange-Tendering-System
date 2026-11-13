@@ -13,6 +13,8 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
     [Authorize(Roles = SystemRoles.TopCommittee)]
     public class DecisionsController : Controller
     {
+        public IActionResult Index() => RedirectToAction(nameof(ReviewEvaluation));
+
         // Review Tender Evaluation — Owner: Doulat · Trello: Review Tender Evaluation (https://trello.com/c/EDdybTCg)
         // GET /TopCommittee/Decisions/ReviewEvaluation/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult ReviewEvaluation(int? id)

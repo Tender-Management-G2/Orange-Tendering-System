@@ -196,6 +196,8 @@
     if (!table.closest('.pg-table-wrap') && !table.classList.contains('pg-table')) { const w = el('div', 'pg-table-wrap'); table.before(w); w.append(table); table.classList.add('pg-table'); }
     const tbody = table.tBodies[0]; const head = table.tHead && table.tHead.rows[0];
     if (!tbody || !head) return;
+    // Editable tables (rows with form fields, e.g. the purchase-request item grid) keep their own scripts: never re-order or paginate them.
+    if (tbody.querySelector('input, textarea, select, [data-remove-item]')) return;
     let rows = [...tbody.rows];
     if (!rows.length || (rows.length === 1 && rows[0].cells.length === 1 && rows[0].cells[0].colSpan > 1)) return;
     table.dataset.enhanced = '1';

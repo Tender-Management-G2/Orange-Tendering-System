@@ -60,6 +60,8 @@ builder.Services.AddScoped<InternalDashboardService>();
 builder.Services.AddScoped<FinalDecisionService>();
 builder.Services.AddScoped<AiChatService>();
 builder.Services.AddScoped<ClarificationService>();
+builder.Services.AddScoped<ReportingService>();
+builder.Services.AddScoped<ReportExport>();
 builder.Services.Configure<ReportSigningOptions>(builder.Configuration.GetSection("ReportSigning"));
 builder.Services.Configure<ReportRevisionPolicy>(builder.Configuration.GetSection("ReportRevisionPolicy"));
 builder.Services.Configure<ReportPdfOptions>(builder.Configuration.GetSection("ReportPdf"));

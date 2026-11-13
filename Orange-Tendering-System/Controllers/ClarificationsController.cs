@@ -105,7 +105,8 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
     public async Task<IActionResult> New()
     {
         if (User.IsInRole(SystemRoles.Supplier)) return RedirectToAction("Index", "Clarifications", new { area = "Supplier" });
-        return View(await clarifications.Options(User));
+        try { return View(await clarifications.Options(User)); }
+        catch (WorkflowException e) { TempData["ClarificationError"] = e.Message; return RedirectToAction(nameof(Index)); }
     }
 
     [HttpPost, ValidateAntiForgeryToken]

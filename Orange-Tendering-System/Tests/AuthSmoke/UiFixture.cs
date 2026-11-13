@@ -61,6 +61,8 @@ public static class UiFixture
         var requester = await Make(SystemRoles.RequestingDepartment, "Department", "Omar Requester", dept.Id);
         var officer = await Make(SystemRoles.SourcingOfficer, "SourcingOfficer", "Sara Officer");
         var evaluator = await Make(SystemRoles.EvaluationCommittee, "EvaluationCommittee", "Khaled Evaluator", dept.Id);
+        await Make(SystemRoles.EvaluationCommittee, "EvaluationCommittee2", "Rana Financial", dept.Id);
+        await Make(SystemRoles.EvaluationCommittee, "EvaluationCommittee3", "Samer Technical", dept.Id);
         var manager = await Make(SystemRoles.SourcingManager, "SourcingManager", "Nour Manager");
         var top = await Make(SystemRoles.TopCommittee, "TopCommittee", "Yousef Committee");
 
