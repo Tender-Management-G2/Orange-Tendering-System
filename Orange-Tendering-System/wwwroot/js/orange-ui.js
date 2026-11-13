@@ -88,7 +88,7 @@
   /* ---------- Popup-first modals and drawers ---------- */
   const ACTION = /\/(Create|Edit|Details|Review|Approve|Reject|Return|Forward|Upload|Sign|Confirm|Respond|Submit|Decide|Delete|Remove|Add|New|Compliance|Compare|Acknowledge)(\/|\?|$)/i;
   const DRAWER = /\/(Details|Review|Compare|Compliance)(\/|\?|$)/i;
-  const COMPLEX = /\/(Workflow|Identity|Biometrics|Notifications|Tasks)(\/|\?|$)/i;
+  const COMPLEX = /\/(Workflow|Identity|Biometrics|Notifications|Tasks|Offers)(\/|\?|$)/i;
   const dialog = el('dialog', 'ui-dialog');
   dialog.setAttribute('aria-labelledby', 'ui-dialog-title');
   dialog.innerHTML = '<div class="ui-dialog-head"><h2 id="ui-dialog-title"></h2><button type="button" class="ui-dialog-close" aria-label="Close" data-dialog-close>×</button></div><div class="ui-dialog-body" tabindex="-1"></div>';

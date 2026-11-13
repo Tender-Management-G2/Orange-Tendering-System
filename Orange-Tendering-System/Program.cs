@@ -62,6 +62,7 @@ builder.Services.AddScoped<AiChatService>();
 builder.Services.AddScoped<ClarificationService>();
 builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<ReportExport>();
+builder.Services.AddScoped<Orange_Tendering_System.Areas.TopCommittee.Services.TopCommitteeService>();
 builder.Services.Configure<ReportSigningOptions>(builder.Configuration.GetSection("ReportSigning"));
 builder.Services.Configure<ReportRevisionPolicy>(builder.Configuration.GetSection("ReportRevisionPolicy"));
 builder.Services.Configure<ReportPdfOptions>(builder.Configuration.GetSection("ReportPdf"));
