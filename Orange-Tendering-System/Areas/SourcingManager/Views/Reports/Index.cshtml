@@ -157,6 +157,16 @@
                                    class="btn btn-primary btn-sm">
                                     Review
                                 </a>
+                                @if (report.Status == ReportStatus.Accepted)
+                                {
+                                    <a asp-area="SourcingManager"
+                                       asp-controller="Reports"
+                                       asp-action="Forward"
+                                       asp-route-id="@report.Id"
+                                       class="btn btn-outline-secondary btn-sm">
+                                        Forward
+                                    </a>
+                                }
                             </td>
                         </tr>
                     }

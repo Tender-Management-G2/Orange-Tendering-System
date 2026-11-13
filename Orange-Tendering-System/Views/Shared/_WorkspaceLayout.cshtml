@@ -38,6 +38,10 @@ until implemented. Notifications link to the shared page shell.
     var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
     var label = workspace?.Label ?? "Workspace";
     var pageTitle = ViewData["Title"]?.ToString() ?? $"{label} workspace";
+    var isSourcingManager = string.Equals(
+        workspace?.Role,
+        "Sourcing Manager",
+        StringComparison.OrdinalIgnoreCase);
 }
 <!doctype html>
 <html lang="en">
@@ -67,10 +71,35 @@ until implemented. Notifications link to the shared page shell.
     <div class="ws-stage">
         <header class="ws-topbar">
             <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
-            @* TODO (UNASSIGNED — Voice Search, mandatory feature): connect search + SpeechRecognition here and on Tasks/Index. *@
-            <div class="ws-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Workspace search is not available yet" disabled title="Search is not implemented yet" /></div>
+            @if (isSourcingManager)
+            {
+                <form class="ws-search"
+                      asp-area="SourcingManager"
+                      asp-controller="Reports"
+                      asp-action="Index"
+                      method="get"
+                      data-sourcing-manager-search>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg>
+                    <input id="sourcing-manager-search"
+                           type="search"
+                           name="search"
+                           placeholder="Search Sourcing Manager reports…"
+                           aria-label="Search Sourcing Manager reports" />
+                </form>
+            }
+            else
+            {
+                <div class="ws-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Workspace search is not available yet" disabled title="Search is not implemented yet" /></div>
+            }
             <div class="ws-topbar-actions">
-                <button type="button" class="ws-icon-button ws-utility-disabled" disabled aria-label="Voice search is not implemented yet" title="Voice search is not implemented yet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                @if (isSourcingManager)
+                {
+                    <button type="button" class="ws-icon-button" data-sourcing-manager-voice-search aria-label="Search reports by voice" title="Search reports by voice"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                }
+                else
+                {
+                    <button type="button" class="ws-icon-button ws-utility-disabled" disabled aria-label="Voice search is not implemented yet" title="Voice search is not implemented yet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                }
                 <a class="ws-icon-button" asp-area="" asp-controller="Notifications" asp-action="Index" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg></a>
                 <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
                 <partial name="_WorkspaceAccountMenu" />

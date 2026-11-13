@@ -32,6 +32,20 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
             return View(report);
         }
 
+        // Sidebar destination for reports that have arrived for managerial review.
+        [HttpGet]
+        public IActionResult Pending()
+        {
+            return RedirectToAction(nameof(Index), new { status = ReportStatus.Submitted.ToString() });
+        }
+
+        // Sidebar destination for accepted reports that can be sent to the Top Committee.
+        [HttpGet]
+        public IActionResult Forwarding()
+        {
+            return RedirectToAction(nameof(Index), new { status = ReportStatus.Accepted.ToString() });
+        }
+
         // Review Unified Evaluation Report — Owner: Haya · Trello: Review Unified Evaluation Report (https://trello.com/c/IKQ7sZwo)
         // GET /SourcingManager/Reports/Review/{id?}. TODO: load the record by id (NotFound when missing) and check access.
 
@@ -41,13 +55,15 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
         {
             if (id == null)
             {
-                return NotFound();
+                return RedirectToAction(nameof(Index));
             }
 
             var report = await _context.TenderReports
                 .Include(r => r.TenderRound)
                     .ThenInclude(tr => tr.Tender)
                 .Include(r => r.RecommendedBid)
+                .ThenInclude(b => b!.TenderInvitation)
+                .ThenInclude(i => i.Supplier)
                 .Include(r => r.CreatedByUser)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r =>
@@ -323,7 +339,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
         {
             if (id == null)
             {
-                return NotFound();
+                return RedirectToAction(nameof(Index));
             }
 
 

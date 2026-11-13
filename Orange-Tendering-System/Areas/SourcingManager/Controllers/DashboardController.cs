@@ -59,6 +59,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
             var rejected = CountReports(ReportStatus.Rejected);
             var returned = CountReports(ReportStatus.Returned);
 
+
             // Reports waiting for manager review
             var pendingReports = await _context.TenderReports
                 .Include(r => r.TenderRound)
@@ -67,6 +68,22 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                     r.ReportType == ReportType.FullEvaluation &&
                     r.Status == ReportStatus.Submitted)
                 .OrderByDescending(r => r.SubmittedAt)
+                .Take(5)
+                .AsNoTracking()
+                .ToListAsync();
+
+            // Accepted reports that have not been forwarded yet
+            var acceptedReports = await _context.TenderReports
+                .Include(r => r.TenderRound)
+                    .ThenInclude(tr => tr.Tender)
+                .Where(r =>
+                    r.ReportType == ReportType.FullEvaluation &&
+                    r.Status == ReportStatus.Accepted &&
+                    !_context.TenderReports.Any(s =>
+                        s.ReportType == ReportType.ExecutiveSummary &&
+                        s.PreviousReportId == r.Id &&
+                        s.Status == ReportStatus.Submitted))
+                .OrderByDescending(r => r.ReviewedAt)
                 .Take(5)
                 .AsNoTracking()
                 .ToListAsync();
@@ -88,8 +105,11 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 .Select(r => new DashboardTask(
                     $"Review Report #{r.Id}",
                     r.TenderRound.Tender.Title,
-                    "Pending Review"
-                ))
+                    "Pending Review"))
+                .Concat(acceptedReports.Select(r => new DashboardTask(
+                    $"Forward Report #{r.Id}",
+                    r.TenderRound.Tender.Title,
+                    "Ready to Forward")))
                 .ToList();
 
             var activities = recentDecisions

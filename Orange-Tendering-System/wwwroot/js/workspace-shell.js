@@ -74,4 +74,37 @@
   const account=body.querySelector('.ws-account');
   document.addEventListener('click',event=>{if(account&&!account.contains(event.target))account.open=false;});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&account?.open){account.open=false;account.querySelector('summary').focus();}});
+
+  const voiceButton=body.querySelector('[data-sourcing-manager-voice-search]');
+  const reportSearch=body.querySelector('#sourcing-manager-search');
+  const reportSearchForm=body.querySelector('[data-sourcing-manager-search]');
+  if(voiceButton&&reportSearch&&reportSearchForm){
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const announce=message=>{const status=document.querySelector('#workspace-theme-status');if(status)status.textContent=message;};
+    if(!SpeechRecognition){
+      voiceButton.disabled=true;
+      voiceButton.title='Voice search is not supported by this browser';
+      announce('Voice search is not supported by this browser.');
+    }else{
+      const recognition=new SpeechRecognition();
+      recognition.lang='en-US';
+      recognition.interimResults=false;
+      recognition.maxAlternatives=1;
+      recognition.addEventListener('start',()=>{voiceButton.setAttribute('aria-pressed','true');voiceButton.title='Listening…';announce('Listening for a report search.');});
+      recognition.addEventListener('result',event=>{
+        const query=event.results[0][0].transcript.trim();
+        if(!query)return;
+        reportSearch.value=query;
+        announce(`Searching reports for ${query}.`);
+        reportSearchForm.requestSubmit();
+      });
+      recognition.addEventListener('error',event=>{
+        const message=event.error==='not-allowed'?'Microphone permission was not granted.':'Voice search could not understand that. Please try again.';
+        announce(message);
+        voiceButton.title=message;
+      });
+      recognition.addEventListener('end',()=>{voiceButton.setAttribute('aria-pressed','false');voiceButton.title='Search reports by voice';});
+      voiceButton.addEventListener('click',()=>{try{recognition.start();}catch{announce('Voice search is already listening.');}});
+    }
+  }
 })();

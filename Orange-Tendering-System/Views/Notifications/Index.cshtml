@@ -30,6 +30,7 @@ STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 ===========================================================
 *@
+@model IReadOnlyList<Orange_Tendering_System.Models.Entities.Notification>
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Notifications";
@@ -37,29 +38,95 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
     ViewData["Description"] = "Messages about workflow events that concern you.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search notifications" aria-label="Search notifications" disabled />
-    <select aria-label="Show" disabled><option>Show: All</option><option>Show: Unread</option><option>Show: Read</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+@if (!User.IsInRole("Sourcing Manager"))
+{
+    <partial name="_ScaffoldNotice" />
+}
+
+@if (User.IsInRole("Sourcing Manager"))
+{
+    <form method="get" asp-controller="Notifications" asp-action="Index" class="pg-toolbar" aria-label="Search and filters">
+        <input type="search" name="search" value="@ViewBag.Search" placeholder="Search notifications" aria-label="Search notifications" />
+        <select name="status" aria-label="Show">
+            <option value="" selected="@(string.IsNullOrWhiteSpace(ViewBag.Status as string))">Show: All</option>
+            <option value="Unread" selected="@(string.Equals(ViewBag.Status as string, "Unread", StringComparison.OrdinalIgnoreCase))">Unread</option>
+            <option value="Read" selected="@(string.Equals(ViewBag.Status as string, "Read", StringComparison.OrdinalIgnoreCase))">Read</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Reset</a>
+    </form>
+}
+else
+{
+    <section class="pg-toolbar" aria-label="Search and filters">
+        <input type="search" placeholder="Search notifications" aria-label="Search notifications" disabled />
+        <select aria-label="Show" disabled><option>Show: All</option><option>Show: Unread</option><option>Show: Read</option></select>
+        <span class="pg-hint">Search and filters are not implemented yet.</span>
+    </section>
+}
 
 <section class="ws-panel pg-panel" aria-labelledby="tbl-notifications">
     <div class="pg-panel-head"><h2 id="tbl-notifications">Notifications</h2></div>
     <div class="pg-table-wrap">
         <table class="pg-table">
             <thead><tr><th scope="col">Title</th><th scope="col">Message</th><th scope="col">Received</th><th scope="col">Status</th><th scope="col">Link</th></tr></thead>
-            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"You have no notifications."' /></td></tr></tbody>
+            <tbody>
+                @if (User.IsInRole("Sourcing Manager") && Model.Count > 0)
+                {
+                    @foreach (var notification in Model)
+                    {
+                        <tr>
+                            <td>@notification.Title</td>
+                            <td>@notification.Message</td>
+                            <td>@notification.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@(notification.IsRead ? "Read" : "Unread")</td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(notification.Link))
+                                {
+                                    <a asp-controller="Notifications"
+                                       asp-action="Open"
+                                       asp-route-id="@notification.Id">Open</a>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr><td colspan="5"><partial name="_EmptyState" model='"You have no notifications."' /></td></tr>
+                }
+            </tbody>
         </table>
     </div>
 </section>
 
 <section class="ws-panel pg-panel">
     <h2>Bulk actions</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Mark all as read</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
+    @if (User.IsInRole("Sourcing Manager"))
+    {
+        <form asp-controller="Notifications" asp-action="MarkAllRead" method="post" class="pg-form">
+            @Html.AntiForgeryToken()
+            <div class="pg-actions">
+                <button type="submit" class="pg-btn pg-btn-primary" disabled="@(!Model.Any(notification => !notification.IsRead))">Mark all as read</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <form class="pg-form">
+            <fieldset disabled>
+                <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Mark all as read</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
+            </fieldset>
+        </form>
+    }
 </section>

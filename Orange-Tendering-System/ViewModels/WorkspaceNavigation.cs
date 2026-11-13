@@ -81,9 +81,9 @@ namespace Orange_Tendering_System.ViewModels
             new("SourcingManager", "Sourcing Manager", SystemRoles.SourcingManager,
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
-                new("Pending Reports", "Reports", "Index", "request"),
-                new("Report Review", "Reports", "Review", "check"),
-                new("Forwarding", "Reports", "Forward", "send"),
+                new("Pending Reports", "Reports", "Pending", "request"),
+                new("Report Review", "Reports", "Pending", "check"),
+                new("Forwarding", "Reports", "Forwarding", "send"),
                 new("Decision History", "Reports", "History", "history"),
                 new("Analytics & Exports", "Analytics", "Index", "chart", "")
             ]),
