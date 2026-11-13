@@ -22,9 +22,11 @@ ROUTE: /SourcingOfficer/Tenders/Committees/{id?}
 FUTURE IMPLEMENTATION:
 - Decide who assigns committees (Sourcing Officer or Admin)
   and move/authorize the page accordingly.
-- Store the member responsibility — needs a small schema
-  decision (see docs/FINAL_SCAFFOLD_AND_DATABASE_AUDIT.md,
-  CommitteeMember finding).
+- Store the Evaluation seat in
+  CommitteeMember.Responsibility (SourcingManager,
+  DepartmentRepresentative, FinancialRepresentative,
+  TechnicalRepresentative; null for Top). The filtered
+  unique index already allows each seat once per tender.
 - Validate exactly 4 per committee, the 4 Evaluation
   responsibilities, and no overlap; freeze membership once a
   committee round has votes.

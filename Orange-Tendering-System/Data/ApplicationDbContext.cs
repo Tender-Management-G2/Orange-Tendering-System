@@ -55,6 +55,27 @@ namespace Orange_Tendering_System.Data
             builder.Entity<Supplier>()
                 .HasOne(s => s.ReviewedByUser).WithMany().HasForeignKey(s => s.ReviewedByUserId);
 
+            // One person per Evaluation Committee responsibility within a tender. Top Committee members leave
+            // Responsibility null, so the filter ignores them.
+            builder.Entity<CommitteeMember>()
+                .HasIndex(m => new { m.TenderId, m.CommitteeType, m.Responsibility })
+                .IsUnique()
+                .HasFilter("[Responsibility] IS NOT NULL");
+
+            // A document belongs to exactly one owner: supplier, purchase request, tender, bid,
+            // clarification message or report.
+            builder.Entity<Document>().ToTable(t => t.HasCheckConstraint("CK_Documents_ExactlyOneOwner",
+                "(CASE WHEN [SupplierId] IS NULL THEN 0 ELSE 1 END" +
+                " + CASE WHEN [PurchaseRequestId] IS NULL THEN 0 ELSE 1 END" +
+                " + CASE WHEN [TenderId] IS NULL THEN 0 ELSE 1 END" +
+                " + CASE WHEN [BidId] IS NULL THEN 0 ELSE 1 END" +
+                " + CASE WHEN [ClarificationMessageId] IS NULL THEN 0 ELSE 1 END" +
+                " + CASE WHEN [TenderReportId] IS NULL THEN 0 ELSE 1 END) = 1"));
+
+            // A clarification is always about a purchase request, a tender or a bid.
+            builder.Entity<Clarification>().ToTable(t => t.HasCheckConstraint("CK_Clarifications_HasContext",
+                "[PurchaseRequestId] IS NOT NULL OR [TenderId] IS NOT NULL OR [BidId] IS NOT NULL"));
+
             // Protect history: deleting a record never cascades into other domain records.
             // (Identity's own tables keep their default cascade behavior.)
             var domainForeignKeys = builder.Model.GetEntityTypes()

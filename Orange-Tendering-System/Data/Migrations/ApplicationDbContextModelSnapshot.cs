@@ -466,7 +466,10 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.HasIndex("ToUserId");
 
-                    b.ToTable("Clarifications");
+                    b.ToTable("Clarifications", t =>
+                        {
+                            t.HasCheckConstraint("CK_Clarifications_HasContext", "[PurchaseRequestId] IS NOT NULL OR [TenderId] IS NOT NULL OR [BidId] IS NOT NULL");
+                        });
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.ClarificationMessage", b =>
@@ -516,6 +519,10 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("Responsibility")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<int>("TenderId")
                         .HasColumnType("int");
 
@@ -529,6 +536,10 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.HasIndex("TenderId", "UserId")
                         .IsUnique();
+
+                    b.HasIndex("TenderId", "CommitteeType", "Responsibility")
+                        .IsUnique()
+                        .HasFilter("[Responsibility] IS NOT NULL");
 
                     b.ToTable("CommitteeMembers");
                 });
@@ -738,7 +749,10 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.HasIndex("VerifiedByUserId");
 
-                    b.ToTable("Documents");
+                    b.ToTable("Documents", t =>
+                        {
+                            t.HasCheckConstraint("CK_Documents_ExactlyOneOwner", "(CASE WHEN [SupplierId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [PurchaseRequestId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TenderId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [BidId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [ClarificationMessageId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TenderReportId] IS NULL THEN 0 ELSE 1 END) = 1");
+                        });
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.EvaluationCriterion", b =>

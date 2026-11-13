@@ -24,10 +24,11 @@ Paths below are relative to the project folder `Orange-Tendering-System/` unless
   tender details/edit, committee assignment, the Officer report lifecycle, report/export pages, supplier
   registration fields and several technical/financial evaluation fields. One page contradicted the spec (the
   Manager could edit the Officer's submitted report). All are fixed now (§4).
-- **Database:** adequate for the whole workflow. One small schema gap (committee member responsibility, §7) and a
-  few recommended CHECK constraints; everything else is application logic. **No redesign is needed.**
-- **Must happen before feature work:** seed the seven roles; assign owners to the Supplier portal, Officer
-  reports, committee assignment, analytics, My Tasks/voice search; decide the committee-responsibility column.
+- **Database:** adequate for the whole workflow. The one small schema gap (committee member responsibility) and the
+  two recommended CHECK constraints were **applied on 13 Nov 2026** (§11); everything else is application logic.
+  **No redesign is needed.**
+- **Must happen before feature work:** seed the seven roles (Ahmad); assign owners to the Supplier portal, Officer
+  reports, committee assignment, analytics, My Tasks/voice search; decide who assigns committees.
 
 ## 3. Workflow coverage (spec §4)
 
@@ -117,6 +118,8 @@ Top Committee "assigned final decisions" are listed on its Dashboard (Doulat's c
 
 ## 6. Database inventory (verified on live SQL Server, read-only)
 
+*State at the audit (before §11). The current state is in §11.*
+
 - **30 tables** = **22 domain** + **7 Identity** + **1** `__EFMigrationsHistory`.
 - Domain: `AuditLogs`, `BidItems`, `Bids`, `ClarificationMessages`, `Clarifications`, `CommitteeMembers`,
   `CommitteeRounds`, `CommitteeVotes`, `Departments`, `Documents`, `EvaluationCriteria`, `EvaluationScores`,
@@ -138,13 +141,14 @@ Top Committee "assigned final decisions" are listed on its Dashboard (Doulat's c
 ## 7. Database findings
 
 Severity: **A** critical schema gap · **B** recommended constraint/index · **C** application-logic rule ·
-**D** deferred until a design decision · **E** no issue. Nothing below was changed; these are recommendations.
+**D** deferred until a design decision · **E** no issue. The finding A and the two `Document` / `Clarification`
+B findings were approved and **applied** (§11); everything else below is unchanged and remains a recommendation.
 
 | Sev. | Entity / relationship | Problem | Impact | Smallest recommendation | Schema change? |
 |---|---|---|---|---|---|
-| **A** (small) | `CommitteeMember` (`TenderId`, `CommitteeType`, `UserId`, `AssignedAt`) | The confirmed Evaluation composition — Sourcing Manager, Department, **Financial** and **Technical** representatives (spec §4.5) — cannot be recorded. Financial and Technical members share the "Evaluation Committee" role and the responsibility is per tender, so roles or claims cannot express it. | Cannot validate or display the required composition; cannot later give members different criteria subsets (open decision). | Add a nullable enum `CommitteeMember.Responsibility` (`SourcingManager`, `DepartmentRepresentative`, `FinancialRepresentative`, `TechnicalRepresentative`) + filtered unique index `(TenderId, CommitteeType, Responsibility)`. One small migration, before committee assignment is built. | Yes — 1 nullable column + 1 index |
-| B | `Document` (6 nullable owner FKs) | Exactly one owner is not enforced (spec §7.2 already flags it). | A file could belong to two contexts → wrong access check, possible cross-supplier exposure. | CHECK: number of non-null `SupplierId, PurchaseRequestId, TenderId, BidId, ClarificationMessageId, TenderReportId` = 1. Add before uploads are implemented. | Yes — CHECK only |
-| B | `Clarification` (`PurchaseRequestId?`, `TenderId?`, `BidId?`) | A thread can have no context. | Unscoped threads break role/stage authorization. | CHECK: at least one context column is not null. | Yes — CHECK only |
+| **A** (small) — ✅ applied | `CommitteeMember` (`TenderId`, `CommitteeType`, `UserId`, `AssignedAt`) | The confirmed Evaluation composition — Sourcing Manager, Department, **Financial** and **Technical** representatives (spec §4.5) — cannot be recorded. Financial and Technical members share the "Evaluation Committee" role and the responsibility is per tender, so roles or claims cannot express it. | Cannot validate or display the required composition; cannot later give members different criteria subsets (open decision). | Add a nullable enum `CommitteeMember.Responsibility` (`SourcingManager`, `DepartmentRepresentative`, `FinancialRepresentative`, `TechnicalRepresentative`) + filtered unique index `(TenderId, CommitteeType, Responsibility)`. One small migration, before committee assignment is built. | Yes — 1 nullable column + 1 index |
+| B — ✅ applied | `Document` (6 nullable owner FKs) | Exactly one owner is not enforced (spec §7.2 already flags it). | A file could belong to two contexts → wrong access check, possible cross-supplier exposure. | CHECK: number of non-null `SupplierId, PurchaseRequestId, TenderId, BidId, ClarificationMessageId, TenderReportId` = 1. Add before uploads are implemented. | Yes — CHECK only |
+| B — ✅ applied | `Clarification` (`PurchaseRequestId?`, `TenderId?`, `BidId?`) | A thread can have no context. | Unscoped threads break role/stage authorization. | CHECK: at least one context column is not null. | Yes — CHECK only |
 | B | Quantities, prices, costs, scores, numbers | No positive/range checks (`BidItems.UnitPrice`, `Bids.*Cost`, `*.Quantity`, `EvaluationScores.Score`, `RoundNumber`, `VersionNumber`, …). | Bad data possible if a service misses validation. | Optional CHECKs (`Quantity > 0`, prices/costs ≥ 0, numbers ≥ 1). Services must validate anyway. | Optional |
 | C | Minimum-offer gate | 3 distinct submitted suppliers per round (or 2 after the allowed failures) is not a constraint. | — | Service: count distinct `TenderInvitation.SupplierId` with a Submitted `Bid` in the round; unique `(TenderRoundId, SupplierId)` already makes "distinct" reliable. | No |
 | C | `CommitteeVote` / `EvaluationScore` context | FKs do not prove that member, round, criterion and bid belong to the same tender and committee type, or that the bid is compliant. | — | Service checks before every vote/score. | No |
@@ -162,8 +166,8 @@ Severity: **A** critical schema gap · **B** recommended constraint/index · **C
 
 ## 8. Answers to the ten database questions
 
-1. **Documents — exactly one owner?** Yes, it should. Today six nullable FKs exist and nothing enforces it
-   (`Document.SupplierId … TenderReportId`). Add the CHECK in finding B before uploads go live.
+1. **Documents — exactly one owner?** Yes. Six nullable FKs exist (`Document.SupplierId … TenderReportId`);
+   **now enforced** by `CK_Documents_ExactlyOneOwner` (§11). Download authorization remains application logic.
 2. **Request snapshots sufficient?** Yes. `PurchaseRequestReview.SubmittedSnapshotJson` (required) per
    `SubmissionNumber` preserves title, justification, priority, date and all items. Attachments are linked to the
    request (`Document.PurchaseRequestId`), not to a submission — the snapshot should list document ids/names and
@@ -176,7 +180,8 @@ Severity: **A** critical schema gap · **B** recommended constraint/index · **C
    restricted deletes; a rejection leads to a new `CommitteeRound` (`RoundNumber`), so old votes stay. The 4/4
    rule itself is C.
 5. **Separate committee membership?** Separation: yes, enforced by the unique `(TenderId, UserId)` index. Exactly
-   four: C. Required responsibilities (Manager / Department / Financial / Technical): **not representable** — finding A.
+   four: C. Required responsibilities (Manager / Department / Financial / Technical): **now stored** in
+   `CommitteeMember.Responsibility`, one person per responsibility per tender (filtered unique index, §11).
 6. **Manager decision on the exact version?** Yes. `TenderReport.ReviewedByUserId`, `ReviewComment`, `ReviewedAt`
    and `Status` are on each version row; corrections are new rows linked by `PreviousReportId`.
 7. **Award history?** Derivable: `Tender.AwardedBidId` + `AwardedAt`, the Approved Top `CommitteeRound` (its
@@ -199,7 +204,7 @@ four evaluators but reviews separately; submitted reports immutable; optional fe
 from the brief's illustrative statuses (spec §6).
 
 Genuine gaps or open conflicts found:
-1. Committee member responsibility cannot be stored (finding A).
+1. ~~Committee member responsibility cannot be stored (finding A).~~ Resolved in §11.
 2. Who assigns committees (Sourcing Officer or Admin) is not defined anywhere.
 3. Coverage against the original DOCX could not be verified directly (file unavailable).
 4. Contact form: still a 501 placeholder; storage/delivery decision open (spec §21).
@@ -207,13 +212,39 @@ Genuine gaps or open conflicts found:
 
 ## 10. Decisions needed before implementation
 
-1. Approve (or reject) the `CommitteeMember.Responsibility` column — finding A.
-2. Who assigns committees — Sourcing Officer or Admin.
+1. ~~Approve the `CommitteeMember.Responsibility` column~~ — approved and applied (§11).
+2. Who assigns committees — Sourcing Officer or Admin (**still open**).
 3. Whether the initial tender round counts among the "three unsuccessful attempts".
 4. Scoring method, scale, per-member aggregation, price normalization, ties (spec §21).
 5. Owners for the unassigned work in §5.
-6. Whether to add the B-level CHECK constraints in one small migration (recommended before file uploads).
+6. ~~Document / Clarification CHECK constraints~~ — applied (§11). Optional positive-value CHECKs remain a
+   recommendation only.
 7. Biometric approach; Ollama retention; item changes between rounds; multi-currency policy.
-8. **`CLAUDE.md`:** it contains only safe, team-wide engineering instructions (no secrets or local paths), so
+8. How a Sourcing Manager enters the Evaluation workspace: hold both `Sourcing Manager` and `Evaluation Committee`
+   roles, or let the evaluation pages accept a Sourcing Manager with an assigned `Responsibility = SourcingManager`
+   seat (see Ahmad's checklist in `docs/TEAM_HANDOFF.md`).
+9. **`CLAUDE.md`:** it contains only safe, team-wide engineering instructions (no secrets or local paths), so
    tracking it in Git would help every developer. It is ignored today at the project owner's explicit request;
    that rule was kept. Re-enable tracking only if the team agrees.
+
+## 11. Database preparation applied (13 Nov 2026)
+
+Migration **`20261113000510_AddCommitteeResponsibilityAndOwnershipChecks`** — additive only (no column dropped or
+altered, no data touched). Applied to the local development database `OrangeTenderingSystem` on `localhost` after
+confirming the target, the existing migration history and that the affected tables were empty.
+
+| Change | Code | Database object |
+|---|---|---|
+| Evaluation responsibility | `Models/Entities/Enums.cs`: `CommitteeResponsibility { SourcingManager, DepartmentRepresentative, FinancialRepresentative, TechnicalRepresentative }`; `CommitteeMember.Responsibility` (`CommitteeResponsibility?`) | `CommitteeMembers.Responsibility nvarchar(30) NULL` (string-backed like every enum) |
+| One person per responsibility | `ApplicationDbContext`: `HasIndex(TenderId, CommitteeType, Responsibility).IsUnique().HasFilter("[Responsibility] IS NOT NULL")` | `IX_CommitteeMembers_TenderId_CommitteeType_Responsibility` (unique, filtered). Top Committee rows keep `NULL` and are ignored. The existing unique `IX_CommitteeMembers_TenderId_UserId` (no person on both committees of a tender) is unchanged. |
+| Document has exactly one owner | `ApplicationDbContext`: `ToTable(t => t.HasCheckConstraint("CK_Documents_ExactlyOneOwner", …))` | `CK_Documents_ExactlyOneOwner`: exactly one of `SupplierId`, `PurchaseRequestId`, `TenderId`, `BidId`, `ClarificationMessageId`, `TenderReportId` is not null |
+| Clarification has a context | `ApplicationDbContext`: `ToTable(t => t.HasCheckConstraint("CK_Clarifications_HasContext", …))` | `CK_Clarifications_HasContext`: `PurchaseRequestId`, `TenderId` or `BidId` is not null |
+
+**Verified afterwards (live SQL Server):** 30 tables (22 domain + 7 Identity + `__EFMigrationsHistory`);
+4 migrations in `__EFMigrationsHistory`; 59 foreign keys (unchanged); 13 unique non-Identity indexes (12 + 1);
+2 CHECK constraints, both trusted; `dotnet ef migrations has-pending-model-changes`: none; build succeeded.
+
+Still application logic (not constraints): exactly four members per committee; all four Evaluation responsibilities
+present; Top Committee members have no responsibility; the person in the `SourcingManager` seat actually holds the
+`Sourcing Manager` role. No scoring method was added — `EvaluationCriterion.Weight`/`MaxScore` and
+`CommitteeRound.TechnicalWeight`/`FinancialWeight` stay nullable for the committee's future rubric.

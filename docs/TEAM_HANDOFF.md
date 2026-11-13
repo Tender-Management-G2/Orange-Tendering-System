@@ -61,6 +61,37 @@ preview). Never edit committee scores or votes. Decisions are stored on the exac
 Already done in this scaffold: `Program.cs` now calls `.AddRoles<IdentityRole>()` — without it role checks never pass.
 Rules: one authentication system (Identity); no fake biometric checks; no static photo as face verification.
 
+### Ahmad's checklist — roles, initial Admin and accounts (blocks the whole team)
+
+None of this exists yet; nothing is seeded. Tick each item only when it works against a real database.
+
+1. **Seed the seven roles** idempotently at startup (or via an explicit command) from `Models/SystemRoles.cs`:
+   `Admin`, `Requesting Department`, `Sourcing Officer`, `Supplier`, `Evaluation Committee`, `Sourcing Manager`,
+   `Top Committee` — exact spelling, including spaces. Never create them by hand with different names.
+2. **Initial Admin, securely:** create it only from values the developer supplies at run time (user secrets or
+   environment variables), never from a password in Git, `appsettings*.json`, a migration or a seeder. Refuse to
+   run if no password is supplied; do not silently promote an existing account.
+3. **Admin creates internal employees** (`Areas/Admin/Users/Create`): `FullName`, email, `DepartmentId`,
+   `IsActive`, temporary password handled securely; public registration must never create employees.
+4. **Admin assigns and removes roles** (`Areas/Admin/Users/Edit`, `Roles/Index`) with `UserManager`; audit each
+   change; keep at least one active Admin.
+5. **Activate / deactivate** with `ApplicationUser.IsActive` (never delete users who have history); block sign-in
+   for inactive users and refresh the security stamp so existing cookies stop working.
+6. **Supplier registration → approval:** Register creates the account + a `Pending` `Supplier` + legal
+   `Documents` + the `Supplier` role in one transaction; sign-in or participation is blocked until Admin sets the
+   supplier to `Approved` (Rjoub builds the review page).
+7. **Login redirect:** after sign-in, send each user to their workspace (`Views/Workspace/Index` lists them).
+8. **Global role ≠ committee seat.** The `Evaluation Committee` and `Top Committee` roles only let a user open those
+   workspaces. Scoring and voting on a tender additionally require a `CommitteeMember` row for **that tender**
+   (`CommitteeType`, and for Evaluation the `Responsibility`: SourcingManager, DepartmentRepresentative,
+   FinancialRepresentative, TechnicalRepresentative). Every vote/score check must use the assignment, not the role.
+9. **The Sourcing Manager sits on the Evaluation Committee without losing the Sourcing Manager role.** Give that
+   user both `Sourcing Manager` and `Evaluation Committee` roles (or let the Evaluation workspace accept a
+   Sourcing Manager who has a `CommitteeMember` row with `Responsibility = SourcingManager`). The separate
+   managerial review stage still uses the `Sourcing Manager` role. Decide one approach and document it.
+10. **Demo accounts:** follow [DEMO_DATA_PLAN.md](DEMO_DATA_PLAN.md); passwords are set locally by each developer,
+    never committed.
+
 ## Developer 4 — Amal (Tender Management)
 
 Files: `Areas/SourcingOfficer/Views/Dashboard/Index`, `PurchaseRequests/Index`, `Tenders/Index`, `Details`, `Edit`
@@ -108,8 +139,10 @@ Admin has no committee vote.
 - **Officer Reports (7 pages)** — `Areas/SourcingOfficer/Views/Reports/Index`, `Comparison`, `Details`,
   `EvaluationResult`, `SubmitToManager`, `Returned`, `History`. Without them the report hand-offs between Officer,
   committee and Manager cannot be demonstrated.
-- **Committee Assignment** — `Areas/SourcingOfficer/Views/Tenders/Committees`. Also needs a **business-role decision**
-  (Sourcing Officer or Admin) and a small schema decision for member responsibility (see the audit report).
+- **Committee Assignment** — `Areas/SourcingOfficer/Views/Tenders/Committees`. The schema is ready
+  (`CommitteeMember.Responsibility`, migration `AddCommitteeResponsibilityAndOwnershipChecks`). **Unresolved
+  product-owner decision:** who may assign committee members — Sourcing Officer or Admin. The page sits in the
+  Sourcing Officer area only until that is decided.
 - **Assigned Evaluations** — `Areas/EvaluationCommittee/Views/Evaluations/Index` (committee entry point).
 - **Reports, Analytics & Exports (6 pages)** — `Views/Analytics/*` (purchase requests, tenders, suppliers, bids &
   evaluation, governance; PDF/Excel entry points).

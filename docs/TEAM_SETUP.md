@@ -50,7 +50,7 @@ Run these commands in PowerShell. Each developer uses their own local database. 
    SELECT name FROM sys.tables ORDER BY name;
    ```
 
-   Expect three migration rows and 30 tables, including the seven `AspNet*` tables. Re-running `dotnet ef database update` should report that the database is already up to date.
+   Expect four migration rows and 30 tables, including the seven `AspNet*` tables. Re-running `dotnet ef database update` should report that the database is already up to date.
 
 5. Launch the MVC app:
 
