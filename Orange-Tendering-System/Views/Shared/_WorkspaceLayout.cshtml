@@ -84,12 +84,14 @@ bell (SignalR), modal host and table kit (wwwroot/js/orange-ui.js).
         </main>
         <footer class="ws-internal-footer"><span>© @DateTime.UtcNow.Year Sourcing &amp; Tender Management System · Academic project</span><a asp-area="" asp-controller="Home" asp-action="HowItWorks">How the workflow works ↗</a></footer>
     </div>
+    <partial name="_AiChatWidget" />
     <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
     <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
     <script src="~/js/vendor/signalr.min.js" asp-append-version="true"></script>
     <script src="~/js/notification-bell.js" asp-append-version="true"></script>
     <partial name="_JQueryScripts" />
     <script src="~/js/orange-ui.js" asp-append-version="true"></script>
+    <script src="~/js/ai-chat.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

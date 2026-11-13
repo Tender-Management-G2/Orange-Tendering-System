@@ -42,6 +42,14 @@ namespace Orange_Tendering_System.Data
         public DbSet<UserPasskeyCredential> UserPasskeyCredentials => Set<UserPasskeyCredential>();
         public DbSet<FaceTemplate> FaceTemplates => Set<FaceTemplate>();
 
+        // Final decision relay (Top Committee -> Manager -> Officer -> Suppliers)
+        public DbSet<FinalDecisionNotice> FinalDecisionNotices => Set<FinalDecisionNotice>();
+        public DbSet<SupplierResultDelivery> SupplierResultDeliveries => Set<SupplierResultDelivery>();
+
+        // AI Chat Assistant (per-user history)
+        public DbSet<AiChatConversation> AiChatConversations => Set<AiChatConversation>();
+        public DbSet<AiChatMessage> AiChatMessages => Set<AiChatMessage>();
+
         private void ProtectReportHistory()
         {
             ChangeTracker.DetectChanges();
