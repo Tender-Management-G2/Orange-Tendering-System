@@ -58,6 +58,10 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     { UserId = actor.Id, EntityName = "Tender", EntityId = tenderId.ToString(), Action = action, NewValues = JsonSerializer.Serialize(evidence), CreatedAt = Now });
     private void Notify(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
     { UserId = userId, Title = title, Message = message, Link = $"/Workflow/Details/{tenderId}", CreatedAt = Now });
+    // Notification whose link opens the evaluation meeting page ("Join meeting") for the person it is sent to.
+    private void NotifyMeeting(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
+    { UserId = userId, Title = title, Message = message, Link = $"/Meetings/Join/{tenderId}", CreatedAt = Now });
+    private async Task NotifyOfficerMeeting(int tenderId, string message) => NotifyMeeting((await GlobalOfficer()).Id, tenderId, "Evaluation meeting scheduled", message);
     private async Task NotifyOfficer(int tenderId, string title, string message) => Notify((await GlobalOfficer()).Id, tenderId, title, message);
 
     // Every mutation of a tender takes the same SQL Server row lock, including bidding,
@@ -278,7 +282,8 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     public Task Setup(int id, SessionInput input, ClaimsPrincipal principal, string? zoomMeetingId = null) => Change(id, principal, "EvaluationScheduled", async (t, a) =>
     {
         var (r, w, bids, ai, members) = await SetupChecks(t, a, input);
-        Require(Uri.TryCreate(input.MeetingUrl, UriKind.Absolute, out var url) && url.Scheme == "https" && (url.Host == "zoom.us" || url.Host.EndsWith(".zoom.us", StringComparison.OrdinalIgnoreCase)) && input.MeetingUrl!.Length <= 1000, "Provide an HTTPS Zoom meeting link.");
+        Require(Uri.TryCreate(input.MeetingUrl, UriKind.Absolute, out var url) && url.Scheme == "https" && (url.Host == "zoom.us" || url.Host.EndsWith(".zoom.us", StringComparison.OrdinalIgnoreCase)
+            || (url.Host == "meet.jit.si" && url.AbsolutePath.StartsWith("/OrangeTender", StringComparison.Ordinal))) && input.MeetingUrl!.Length <= 1000, "Provide an HTTPS Zoom meeting link (or create the meeting automatically).");
         Require(zoomMeetingId == null || zoomMeetingId.Length <= 40, "Invalid Zoom meeting identifier.");
         var cr = new CommitteeRound { TenderRoundId = r.Id, CommitteeType = CommitteeType.Evaluation, RoundNumber = 1, StartedAt = Now, FinancialWeight = w.ApprovedFinancial, TechnicalWeight = w.ApprovedTechnical };
         cr.Criteria.Add(new EvaluationCriterion { Name = "Financial", Type = CriterionType.Financial, Weight = w.ApprovedFinancial, MaxScore = 100 });
@@ -289,8 +294,10 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             Invitations = members.Select(x => new EvaluationParticipation { CommitteeMemberId = x.Id, SentAt = Now }).ToList() };
         db.Add(session); t.Status = TenderStatus.Evaluation; r.Status = TenderRoundStatus.SentToEvaluation;
         var attachedDocuments = eligible.Sum(x => x.Documents.Count);
-        var meeting = zoomMeetingId != null ? $"Zoom meeting {zoomMeetingId} was created for this session." : "The Zoom link was supplied by the officer; no meeting was created through the Zoom API.";
-        foreach (var m in members) Notify(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {session.StartsAt:u} and closes automatically at {session.EndsAt:u}. {meeting} The reviewed AI analysis #{ai.Id} and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s) are attached on the tender page.");
+        var meeting = zoomMeetingId != null ? $"Zoom meeting {zoomMeetingId} was created for this session. Use Join meeting in this notification."
+            : input.MeetingUrl!.Contains("meet.jit.si") ? "The system created the video meeting room for this session. Use Join meeting in this notification at the scheduled time." : "The Zoom link was supplied by the officer; open it from the tender page.";
+        await NotifyOfficerMeeting(id, $"Evaluation meeting scheduled for {session.StartsAt:u}. {meeting}");
+        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {session.StartsAt:u} and closes automatically at {session.EndsAt:u}. {meeting} The reviewed AI analysis #{ai.Id} and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s) are attached on the tender page.");
         Audit(a, id, "EvaluationScheduleEvidence", new { r.RoundNumber, session.StartsAt, session.EndsAt, ZoomMeetingId = zoomMeetingId, AiAnalysisId = ai.Id, EligibleBidIds = eligible.Select(x => x.Id), AttachedDocuments = attachedDocuments, InvitedMemberIds = members.Select(x => x.Id) });
     });
     public Task SubmitEvaluation(int id, List<ScoreInput> scores, ClaimsPrincipal principal)

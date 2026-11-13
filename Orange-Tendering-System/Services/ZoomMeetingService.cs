@@ -102,7 +102,14 @@ public class EvaluationSchedulingService(TenderWorkflowService workflow, ZoomMee
 {
     public async Task Schedule(int tenderId, SessionInput input, ClaimsPrincipal principal, CancellationToken ct)
     {
-        if (!input.CreateZoomMeeting) { await workflow.Setup(tenderId, input, principal); return; }
+        // The system creates the join link by itself unless the officer pasted one: Zoom when it is configured, otherwise a private Jitsi room.
+        var automatic = input.CreateZoomMeeting || input.CreateJitsiMeeting || string.IsNullOrWhiteSpace(input.MeetingUrl);
+        if (!automatic) { await workflow.Setup(tenderId, input, principal); return; }
+        if (!(input.CreateZoomMeeting || zoom.Configured))
+        {
+            input.MeetingUrl = $"https://meet.jit.si/OrangeTender{tenderId}-{Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(10)).ToLowerInvariant()}";
+            await workflow.Setup(tenderId, input, principal); return;
+        }
         // Check every other precondition first so a meeting is not created for a request that cannot be saved.
         await workflow.ValidateSetup(tenderId, input, principal);
         var meeting = await zoom.Create($"Orange tender {tenderId} evaluation", input.StartsAt.UtcDateTime, input.EndsAt.UtcDateTime, ct);
