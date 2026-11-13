@@ -111,6 +111,8 @@ public static class UiFixture
         db.CommitteeMembers.Add(new CommitteeMember { TenderId = t2.Id, CommitteeType = CommitteeType.Evaluation, Responsibility = CommitteeResponsibility.TechnicalRepresentative, UserId = evaluator.Id, AssignedAt = now.AddDays(-20) });
         foreach (var tender in new[] { t3, t4 })
             db.CommitteeMembers.Add(new CommitteeMember { TenderId = tender.Id, CommitteeType = CommitteeType.Evaluation, Responsibility = CommitteeResponsibility.SourcingManager, UserId = manager.Id, AssignedAt = now.AddDays(-70) });
+        db.CommitteeMembers.Add(new CommitteeMember { TenderId = t3.Id, CommitteeType = CommitteeType.Evaluation, Responsibility = CommitteeResponsibility.TechnicalRepresentative, UserId = evaluator.Id, AssignedAt = now.AddDays(-75) });
+        db.CommitteeMembers.Add(new CommitteeMember { TenderId = t3.Id, CommitteeType = CommitteeType.Top, UserId = top.Id, AssignedAt = now.AddDays(-60) });
         db.Clarifications.Add(new Clarification { TenderId = t1.Id, FromUserId = sup2.Id, ToUserId = officer.Id, Subject = "Question about delivery site", Status = ClarificationStatus.Open, CreatedAt = now.AddHours(-5) });
 
         Notification N(ApplicationUser u, string title, string message, string link, bool read, int minutesAgo) => new() { UserId = u.Id, Title = title, Message = message, Link = link, IsRead = read, CreatedAt = now.AddMinutes(-minutesAgo) };
