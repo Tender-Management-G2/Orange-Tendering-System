@@ -1,21 +1,20 @@
 // ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: UNASSIGNED — Team assignment required
-// Module: Shared workflow / Voice Search
-// Purpose: MVC endpoints for the Tasks pages of the shared signed-in pages.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+// Module: Shared workflow
+// Purpose: My Tasks — the actionable work items of the signed-in internal role, computed from SQL Server by InternalDashboardService.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orange_Tendering_System.Services;
+using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Controllers
 {
     [Authorize]
-    public class TasksController : Controller
+    public class TasksController(InternalDashboardService dashboard) : Controller
     {
-        // My Tasks — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Tasks. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            var workspace = WorkspaceNavigation.Workspaces.FirstOrDefault(w => User.IsInRole(w.Role) && w.Area != "Supplier");
+            return View(workspace == null ? [] : await dashboard.TasksAsync(workspace.Role, User));
         }
     }
 }

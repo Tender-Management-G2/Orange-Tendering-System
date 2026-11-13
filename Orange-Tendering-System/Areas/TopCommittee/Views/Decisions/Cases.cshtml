@@ -1,0 +1,21 @@
+@model List<Orange_Tendering_System.Areas.TopCommittee.Services.TopCase>
+@{
+    var voting = ViewContext.RouteData.Values["action"]?.ToString() == "Decision";
+    ViewData["Title"] = voting ? "Voting" : "Evaluation Summary"; ViewData["WorkspaceSection"] = voting ? "Voting" : "Evaluation Summary";
+    ViewData["Description"] = voting ? "Tenders waiting for your final decision." : "Tenders assigned to you, with the results to review before deciding.";
+}
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>@(voting ? "Waiting for my decision" : "My tenders")</h2></div>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th scope="col">Tender</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col">Recommended supplier</th><th scope="col">My decision</th><th scope="col" data-nosort>Actions</th></tr></thead>
+        <tbody>
+        @foreach (var c in Model)
+        {
+            <tr><td><strong>@c.Title</strong></td><td>@c.Department</td><td>@c.Status</td><td>@(c.Winner ?? "—")</td><td>@(c.MyVote ?? (c.AwaitingMyVote ? "Not yet" : "—"))</td>
+                <td><a class="pg-btn @(c.AwaitingMyVote ? "pg-btn-primary" : "")" data-no-modal asp-action="@(voting ? "Decision" : "ReviewEvaluation")" asp-route-id="@c.TenderId">@(voting ? "Open & decide" : "Review results")</a></td></tr>
+        }
+        @if (Model.Count == 0) { <tr><td colspan="6"><partial name="_EmptyState" model='voting ? "Nothing is waiting for your decision." : "No tenders are assigned to you yet."' /></td></tr> }
+        </tbody>
+    </table></div>
+</section>

@@ -1,88 +1,71 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Bid Compliance Check
+@model Orange_Tendering_System.Models.Entities.Bid
+@{ ViewData["Title"] = "Check offer requirements"; ViewData["WorkspaceSection"] = "Received Bids"; ViewData["Description"] = "Compare the offer with the tender's required documents and conditions."; }
+<div class="so-page">
+    <partial name="_PageHeader" />
+    @if (TempData["ComplianceSaved"] is string saved) { <div class="so-alert" role="status">@saved</div> }
+    <section class="ws-panel pg-panel">
+        <div class="pg-panel-head">
+            <div><span class="pg-badge">Offer #@Model.Id</span> <span class="pg-badge">@Model.TenderInvitation.Supplier.CompanyName</span></div>
+            <a class="pg-btn" asp-action="Details" asp-route-id="@Model.Id">Read full offer</a>
+        </div>
+        <h2>@Model.TenderInvitation.TenderRound.Tender.Title</h2>
+        <div class="so-requirements"><strong>Requirements set for suppliers</strong><p>@(string.IsNullOrWhiteSpace(Model.TenderInvitation.TenderRound.Tender.Requirements) ? "No mandatory requirements were entered for this tender." : Model.TenderInvitation.TenderRound.Tender.Requirements)</p></div>
+        <h3 class="so-subheading">Documents submitted with this offer</h3>
+        @if (Model.Documents.Count == 0) { <p class="pg-hint">The supplier did not attach documents to this offer.</p> }
+        else { <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead><tbody>@foreach (var document in Model.Documents) { <tr><td>@document.FileName</td><td>@(document.DocumentType ?? "—")</td><td>@document.UploadedAt.ToLocalTime().ToString("d MMM yyyy")</td></tr> }</tbody></table></div> }
+        <p class="pg-hint">Choose a result below. The form will show only the information needed for that result.</p>
+    </section>
 
-DEVELOPER OWNER: Saja
-MODULE: Sourcing Officer / Bid Management
-TRELLO TASK: Bid Compliance Check
-TRELLO URL: https://trello.com/c/oDUNPe8T
-
-PURPOSE:
-The Officer records the compliance result of one offer
-revision, with reasons and missing documents.
-
-BUSINESS ACCESS:
-Sourcing Officer
-
-ROUTE: /SourcingOfficer/Bids/Compliance/{id?}
-
-FUTURE IMPLEMENTATION:
-- POST: set Bid.ComplianceStatus, ComplianceNotes,
-  MissingRequirements, ComplianceCheckedByUserId,
-  ComplianceCheckedAt (UTC).
-- Pending Clarification: open a Clarification linked to the
-  bid (BidId).
-- Audit the decision.
-
-DEPENDENCIES:
-Bids (compliance columns), Tenders.Requirements,
-Clarifications, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "Bid Compliance Check";
-    ViewData["WorkspaceSection"] = "Compliance";
-    ViewData["Description"] = "Record whether an offer meets the tender’s mandatory requirements.";
-}
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel">
-    <h2>Compliance statuses</h2>
-    <div class="pg-badges"><span class="pg-badge">Not checked</span><span class="pg-badge is-ok">Compliant</span><span class="pg-badge is-bad">Non-Compliant</span><span class="pg-badge is-warn">Pending Clarification</span></div>
-    <p class="pg-hint">A non-compliant offer still counts as a received offer for the minimum-offer rule, but it cannot be recommended or awarded.</p>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Offer</h2>
-    <dl class="pg-dl">
-        <div><dt>Supplier</dt><dd>—</dd></div>
-        <div><dt>Tender / round</dt><dd>—</dd></div>
-        <div><dt>Revision</dt><dd>—</dd></div>
-        <div><dt>Submitted</dt><dd>—</dd></div>
-        <div><dt>Tender requirements</dt><dd>—</dd></div>
-    </dl>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Compliance decision</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-compliance-status-1">Compliance status</label><select id="f-compliance-status-1"><option>Compliant</option><option>Non-Compliant</option><option>Pending Clarification</option></select></div>
-                <div class="pg-field pg-field-wide"><label for="f-reasons-for-non-compliance-2">Reasons for non-compliance</label><textarea id="f-reasons-for-non-compliance-2" rows="4"></textarea></div>
-                <div class="pg-field pg-field-wide"><label for="f-missing-documents-or-unmet-requirements-3">Missing documents or unmet requirements</label><textarea id="f-missing-documents-or-unmet-requirements-3" rows="4"></textarea></div>
+    <section class="ws-panel pg-panel">
+        <h2>Your compliance decision</h2>
+        <form asp-action="Compliance" method="post" class="pg-form" id="compliance-form">
+            <input type="hidden" name="id" value="@Model.Id" />
+            <div asp-validation-summary="ModelOnly" class="pg-validation" role="alert"></div>
+            <div class="pg-field pg-field-wide">
+                <label for="status">Does this offer meet the requirements?</label>
+                <select id="status" name="status" aria-controls="noncompliant-box clarification-box">
+                    <option value="Compliant" selected="@(Model.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant)">Compliant — meets requirements</option>
+                    <option value="NonCompliant" selected="@(Model.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.NonCompliant)">Non-compliant — a requirement is missing</option>
+                    <option value="PendingClarification" selected="@(Model.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.PendingClarification)">Needs clarification — waiting for supplier</option>
+                </select>
             </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save compliance review</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Review record</h2>
-    <dl class="pg-dl">
-        <div><dt>Reviewed by</dt><dd>—</dd></div>
-        <div><dt>Reviewed at (UTC)</dt><dd>—</dd></div>
-    </dl>
-</section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="SourcingOfficer" asp-controller="Clarifications" asp-action="Index">Ask the supplier for clarification</a></li>
-        <li><a asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Details">Offer details</a></li>
-    </ul>
-</nav>
+            <div class="pg-field so-conditional-box" id="noncompliant-box" hidden>
+                <label for="notes">Why does this offer not meet the requirements?</label>
+                <textarea name="notes" id="notes" rows="3" maxlength="2000" placeholder="Explain the unmet requirement or failed check">@Model.ComplianceNotes</textarea>
+                <small class="pg-hint">A reason is required so the decision is clear.</small>
+                <span class="pg-validation" data-error-for="notes">@Html.ValidationMessage("notes")</span>
+            </div>
+            <div class="pg-field so-conditional-box" id="clarification-box" hidden>
+                <label for="missingRequirements">What information or documents are needed from the supplier?</label>
+                <textarea name="missingRequirements" id="missingRequirements" rows="3" maxlength="2000" placeholder="List each missing document or detail">@Model.MissingRequirements</textarea>
+                <small class="pg-hint">List what the supplier needs to provide before you can complete the check.</small>
+                <span class="pg-validation" data-error-for="missingRequirements">@Html.ValidationMessage("missingRequirements")</span>
+            </div>
+            <div class="pg-actions">
+                <button type="submit" class="pg-btn pg-btn-primary">Save compliance decision</button>
+                <a class="pg-btn" asp-action="Index" asp-route-id="@Model.TenderInvitation.TenderRound.TenderId">Cancel</a>
+            </div>
+        </form>
+    </section>
+</div>
+@section Scripts {
+    <script>
+        (() => {
+            const status = document.getElementById('status');
+            const reasonBox = document.getElementById('noncompliant-box');
+            const missingBox = document.getElementById('clarification-box');
+            const reason = document.getElementById('notes');
+            const missing = document.getElementById('missingRequirements');
+            function updateFields() {
+                const isNonCompliant = status.value === 'NonCompliant';
+                const needsClarification = status.value === 'PendingClarification';
+                reasonBox.hidden = !isNonCompliant;
+                missingBox.hidden = !needsClarification;
+                reason.required = isNonCompliant;
+                missing.required = needsClarification;
+            }
+            status.addEventListener('change', updateFields);
+            updateFields();
+        })();
+    </script>
+}

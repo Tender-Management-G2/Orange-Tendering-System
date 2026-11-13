@@ -1,37 +1,44 @@
 // ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Doulat
-// Module: Top Committee
-// Purpose: MVC endpoints for the Decisions pages of the Top Committee workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+// Module: Top Committee - final decision pages (spec 4.7): review of results, voting entry point and bid history.
+// These pages are read-only. The vote and the signature are cast on the signed report page (Reports/Review -> TenderWorkflowService.TopVote),
+// which enforces the Manager's prior signature, the committee signatures, one vote per member and the 3-of-4 approval rule.
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orange_Tendering_System.Areas.TopCommittee.Services;
 using Orange_Tendering_System.Models;
 
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
 {
     [Area("TopCommittee")]
     [Authorize(Roles = SystemRoles.TopCommittee)]
-    public class DecisionsController : Controller
+    public class DecisionsController(TopCommitteeService service) : Controller
     {
-        // Review Tender Evaluation — Owner: Doulat · Trello: Review Tender Evaluation (https://trello.com/c/EDdybTCg)
-        // GET /TopCommittee/Decisions/ReviewEvaluation/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult ReviewEvaluation(int? id)
+        private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+        public IActionResult Index() => RedirectToAction(nameof(ReviewEvaluation));
+
+        // GET /TopCommittee/Decisions/ReviewEvaluation/{id?}: the tenders waiting for me, or one tender's full results.
+        public async Task<IActionResult> ReviewEvaluation(int? id)
         {
-            return View();
+            if (id == null) return View("Cases", (await service.Cases(UserId)).Where(c => c.Outcome == null).ToList());
+            var details = await service.Details(UserId, id.Value);
+            return details == null ? NotFound() : View(details);
         }
 
-        // Committee Decision — Owner: Doulat · Trello: Committee Decision (https://trello.com/c/RtPahsxa)
-        // GET /TopCommittee/Decisions/Decision/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Decision(int? id)
+        // GET /TopCommittee/Decisions/Decision/{id?}: voting status of a tender and the entry to the signed report page.
+        public async Task<IActionResult> Decision(int? id)
         {
-            return View();
+            if (id == null) return View("Cases", (await service.Cases(UserId)).Where(c => c.AwaitingMyVote).ToList());
+            var details = await service.Details(UserId, id.Value);
+            return details == null ? NotFound() : View(details);
         }
 
-        // Committee Voting & Decision History — Owner: Doulat · Trello: Committee Voting & Decision History (https://trello.com/c/3NtWOXwd)
-        // GET /TopCommittee/Decisions/History/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult History(int? id)
+        // GET /TopCommittee/Decisions/History: every tender I was assigned to with its outcome.
+        public async Task<IActionResult> History(int? id)
         {
-            return View();
+            if (id != null) return RedirectToAction(nameof(ReviewEvaluation), new { id });
+            return View((await service.Cases(UserId)).Where(c => c.Outcome != null || c.MyVote != null).ToList());
         }
     }
 }

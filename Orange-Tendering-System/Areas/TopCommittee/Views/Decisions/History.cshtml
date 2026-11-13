@@ -1,56 +1,20 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Committee Voting & Decision History
-
-DEVELOPER OWNER: Doulat
-MODULE: Top Committee
-TRELLO TASK: Committee Voting & Decision History
-TRELLO URL: https://trello.com/c/3NtWOXwd
-
-PURPOSE:
-Show all Top Committee rounds and individual votes; earlier
-rounds are preserved.
-
-BUSINESS ACCESS:
-Top Committee member (assigned to the tender)
-
-ROUTE: /TopCommittee/Decisions/History/{id?}
-
-FUTURE IMPLEMENTATION:
-- Query CommitteeRounds (Top) with CommitteeVotes.
-
-DEPENDENCIES:
-CommitteeRounds, CommitteeVotes, CommitteeMembers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
+@model List<Orange_Tendering_System.Areas.TopCommittee.Services.TopCase>
 @{
-    ViewData["Title"] = "Committee Voting & Decision History";
-    ViewData["WorkspaceSection"] = "Decision History";
-    ViewData["Description"] = "Every Top Committee round with its votes, including rejected rounds.";
+    ViewData["Title"] = "Decision History"; ViewData["WorkspaceSection"] = "Decision History";
+    ViewData["Description"] = "Past tenders you decided on, with the final outcome.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-committee-rounds">
-    <div class="pg-panel-head"><h2 id="tbl-committee-rounds">Committee rounds</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Summary version</th><th scope="col">Approvals</th><th scope="col">Rejections</th><th scope="col">Outcome</th><th scope="col">Completed</th></tr></thead>
-            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No Top Committee rounds yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-votes">
-    <div class="pg-panel-head"><h2 id="tbl-votes">Votes</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Member</th><th scope="col">Vote</th><th scope="col">Comment</th><th scope="col">Voted at</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Select a round to see its votes."' /></td></tr></tbody>
-        </table>
-    </div>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Bid history</h2></div>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th scope="col">Tender</th><th scope="col">Department</th><th scope="col">Outcome</th><th scope="col">Supplier</th><th scope="col">Decisions (approve / total)</th><th scope="col">My decision</th><th scope="col">Closed</th><th scope="col" data-nosort>Actions</th></tr></thead>
+        <tbody>
+        @foreach (var c in Model)
+        {
+            <tr><td><strong>@c.Title</strong></td><td>@c.Department</td><td>@(c.Outcome ?? c.Status)</td><td>@(c.Winner ?? "—")</td><td>@c.Approvals / @c.Votes</td><td>@(c.MyVote ?? "—")</td><td>@(c.AwardedAt?.ToString("yyyy-MM-dd") ?? "—")</td>
+                <td><a class="pg-btn" data-no-modal asp-action="ReviewEvaluation" asp-route-id="@c.TenderId">Details</a></td></tr>
+        }
+        @if (Model.Count == 0) { <tr><td colspan="8"><partial name="_EmptyState" model='"No decided tenders yet."' /></td></tr> }
+        </tbody>
+    </table></div>
 </section>

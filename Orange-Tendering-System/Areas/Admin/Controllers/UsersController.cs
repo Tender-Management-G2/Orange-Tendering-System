@@ -87,7 +87,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             TempData["SuccessMessage"] =
-                "User created successfully. Account confirmation is required.";
+                "User created successfully. The active account can now sign in.";
 
             return RedirectToAction(nameof(Index));
         }

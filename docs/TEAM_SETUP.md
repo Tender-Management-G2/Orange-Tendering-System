@@ -50,15 +50,15 @@ Run these commands in PowerShell. Each developer uses their own local database. 
    SELECT name FROM sys.tables ORDER BY name;
    ```
 
-   Expect four migration rows and 30 tables, including the seven `AspNet*` tables. Re-running `dotnet ef database update` should report that the database is already up to date.
+   Expect five migration rows and 30 tables, including the seven `AspNet*` tables. Re-running `dotnet ef database update` should report that the database is already up to date.
 
 5. Launch the MVC app:
 
    ```powershell
-   dotnet run --launch-profile http
+   dotnet run --launch-profile https
    ```
 
-   Open `http://localhost:5254`. Public pages should load. The seven Identity roles and an initial admin are **not seeded** by migrations or startup, so role-protected workspaces will show Access denied until the authentication owner implements provisioning. This does not prevent database creation or application launch.
+   Open `https://localhost:7182`. Public pages should load. The seven Identity roles are seeded at startup. The optional initial Admin is created only when runtime BootstrapAdmin credentials are configured; otherwise assign an Admin by an approved local provisioning process. This does not prevent database creation or application launch.
 
 ## After pulling changes
 
@@ -68,7 +68,7 @@ From the project directory, with your Development connection string still config
 git pull
 dotnet restore
 dotnet ef database update
-dotnet run --launch-profile http
+dotnet run --launch-profile https
 ```
 
 `database update` applies only pending migrations recorded in `__EFMigrationsHistory`. Do not drop or reset a database to catch up.
@@ -87,4 +87,12 @@ dotnet run --launch-profile http
 | Cannot connect or login fails | Start the correct SQL Server instance and verify its name, authentication mode, and permissions. |
 | Certificate error | For a local self-signed certificate, include `TrustServerCertificate=True`. |
 | Tables already exist but migration fails | Inspect the target database and `__EFMigrationsHistory`; do not delete tables to force migration. |
-| Workspace says Access denied | Roles and user assignments are not seeded yet; see [team handoff](TEAM_HANDOFF.md). |
+| Workspace says Access denied | Roles are seeded at startup; assign the user an appropriate role and see [team handoff](TEAM_HANDOFF.md). |
+
+## Authentication setup on Ahmad branch
+
+Apply `20261113091517_AddAuthenticationState` only to your verified local database. It adds three `AspNetUsers` columns and keeps the 30-table schema. Development defaults to `Smtp:Mode=LocalInbox`: run `node Tools/DevMail/server.js` from the web project directory and read test OTP mail at `http://127.0.0.1:8025`. For delivery to a real Gmail inbox, set `Smtp:Mode=Smtp` and Gmail sender credentials in the web project's Visual Studio User Secrets, then restart the app. See [the exact Gmail setup and delivery test](../Orange-Tendering-System/Tools/DevMail/README.md). Never commit credentials or OTPs.
+
+For a brand-new local installation only, optionally set `BootstrapAdmin:Email`, `BootstrapAdmin:Password`, and `BootstrapAdmin:FullName` at runtime. The Admin account requires a password change at first sign-in. Never commit those values. Real SMTP must support STARTTLS; the Development inbox accepts unauthenticated email only on loopback. Supplier documents are stored under the application's ignored `App_Data/SupplierDocuments` directory outside `wwwroot`; back this directory up and protect it in deployment. The app needs write permission there.
+
+Use the HTTPS launch profile for sign-in because Identity cookies require HTTPS. If the local development certificate is missing, run `dotnet dev-certs https --trust`. The first Admin and Supplier onboarding require the migration and SQL Server; supplier OTP requires the running local Development inbox or a configured SMTP provider. Rjoub's Admin supplier review UI is still a scaffold, so company approval is not available through that UI yet.

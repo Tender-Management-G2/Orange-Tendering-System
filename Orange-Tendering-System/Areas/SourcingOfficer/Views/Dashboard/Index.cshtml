@@ -1,80 +1,24 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Sourcing Officer Dashboard
-
-DEVELOPER OWNER: Amal
-MODULE: Sourcing Officer / Tender Management
-TRELLO TASK: Sourcing Officer Dashboard
-TRELLO URL: https://trello.com/c/VeRtD4Tn
-
-PURPOSE:
-Task dashboard for the Sourcing Officer: incoming requests,
-active tenders and rounds, offers received, and work
-returned from later stages.
-
-BUSINESS ACCESS:
-Sourcing Officer
-
-ROUTE: /SourcingOfficer
-
-FUTURE IMPLEMENTATION:
-- Counts: Submitted requests, tenders by TenderStatus, open
-  rounds, offers awaiting compliance.
-- My Tasks: requests to review, rounds past deadline,
-  reports returned by the Manager.
-- Fill WorkspaceDashboardViewModel; leave unavailable
-  metrics out.
-
-DEPENDENCIES:
-PurchaseRequests, Tenders, TenderRounds, Bids,
-TenderReports.
-
-STATUS:
-LAYOUT FROM THE SUPPLIED ZIP — DATA NOT CONNECTED.
-Metrics show "—" until a service fills WorkspaceDashboardViewModel.
-===========================================================
-*@
-@model WorkspaceDashboardViewModel
-@{
-    ViewData["Title"] = "Sourcing Officer Dashboard";
-    ViewData["WorkspaceSection"] = "Dashboard";
-    var data = Model ?? new WorkspaceDashboardViewModel();
-    var displayName = data.DisplayName ?? "Sourcing Officer";
-    var total = data.Statuses.Sum(status => (long)Math.Max(0, status.Count));
-    var palette = new[] { "#ff8a00", "#098fff", "#00bf81", "#c6cbd2" };
-    var segments = new List<string>();
-    decimal angle = 0;
-    for (var i = 0; i < data.Statuses.Count && total > 0; i++) {
-        var end = angle + Math.Max(0, data.Statuses[i].Count) * 360m / total;
-        segments.Add($"{palette[i % palette.Length]} {angle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg {end.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg");
-        angle = end;
-    }
-    var distribution = total > 0 ? $"conic-gradient({string.Join(",", segments)})" : "conic-gradient(var(--dash-empty-ring) 0deg 360deg)";
-}
-<div class="dash-board dash-internal" data-dashboard-body="true" data-dashboard-role="Sourcing Officer">
-    <section class="dash-welcome" aria-labelledby="dashboard-title">
-        <div class="dash-welcome-photo" aria-hidden="true"></div>
-        <div class="dash-welcome-waves" aria-hidden="true"></div>
-        <div class="dash-welcome-copy"><h1 id="dashboard-title">Welcome back,<strong>@displayName</strong></h1><p>Manage sourcing activities, tenders, and supplier interactions efficiently.</p></div>
-    </section>
-    <section class="dash-metrics" aria-label="Dashboard statistics">
-        <article class="dash-metric dash-orange"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM9 13h6M9 17h6"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("active-tenders")</strong><span>Active Tenders</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("active-tenders",out var trendactivetenders)) { <span class="dash-trend @(trendactivetenders >= 0 ? "is-positive" : "is-negative")">@(trendactivetenders >= 0 ? "↑" : "↓") @trendactivetenders.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
-        <article class="dash-metric dash-blue"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("purchase-requests")</strong><span>Purchase Requests</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("purchase-requests",out var trendpurchaserequests)) { <span class="dash-trend @(trendpurchaserequests >= 0 ? "is-positive" : "is-negative")">@(trendpurchaserequests >= 0 ? "↑" : "↓") @trendpurchaserequests.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
-        <article class="dash-metric dash-green"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-3c0-7 14-7 14 0v3M17 4c5 0 5 7 0 7M18 14c4 0 4 4 4 7"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("registered-suppliers")</strong><span>Registered Suppliers</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("registered-suppliers",out var trendregisteredsuppliers)) { <span class="dash-trend @(trendregisteredsuppliers >= 0 ? "is-positive" : "is-negative")">@(trendregisteredsuppliers >= 0 ? "↑" : "↓") @trendregisteredsuppliers.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
-        <article class="dash-metric dash-purple"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("pending-evaluations")</strong><span>Pending Evaluations</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("pending-evaluations",out var trendpendingevaluations)) { <span class="dash-trend @(trendpendingevaluations >= 0 ? "is-positive" : "is-negative")">@(trendpendingevaluations >= 0 ? "↑" : "↓") @trendpendingevaluations.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
-    </section>
-    <section class="dash-middle-row">
-        <article class="dash-panel dash-workflow"><div class="dash-panel-heading"><h2>Sourcing Workflow</h2><button type="button" class="dash-text-action" disabled title="This module is not available yet">View Process <span aria-hidden="true">→</span></button></div><ol class="dash-workflow-stages"><li class="@(data.CurrentWorkflowStage == 0 ? "is-current" : data.CurrentWorkflowStage > 0 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></span><span>Purchase<br />Request</span></li><li class="@(data.CurrentWorkflowStage == 1 ? "is-current" : data.CurrentWorkflowStage > 1 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM9 13h6M9 17h6"/></svg></span><span>Tender<br />Creation</span></li><li class="@(data.CurrentWorkflowStage == 2 ? "is-current" : data.CurrentWorkflowStage > 2 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></span><span>Bidding<br /><small>(by Suppliers)</small></span></li><li class="@(data.CurrentWorkflowStage == 3 ? "is-current" : data.CurrentWorkflowStage > 3 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v19M7 22h10M3 6h18M5 6l-4 9h8zM19 6l-4 9h8z"/></svg></span><span>Evaluation<br /><small>(Technical &amp; Financial)</small></span></li><li class="@(data.CurrentWorkflowStage == 4 ? "is-current" : data.CurrentWorkflowStage > 4 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></span><span>Manager<br />Review</span></li><li class="@(data.CurrentWorkflowStage == 5 ? "is-current" : data.CurrentWorkflowStage > 5 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-3c0-7 14-7 14 0v3M17 4c5 0 5 7 0 7M18 14c4 0 4 4 4 7"/></svg></span><span>Top<br />Committee</span></li><li class="@(data.CurrentWorkflowStage == 6 ? "is-current" : data.CurrentWorkflowStage > 6 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10"/></svg></span><span>Award<br />&amp; Closure</span></li></ol><span class="dash-data-caption">@(data.CurrentWorkflowStage.HasValue ? "Verified workflow position" : "Process overview · no tender selected")</span></article>
-        <article class="dash-panel dash-ongoing"><div class="dash-panel-heading"><h2>Ongoing Tender</h2></div><svg class="dash-tower" viewBox="0 0 160 190" aria-hidden="true"><path d="m80 45-40 140h80L80 45M80 45v140M65 95l40 30-55 35 70 25M95 95l-40 30 55 35-70 25M65 52c-22-17-22-45 0-62M95 52c22-17 22-45 0-62M55 65c-35-24-35-61 0-85M105 65c35-24 35-61 0-85" /><circle cx="80" cy="20" r="7"/></svg>
-        <div class="dash-ongoing-copy">@if(data.OngoingTender is { } tender) { <strong>@tender.Reference</strong><p>@tender.Title</p><div class="dash-tender-progress"><i style="width:@(Math.Clamp(tender.Progress ?? 0,0,100))%"></i></div><div class="dash-progress-caption"><span>@tender.Status</span><b>@(tender.Progress.HasValue ? $"{Math.Clamp(tender.Progress.Value,0,100)}%" : "—")</b></div> } else { <strong>—</strong><p>No verified tender selected</p><div class="dash-tender-progress"></div><div class="dash-progress-caption"><span>Waiting for tender data</span><b>—</b></div> }</div></article>
-    </section>
-    <section class="dash-bottom-row">
-        <article class="dash-panel dash-tasks"><div class="dash-panel-heading"><h2>My Tasks</h2><button type="button" class="dash-text-action" disabled title="This module is not available yet">View All <span aria-hidden="true">→</span></button></div><div class="dash-task-list">@if(data.Tasks.Count > 0) { foreach(var task in data.Tasks) { <div class="dash-task-item"><span class="dash-task-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></span><div><strong>@task.Title</strong><small>@task.Context</small></div><span class="dash-status-pill">@task.Status</span></div> } } else { <div class="dash-empty-rows" aria-hidden="true"></div><div class="dash-empty-state"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg><span>@(data.DataConnected ? "No assigned tasks." : "Assigned tasks are not connected.")</span></div> }</div></article>
-        <article class="dash-panel dash-distribution"><div class="dash-panel-heading"><h2>Tenders by Status</h2></div><div class="dash-distribution-body"><div class="dash-donut @(data.Statuses.Count > 0 ? "has-data" : "")" style="--dash-distribution:@distribution"><span><strong>@data.Number("tenders-total")</strong><small>Tenders</small></span></div><div class="dash-legend">@if(data.Statuses.Count > 0) { foreach(var status in data.Statuses) { <div><i></i><span>@status.Label</span><b>@status.Count</b></div> } } else { <div><i></i><span>Open</span><b>—</b></div><div><i></i><span>Under Evaluation</span><b>—</b></div><div><i></i><span>Under Review</span><b>—</b></div><div><i></i><span>Closed</span><b>—</b></div> }</div></div><span class="dash-data-caption">@(data.DataConnected ? "Verified system data" : "Waiting for verified data")</span></article>
-        <article class="dash-panel dash-activity"><div class="dash-panel-heading"><h2>Recent Activities</h2><button type="button" class="dash-text-action" disabled title="This module is not available yet">View All <span aria-hidden="true">→</span></button></div><div class="dash-activity-list">@if (data.Activities.Count > 0) { foreach(var activity in data.Activities) { <div class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@activity.Title</strong><span>@activity.Context</span></div><time>@activity.Time</time></div> } } else { <div class="dash-empty-timeline" aria-hidden="true"><i></i><i></i><i></i></div><div class="dash-empty-state"><span>@(data.DataConnected ? "No recent activities." : "Activity history is not connected.")</span></div> }</div></article>
-    </section>
+@model Orange_Tendering_System.ViewModels.SourcingOfficerDashboardViewModel
+@{ ViewData["Title"] = "Sourcing Officer Home"; ViewData["WorkspaceSection"] = "Dashboard"; ViewData["Description"] = "Your work, in order. Start with a request or use the ready-made demo tender to try the full officer flow."; }
+<div class="so-page"><partial name="_PageHeader" />
+<section class="so-welcome ws-panel" aria-labelledby="so-welcome-title">
+    <div><span class="so-eyebrow">WELCOME TO YOUR WORKSPACE</span><h2 id="so-welcome-title">What would you like to do?</h2><p>Follow the numbered steps below. The demo data is already in the database, so you can try each screen right away.</p></div>
+    <a class="pg-btn pg-btn-primary" asp-controller="PurchaseRequests" asp-action="Index">Start with requests <span aria-hidden="true">→</span></a>
+</section>
+<section class="pg-cards so-metrics" aria-label="Current work counts">
+    <a class="pg-card" asp-controller="PurchaseRequests" asp-action="Index"><span>Requests waiting for review</span><strong>@Model.SubmittedRequests</strong><small>Open the request inbox</small></a>
+    <a class="pg-card" asp-controller="PurchaseRequests" asp-action="Index"><span>Accepted, ready for a tender</span><strong>@Model.AcceptedRequestsWithoutTender</strong><small>Create a tender from a request</small></a>
+    <a class="pg-card" asp-controller="Tenders" asp-action="Index"><span>Open tenders</span><strong>@Model.ActiveTenders</strong><small>View tenders and offers</small></a>
+    <a class="pg-card" asp-controller="Reports" asp-action="Index"><span>Committee reports to forward</span><strong>@Model.ReportsToForward</strong><small>Read and send reports to the manager</small></a>
+</section>
+<section class="ws-panel pg-panel so-guide" aria-labelledby="so-guide-title">
+    <div class="pg-panel-head"><div><span class="so-eyebrow">A SIMPLE WALKTHROUGH</span><h2 id="so-guide-title">Try the demo in four steps</h2></div><span class="pg-badge is-ok">Demo data loaded</span></div>
+    <ol class="so-steps">
+        <li><span class="so-step-number">1</span><div><h3>Review a department request</h3><p>Open the request inbox. Choose <strong>DEMO - Monitors awaiting review</strong> and mark it accepted, returned, or rejected.</p></div><a class="pg-btn" asp-controller="PurchaseRequests" asp-action="Index">Open requests</a></li>
+        <li><span class="so-step-number">2</span><div><h3>Create a tender</h3><p>Use <strong>DEMO - Laptops ready for tender</strong>, or the request you just accepted. Its item is copied into the new tender automatically.</p></div><a class="pg-btn" asp-controller="PurchaseRequests" asp-action="Index">Choose an accepted request</a></li>
+        <li><span class="so-step-number">3</span><div><h3>Send offers to the evaluation committee</h3><p>For the quickest test, open <strong>DEMO Tender - Laptops ready for committee</strong>. It has four submitted offers: three compliant and one non-compliant. Select the three compliant offers and send them.</p>@if(Model.TenderReadyForCommittee != null){<a class="so-inline-link" asp-controller="Tenders" asp-action="Details" asp-route-id="@Model.TenderReadyForCommittee.Id">Open the demo tender →</a>}</div><a class="pg-btn" asp-controller="Tenders" asp-action="Index">Open tenders</a></li>
+        <li><span class="so-step-number">4</span><div><h3>Read committee reports and answer suppliers</h3><p>Reports contains submitted, accepted, returned, and rejected examples. All supplier conversations arrive in the same Clarifications inbox.</p></div><div class="so-step-actions"><a class="pg-btn" asp-controller="Reports" asp-action="Index">Open reports</a><a class="pg-btn" asp-area="" asp-controller="Clarifications" asp-action="Index">Open clarifications</a></div></li>
+    </ol>
+</section>
+<aside class="so-help"><strong>Want to see it as a supplier?</strong><span>Sign out and log in as <code>supplier1@orange-demo.local</code>. Password for every demo account: <code>OrangeDemo2026!</code>. The supplier account can see its own invitation and offer only.</span><a class="so-inline-link" asp-area="" asp-controller="Home" asp-action="HowItWorks">Read how the workflow works →</a></aside>
 </div>
-@section Styles { <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" /> }
-
-

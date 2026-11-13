@@ -1,23 +1,18 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Tariq
-// Module: Technical & Financial Evaluation Committee
-// Purpose: MVC endpoints for the Reports pages of the Evaluation Committee workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Orange_Tendering_System.Controllers;
 using Orange_Tendering_System.Models;
-
-namespace Orange_Tendering_System.Areas.EvaluationCommittee.Controllers
+using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
+namespace Orange_Tendering_System.Areas.EvaluationCommittee.Controllers;
+[Area("EvaluationCommittee"), Authorize(Roles=SystemRoles.EvaluationCommittee+","+SystemRoles.SourcingManager)]
+public class ReportsController(TenderWorkflowService workflow) : ReportControllerBase(workflow)
 {
-    [Area("EvaluationCommittee")]
-    [Authorize(Roles = SystemRoles.EvaluationCommittee)]
-    public class ReportsController : Controller
+    public IActionResult Unified(int? id)=>RedirectToAction("Index", "Workflow");
+    [HttpPost] public Task<IActionResult> Sign(int id,string documentHash,bool confirmed,string comment="") => Execute(id,async()=>
     {
-        // Unified Evaluation Report — Owner: Tariq · Trello: Unified Evaluation Report (https://trello.com/c/ssHM0e0R)
-        // GET /EvaluationCommittee/Reports/Unified/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Unified(int? id)
-        {
-            return View();
-        }
-    }
+        var report=await Workflow.ReviewReport(id,User);
+        TenderWorkflowService.Require(report.IsCurrent,"An obsolete report cannot be signed.");
+        await Workflow.FinalizeReport(report.Tender.Id,comment,User,documentHash,confirmed);
+    });
 }

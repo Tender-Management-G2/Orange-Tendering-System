@@ -1,0 +1,42 @@
+@page
+@model VerifyEmailModel
+@inject IWebHostEnvironment HostEnvironment
+@inject IConfiguration Configuration
+@using Orange_Tendering_System.Services
+@{
+    ViewData["Title"] = "Verify Email";
+}
+<section class="section auth-section">
+    <div class="glass auth-card">
+        <span class="eyebrow">SUPPLIER ONBOARDING</span>
+        <h1>Verify Email</h1>
+        <partial name="_RegistrationSteps" model="2" />
+            <p>Your supplier application is not submitted for administrator review until this code is verified.</p>
+            <p>If you already started an application, your uploaded documents are saved. You can request a new code here without registering again.</p>
+            @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
+            {
+                <p>Development mode sends verification codes to the <a href="http://127.0.0.1:8025/" target="_blank" rel="noopener noreferrer">local mail inbox</a>, not to your Gmail inbox. Enter the latest code from that page. It expires in 10 minutes.</p>
+            }
+            else
+            {
+                <p>Enter the six-digit code sent to your email. It expires in 10 minutes.</p>
+            }
+            @if (TempData["Notice"] is string notice) { <p role="status">@notice</p> }
+            @* Explicit action: without it the form posts to the address-bar URL, which may still be ?handler=Resend. *@
+            <form method="post" asp-page="./VerifyEmail">
+                <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+                <label asp-for="Input.Email">Email</label>
+                <input asp-for="Input.Email" autocomplete="email" />
+                <span asp-validation-for="Input.Email" class="field-error"></span>
+                <label asp-for="Input.Code">Verification code</label>
+                <input asp-for="Input.Code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
+                <span asp-validation-for="Input.Code" class="field-error"></span>
+                <button type="submit" class="primary">Verify Email →</button>
+            </form>
+            <form method="post" asp-page-handler="Resend">
+                <input type="hidden" name="email" value="@Model.Input.Email" />
+                <button type="submit" class="overview">Send a new code</button>
+            </form>
+    </div>
+</section>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

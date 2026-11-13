@@ -1,5 +1,5 @@
-// ORANGE TENDER MANAGEMENT SYSTEM — Owner: Ahmad (Authentication). Scaffolded from ASP.NET Core Identity UI 10; logic unchanged.
-// Status: existing Identity behavior. See the TODO list in ResetPassword.cshtml.
+// ORANGE TENDER MANAGEMENT SYSTEM — Owner: Ahmad (Authentication).
+// Identity reset-token flow with security audit.
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 #nullable disable
@@ -14,16 +14,19 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Data;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account
 {
     public class ResetPasswordModel : PageModel
     {
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ApplicationDbContext _db;
 
-        public ResetPasswordModel(UserManager<ApplicationUser> userManager)
+        public ResetPasswordModel(UserManager<ApplicationUser> userManager, ApplicationDbContext db)
         {
             _userManager = userManager;
+            _db = db;
         }
 
         /// <summary>
@@ -82,10 +85,8 @@ namespace Orange_Tendering_System.Areas.Identity.Pages.Account
             }
             else
             {
-                Input = new InputModel
-                {
-                    Code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code))
-                };
+                try { Input = new InputModel { Code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code)) }; }
+                catch (FormatException) { return BadRequest("Invalid reset link."); }
                 return Page();
             }
         }
@@ -107,6 +108,12 @@ namespace Orange_Tendering_System.Areas.Identity.Pages.Account
             var result = await _userManager.ResetPasswordAsync(user, Input.Code, Input.Password);
             if (result.Succeeded)
             {
+                _db.AuditLogs.Add(new AuditLog
+                {
+                    UserId = user.Id, Action = "PasswordReset", EntityName = "ApplicationUser",
+                    EntityId = user.Id, CreatedAt = DateTime.UtcNow
+                });
+                await _db.SaveChangesAsync();
                 return RedirectToPage("./ResetPasswordConfirmation");
             }
 

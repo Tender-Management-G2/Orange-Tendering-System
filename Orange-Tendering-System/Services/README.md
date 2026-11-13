@@ -3,7 +3,15 @@
 Business logic goes here: **Controller → Service → `ApplicationDbContext`**. Controllers stay thin; views never
 contain rules. Register each service in `Program.cs` (`builder.Services.AddScoped<...>()`).
 
-Planned services (create them when you implement the feature — nothing exists yet):
+Implemented services now include `TenderWorkflowService`, `WeightedCalculation`,
+`ProtectedDocumentStore`, `OllamaBidAnalysisService`, and `EvaluationDeadlineWorker`.
+Round control (re-tender limit, fewer-supplier approval, supplier carry-forward, scheduled opening) is in
+`TenderWorkflowService.Rounds.cs`; `ZoomMeetingService`/`EvaluationSchedulingService` schedule evaluation meetings and
+`ExternalInvitationDispatcher` delivers invitations to unregistered suppliers. See
+[the round control delivery](../../docs/ROUND_CONTROL_DELIVERY.md).
+See [the weighted workflow delivery](../../docs/WEIGHTED_WORKFLOW_DELIVERY.md) for the approved formulas,
+policy gates, SQL Server test results and configuration. The table below retains the original module ownership
+plan; suggested class names are not additional parallel implementations to create.
 
 | Service | Owner | Responsibility |
 |---|---|---|

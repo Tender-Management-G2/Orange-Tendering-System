@@ -479,88 +479,51 @@ PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
                 ><small>System-wide visibility</small></span
               >
             </div>
-            <span class="connection-state"
-              ><i></i>Statistics not connected yet</span
-            >
+            <span class="connection-state is-live"><i></i>Live system data</span>
           </div>
           <div class="dashboard-body">
+            @{
+              var st = (PublicStats)ViewBag.Stats;
+              var total = Math.Max(1, st.Bidding + st.Evaluation + st.Approvals + st.Closed);
+              var a1 = st.Bidding * 360.0 / total; var a2 = a1 + st.Evaluation * 360.0 / total; var a3 = a2 + st.Approvals * 360.0 / total;
+              string D(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+              var donut = st.Bidding + st.Evaluation + st.Approvals + st.Closed == 0 ? "conic-gradient(#ffffff22 0 360deg)" : $"conic-gradient(#ff8a00 0 {D(a1)}deg,#098fff {D(a1)}deg {D(a2)}deg,#00bf81 {D(a2)}deg {D(a3)}deg,#c6cbd2 {D(a3)}deg 360deg)";
+              var peak = Math.Max(1, st.Monthly.Max(x => x.Value));
+            }
             <div class="metric-grid">
               <article class="metric">
-                <div class="metric-top">
-                  <svg aria-hidden="true"><use href="#layers" /></svg
-                  ><span class="metric-state">NOT CONNECTED</span>
-                </div>
-                <span>Active Tenders</span
-                ><strong aria-label="Not available">—</strong
-                ><small>Tenders currently in progress</small>
+                <div class="metric-top"><svg aria-hidden="true"><use href="#layers" /></svg><span class="metric-state">LIVE</span></div>
+                <span>Active Tenders</span><strong>@st.ActiveTenders</strong><small>Tenders currently in progress</small>
               </article>
               <article class="metric">
-                <div class="metric-top">
-                  <svg aria-hidden="true"><use href="#people" /></svg
-                  ><span class="metric-state">NOT CONNECTED</span>
-                </div>
-                <span>Approved Suppliers</span
-                ><strong aria-label="Not available">—</strong
-                ><small>Eligible supplier partnerships</small>
+                <div class="metric-top"><svg aria-hidden="true"><use href="#people" /></svg><span class="metric-state">LIVE</span></div>
+                <span>Approved Suppliers</span><strong>@st.ApprovedSuppliers</strong><small>Verified and approved by Admin</small>
               </article>
               <article class="metric">
-                <div class="metric-top">
-                  <svg aria-hidden="true"><use href="#check" /></svg
-                  ><span class="metric-state">NOT CONNECTED</span>
-                </div>
-                <span>Completed Purchase Requests</span
-                ><strong aria-label="Not available">—</strong
-                ><small>Requests through completion</small>
+                <div class="metric-top"><svg aria-hidden="true"><use href="#check" /></svg><span class="metric-state">LIVE</span></div>
+                <span>Completed Purchase Requests</span><strong>@st.CompletedRequests</strong><small>Accepted and moved on to sourcing</small>
               </article>
             </div>
             <div class="analytics-grid">
               <article class="analytics-panel">
-                <div class="panel-title">
-                  <h3>Tender Status Distribution</h3>
-                  <span class="quiet-tag">LIFECYCLE</span>
-                </div>
+                <div class="panel-title"><h3>Tender Status Distribution</h3><span class="quiet-tag">LIFECYCLE</span></div>
                 <div class="distribution-empty">
-                  <div class="empty-donut" aria-hidden="true">
-                    <span>—<small>No data</small></span>
-                  </div>
+                  <div class="live-donut" aria-hidden="true" style="--donut:@donut"><span>@(st.Bidding + st.Evaluation + st.Approvals + st.Closed)<small>Tenders</small></span></div>
                   <div class="distribution-legend">
-                    <span><i></i>Bidding<b>—</b></span
-                    ><span><i></i>Evaluation<b>—</b></span
-                    ><span><i></i>Approvals<b>—</b></span
-                    ><span><i></i>Closed<b>—</b></span>
+                    <span><i style="background:#ff8a00"></i>Bidding<b>@st.Bidding</b></span><span><i style="background:#098fff"></i>Evaluation<b>@st.Evaluation</b></span><span><i style="background:#00bf81"></i>Approvals<b>@st.Approvals</b></span><span><i style="background:#c6cbd2"></i>Closed<b>@st.Closed</b></span>
                   </div>
                 </div>
-                <p class="chart-caption">
-                  Distribution appears when verified tender data is connected.
-                </p>
+                <p class="chart-caption">Calculated from the tender records in the system (counts only).</p>
               </article>
               <article class="analytics-panel">
-                <div class="panel-title">
-                  <h3>Procurement Activity</h3>
-                  <span class="quiet-tag">ACTIVITY</span>
+                <div class="panel-title"><h3>Procurement Activity</h3><span class="quiet-tag">TENDERS CREATED</span></div>
+                <div class="home-bars" role="img" aria-label="Tenders created per month">
+                  @foreach (var m in st.Monthly) { <div><i style="height:@(Math.Max(4, m.Value * 100 / peak))%"></i><b>@m.Value</b><span>@m.Key</span></div> }
                 </div>
-                <div class="activity-empty">
-                  <div class="chart-grid" aria-hidden="true">
-                    <i></i><i></i><i></i><i></i>
-                  </div>
-                  <div class="activity-message">
-                    <svg aria-hidden="true"><use href="#bars" /></svg
-                    ><strong>Your activity, in focus.</strong
-                    ><span>Waiting for a verified data connection.</span>
-                  </div>
-                </div>
-                <p class="chart-caption">
-                  No sample activity or live statistics are displayed.
-                </p>
+                <p class="chart-caption">Tenders created in the last six months.</p>
               </article>
             </div>
-            <div class="dashboard-empty-note">
-              <svg aria-hidden="true"><use href="#shield" /></svg
-              ><span
-                ><strong>Real insights start with real data.</strong> Metrics
-                are unavailable until the backend is connected.</span
-              >
-            </div>
+            
           </div>
         </div>
       </section>

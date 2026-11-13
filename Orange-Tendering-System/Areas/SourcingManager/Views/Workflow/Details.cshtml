@@ -1,0 +1,165 @@
+@model Orange_Tendering_System.ViewModels.WorkflowDetails
+@using Orange_Tendering_System.Models.Entities
+@using System.Text.Json
+@{
+    ViewData["Title"] = Model.Tender.Title;
+    ViewData["WorkspaceSection"] = "Weighted Evaluation";
+    var area = ViewContext.RouteData.Values["area"]?.ToString();
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var id = Model.Tender.Id;
+    var w = Model.Weights;
+    var s = Model.Session;
+    var round = Model.Tender.Rounds.OrderByDescending(x => x.RoundNumber).FirstOrDefault();
+    var mySeat = Model.Tender.CommitteeMembers.FirstOrDefault(x => x.UserId == Model.UserId && x.CommitteeType == CommitteeType.Evaluation);
+    var submitted = s != null && mySeat != null && s.Submissions.Any(x => x.CommitteeMemberId == mySeat.Id);
+}
+<style>
+.wf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:1rem}.wf form{margin:1rem 0;padding:1rem;border:1px solid #8885;border-radius:8px}.wf label{display:block;margin:.6rem 0}.wf input:not([type=checkbox]),.wf textarea,.wf select{display:block;width:100%;max-width:42rem;padding:.55rem;color:inherit;background:transparent;border:1px solid #888;border-radius:4px}.wf button,.wf .button{background:#ff7900;color:#111;padding:.6rem 1rem;border:0;border-radius:4px;font-weight:700;cursor:pointer}.wf pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:32rem;overflow:auto}.wf table{width:100%;border-collapse:collapse}.wf th,.wf td{text-align:left;padding:.6rem;border-bottom:1px solid #8885}.wf section{margin:1rem 0;padding:1.2rem;border:1px solid #8885;border-radius:10px}.wf .blocker{border-left:5px solid #ff7900;padding:1rem}.wf .scroll{overflow:auto}.wf small{display:block}
+</style>
+<div class="wf">
+<a asp-area="@area" asp-controller="@controller" asp-action="Index">Back to assigned tenders</a>
+<h1>@Model.Tender.Title</h1>
+@if (TempData["WorkflowMessage"] is string message) { <p role="status">@message</p> }
+<p><strong>@Model.Tender.Status</strong> · Purchase Request #@Model.Tender.PurchaseRequestId · Requirements version @(w?.Version ?? 1)</p>
+@if (!Model.WeightPolicyConfigured && w?.State != WeightState.Approved) { <p class="blocker">Awaiting Approval Policy. Weight approval authority has not been configured. Bidding is blocked.</p> }
+@if (!Model.FinalPolicyConfigured && !Model.IsSupplier) { <p class="blocker">Awaiting Final Approval Policy. Award requires an explicit policy for Top Committee scope, quorum, approval threshold, tie outcome and rejection handling.</p> }
+<section><h2>1. Tender requirements</h2><p>@Model.Tender.Description</p><pre>@Model.Tender.Requirements</pre>
+<div class="scroll"><table><thead><tr><th>Product / service</th><th>Quantity</th><th>Specifications</th></tr></thead><tbody>
+@foreach (var item in Model.Tender.Items) { <tr><td>@item.Name</td><td>@item.Quantity @item.Unit</td><td>@item.Specifications</td></tr> }
+</tbody></table></div>
+@if (Model.IsOfficer && w == null) {
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Upload" asp-route-id="@id" method="post" enctype="multipart/form-data"><label>Supporting requirement document<input type="file" name="file" accept=".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg" required /></label><button>Upload requirement document</button></form>
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RequestWeights" asp-route-id="@id" method="post"><p>Sending freezes this requirements version and its documents.</p><button>Send weight request to four members</button></form>
+}
+@if (w != null && !Model.IsSupplier) { <details><summary>Frozen requirements snapshot</summary><pre>@w.RequirementsJson</pre></details> }
+</section>
+<section><h2>2–4. Evaluation weights</h2>
+@if (w == null) { <p>Weight request has not been sent.</p> }
+else {
+<p>Status: @(w.State == WeightState.AwaitingApproval && !Model.WeightPolicyConfigured ? "Awaiting Approval Policy" : w.State == WeightState.AwaitingApproval ? "Awaiting Weight Approval" : w.State.ToString())</p>
+@if (!Model.IsSupplier) {
+<table><thead><tr><th>Committee assignment</th><th>Financial %</th><th>Technical %</th><th>Submitted UTC</th></tr></thead><tbody>
+@foreach (var p in w.Proposals) { <tr><td>@p.CommitteeMemberId · @p.MemberUserId</td><td>@p.Financial.ToString("0.####")</td><td>@p.Technical.ToString("0.####")</td><td>@p.SubmittedAt.ToString("u")</td></tr> }
+</tbody></table><p>@w.Proposals.Count / 4 proposals received.</p>
+@if (w.FinancialAverage != null) { <p>Calculated arithmetic mean: Financial @w.FinancialAverage.Value.ToString("0.######")% / Technical @w.TechnicalAverage!.Value.ToString("0.######")% · Total 100%. Calculated values require formal approval.</p> }
+}
+@if (w.State == WeightState.Approved) { <p><strong>Approved and locked:</strong> Financial @w.ApprovedFinancial!.Value.ToString("0.######")% / Technical @w.ApprovedTechnical!.Value.ToString("0.######")%.</p><p>Requirements version @w.Version · Approved @w.ApprovedAt?.ToString("u") by @w.ApprovedByUserId.</p> }
+@if (Model.IsEvaluator && w.State == WeightState.Proposals && w.Proposals.All(x => x.MemberUserId != Model.UserId)) {
+<form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post"><p>One final independent proposal per member. Submission cannot be edited.</p><label>Financial weight %<input id="financial-weight" name="financial" type="number" min="0" max="100" step="0.0001" required /></label><label>Technical weight %<input id="technical-weight" name="technical" type="number" min="0" max="100" step="0.0001" required /></label><button>Submit final proposal</button></form>
+}
+@if (Model.CanApproveWeights && w.State == WeightState.AwaitingApproval) {
+<form asp-area="EvaluationCommittee" asp-controller="WeightApprovals" asp-action="Approve" asp-route-id="@id" method="post"><p>Approve the displayed four proposals and exact averages for this requirements version.</p><button>Formally approve and lock weights</button></form>
+}
+}
+</section>
+@* Round history, Proceed / Re-Tender, fewer-supplier approval and external invitations. *@
+<partial name="_RoundControls" model="Model" />
+@if (Model.IsOfficer) {
+<section><h2>5. Supplier bidding and compliance</h2>
+@if (Model.Tender.Status == TenderStatus.Draft && w?.State == WeightState.Approved) {
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post"><label>Bidding deadline (local time)<input type="datetime-local" data-utc name="deadline" required /></label><button>Publish approved criteria and open bidding</button></form>
+}
+@if (round?.Status == TenderRoundStatus.Open) {
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Invite" asp-route-id="@id" method="post"><label>Approved supplier ID<input name="supplierId" type="number" min="1" required /></label><button>Invite supplier</button></form>
+<p>Deadline: <time data-local="@(round.Deadline.HasValue ? DateTime.SpecifyKind(round.Deadline.Value, DateTimeKind.Utc).ToString("O") : "")">@round.Deadline?.ToString("u")</time></p>
+@if (round.Deadline <= Model.UtcNow) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post"><button>Close bidding</button></form> }
+}
+@foreach (var bid in Model.Bids.Where(x => x.Status == BidStatus.Submitted)) {
+<p>Bid #@bid.Id · Supplier #@bid.TenderInvitation.SupplierId · @bid.ComplianceStatus · @bid.ComplianceNotes · Missing: @bid.MissingRequirements</p>
+@if (round?.Status == TenderRoundStatus.Closed && s == null) {
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Compliance" asp-route-id="@id" method="post"><input type="hidden" name="bidId" value="@bid.Id" /><label>Compliance result<select name="status"><option value="Compliant">Compliant</option><option value="NonCompliant">Non-Compliant</option><option value="PendingClarification">Pending Clarification</option></select></label><label>Reasons and verification notes<textarea name="notes" maxlength="2000" required></textarea></label><label>Missing requirements / documents<textarea name="missing" maxlength="2000"></textarea></label><button>Record compliance check</button></form>
+}
+}
+</section>
+}
+@if (Model.IsSupplier) {
+<section><h2>5. Your invitation and offer</h2>
+@foreach (var invitation in Model.Tender.Rounds.SelectMany(x => x.Invitations)) {
+<p>Invitation #@invitation.Id · @invitation.Status · Round @(Model.Tender.Rounds.FirstOrDefault(x => x.Id == invitation.TenderRoundId)?.RoundNumber)@(invitation.TenderRoundId == round?.Id ? "" : " · earlier round, kept as history")</p>
+@if (invitation.TenderRoundId == round?.Id && invitation.Status == InvitationStatus.Pending && round?.Status == TenderRoundStatus.Open && round.Deadline > Model.UtcNow) {
+<form asp-area="Supplier" asp-controller="Workflow" asp-action="Respond" asp-route-id="@id" method="post"><input type="hidden" name="invitationId" value="@invitation.Id" /><button name="accept" value="true">Accept invitation</button> <button name="accept" value="false">Decline invitation</button></form>
+}
+@if (invitation.TenderRoundId == round?.Id && invitation.Status == InvitationStatus.Accepted && Model.Bids.All(x => x.TenderInvitationId != invitation.Id) && round?.Status == TenderRoundStatus.Open && round.Deadline > Model.UtcNow) {
+<a asp-area="Supplier" asp-controller="Offers" asp-action="Create" asp-route-id="@invitation.Id">Prepare offer, attach documents and submit</a>
+}
+}
+@foreach (var bid in Model.Bids) { <p>Your bid #@bid.Id · @bid.Status · Compliance: @bid.ComplianceStatus · @bid.ComplianceNotes</p>
+<a asp-area="Supplier" asp-controller="Offers" asp-action="Details" asp-route-id="@bid.Id">Review offer and documents</a>
+}
+</section>
+}
+@if (!Model.IsSupplier) {
+@if (Model.Bids.Count > 0) {
+<section><h2>Supplier comparison</h2><div class="scroll"><table><thead><tr><th>Bid / supplier</th><th>Price including costs</th><th>Delivery</th><th>Technical proposal / terms</th><th>Compliance</th></tr></thead><tbody>
+@foreach (var bid in Model.Bids) { <tr><td>#@bid.Id / #@bid.TenderInvitation.SupplierId</td><td>@((bid.Items.Sum(x => x.Quantity*x.UnitPrice)+bid.OtherCost+bid.ShippingCost+bid.InstallationCost+bid.MaintenanceCost+bid.TaxAmount).ToString("N2")) @bid.CurrencyCode</td><td>@bid.DeliveryDays days</td><td>@bid.TechnicalProposal<br />@bid.PaymentTerms</td><td>@bid.ComplianceStatus<br />@bid.ComplianceNotes</td></tr> }
+</tbody></table></div></section>
+}
+@if (Model.IsOfficer && round?.Status == TenderRoundStatus.Closed) {
+<section><h2>6. AI analysis and evaluation setup</h2><p>Ollama provides unverified assistance. It cannot change official weights, scores, compliance, approval or award decisions.</p>
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Analyze" asp-route-id="@id" method="post"><button>Analyze actual submitted offers with Ollama</button></form>
+@if (s == null) {
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Setup" asp-route-id="@id" method="post"><label>Reviewed AI analysis ID<input name="AiAnalysisId" type="number" min="1" required /></label><label><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> The system creates the Jitsi video meeting link automatically and sends it to the Officer and the four evaluators</label><label>Or paste your own Zoom link instead (untick the box above)<input name="MeetingUrl" type="url" /></label><label>Evaluation start (local time)<input name="StartsAt" type="datetime-local" data-utc required /></label><label>Evaluation end (local time)<input name="EndsAt" type="datetime-local" data-utc required /></label><p>Scoring opens automatically at the start time and closes automatically at the end time; you can also end it manually. The reviewed AI analysis and the documents of every eligible offer are attached for the four assigned members, who receive in-app invitations.</p><p>Confirmed committee:</p><ul>@foreach (var m in Model.Tender.CommitteeMembers.Where(x => x.CommitteeType == CommitteeType.Evaluation)) { <li>@m.Responsibility: @m.UserId</li> }</ul><button>Confirm committee and send evaluation invitations</button></form>
+}
+</section>
+}
+@foreach (var ai in Model.Analyses) {
+<section><h3>AI analysis #@ai.Id · @ai.Status</h3><p>Model: @ai.Model · @ai.DurationMilliseconds ms · Started @ai.StartedAt.ToString("u") · @(ai.ReviewedAt == null ? "Unreviewed assistance" : "Reviewed as supplementary evidence")</p><pre>@ai.Findings</pre><details><summary>Actual source evidence and extraction limitations</summary><pre>@ai.EvidenceJson</pre></details>
+@if (Model.IsOfficer && ai.Status == "Completed" && ai.ReviewedAt == null) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ReviewAi" asp-route-id="@id" method="post"><input name="analysisId" type="hidden" value="@ai.Id" /><button>Record human review of AI report</button></form> }
+</section>
+}
+@if (s != null) {
+<section><h2>7. Committee evaluation</h2><p>State: @s.State · @s.Submissions.Count / 4 final submissions · @(4-s.Submissions.Count) missing</p><p>Opens <time data-local="@DateTime.SpecifyKind(s.StartsAt, DateTimeKind.Utc).ToString("O")">@s.StartsAt.ToString("u")</time> · Closes <time data-local="@DateTime.SpecifyKind(s.EndsAt, DateTimeKind.Utc).ToString("O")">@s.EndsAt.ToString("u")</time></p><a href="@s.MeetingUrl" target="_blank" rel="noopener noreferrer">Open @(s.MeetingUrl.Contains("meet.jit.si") ? "Jitsi" : "Zoom") meeting link</a> · <a data-no-modal href="/Meetings/Join/@id">Join inside the system</a><p>@(s.ZoomMeetingId != null ? $"Zoom meeting {s.ZoomMeetingId} was created by the system." : s.MeetingUrl.Contains("meet.jit.si") ? "Jitsi meeting created by the system." : "Zoom link supplied by the officer.") @(s.OpenedAt != null ? $"Scoring opened automatically at {s.OpenedAt:u}." : "")</p><p>@s.Invitations.Count persisted committee invitations.</p>
+@if (s.State == SessionState.Incomplete) { <p class="blocker">Evaluation incomplete. Recommendation is blocked. No missing score is treated as zero and no partial average is permitted. An authorized resolution policy is required.</p> }
+@if (Model.IsEvaluator && !submitted && s.State == SessionState.Scheduled && Model.UtcNow < s.StartsAt) { <p>Evaluation form is locked until the scheduled opening time.</p> }
+@if (submitted) { <p role="status">Your final evaluation is recorded. Submitted scores are immutable.</p> }
+@if (Model.IsEvaluator && !submitted && s.State == SessionState.Scheduled && Model.UtcNow >= s.StartsAt && Model.UtcNow < s.EndsAt) {
+<form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post"><p>Scores range from 0–100 and are independent of the approved weight percentages. Submit all eligible suppliers together.</p>
+@{ var scoreIndex = 0; }
+@foreach (var eligible in s.EligibleBids) { <fieldset><legend>Bid #@eligible.BidId</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" /><label>Financial score<input name="scores[@scoreIndex].Financial" type="number" min="0" max="100" step="0.0001" required /></label><label>Technical score<input name="scores[@scoreIndex].Technical" type="number" min="0" max="100" step="0.0001" required /></label><label>Observations and justification<textarea name="scores[@scoreIndex].Justification" maxlength="2000" required></textarea></label></fieldset> scoreIndex++; }
+<button>Submit complete final evaluation</button></form>
+}
+@if (Model.IsOfficer && s.State == SessionState.Scheduled && s.Submissions.Count == 4) {
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="EndEvaluation" asp-route-id="@id" method="post"><p>Completed: @s.Submissions.Count · Missing: @(4-s.Submissions.Count). All four submissions are complete. This action calculates results and generates the PDF automatically.</p><label>Closure reason<textarea name="reason" required></textarea></label><label><input name="confirmed" type="checkbox" value="true" required /> I confirm finalizing all four submissions and generating the report.</label><button>End Evaluation</button></form>
+}
+@if (s.ClosedAt != null) { <p>Closed @s.ClosedAt?.ToString("u") · By @(s.ClosedByUserId ?? "System deadline") · @s.ClosureReason</p> }
+@if (Model.Scores.Count > 0) { <div class="scroll"><table><thead><tr><th>Member</th><th>Bid</th><th>Score type</th><th>Raw score</th><th>Observations</th></tr></thead><tbody>@foreach (var score in Model.Scores) { <tr><td>@score.CommitteeMemberId</td><td>@score.BidId</td><td>@score.EvaluationCriterion.Type</td><td>@score.Score.ToString("0.####")</td><td>@score.Comment</td></tr> }</tbody></table></div> }
+@if (Model.Ranking.Count > 0) {
+<h3>Calculated ranking</h3><p>Member score = (FinancialScore × FinancialWeight + TechnicalScore × TechnicalWeight) / 100. Final supplier score = sum of all four member scores / 4. Ranking uses full precision; display uses four decimal places.</p><table><thead><tr><th>Rank</th><th>Bid</th><th>Final score</th><th>Result</th></tr></thead><tbody>@foreach (var r in Model.Ranking) { <tr><td>@r.Rank</td><td>@r.BidId</td><td>@r.Score.ToString("0.0000")</td><td>@(r.Tied ? "Exact score tie" : r.Rank == 1 ? "Recommended Winner" : "Ranked")</td></tr> }</tbody></table>
+@if (Model.Ranking.Count(x => x.Rank == 1) > 1) { <p class="blocker">Exact highest-score tie. A documented resolution policy is required before award.</p> }
+}
+<p>When all four evaluations close, the system automatically calculates the ranking and generates the PDF for signing.</p>
+</section>
+@if (s.Report != null) {
+<section><h2>Unified evaluation report · Version @s.Report.VersionNumber</h2><p><a asp-area="@area" asp-controller="Reports" asp-action="Review" asp-route-id="@s.ReportId">Review generated PDF, signatures and version history</a></p><p>Status @s.Report.Status · Created by @s.Report.CreatedByUserId at @s.Report.CreatedAt.ToString("u") · Recommended bid @(s.Report.RecommendedBidId?.ToString() ?? "Blocked: exact top-score tie")</p><pre>@s.Report.Content</pre><p>Report finalization votes: @Model.Votes.Count(x => x.CommitteeRoundId == (s.ReportReviewRoundId ?? s.CommitteeRoundId)) / 4</p>
+@if (Model.IsEvaluator && s.State == SessionState.ReportDraft && !Model.Votes.Any(x => x.CommitteeRoundId == (s.ReportReviewRoundId ?? s.CommitteeRoundId) && x.CommitteeMemberId == mySeat?.Id)) { <p><a asp-area="@area" asp-controller="Reports" asp-action="Review" asp-route-id="@s.ReportId">Open the generated PDF, signing and revision workflow</a></p> }
+@if (Model.IsOfficer && s.State == SessionState.Finalized && Model.Tender.Status == TenderStatus.OfficerReview) { <p><a asp-area="@area" asp-controller="Reports" asp-action="Review" asp-route-id="@s.ReportId">Open the generated PDF, signing and revision workflow</a></p> }
+@if (s.Report.ReviewedAt != null) { <p>Manager: @s.Report.ReviewedByUserId · @s.Report.Status · @s.Report.ReviewedAt?.ToString("u") · @s.Report.ReviewComment</p> }
+@if (s.State == SessionState.Returned) { <p class="blocker">Returned report preserved. Scores remain locked. The officer can create a textual correction version requiring four fresh committee endorsements. Renewed scoring requires a separate authorized policy.</p> }
+@if (Model.IsOfficer && s.State == SessionState.Returned) { <p><a asp-area="@area" asp-controller="Reports" asp-action="Review" asp-route-id="@s.ReportId">Open the generated PDF, signing and revision workflow</a></p> }@if (Model.IsManager && Model.Tender.Status == TenderStatus.ManagerReview && s.State == SessionState.Finalized) { <p><a asp-area="@area" asp-controller="Reports" asp-action="Review" asp-route-id="@s.ReportId">Open the generated PDF, signing and revision workflow</a></p> }
+@if (Model.IsManager) { <p><a asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Details" asp-route-id="@id">Open your independent Evaluation Committee tasks</a></p> }
+</section>
+}
+@if (s.State == SessionState.ManagerApproved || s.State == SessionState.Awarded) {
+<section><h2>8. Final approval and award</h2>
+@if (Model.IsOfficer && Model.FinalPolicyConfigured && !Model.Tender.CommitteeMembers.Any(x => x.CommitteeType == CommitteeType.Top)) {
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="AssignTop" asp-route-id="@id" method="post"><p>If configured policy requires Top Committee approval, assign four authorized members separate from the Evaluation Committee.</p>@for(var i=0; i<4; i++) { <label>Top Committee member @(i+1) user ID<input name="memberIds" required /></label> }<button>Assign and invite Top Committee</button></form>
+}
+@if (Model.IsTop && s.State == SessionState.ManagerApproved && Model.FinalPolicyConfigured) {
+<p><a asp-area="@area" asp-controller="Reports" asp-action="Review" asp-route-id="@s.ReportId">Open the generated PDF, signing and revision workflow</a></p>
+}
+@foreach (var vote in Model.Votes.Where(x => x.CommitteeRound.CommitteeType == CommitteeType.Top)) { <p>Member #@vote.CommitteeMemberId · @vote.Decision · @vote.VotedAt.ToString("u") · @vote.Comment</p> }
+@if (Model.IsOfficer && s.State == SessionState.ManagerApproved && Model.FinalPolicyConfigured) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Award" asp-route-id="@id" method="post"><p>The server verifies all configured approvals, eligibility, exact ranking and absence of ties before award.</p><button>Record official award and close tender</button></form> }
+@if (Model.Tender.AwardedBidId != null) { <p><strong>Officially awarded bid #@Model.Tender.AwardedBidId</strong> · @Model.Tender.AwardedAt?.ToString("u") · Closed @Model.Tender.ClosedAt?.ToString("u")</p> }
+</section>
+}
+}
+}
+<section><h2>Authorized documents</h2><p>Downloads are access checked. Files are stored outside the public web root.</p><ul>@foreach (var document in Model.Documents) { <li><a asp-area="@area" asp-controller="@controller" asp-action="Download" asp-route-id="@document.Id">@document.FileName</a> · @(document.BidId == null ? "Requirements" : $"Bid #{document.BidId}")</li> }</ul></section>
+@if (!Model.IsSupplier) { <section><h2>Decision and audit history</h2>@foreach (var entry in Model.History) { <details><summary>@entry.CreatedAt.ToString("u") · @entry.Action · @entry.UserId</summary><pre>@entry.NewValues</pre></details> }</section> }
+</div>
+<script>
+const financial=document.getElementById('financial-weight'), technical=document.getElementById('technical-weight');
+if(financial&&technical){financial.addEventListener('input',()=>technical.value=(100-Number(financial.value)).toFixed(4));technical.addEventListener('input',()=>financial.value=(100-Number(technical.value)).toFixed(4));}
+document.querySelectorAll('time[data-local]').forEach(el=>{const d=new Date(el.dataset.local);if(!isNaN(d))el.textContent=d.toLocaleString();});
+document.querySelectorAll('form').forEach(form=>form.addEventListener('submit',()=>{form.querySelectorAll('input[data-utc]').forEach(input=>{if(input.value){const hidden=document.createElement('input');hidden.type='hidden';hidden.name=input.name;hidden.value=new Date(input.value).toISOString();input.removeAttribute('name');form.appendChild(hidden);}});}));
+</script>

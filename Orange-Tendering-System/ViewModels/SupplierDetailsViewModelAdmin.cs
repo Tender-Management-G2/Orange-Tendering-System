@@ -25,7 +25,7 @@ namespace Orange_Tendering_System.ViewModels
         public List<SupplierAccountViewModel> Accounts
         { get; set; } = new();
 
-        public List<SupplierDocumentViewModel> Documents
+        public List<AdminSupplierDocumentViewModel> Documents
         { get; set; } = new();
 
         public List<SupplierInvitationViewModel> Invitations
@@ -39,7 +39,7 @@ namespace Orange_Tendering_System.ViewModels
         public bool IsActive { get; set; }
     }
 
-    public class SupplierDocumentViewModel
+    public class AdminSupplierDocumentViewModel
     {
         public int Id { get; set; }
         public string FileName { get; set; } = "";

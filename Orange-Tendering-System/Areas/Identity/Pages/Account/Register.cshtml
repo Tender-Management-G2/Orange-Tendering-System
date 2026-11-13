@@ -1,97 +1,87 @@
-﻿@page
+@page
 @model RegisterModel
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Supplier Registration (ASP.NET Core Identity register)
-
-DEVELOPER OWNER: Ahmad
-MODULE: Authentication
-TRELLO TASK: User Registration
-TRELLO URL: https://trello.com/c/vYTVxn8o
-
-PURPOSE:
-Public self-registration. By the approved rules ONLY suppliers
-register publicly; internal employee accounts are created by
-Admin (Areas/Admin/Users/Create).
-
-BUSINESS ACCESS:
-Anonymous visitors (supplier companies).
-
-FUTURE IMPLEMENTATION:
-- Extend RegisterModel.InputModel with full name and the
-  company fields shown (disabled) below.
-- In one transaction: create the ApplicationUser, create a
-  Supplier with Status = Pending, set ApplicationUser.SupplierId,
-  and add the "Supplier" role (SystemRoles.Supplier).
-- Never let a public user choose a role or an internal
-  department. Admin approves the supplier later.
-- Notify Admin and write an AuditLog entry.
-
-DEPENDENCIES:
-AspNetUsers, ApplicationUser, Suppliers, AspNetUserRoles,
-Admin Supplier Review page, Notifications, AuditLogs.
-
-STATUS:
-ACCOUNT CREATION WORKS (existing Identity, email + password
-only). Supplier company profile is NOT IMPLEMENTED.
-
-IMPORTANT:
-Registration must not grant any internal role.
-===========================================================
-*@
+@inject IWebHostEnvironment HostEnvironment
+@inject IConfiguration Configuration
+@using Orange_Tendering_System.Services
 @{
     ViewData["Title"] = "Supplier Registration";
 }
 <section class="section auth-section">
-    <div class="glass auth-card">
+    <div class="glass auth-card auth-card-wide">
         <span class="eyebrow">SUPPLIER ONBOARDING</span>
         <h1>Register your company</h1>
-        <p>Public registration is for supplier companies. Internal employee accounts are created by the system administrator. New supplier accounts stay pending until Admin approval.</p>
-        <form id="registerForm" asp-route-returnUrl="@Model.ReturnUrl" method="post">
+        <partial name="_RegistrationSteps" model="1" />
+        <p>Registration is for supplier companies. After your details, you verify your email and register your face for sign-in. Your company can participate only after administrator approval.</p>
+        <p><a class="auth-link" asp-page="./VerifyEmail">Already started? Verify your email or request a new code</a></p>
+        @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
+        {
+            <p class="auth-note">Local development: start <code>node Tools/DevMail/server.js</code> and read verification emails at <a href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">the local inbox</a>.</p>
+        }
+        <form id="registerForm" method="post" enctype="multipart/form-data">
+            <div id="registrationErrors" class="validation-summary" role="alert" aria-live="polite"></div>
             <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-            <label asp-for="Input.Email">Email</label>
-            <input asp-for="Input.Email" autocomplete="username" aria-required="true" />
-            <span asp-validation-for="Input.Email" class="field-error"></span>
-            <label asp-for="Input.Password">Password</label>
-            <input asp-for="Input.Password" autocomplete="new-password" aria-required="true" />
-            <span asp-validation-for="Input.Password" class="field-error"></span>
-            <label asp-for="Input.ConfirmPassword">Confirm Password</label>
-            <input asp-for="Input.ConfirmPassword" autocomplete="new-password" aria-required="true" />
-            <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
-
-            @* TODO (Ahmad): bind these to RegisterModel.InputModel, save a Pending Supplier (Suppliers table) and the
-               uploaded legal documents (Documents.SupplierId, stored outside wwwroot). Disabled until then. *@
-            <fieldset class="auth-fieldset" disabled>
-                <legend>Company details — not connected yet</legend>
-                <label for="contact-full-name">Your full name</label>
-                <input id="contact-full-name" />
-                <label for="company-name">Company name</label>
-                <input id="company-name" />
-                <label for="registration-number">Commercial registration number</label>
-                <input id="registration-number" />
-                <label for="tax-number">Tax number (where applicable)</label>
-                <input id="tax-number" />
-                <label for="company-email">Company email</label>
-                <input id="company-email" type="email" />
-                <label for="company-phone">Company phone</label>
-                <input id="company-phone" type="tel" />
-                <label for="company-address">Company address</label>
-                <input id="company-address" />
-                <label for="legal-documents">Commercial registration, licenses and legal documents</label>
-                <input id="legal-documents" type="file" multiple />
+            <fieldset class="auth-fieldset">
+                <legend>Contact account</legend>
+                <label asp-for="Input.FullName">Contact person's full name</label>
+                <input asp-for="Input.FullName" autocomplete="name" />
+                <span asp-validation-for="Input.FullName" class="field-error"></span>
+                <label asp-for="Input.Email">Email address</label>
+                <input asp-for="Input.Email" autocomplete="email" />
+                <span asp-validation-for="Input.Email" class="field-error"></span>
+                <label asp-for="Input.Password">Password</label>
+                <input asp-for="Input.Password" autocomplete="new-password" />
+                <span asp-validation-for="Input.Password" class="field-error"></span>
+                <label asp-for="Input.ConfirmPassword">Confirm password</label>
+                <input asp-for="Input.ConfirmPassword" autocomplete="new-password" />
+                <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
             </fieldset>
-
-            <div class="auth-fieldset" role="note">
-                <small><strong>After registration:</strong> your company stays <em>Pending</em> until the system administrator verifies its registration and legal documents, then marks it <em>Approved</em> (or <em>Rejected</em> with a reason). Only approved companies can be invited to tenders. Creating an account here does not yet create the company profile — that part is not implemented.</small>
-            </div>
-
-            <button id="registerSubmit" type="submit" class="primary">Create Account →</button>
+            <fieldset class="auth-fieldset">
+                <legend>Company details</legend>
+                <label asp-for="Input.CompanyName">Legal company name</label>
+                <input asp-for="Input.CompanyName" />
+                <span asp-validation-for="Input.CompanyName" class="field-error"></span>
+                <label asp-for="Input.Category">Main supply category</label>
+                <select asp-for="Input.Category">
+                    <option value="">Choose your category</option>
+                    @foreach (var category in Model.Categories) { <option value="@category">@category</option> }
+                </select>
+                <span asp-validation-for="Input.Category" class="field-error"></span>
+                <label asp-for="Input.RegistrationNumber">Commercial registration number</label>
+                <input asp-for="Input.RegistrationNumber" />
+                <span asp-validation-for="Input.RegistrationNumber" class="field-error"></span>
+                <label asp-for="Input.TaxNumber">Tax number (where applicable)</label>
+                <input asp-for="Input.TaxNumber" />
+                <span asp-validation-for="Input.TaxNumber" class="field-error"></span>
+                <label asp-for="Input.CompanyEmail">Company email</label>
+                <input asp-for="Input.CompanyEmail" autocomplete="email" />
+                <span asp-validation-for="Input.CompanyEmail" class="field-error"></span>
+                <label asp-for="Input.CompanyPhone">Company telephone number</label>
+                <input asp-for="Input.CompanyPhone" type="tel" />
+                <span asp-validation-for="Input.CompanyPhone" class="field-error"></span>
+                <label asp-for="Input.CompanyAddress">Company address</label>
+                <input asp-for="Input.CompanyAddress" />
+                <span asp-validation-for="Input.CompanyAddress" class="field-error"></span>
+            </fieldset>
+            <fieldset class="auth-fieldset">
+                <legend>Official documents</legend>
+                <p>PDF, PNG, or JPEG. Maximum 10 MB per file.</p>
+                <label asp-for="CommercialRegistrationCertificate">Commercial registration certificate</label>
+                <input asp-for="CommercialRegistrationCertificate" type="file" accept=".pdf,.png,.jpg,.jpeg" />
+                <span asp-validation-for="CommercialRegistrationCertificate" class="field-error"></span>
+                <label asp-for="TaxCertificate">Tax certificate (required if you entered a tax number)</label>
+                <input asp-for="TaxCertificate" type="file" accept=".pdf,.png,.jpg,.jpeg" />
+                <span asp-validation-for="TaxCertificate" class="field-error"></span>
+                <label asp-for="LegalDocuments">Business licenses or other required legal documents</label>
+                <input asp-for="LegalDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg" />
+                <span asp-validation-for="LegalDocuments" class="field-error"></span>
+            </fieldset>
+            <p class="auth-note">First, verify your email with the code we send. Your application is submitted for administrator review only after verification.</p>
+            <button id="registerSubmit" type="submit" class="primary">Send verification code →</button>
         </form>
-        <a class="auth-link" asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">Already registered? Sign in ↗</a>
+        <a class="auth-link" asp-page="./Login">Already started? Sign in with your email and password to resume setup</a>
     </div>
 </section>
-
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/supplier-registration.js" asp-append-version="true"></script>
 }

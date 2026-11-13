@@ -1,0 +1,16 @@
+@model RequestTable
+<div class="pg-table-wrap"><table class="pg-table">
+    <thead><tr><th scope="col">Reference</th><th scope="col">Title</th><th scope="col">Priority</th><th scope="col">Needed by</th><th scope="col">Status</th><th scope="col">Last submitted (UTC)</th><th scope="col">Actions</th></tr></thead>
+    <tbody>
+    @foreach (var request in Model.Requests)
+    {
+        <tr>
+            <td>PR-@request.Id</td><td>@request.Title</td><td>@request.Priority</td><td>@request.NeededBy?.ToString("yyyy-MM-dd")</td>
+            <td><span class="pg-badge">@RequestDisplay.Status(request)</span></td><td>@RequestDisplay.Date(request.SubmittedAt)</td>
+            <td><a asp-area="Department" asp-controller="PurchaseRequests" asp-action="Details" asp-route-id="@request.Id">Details</a>
+            @if (RequestDisplay.Editable(request, Model.UserId)) { <a asp-area="Department" asp-controller="PurchaseRequests" asp-action="Edit" asp-route-id="@request.Id"> · Edit</a> }</td>
+        </tr>
+    }
+    @if (Model.Requests.Count == 0) { <tr><td colspan="7">No matching purchase requests.</td></tr> }
+    </tbody>
+</table></div>

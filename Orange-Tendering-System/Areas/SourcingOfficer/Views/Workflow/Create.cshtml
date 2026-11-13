@@ -1,0 +1,34 @@
+@model Orange_Tendering_System.ViewModels.RequirementsInput
+@inject Microsoft.AspNetCore.Identity.UserManager<Orange_Tendering_System.Models.Entities.ApplicationUser> People
+@inject Orange_Tendering_System.Data.ApplicationDbContext Records
+@using Microsoft.EntityFrameworkCore
+@{
+    ViewData["Title"] = "Tender requirements"; ViewData["WorkspaceSection"] = "Tenders";
+    // Pick people by name instead of pasting Identity user ids: only active accounts of the right role are offered (the server re-checks every choice).
+    async Task<List<(string Id, string Label)>> Pool(string role) => (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive)
+        .Select(u => (u.Id, (string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName + " (" + u.Email + ")")!)).OrderBy(u => u.Item2).ToList();
+    var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager);
+    var evaluators = await Pool(Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee);
+    var openRequests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted).OrderByDescending(r => r.Id)
+        .Select(r => new { r.Id, r.Title, Dept = r.Department.Name }).ToListAsync();
+}
+<h1>Prepare tender requirements</h1>
+<p>Use an accepted Purchase Request. Its items, quantities and specifications are copied into the tender. Assign four distinct active committee accounts.</p>
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create" method="post" class="ws-panel pg-panel">
+    <div asp-validation-summary="All" role="alert"></div>
+    <p><label asp-for="PurchaseRequestId">Approved purchase request</label><select asp-for="PurchaseRequestId" required><option value="">Select an accepted request</option>@foreach (var r in openRequests) { <option value="@r.Id" selected="@(Model.PurchaseRequestId == r.Id)">PR-@r.Id.ToString("0000") · @r.Title (@r.Dept)</option> }</select></p>
+    <p><label asp-for="Title"></label><input asp-for="Title" required /></p>
+    <p><label asp-for="Description"></label><textarea asp-for="Description" required></textarea></p>
+    <p><label asp-for="TechnicalRequirements">Technical requirements</label><textarea asp-for="TechnicalRequirements" required></textarea></p>
+    <p><label asp-for="CommercialConditions">Financial and commercial conditions</label><textarea asp-for="CommercialConditions" required></textarea></p>
+    <p><label asp-for="DeliveryExpectations">Delivery expectations</label><textarea asp-for="DeliveryExpectations" required></textarea></p>
+    <p><label asp-for="MandatoryCompliance">Mandatory compliance requirements and documents</label><textarea asp-for="MandatoryCompliance" required></textarea></p>
+    <p><label asp-for="EstimatedValue">Estimated procurement value</label><input asp-for="EstimatedValue" type="number" min="0.01" step="0.01" required /></p>
+    <p><label asp-for="Currency"></label><input asp-for="Currency" maxlength="3" pattern="[A-Z]{3}" required /></p>
+    <p><label><input asp-for="IsCritical" /> Critical procurement (used only by an explicitly configured final-approval policy)</label></p>
+    <p><label asp-for="SourcingManagerId">Sourcing Manager</label><select asp-for="SourcingManagerId" required><option value="">Select a person</option>@foreach (var u in managers) { <option value="@u.Id" selected="@(Model.SourcingManagerId == u.Id)">@u.Label</option> }</select></p>
+    <p><label asp-for="DepartmentRepresentativeId">Department Representative (Evaluation Committee member)</label><select asp-for="DepartmentRepresentativeId" required><option value="">Select a person</option>@foreach (var u in evaluators) { <option value="@u.Id" selected="@(Model.DepartmentRepresentativeId == u.Id)">@u.Label</option> }</select></p>
+    <p><label asp-for="FinancialRepresentativeId">Financial Representative (Evaluation Committee member)</label><select asp-for="FinancialRepresentativeId" required><option value="">Select a person</option>@foreach (var u in evaluators) { <option value="@u.Id" selected="@(Model.FinancialRepresentativeId == u.Id)">@u.Label</option> }</select></p>
+    <p><label asp-for="TechnicalRepresentativeId">Technical Representative (Evaluation Committee member)</label><select asp-for="TechnicalRepresentativeId" required><option value="">Select a person</option>@foreach (var u in evaluators) { <option value="@u.Id" selected="@(Model.TechnicalRepresentativeId == u.Id)">@u.Label</option> }</select></p>
+    <button type="submit">Save tender requirements</button>
+</form>

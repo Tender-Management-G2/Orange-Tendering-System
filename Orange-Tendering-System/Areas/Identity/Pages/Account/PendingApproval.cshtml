@@ -1,0 +1,78 @@
+@page
+@model PendingApprovalModel
+@*
+    Supplier registration steps 3 and 4 (after Register and Verify Email, which signs the supplier in):
+    - No face enrolled yet: "Face registration" step (BiometricsController.FaceEnrollChallenge/FaceEnroll,
+      allowed for pending suppliers by SupplierApprovalGate). Success returns here with ?faceRegistered=true.
+    - Face enrolled: registration complete, waiting for administrator approval.
+*@
+@{
+    var faceDone = Model.FaceTemplateCount > 0;
+    var setupDone = faceDone && Model.PasskeyCount > 0;
+    var title = setupDone ? (Model.CompanyApproved ? "Registration Complete" : "Pending Approval") : faceDone ? "Fingerprint / Passkey Registration" : "Face Registration";
+    ViewData["Title"] = title;
+}
+<section class="section auth-section">
+    <div class="glass auth-card">
+        <span class="eyebrow">SUPPLIER ONBOARDING</span>
+        <h1>@title</h1>
+        <partial name="_RegistrationSteps" model="@(setupDone ? 5 : faceDone ? 4 : 3)" />
+
+        @if (Model.JustRegistered)
+        {
+            <div class="bio-status bio-status--success" role="status">Face registered successfully. Complete fingerprint / passkey registration next.</div>
+        }
+        @if (setupDone)
+        {
+            <p role="status">Fingerprint / Passkey Registered Successfully. Your email, face and passkey setup are complete. Company approval is a separate administrator decision.</p>
+            <p>Once your company is approved, choose face recognition or fingerprint / passkey on the sign-in page. Tender invitations and bids become available after approval.</p>
+        }
+        else
+        {
+            <p role="status">Your email is verified. Register your face, then register a fingerprint / passkey. After company approval, either method can be used to sign in.</p>
+        }
+
+        <div id="bio-root" data-return-url="" data-enrolled-url="/Identity/Account/PendingApproval?faceRegistered=true">
+            @Html.AntiForgeryToken()
+            <fieldset class="auth-fieldset">
+                <legend>@(faceDone ? "Register my face again (if sign-in does not recognise you)" : "Face registration")</legend>
+                <p>@(faceDone ? "✓ Face registered (" + Model.FaceTemplateCount + " encrypted samples)." : "1. Enter your password  2. Click Register Face  3. Allow the camera and look at it for 5 seconds — your face is captured automatically.")</p>
+                <label for="bioPassword">Current password</label>
+                <input id="bioPassword" type="password" autocomplete="current-password" />
+                <small>Re-checked so only you can link a face to this account.</small>
+                <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
+                <button id="btnFaceEnroll" type="button" class="@(faceDone ? "overview" : "primary")">@(faceDone ? "Register face again" : "Register Face")</button>
+                <div id="facePanel" class="bio-face-panel bio-hidden">
+                    <video id="faceVideo" playsinline muted autoplay></video>
+                    <div id="faceHint" class="bio-face-hint"></div>
+                </div>
+                <small>The camera picture stays on this device; only face measurements are sent.</small>
+            </fieldset>
+
+            @if (faceDone)
+            {
+                <fieldset class="auth-fieldset">
+                    <legend>Fingerprint / Passkey Registration</legend>
+                    <p>@(Model.PasskeyCount > 0 ? "✓ " + Model.PasskeyCount + " device(s) registered." : "No device registered.")</p>
+                    <label for="passkeyLabel">Device name</label>
+                    <input id="passkeyLabel" type="text" maxlength="60" placeholder="My phone" />
+                    <button id="btnPasskeyRegister" type="button" class="overview">Register Fingerprint / Passkey</button>
+                    <small>Uses the current password from the section above. Your browser may offer this computer or a phone (QR code).</small>
+                </fieldset>
+            }
+        </div>
+
+        <a class="auth-link" asp-area="" asp-controller="Home" asp-action="Index">Return to homepage</a>
+        <a class="auth-link" asp-page="./Login">Sign in with face or fingerprint / passkey</a>
+        <form asp-page="./Logout" method="post">
+            <button type="submit" class="overview">Sign out</button>
+        </form>
+    </div>
+</section>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+}
+@section Scripts {
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
+}

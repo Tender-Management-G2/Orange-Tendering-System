@@ -48,22 +48,20 @@ namespace Orange_Tendering_System.ViewModels
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Requests", "PurchaseRequests", "Index", "request"),
                 new("Tenders", "Tenders", "Index", "tender"),
-                new("Tender Rounds", "Tenders", "Rounds", "rounds"),
-                new("Invitations", "Invitations", "Index", "mail"),
                 new("Received Bids", "Bids", "Index", "layers"),
-                new("Compliance", "Bids", "Compliance", "check"),
-                new("Comparison", "Bids", "Compare", "compare"),
                 new("Reports", "Reports", "Index", "report"),
-                new("Supplier Clarifications", "Clarifications", "Index", "chat"),
-                new("Analytics & Exports", "Analytics", "Index", "chart", "")
+                new("Final Decisions", "FinalDecisions", "Index", "check"),
+                  new("Supplier Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Invitations", "Invitations", "Index", "mail"),
+                new("Weighted Tenders", "Workflow", "Index", "tender"),
                 new("My Offers", "Offers", "Index", "layers"),
                 new("Documents", "Documents", "Index", "folder"),
                 new("Profile", "Profile", "Index", "user"),
+                new("Notifications", "Notifications", "Index", "bell"),
                 new("Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("EvaluationCommittee", "Evaluation Committee", SystemRoles.EvaluationCommittee,
@@ -82,8 +80,9 @@ namespace Orange_Tendering_System.ViewModels
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Pending Reports", "Reports", "Index", "request"),
-                new("Report Review", "Reports", "Review", "check"),
+                new("Report Review", "Reports", "Index", "check"),
                 new("Forwarding", "Reports", "Forward", "send"),
+                new("Final Decisions", "FinalDecisions", "Index", "check"),
                 new("Decision History", "Reports", "History", "history"),
                 new("Analytics & Exports", "Analytics", "Index", "chart", "")
             ]),
