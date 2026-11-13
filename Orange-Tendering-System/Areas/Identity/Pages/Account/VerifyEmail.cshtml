@@ -1,5 +1,7 @@
 @page
 @model VerifyEmailModel
+@inject IWebHostEnvironment HostEnvironment
+@inject IConfiguration Configuration
 @{
     ViewData["Title"] = "Verify Email";
 }
@@ -14,7 +16,15 @@
         }
         else
         {
-            <p>Enter the six-digit code sent to your email. It expires in 10 minutes.</p>
+            @if (HostEnvironment.IsDevelopment() &&
+                (Configuration["Smtp:Host"] == "127.0.0.1" || Configuration["Smtp:Host"] == "localhost"))
+            {
+                <p>Development mode sends verification codes to the <a href="http://127.0.0.1:8025/" target="_blank" rel="noopener noreferrer">local mail inbox</a>, not to your Gmail inbox. Enter the latest code from that page. It expires in 10 minutes.</p>
+            }
+            else
+            {
+                <p>Enter the six-digit code sent to your email. It expires in 10 minutes.</p>
+            }
             @if (TempData["Notice"] is string notice) { <p role="status">@notice</p> }
             <form method="post">
                 <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
