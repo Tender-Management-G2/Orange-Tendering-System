@@ -212,3 +212,4 @@ a.pg-btn-primary{background:linear-gradient(105deg,#ffb322,#ff7900 45%,#c65200);
 .ai-send:disabled{opacity:.5;cursor:wait}.ai-send svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .ws-toast-region{bottom:92px}
 @media (max-width:520px){.ai-panel{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}.ai-fab{right:14px;bottom:14px}}
+

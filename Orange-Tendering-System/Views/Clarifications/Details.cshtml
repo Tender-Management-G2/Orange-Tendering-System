@@ -11,7 +11,7 @@
 @if (TempData["ClarificationError"] is string error) { <p class="pg-note" role="alert">@error</p> }
 @if (TempData["ClarificationMessage"] is string notice) { <p class="pg-note" role="status">@notice</p> }
 <section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>@Model.Subject</h2><span class="pg-hint">With @other · @linked · @Model.Status</span></div><a asp-action="Index" class="pg-btn">Back to clarifications</a></div>
+    <div class="pg-panel-head"><div><h2>@Model.Subject</h2><span class="pg-hint">With @other · @linked · <span class="ui-pill ui-pill--@(Model.Status == Orange_Tendering_System.Models.Entities.ClarificationStatus.Closed ? "good" : Model.Status == Orange_Tendering_System.Models.Entities.ClarificationStatus.Open ? "warn" : "info")">@Orange_Tendering_System.Services.ClarificationPolicy.Label(Model.Status)</span></span></div><a asp-action="Index" class="pg-btn">Back to clarifications</a></div>
     <div class="so-chat">
     @foreach (var item in Model.Messages.OrderBy(m => m.SentAt))
     {
@@ -29,5 +29,6 @@
         <input type="hidden" name="id" value="@Model.Id" />
         <div class="pg-field"><label for="message">Message</label><textarea id="message" name="message" rows="4" maxlength="10000" required></textarea></div>
         <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send reply</button></div>
-    </form></section>
+    </form>
+    <form asp-action="Resolve" asp-route-id="@Model.Id" method="post" class="pg-form"><div class="pg-actions"><button type="submit" class="pg-btn">Mark as resolved</button></div></form></section>
 }

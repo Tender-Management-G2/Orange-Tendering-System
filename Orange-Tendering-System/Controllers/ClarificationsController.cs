@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Controllers;
 
 [Authorize]
-public class ClarificationsController(ApplicationDbContext db) : Controller
+public class ClarificationsController(ApplicationDbContext db, ClarificationService clarifications) : Controller
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -75,6 +77,11 @@ public class ClarificationsController(ApplicationDbContext db) : Controller
             && (c.FromUserId == userId || c.ToUserId == userId)
             && c.Status != ClarificationStatus.Closed);
         if (thread == null) return NotFound();
+        if (!await clarifications.CanContinue(thread))
+        {
+            TempData["ClarificationError"] = "This conversation can no longer continue: the two people are no longer an allowed role pair.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
 
         var now = DateTime.UtcNow;
         db.ClarificationMessages.Add(new ClarificationMessage
@@ -90,6 +97,37 @@ public class ClarificationsController(ApplicationDbContext db) : Controller
         });
         await db.SaveChangesAsync();
         TempData["ClarificationMessage"] = "Reply sent.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    // Start a new conversation: only the approved role chain is offered, and the server re-checks every choice.
+    [HttpGet]
+    public async Task<IActionResult> New()
+    {
+        if (User.IsInRole(SystemRoles.Supplier)) return RedirectToAction("Index", "Clarifications", new { area = "Supplier" });
+        try { return View(await clarifications.Options(User)); }
+        catch (WorkflowException e) { TempData["ClarificationError"] = e.Message; return RedirectToAction(nameof(Index)); }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> New(string option, string subject, string message)
+    {
+        var parts = (option ?? "").Split('|');
+        try
+        {
+            if (parts.Length != 3 || !int.TryParse(parts[2], out var contextId)) throw new WorkflowException("Choose who to ask.");
+            var id = await clarifications.CreateAsync(User, parts[0], parts[1], contextId, subject, message);
+            TempData["ClarificationMessage"] = "Clarification sent.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+        catch (WorkflowException e) { TempData["ClarificationError"] = e.Message; return RedirectToAction(nameof(Index)); }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Resolve(int id)
+    {
+        if (!await clarifications.ResolveAsync(CurrentUserId!, id)) return NotFound();
+        TempData["ClarificationMessage"] = "Marked as resolved.";
         return RedirectToAction(nameof(Details), new { id });
     }
 }
