@@ -15,6 +15,7 @@ public class RegisterModel(
     ApplicationDbContext db,
     UserManager<ApplicationUser> users,
     IEmailSender emailSender,
+    IConfiguration configuration,
     IWebHostEnvironment environment,
     ILogger<RegisterModel> logger) : PageModel
 {
@@ -145,7 +146,18 @@ public class RegisterModel(
         {
             await transaction.RollbackAsync();
             logger.LogError(exception, "Supplier registration failed.");
-            ModelState.AddModelError(string.Empty, "Registration could not be completed. Please try again later.");
+            var localMail = environment.IsDevelopment() &&
+                (configuration["Smtp:Host"] == "127.0.0.1" || configuration["Smtp:Host"] == "localhost");
+            var deliveryFailed = exception is System.Net.Mail.SmtpException ||
+                (exception is InvalidOperationException && !SmtpEmailSender.IsConfigured(configuration));
+            var message = deliveryFailed && localMail
+                ? "The local development mail inbox is not running. Start it with 'node Tools/DevMail/server.js', then try again."
+                : deliveryFailed && !SmtpEmailSender.IsConfigured(configuration)
+                    ? "Email delivery is not configured. Configure SMTP before registering."
+                    : deliveryFailed
+                        ? "Email delivery failed. Check the SMTP service settings and try again."
+                    : "Registration could not be completed. Check the application log and try again.";
+            ModelState.AddModelError(string.Empty, message);
             return Page();
         }
         finally

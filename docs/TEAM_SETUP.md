@@ -91,7 +91,7 @@ dotnet run --launch-profile https
 
 ## Authentication setup on Ahmad branch
 
-Apply `20261113091517_AddAuthenticationState` only to your verified local database. It adds three `AspNetUsers` columns and keeps the 30-table schema. Configure SMTP in User Secrets or environment variables, never tracked configuration:
+Apply `20261113091517_AddAuthenticationState` only to your verified local database. It adds three `AspNetUsers` columns and keeps the 30-table schema. For local Development registration, run `node Tools/DevMail/server.js` from the web project directory, then read OTP email at `http://127.0.0.1:8025`. No SMTP credentials are needed for this local inbox. For real email delivery, configure SMTP in User Secrets or environment variables, never tracked configuration:
 
 ```powershell
 dotnet user-secrets set "Smtp:Host" "your-smtp-host"
@@ -101,6 +101,6 @@ dotnet user-secrets set "Smtp:Username" "your-smtp-user"
 dotnet user-secrets set "Smtp:Password" "your-private-smtp-password"
 ```
 
-For a brand-new local installation only, optionally set `BootstrapAdmin:Email`, `BootstrapAdmin:Password`, and `BootstrapAdmin:FullName` at runtime. The Admin account requires a password change at first sign-in. Never commit those values. SMTP must support STARTTLS. Supplier documents are stored under the application's ignored `App_Data/SupplierDocuments` directory outside `wwwroot`; back this directory up and protect it in deployment. The app needs write permission there.
+For a brand-new local installation only, optionally set `BootstrapAdmin:Email`, `BootstrapAdmin:Password`, and `BootstrapAdmin:FullName` at runtime. The Admin account requires a password change at first sign-in. Never commit those values. Real SMTP must support STARTTLS; the Development inbox accepts unauthenticated email only on loopback. Supplier documents are stored under the application's ignored `App_Data/SupplierDocuments` directory outside `wwwroot`; back this directory up and protect it in deployment. The app needs write permission there.
 
-Use the HTTPS launch profile for sign-in because Identity cookies require HTTPS. If the local development certificate is missing, run `dotnet dev-certs https --trust`. The first Admin and Supplier onboarding require the migration, SQL Server, and SMTP configuration. Rjoub's Admin supplier review UI is still a scaffold, so company approval is not available through that UI yet.
+Use the HTTPS launch profile for sign-in because Identity cookies require HTTPS. If the local development certificate is missing, run `dotnet dev-certs https --trust`. The first Admin and Supplier onboarding require the migration and SQL Server; supplier OTP requires the running local Development inbox or a configured SMTP provider. Rjoub's Admin supplier review UI is still a scaffold, so company approval is not available through that UI yet.

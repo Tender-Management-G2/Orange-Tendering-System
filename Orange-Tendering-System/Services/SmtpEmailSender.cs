@@ -22,12 +22,18 @@ public sealed class SmtpEmailSender(IConfiguration configuration) : IEmailSender
         {
             IsBodyHtml = true
         };
-        using var client = new SmtpClient(configuration["Smtp:Host"]!, int.Parse(configuration["Smtp:Port"]!))
+        var host = configuration["Smtp:Host"]!;
+        var username = configuration["Smtp:Username"];
+        // Local development mail catchers do not usually support STARTTLS. Never allow
+        // plaintext SMTP to a remote host or when credentials are supplied.
+        var localMailCatcher = configuration.GetValue<bool>("Smtp:AllowInsecureLoopback") &&
+            (host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || host == "127.0.0.1" || host == "::1") &&
+            string.IsNullOrWhiteSpace(username);
+        using var client = new SmtpClient(host, int.Parse(configuration["Smtp:Port"]!))
         {
-            EnableSsl = true,
+            EnableSsl = !localMailCatcher,
             DeliveryMethod = SmtpDeliveryMethod.Network
         };
-        var username = configuration["Smtp:Username"];
         if (!string.IsNullOrWhiteSpace(username))
             client.Credentials = new NetworkCredential(username, configuration["Smtp:Password"]);
         await client.SendMailAsync(message);
