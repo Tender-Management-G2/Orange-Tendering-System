@@ -1,56 +1,30 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Committee Voting & Decision History
-
-DEVELOPER OWNER: Doulat
-MODULE: Top Committee
-TRELLO TASK: Committee Voting & Decision History
-TRELLO URL: https://trello.com/c/3NtWOXwd
-
-PURPOSE:
-Show all Top Committee rounds and individual votes; earlier
-rounds are preserved.
-
-BUSINESS ACCESS:
-Top Committee member (assigned to the tender)
-
-ROUTE: /TopCommittee/Decisions/History/{id?}
-
-FUTURE IMPLEMENTATION:
-- Query CommitteeRounds (Top) with CommitteeVotes.
-
-DEPENDENCIES:
-CommitteeRounds, CommitteeVotes, CommitteeMembers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
+@model DecisionHistory
 @{
     ViewData["Title"] = "Committee Voting & Decision History";
     ViewData["WorkspaceSection"] = "Decision History";
-    ViewData["Description"] = "Every Top Committee round with its votes, including rejected rounds.";
+    ViewData["Description"] = "Recorded rounds and votes for tenders assigned to you. Earlier decisions remain preserved.";
 }
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-committee-rounds">
-    <div class="pg-panel-head"><h2 id="tbl-committee-rounds">Committee rounds</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Summary version</th><th scope="col">Approvals</th><th scope="col">Rejections</th><th scope="col">Outcome</th><th scope="col">Completed</th></tr></thead>
-            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No Top Committee rounds yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-votes">
-    <div class="pg-panel-head"><h2 id="tbl-votes">Votes</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Member</th><th scope="col">Vote</th><th scope="col">Comment</th><th scope="col">Voted at</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Select a round to see its votes."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
+<partial name="_PageHeader" /><partial name="_Messages" />
+<form method="get" asp-action="History" class="pg-toolbar">
+    <input type="search" name="search" value="@Model.Search" placeholder="Tender title or numeric reference" aria-label="Search tender" />
+    <input type="number" min="1" name="tenderId" value="@Model.TenderId" placeholder="Tender ID" aria-label="Tender ID" />
+    <select name="status" aria-label="Round status"><option value="">All statuses</option>@foreach (var status in Enum.GetValues<CommitteeRoundStatus>()) { <option value="@status" selected="@(Model.Status == status)">@CommitteeDisplay.Status(status)</option> }</select>
+    <button type="submit" class="pg-btn pg-btn-primary">Filter</button><a asp-action="History" class="pg-btn">Clear</a>
+</form>
+<section class="ws-panel pg-panel"><h2>Committee rounds (@Model.Total)</h2><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Tender</th><th>Round / Summary Version</th><th>Recommended Supplier</th><th>Recorded Votes</th><th>Outcome</th><th>Decision Date</th><th>Details</th></tr></thead><tbody>
+@foreach (var round in Model.Rounds)
+{
+    <tr><td>T-@round.TenderRound.TenderId · @round.TenderRound.Tender.Title</td><td>@round.RoundNumber / @round.TenderReport?.VersionNumber</td><td>@round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</td><td>@round.Votes.Count Voted · @round.Votes.Count(v => v.Decision == VoteDecision.Approve) Approve · @round.Votes.Count(v => v.Decision == VoteDecision.Reject) Reject</td><td>@CommitteeDisplay.Status(round.Status)</td><td>@CommitteeDisplay.Date(round.CompletedAt)</td><td><a asp-action="History" asp-route-id="@round.Id">Votes &amp; comments</a> · <a asp-action="ReviewEvaluation" asp-route-id="@round.Id">Report</a></td></tr>
+}
+@if (Model.Rounds.Count == 0) { <tr><td colspan="7">No matching committee rounds.</td></tr> }
+</tbody></table></div><nav class="pg-actions" aria-label="History pages">
+@if (Model.Page > 1) { <a class="pg-btn" asp-route-id="" asp-route-page="@(Model.Page - 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-tenderId="@Model.TenderId">Previous</a> }
+<span>Page @Model.Page of @Model.Pages</span>
+@if (Model.Page < Model.Pages) { <a class="pg-btn" asp-route-id="" asp-route-page="@(Model.Page + 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-tenderId="@Model.TenderId">Next</a> }
+</nav></section>
+@if (Model.Selected is { } selected)
+{
+    <section class="ws-panel pg-panel"><h2>T-@selected.Tender.Id — @selected.Tender.Title</h2><p>Committee round @selected.Round.RoundNumber · @CommitteeDisplay.Status(selected.Round.Status) · @CommitteeDisplay.Date(selected.Round.CompletedAt)</p><p>Current tender award: @(selected.Tender.AwardedBidId.HasValue ? $"Bid #{selected.Tender.AwardedBidId} · {selected.Tender.AwardedBid?.TenderInvitation.Supplier.CompanyName}" : "No award recorded")</p><p style="white-space:pre-wrap">@selected.Round.TenderReport?.ReviewComment</p></section>
+    <partial name="_VotingStatus" model="selected" />
+}
+@section Styles { <partial name="_TopStyles" /> }

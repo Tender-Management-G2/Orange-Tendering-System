@@ -8,7 +8,8 @@ namespace Orange_Tendering_System.Models.Entities
 
     public enum RequestPriority { Low, Normal, High, Urgent }
 
-    public enum PurchaseRequestStatus { Draft, Submitted, Returned, Rejected, Accepted }
+    // Accepted is retained for compatibility with existing team code and stored records.
+    public enum PurchaseRequestStatus { Draft, Submitted, Returned, Rejected, Accepted, UnderReview, Approved, ConvertedToTender }
 
     public enum ReviewDecision { Pending, Accepted, Returned, Rejected }
 

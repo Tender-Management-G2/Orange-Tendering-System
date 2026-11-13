@@ -1,0 +1,40 @@
+<script>
+(() => {
+    const body = document.getElementById('department-items');
+    const message = document.getElementById('department-item-message');
+    const fields = ['Name', 'Specifications', 'Quantity', 'Unit'];
+    function reindex() {
+        [...body.rows].forEach((row, i) => {
+            fields.forEach(field => {
+                const input = row.querySelector(`[name$=".${field}"]`);
+                input.name = `Items[${i}].${field}`;
+                input.id = `Items_${i}__${field}`;
+            });
+            row.querySelector('[data-remove-item]').disabled = body.rows.length <= 1;
+        });
+    }
+    document.getElementById('department-add-item').addEventListener('click', () => {
+        if (body.rows.length >= 100) { message.textContent = 'You can add up to 100 items.'; return; }
+        const row = body.rows[0].cloneNode(true);
+        row.querySelectorAll('input,textarea').forEach(input => {
+            input.value = input.name.endsWith('.Quantity') ? '1' : '';
+            input.removeAttribute('value');
+            input.classList.remove('input-validation-error');
+            if (input.tagName === 'TEXTAREA') input.textContent = '';
+        });
+        body.appendChild(row);
+        reindex();
+        row.querySelector('input').focus();
+        message.textContent = 'Item added.';
+    });
+    body.addEventListener('click', event => {
+        const button = event.target.closest('[data-remove-item]');
+        if (!button || body.rows.length <= 1) return;
+        button.closest('tr').remove();
+        reindex();
+        document.getElementById('department-add-item').focus();
+        message.textContent = 'Item removed.';
+    });
+    reindex();
+})();
+</script>

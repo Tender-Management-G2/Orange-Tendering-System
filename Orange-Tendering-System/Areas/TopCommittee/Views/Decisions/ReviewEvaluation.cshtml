@@ -1,64 +1,74 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Review Tender Evaluation
-
-DEVELOPER OWNER: Doulat
-MODULE: Top Committee
-TRELLO TASK: Review Tender Evaluation
-TRELLO URL: https://trello.com/c/EDdybTCg
-
-PURPOSE:
-Top Committee members read the executive summary and key
-ranking before voting.
-
-BUSINESS ACCESS:
-Top Committee member (assigned to the tender)
-
-ROUTE: /TopCommittee/Decisions/ReviewEvaluation/{id?}
-
-FUTURE IMPLEMENTATION:
-- Load the CommitteeRound’s TenderReport (ExecutiveSummary).
-- Show only what the Top Committee is allowed to see.
-
-DEPENDENCIES:
-TenderReports, CommitteeRounds.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
+@model RoundDetails
 @{
-    ViewData["Title"] = "Review Tender Evaluation";
+    var request = Model.Tender.PurchaseRequest;
+    ViewData["Title"] = $"T-{Model.Tender.Id} — Review Tender Evaluation";
     ViewData["WorkspaceSection"] = "Evaluation Summary";
-    ViewData["Description"] = "The Sourcing Manager’s short executive summary and the key comparison.";
+    ViewData["Description"] = $"{Model.Tender.Title} · tender round {Model.Round.TenderRound.RoundNumber} · committee round {Model.Round.RoundNumber}.";
 }
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel">
-    <h2>Executive summary</h2>
-    <dl class="pg-dl">
-        <div><dt>Tender</dt><dd>—</dd></div>
-        <div><dt>Summary version</dt><dd>—</dd></div>
-        <div><dt>Forwarded by</dt><dd>—</dd></div>
-        <div><dt>Forwarded on</dt><dd>—</dd></div>
-        <div><dt>Recommended offer</dt><dd>—</dd></div>
-    </dl>
+<partial name="_PageHeader" /><partial name="_Messages" />
+@if (Model.Round.TenderReport is { ReportType: not ReportType.ExecutiveSummary } linkedReport)
+{ <aside class="pg-note"><strong>The linked report is an evaluation report, not the Manager's executive summary.</strong><p>Recorded report type: @linkedReport.ReportType. You can review the available information, but an actual submitted ExecutiveSummary from the responsible Manager is still required for AI report analysis and voting.</p></aside> }
+<nav class="pg-links"><ul><li><a asp-action="Decision" asp-route-id="@Model.Round.Id">Committee voting</a></li><li><a asp-action="History" asp-route-id="@Model.Round.Id">Decision history</a></li><li><a asp-controller="Dashboard" asp-action="Index">Dashboard</a></li></ul></nav>
+@if (Model.Blockers.Count > 0 && Model.Round.Status == CommitteeRoundStatus.InProgress)
+{ <aside class="pg-note"><strong>Eligibility notes</strong><ul>@foreach (var reason in Model.Blockers) { <li>@reason</li> }</ul></aside> }
+<section class="ws-panel pg-panel"><h2>Original Purchase Request</h2>
+<dl class="pg-dl"><div><dt>Reference</dt><dd>PR-@request.Id</dd></div><div><dt>Title</dt><dd>@request.Title</dd></div><div><dt>Department</dt><dd>@request.Department.Name</dd></div><div><dt>Priority</dt><dd>@request.Priority</dd></div><div><dt>Required date</dt><dd>@request.NeededBy?.ToString("yyyy-MM-dd")</dd></div></dl><p style="white-space:pre-wrap">@request.Justification</p>
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Requested item</th><th>Quantity</th><th>Unit</th><th>Specifications</th></tr></thead><tbody>@foreach (var item in request.Items) { <tr><td>@item.Name</td><td>@item.Quantity.ToString("0.###")</td><td>@item.Unit</td><td style="white-space:pre-wrap">@item.Specifications</td></tr> }</tbody></table></div>
 </section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-key-comparison">
-    <div class="pg-panel-head"><h2 id="tbl-key-comparison">Key comparison</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Rank</th><th scope="col">Supplier</th><th scope="col">Final score</th><th scope="col">Calculated total</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Summary not loaded."' /></td></tr></tbody>
-        </table>
-    </div>
+<section class="ws-panel pg-panel"><h2>Tender information</h2><dl class="pg-dl"><div><dt>Reference</dt><dd>T-@Model.Tender.Id</dd></div><div><dt>Status</dt><dd>@Model.Tender.Status</dd></div><div><dt>Created</dt><dd>@CommitteeDisplay.Date(Model.Tender.CreatedAt)</dd></div><div><dt>Opens</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderRound.OpensAt)</dd></div><div><dt>Deadline</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderRound.Deadline)</dd></div><div><dt>Closed</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderRound.ClosedAt)</dd></div></dl><h3>Description</h3><p style="white-space:pre-wrap">@Model.Tender.Description</p><h3>Requirements / recorded terms</h3><p style="white-space:pre-wrap">@Model.Tender.Requirements</p></section>
+<section class="ws-panel pg-panel"><h2>Sourcing Manager recommendation</h2><dl class="pg-dl"><div><dt>Responsible Manager</dt><dd>@(Model.Manager?.FullName ?? "Not verified")</dd></div><div><dt>Executive summary version</dt><dd>@Model.Round.TenderReport?.VersionNumber</dd></div><div><dt>Report status</dt><dd>@Model.Round.TenderReport?.Status</dd></div><div><dt>Recommended supplier</dt><dd>@Model.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</dd></div><div><dt>Submitted</dt><dd>@CommitteeDisplay.Date(Model.Round.TenderReport?.SubmittedAt)</dd></div></dl><p style="white-space:pre-wrap">@Model.Round.TenderReport?.Content</p></section>
+<section class="ws-panel pg-panel"><h2>Supplier comparison — current submitted offers</h2><p class="pg-hint">Raw member scores are listed below and are not weighted totals. No currency conversion, normalization, ranking formula or member weighting is invented.</p>
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Supplier</th><th>Total price</th><th>Currency</th><th>Delivery (days)</th><th>Technical raw scores</th><th>Financial raw scores</th><th>Compliance</th><th>Recommendation</th></tr></thead><tbody>
+@foreach (var bid in Model.Bids)
+{
+    var evaluation = Model.Evaluations.OrderByDescending(e => e.RoundNumber).FirstOrDefault();
+    var technical = evaluation?.Criteria.Where(c => c.Type == CriterionType.Technical).SelectMany(c => c.Scores).Where(s => s.BidId == bid.Id).Select(s => s.Score.ToString("0.####")).ToList() ?? new List<string>();
+    var financial = evaluation?.Criteria.Where(c => c.Type == CriterionType.Financial).SelectMany(c => c.Scores).Where(s => s.BidId == bid.Id).Select(s => s.Score.ToString("0.####")).ToList() ?? new List<string>();
+    <tr><td>@bid.TenderInvitation.Supplier.CompanyName</td><td>@CommitteeDisplay.Total(bid).ToString("N2")</td><td>@bid.CurrencyCode</td><td>@bid.DeliveryDays</td><td>@(technical.Count == 0 ? "Not recorded" : string.Join(" / ", technical))</td><td>@(financial.Count == 0 ? "Not recorded" : string.Join(" / ", financial))</td><td>@bid.ComplianceStatus</td><td>@(bid.Id == Model.Round.TenderReport?.RecommendedBidId ? "Recommended" : "—")</td></tr>
+}
+@if (Model.Bids.Count == 0) { <tr><td colspan="8">No current submitted bids available.</td></tr> }
+</tbody></table></div></section>
+<section class="ws-panel pg-panel"><h2>Technical &amp; financial offer details</h2>
+@foreach (var bid in Model.Bids)
+{
+    <details><summary>@bid.TenderInvitation.Supplier.CompanyName · Bid #@bid.Id / Revision @bid.RevisionNumber</summary><h3>Technical proposal</h3><p style="white-space:pre-wrap">@bid.TechnicalProposal</p>
+    <p><strong>Compliance:</strong> @bid.ComplianceStatus</p><p style="white-space:pre-wrap">@bid.ComplianceNotes</p><p><strong>Missing requirements:</strong> @bid.MissingRequirements</p>
+    <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th>Line total (@bid.CurrencyCode)</th><th>Offered specifications</th></tr></thead><tbody>
+    @foreach (var item in bid.Items) { <tr><td>@item.TenderItem.Name</td><td>@item.Quantity</td><td>@item.UnitPrice.ToString("N2")</td><td>@((item.Quantity * item.UnitPrice).ToString("N2"))</td><td>@item.OfferedSpecifications</td></tr> }
+    </tbody></table></div><dl class="pg-dl"><div><dt>Tax</dt><dd>@bid.TaxAmount.ToString("N2") @bid.CurrencyCode</dd></div><div><dt>Transport</dt><dd>@bid.ShippingCost.ToString("N2") @bid.CurrencyCode</dd></div><div><dt>Installation</dt><dd>@bid.InstallationCost.ToString("N2") @bid.CurrencyCode</dd></div><div><dt>Maintenance</dt><dd>@bid.MaintenanceCost.ToString("N2") @bid.CurrencyCode</dd></div><div><dt>Other costs</dt><dd>@bid.OtherCost.ToString("N2") @bid.CurrencyCode</dd></div><div><dt>Total</dt><dd>@CommitteeDisplay.Total(bid).ToString("N2") @bid.CurrencyCode</dd></div><div><dt>Payment terms</dt><dd>@bid.PaymentTerms</dd></div><div><dt>Delivery days</dt><dd>@bid.DeliveryDays</dd></div><div><dt>Offer validity</dt><dd>@bid.ValidUntil?.ToString("yyyy-MM-dd")</dd></div></dl></details>
+}
 </section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="TopCommittee" asp-controller="Decisions" asp-action="Decision">Go to voting</a></li>
-    </ul>
-</nav>
+<section class="ws-panel pg-panel"><h2>Recorded technical / financial criteria and scores</h2>
+@foreach (var evaluation in Model.Evaluations.OrderByDescending(e => e.RoundNumber))
+{
+    <details open="@(evaluation == Model.Evaluations.OrderByDescending(e => e.RoundNumber).First())"><summary>Evaluation round @evaluation.RoundNumber — @CommitteeDisplay.Status(evaluation.Status)</summary>
+    <p>Recorded technical weight: @(evaluation.TechnicalWeight?.ToString() ?? "Not set") · Recorded financial weight: @(evaluation.FinancialWeight?.ToString() ?? "Not set")</p>
+    <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Type</th><th>Criterion</th><th>Weight</th><th>Max score</th><th>Bid</th><th>Member</th><th>Raw score</th><th>Comments</th></tr></thead><tbody>
+    @foreach (var criterion in evaluation.Criteria.OrderBy(c => c.DisplayOrder))
+    {
+        @foreach (var score in criterion.Scores)
+        { <tr><td>@criterion.Type</td><td>@criterion.Name</td><td>@criterion.Weight</td><td>@criterion.MaxScore</td><td>#@score.BidId</td><td>@score.CommitteeMember.User.FullName</td><td>@score.Score</td><td style="white-space:pre-wrap">@score.Comment</td></tr> }
+        @if (criterion.Scores.Count == 0) { <tr><td>@criterion.Type</td><td>@criterion.Name</td><td>@criterion.Weight</td><td>@criterion.MaxScore</td><td colspan="4">No scores recorded.</td></tr> }
+    }
+    </tbody></table></div></details>
+}
+@if (Model.Evaluations.Count == 0) { <p>No evaluation results recorded.</p> }
+</section>
+<section class="ws-panel pg-panel"><h2>Consolidated evaluation &amp; comparison reports</h2>
+@foreach (var report in Model.Reports.Where(r => r.ReportType != ReportType.ExecutiveSummary))
+{ <details><summary>@report.ReportType · Version @report.VersionNumber · @report.Status</summary><p>Submitted @CommitteeDisplay.Date(report.SubmittedAt) by @report.CreatedByUser.FullName</p><p style="white-space:pre-wrap">@report.Content</p>@if (!string.IsNullOrWhiteSpace(report.RankingSnapshotJson)) { <p class="pg-hint">A ranking snapshot is preserved with this report. No score is recalculated by Top Committee.</p> }</details> }
+@if (!Model.Reports.Any(r => r.ReportType == ReportType.FullEvaluation)) { <p>No consolidated evaluation report is available.</p> }
+</section>
+<section class="ws-panel pg-panel"><h2>Supporting documents</h2><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>File</th><th>Context</th><th>Size (bytes)</th><th>Access</th></tr></thead><tbody>
+@foreach (var document in Model.Documents)
+{
+    <tr><td>@document.FileName</td><td>@(document.BidId.HasValue ? $"Bid #{document.BidId}" : document.SupplierId.HasValue ? $"Supplier #{document.SupplierId}" : document.TenderReportId.HasValue ? $"Report #{document.TenderReportId}" : document.PurchaseRequestId.HasValue ? "Purchase request" : "Tender")</td><td>@document.SizeBytes</td><td>
+    @if (document.DocumentType == "DepartmentSupportingDocument") { <a asp-action="Download" asp-route-id="@document.Id" asp-route-roundId="@Model.Round.Id">Download</a> }
+    else { <span class="pg-hint">Authorized shared storage integration pending</span> }</td></tr>
+}
+@if (Model.Documents.Count == 0) { <tr><td colspan="4">No supporting document records.</td></tr> }
+</tbody></table></div></section>
+<partial name="_ReportAnalysis" model="Model" />
+<partial name="_VotingStatus" model="Model" /><partial name="_Clarifications" model="Model" />
+@section Styles { <partial name="_TopStyles" /> }
+@section Scripts { <partial name="_ReportAnalysisScripts" /> }

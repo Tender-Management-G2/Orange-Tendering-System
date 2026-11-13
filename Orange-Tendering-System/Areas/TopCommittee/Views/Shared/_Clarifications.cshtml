@@ -1,0 +1,38 @@
+@model RoundDetails
+<section class="ws-panel pg-panel" id="clarifications">
+    <h2>Clarifications with the Sourcing Manager</h2>
+    <p>Pending questions pause voting until answered and resolved. Only your own directly involved conversations appear here.</p>
+    @if (Model.Threads.Count == 0) { <p>No clarification history.</p> }
+    @foreach (var thread in Model.Threads)
+    {
+        <details><summary>@thread.Subject · @CommitteeDisplay.Clarification(thread.Status)</summary>
+        @foreach (var message in thread.Messages.OrderBy(m => m.SentAt).ThenBy(m => m.Id))
+        { <article><strong>@message.SenderUser.FullName</strong><small> · @CommitteeDisplay.Date(message.SentAt)</small><p style="white-space:pre-wrap">@message.Message</p></article> }
+        @if (Model.CanClarify && thread.Status != ClarificationStatus.Closed)
+        {
+            <form asp-controller="Clarifications" asp-action="Reply" method="post" class="pg-form">
+                <input type="hidden" name="RoundId" value="@Model.Round.Id" /><input type="hidden" name="ThreadId" value="@thread.Id" />
+                <div class="pg-field"><label for="reply-@thread.Id">Follow-up message</label><textarea name="Message" id="reply-@thread.Id" maxlength="10000" required></textarea></div>
+                <div class="pg-actions"><button class="pg-btn" type="submit">Send follow-up</button></div>
+            </form>
+            @if (thread.Status == ClarificationStatus.Answered)
+            {
+                <form asp-controller="Clarifications" asp-action="Resolve" method="post"><input type="hidden" name="roundId" value="@Model.Round.Id" /><input type="hidden" name="threadId" value="@thread.Id" /><button type="submit" class="pg-btn">Mark resolved</button></form>
+            }
+        }
+        </details>
+    }
+    @if (Model.CanClarify)
+    {
+        <h3>Request additional details</h3>
+        <form asp-controller="Clarifications" asp-action="Ask" method="post" class="pg-form">
+            <input type="hidden" name="RoundId" value="@Model.Round.Id" />
+            <div class="pg-form-grid">
+                <div class="pg-field"><label for="question-subject">Subject</label><input id="question-subject" name="Subject" maxlength="200" required /></div>
+                <div class="pg-field pg-field-wide"><label for="question-message">Detailed question</label><textarea id="question-message" name="Message" maxlength="10000" required></textarea></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send to @Model.Manager?.FullName</button></div>
+        </form>
+    }
+    else { <p class="pg-hint">New questions require the current active committee round and a verified responsible Manager.</p> }
+</section>

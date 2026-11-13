@@ -1,0 +1,20 @@
+@model RoundDetails
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Committee Members &amp; Voting Status</h2><span class="pg-badge">@Model.ValidVotes.Select(v => v.CommitteeMemberId).Distinct().Count() / 4 Voted</span></div>
+    <p>Final outcome: <strong>@CommitteeDisplay.Status(Model.Round.Status)</strong>. All four members must vote; approval requires four Approve votes.</p>
+    <progress value="@Model.ValidVotes.Count" max="4" aria-label="Committee voting progress">@Model.ValidVotes.Count / 4</progress>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th>Member</th><th>Voting Status</th><th>Decision</th><th>Comments</th><th>Voted At</th></tr></thead>
+        <tbody>
+        @foreach (var member in Model.TopMembers.OrderBy(m => m.AssignedAt).ThenBy(m => m.Id))
+        {
+            var vote = Model.Round.Votes.SingleOrDefault(v => v.CommitteeMemberId == member.Id);
+            <tr><td>@member.User.FullName</td><td>@(vote is null ? "Pending" : "Voted")</td><td>@(vote?.Decision.ToString() ?? "—")</td><td style="white-space:pre-wrap">@vote?.Comment</td><td>@CommitteeDisplay.Date(vote?.VotedAt)</td></tr>
+        }
+        @foreach (var vote in Model.Round.Votes.Where(v => !Model.TopMembers.Any(m => m.Id == v.CommitteeMemberId)))
+        { <tr><td>@vote.CommitteeMember.User.FullName (historical assignment)</td><td>Voted</td><td>@vote.Decision</td><td>@vote.Comment</td><td>@CommitteeDisplay.Date(vote.VotedAt)</td></tr> }
+        @if (Model.TopMembers.Count == 0 && Model.Round.Votes.Count == 0) { <tr><td colspan="5">No assigned members or votes.</td></tr> }
+        </tbody>
+    </table></div>
+    <p class="pg-hint">Submitted votes are read-only and visible to all assigned members. Refresh to load the latest saved votes.</p>
+</section>

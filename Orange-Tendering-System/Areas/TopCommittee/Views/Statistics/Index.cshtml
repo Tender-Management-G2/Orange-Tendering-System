@@ -1,59 +1,20 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Management Statistics
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Top Committee
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Management view required by the specification: awarded
-tenders and totals per supplier.
-
-BUSINESS ACCESS:
-Top Committee member
-
-ROUTE: /TopCommittee/Statistics
-
-FUTURE IMPLEMENTATION:
-- Aggregate from Tenders.AwardedBidId → Bid →
-  TenderInvitation → Supplier.
-- Non-confidential aggregates only.
-
-DEPENDENCIES:
-Tenders, Bids, BidItems, TenderInvitations, Suppliers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-In the specification (section 9) but no Trello card — team
-assignment required.
-===========================================================
-*@
+@model ManagementStatistics
 @{
     ViewData["Title"] = "Management Statistics";
     ViewData["WorkspaceSection"] = "Management Statistics";
-    ViewData["Description"] = "Totals by supplier and how often each supplier was awarded.";
+    ViewData["Description"] = "Site-wide management aggregates and supplier transaction frequency. Monetary values are separated by currency.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="pg-cards" aria-label="Summary">
-    <article class="pg-card"><span>Awarded tenders</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Total awarded value</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Active tenders</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Suppliers awarded</span><strong>—</strong><small>Not connected</small></article>
+<div class="pg-actions"><a class="pg-btn pg-btn-primary" asp-action="Export">Download comprehensive Excel report</a><span class="pg-hint">Generated @CommitteeDisplay.Date(Model.GeneratedAt)</span></div>
+<section class="pg-cards">
+@foreach (var metric in new[] { ("Total Suppliers", Model.Suppliers), ("Approved Suppliers", Model.ApprovedSuppliers), ("Total Tenders", Model.Tenders), ("Active Tenders", Model.ActiveTenders), ("Awarded Tenders", Model.AwardedTenders), ("Completed Purchase Requests", Model.CompletedRequests) })
+{ <article class="pg-card"><span>@metric.Item1</span><strong>@metric.Item2</strong></article> }
 </section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-awards-by-supplier">
-    <div class="pg-panel-head"><h2 id="tbl-awards-by-supplier">Awards by supplier</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Supplier</th><th scope="col">Awarded tenders</th><th scope="col">Total awarded value</th></tr></thead>
-            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No awards recorded yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
+<section class="ws-panel pg-panel"><h2>Tender status distribution</h2><div class="pg-badges">@foreach (var status in Model.Distribution) { <span class="pg-badge">@status.Key: @status.Value</span> } @if (Model.Distribution.Count == 0) { <p>No tender statistics available.</p> }</div></section>
+<section class="ws-panel pg-panel"><h2>Awarded values by currency</h2>@foreach (var value in Model.Values) { <p><strong>@value.Currency @value.Amount.ToString("N2")</strong></p> } @if (Model.Values.Count == 0) { <p>No awarded values recorded.</p> }</section>
+<section class="ws-panel pg-panel"><h2>Supplier participation &amp; transaction frequency</h2><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Supplier</th><th>Status</th><th>Invitations</th><th>Submitted Offers</th><th>Times Awarded</th><th>Awarded Value</th></tr></thead><tbody>
+@foreach (var row in Model.SupplierRows)
+{ <tr><td>@row.Name</td><td>@row.Status</td><td>@row.Invitations</td><td>@row.SubmittedOffers</td><td>@row.Awards</td><td>@foreach (var value in row.Values) { <div>@value.Currency @value.Amount.ToString("N2")</div> } @if (row.Values.Count == 0) { <span>—</span> }</td></tr> }
+@if (Model.SupplierRows.Count == 0) { <tr><td colspan="6">No supplier statistics available.</td></tr> }
+</tbody></table></div><p class="pg-hint">Submitted offers count distinct invitations with a recorded submission, including past revisions; revisions are not counted twice. Transaction frequency is the number of awarded tenders. Completed purchase requests have at least one awarded tender. Active tenders exclude Awarded, Rejected and Cancelled.</p></section>
+@section Styles { <partial name="_TopStyles" /> }

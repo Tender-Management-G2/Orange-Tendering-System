@@ -1,23 +1,21 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: UNASSIGNED — Team assignment required
-// Module: Top Committee
-// Purpose: MVC endpoints for the Statistics pages of the Top Committee workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Orange_Tendering_System.Areas.TopCommittee.Services;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Models.Entities;
 
-namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
+namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
+
+[Area("TopCommittee"), Authorize(Roles = SystemRoles.TopCommittee)]
+public sealed class StatisticsController(ApplicationDbContext db, UserManager<ApplicationUser> users) : TopCommitteeControllerBase(db, users)
 {
-    [Area("TopCommittee")]
-    [Authorize(Roles = SystemRoles.TopCommittee)]
-    public class StatisticsController : Controller
+    public async Task<IActionResult> Index() => await ActiveUser() is null ? Forbid() : View(await Committee.Statistics());
+    public async Task<IActionResult> Export()
     {
-        // Management Statistics — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /TopCommittee/Statistics. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
-        {
-            return View();
-        }
+        if (await ActiveUser() is null) return Forbid();
+        var report = await Committee.Statistics();
+        return File(StatisticsWorkbook.Create(report), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"TopCommittee-Statistics-{report.GeneratedAt:yyyyMMdd-HHmm}.xlsx");
     }
 }

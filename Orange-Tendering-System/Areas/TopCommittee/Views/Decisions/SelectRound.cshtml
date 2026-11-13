@@ -1,0 +1,60 @@
+@model RoundSelection
+@{
+    var voting = Model.TargetAction == "Decision";
+    var listing = Model.Listing;
+    ViewData["Title"] = voting ? "Voting — Select a Committee Round" : "Evaluation Summary — Select a Committee Round";
+    ViewData["WorkspaceSection"] = voting ? "Voting" : "Evaluation Summary";
+    ViewData["Description"] = voting
+        ? "Choose an assigned round to view the members' votes. Voting is available only when the round is eligible and you have not already voted."
+        : "Choose an assigned round to review its evaluation, recommendation and supporting documents.";
+}
+<partial name="_PageHeader" />
+<partial name="_Messages" />
+<form asp-action="@Model.TargetAction" method="get" class="pg-toolbar">
+    <input name="search" type="search" value="@listing.Search" placeholder="Tender title or numeric reference" aria-label="Search assigned tenders" />
+    <select name="status" aria-label="Committee round status"><option value="">All statuses</option>
+    @foreach (var status in Enum.GetValues<CommitteeRoundStatus>())
+    { <option value="@status" selected="@(listing.Status == status)">@CommitteeDisplay.Status(status)</option> }
+    </select>
+    <button class="pg-btn pg-btn-primary" type="submit">Filter</button>
+    <a class="pg-btn" asp-action="@Model.TargetAction">Clear</a>
+</form>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Your Assigned Committee Rounds (@listing.Total)</h2></div>
+    @if (listing.Total == 0)
+    {
+        @if (!string.IsNullOrWhiteSpace(listing.Search) || listing.Status.HasValue)
+        { <p>No assigned committee rounds match these filters. Clear the filters to see all your rounds.</p> }
+        else
+        { <p>No committee rounds have been assigned to your account yet.</p><p class="pg-hint">The responsible team member must assign you to a tender's Top Committee and create its committee round before it appears here.</p> }
+    }
+    else
+    {
+        <div class="pg-table-wrap"><table class="pg-table">
+            <thead><tr><th>Tender</th><th>Committee Round</th><th>Recommended Supplier</th><th>Status</th><th>Voting Progress</th><th>My Vote</th><th>Action</th></tr></thead>
+            <tbody>
+            @foreach (var round in listing.Rounds)
+            {
+                var myVote = round.Votes.SingleOrDefault(v => v.CommitteeMember.UserId == Model.UserId);
+                <tr>
+                    <td>T-@round.TenderRound.TenderId<br />@round.TenderRound.Tender.Title</td>
+                    <td>@round.RoundNumber</td>
+                    <td>@(round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName ?? "No recommendation recorded")</td>
+                    <td><span class="pg-badge">@CommitteeDisplay.Status(round.Status)</span></td>
+                    <td>@round.Votes.Select(v => v.CommitteeMemberId).Distinct().Count() / 4 Voted</td>
+                    <td>@(myVote?.Decision.ToString() ?? "Pending")</td>
+                    <td><a class="pg-btn pg-btn-primary" asp-action="@Model.TargetAction" asp-route-id="@round.Id">@(voting ? "View voting & eligibility" : "Review evaluation")</a></td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        <nav class="pg-actions" aria-label="Assigned round pages">
+        @if (listing.Page > 1)
+        { <a class="pg-btn" asp-action="@Model.TargetAction" asp-route-page="@(listing.Page - 1)" asp-route-search="@listing.Search" asp-route-status="@listing.Status">Previous</a> }
+        <span>Page @listing.Page of @listing.Pages</span>
+        @if (listing.Page < listing.Pages)
+        { <a class="pg-btn" asp-action="@Model.TargetAction" asp-route-page="@(listing.Page + 1)" asp-route-search="@listing.Search" asp-route-status="@listing.Status">Next</a> }
+        </nav>
+    }
+</section>
+@section Styles { <partial name="_TopStyles" /> }

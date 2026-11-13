@@ -1,54 +1,29 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Committee Decision
-
-DEVELOPER OWNER: Doulat
-MODULE: Top Committee
-TRELLO TASK: Committee Decision
-TRELLO URL: https://trello.com/c/RtPahsxa
-
-PURPOSE:
-A Top Committee member approves or rejects the executive
-summary of one round.
-
-BUSINESS ACCESS:
-Top Committee member (assigned to the tender)
-
-ROUTE: /TopCommittee/Decisions/Decision/{id?}
-
-FUTURE IMPLEMENTATION:
-- POST vote: one CommitteeVote per member per round (unique
-  index); check membership + role + round status.
-- When 4/4 Approve: CommitteeRound = Approved,
-  Tender.AwardedBidId / AwardedAt, Status = Awarded; notify.
-- On Reject: round Rejected; Manager prepares a revised
-  summary and a new round.
-
-DEPENDENCIES:
-CommitteeVotes, CommitteeMembers, CommitteeRounds, Tenders,
-Notifications, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-No majority or 3/4 outcome exists.
-===========================================================
-*@
+@model RoundDetails
 @{
-    ViewData["Title"] = "Committee Decision";
+    ViewData["Title"] = $"T-{Model.Tender.Id} — Committee Decision";
     ViewData["WorkspaceSection"] = "Voting";
-    ViewData["Description"] = "Cast your vote on the executive summary. Award requires all four approvals.";
+    ViewData["Description"] = $"{Model.Tender.Title} · committee round {Model.Round.RoundNumber}. Each member's saved vote is visible to the other assigned members.";
 }
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<partial name="_ApprovalTracker" model='"Top Committee"' />
-
-<div class="pg-grid">
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Approve award", "Approve the recommended supplier for award.", "Records your Approve vote for this round. The award is recorded only when all 4 members approve.", false, false)' />
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Reject", "Reject the executive summary.", "Records your Reject vote with a reason and returns the summary to the Sourcing Manager. The rejection stays visible.", true, true)' />
-</div>
-
-<aside class="pg-note"><strong>Award rule</strong><p>4 of 4 Approve on the same summary version. On success the tender’s AwardedBidId is set — kept separate from the committee’s recommended bid.</p></aside>
+<partial name="_PageHeader" /><partial name="_Messages" />
+<div asp-validation-summary="All" role="alert"></div>
+<nav class="pg-links"><ul><li><a asp-action="ReviewEvaluation" asp-route-id="@Model.Round.Id">Review evaluation</a></li><li><a asp-action="History" asp-route-id="@Model.Round.Id">History</a></li><li><a asp-controller="Dashboard" asp-action="Index">Dashboard</a></li></ul></nav>
+<section class="ws-panel pg-panel"><h2>Official recommendation</h2><dl class="pg-dl"><div><dt>Supplier</dt><dd>@Model.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</dd></div><div><dt>Executive summary version</dt><dd>@Model.Round.TenderReport?.VersionNumber</dd></div><div><dt>Responsible Manager</dt><dd>@Model.Manager?.FullName</dd></div><div><dt>Decision date</dt><dd>@CommitteeDisplay.Date(Model.Round.CompletedAt)</dd></div></dl><p style="white-space:pre-wrap">@Model.Round.TenderReport?.Content</p></section>
+<partial name="_VotingStatus" model="Model" />
+@if (Model.CanVote)
+{
+    <section class="ws-panel pg-panel"><h2>Record my vote</h2>
+    <form asp-action="Vote" method="post" class="pg-form">
+        <input type="hidden" name="RoundId" value="@Model.Round.Id" />
+        <fieldset><legend class="pg-legend">Decision</legend>
+            <label class="pg-check">@Html.RadioButton("Decision", "Approve") Approve the official recommendation</label>
+            <label class="pg-check">@Html.RadioButton("Decision", "Reject") Reject and return for Manager review</label>
+        </fieldset>
+        <div class="pg-field"><label for="vote-comment">Comments / justification (required for Reject)</label>@Html.TextArea("Comment", null, new { id = "vote-comment", maxlength = "2000", rows = "4" })</div>
+        <p class="pg-consequence">Your submitted vote cannot be edited or deleted. The fourth distinct vote automatically records the final outcome. Four Approve votes are required for an award. Only the responsible Manager receives the final-result notification.</p>
+        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Submit my vote</button></div>
+    </form></section>
+}
+else if (Model.MyVote is not null) { <p class="pg-note">Your vote is recorded and read-only.</p> }
+@if (Model.Blockers.Count > 0 && Model.Round.Status == CommitteeRoundStatus.InProgress)
+{ <section class="ws-panel pg-panel"><h2>Voting is not available</h2><ul>@foreach (var reason in Model.Blockers) { <li>@reason</li> }</ul></section> }
+@section Styles { <partial name="_TopStyles" /> }
