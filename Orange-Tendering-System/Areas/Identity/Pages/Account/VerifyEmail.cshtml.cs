@@ -105,7 +105,10 @@ public class VerifyEmailModel(
         catch (Exception exception)
         {
             await transaction.RollbackAsync();
-            logger.LogError(exception, "Supplier OTP delivery failed.");
+            if (exception is System.Net.Mail.SmtpException smtpException)
+                logger.LogWarning("Supplier OTP delivery failed with SMTP status {Status}.", smtpException.StatusCode);
+            else
+                logger.LogError(exception, "Supplier OTP delivery failed.");
             ModelState.AddModelError(string.Empty, "Could not send a new code. Please try again later.");
         }
         return Page();

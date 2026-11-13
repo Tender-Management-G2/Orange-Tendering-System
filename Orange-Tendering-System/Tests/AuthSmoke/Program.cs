@@ -24,6 +24,7 @@ using System.Security.Claims;
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
 if (args.Contains("--final-decision-checks")) { await FinalDecisionChecks.Run(); return; }
+if (args.Contains("--smtp-mode-checks")) { SmtpModeChecks.Run(); return; }
 
 var connection = Environment.GetEnvironmentVariable("AUTH_TEST_CONNECTION")
     ?? throw new InvalidOperationException("Set AUTH_TEST_CONNECTION to a migrated, isolated test database.");
@@ -45,6 +46,7 @@ Environment.SetEnvironmentVariable("ConnectionStrings__Default Connection", conn
 Environment.SetEnvironmentVariable("BootstrapAdmin__Email", adminEmail);
 Environment.SetEnvironmentVariable("BootstrapAdmin__Password", adminPassword);
 Environment.SetEnvironmentVariable("Smtp__Host", "test.local");
+Environment.SetEnvironmentVariable("Smtp__Mode", "Smtp");
 Environment.SetEnvironmentVariable("Smtp__Port", "587");
 Environment.SetEnvironmentVariable("Smtp__From", "sender@example.test");
 Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.EntityFrameworkCore", "Warning");
@@ -475,7 +477,8 @@ WebApplicationFactory<Orange_Tendering_System.WebAppMarker> CreateFactory() => n
         ["ConnectionStrings:Default Connection"] = connection,
         ["BootstrapAdmin:Email"] = adminEmail,
         ["BootstrapAdmin:Password"] = adminPassword,
-        ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test",
+        ["Smtp:Mode"] = "Smtp", ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test",
+        ["Smtp:Username"] = "unused", ["Smtp:Password"] = "unused",
         ["Biometric:MaxFailuresPerWindow"] = "100"
     }));
     builder.ConfigureTestServices(services =>

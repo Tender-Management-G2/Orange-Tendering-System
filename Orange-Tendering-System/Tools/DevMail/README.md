@@ -1,13 +1,40 @@
-# Local supplier registration email
+# Email delivery modes for local development
 
-Development now sends Identity emails to a local, in-memory SMTP inbox. No mailbox account or SMTP password is needed for local testing.
+The web project defaults to `Smtp:Mode=LocalInbox` in `appsettings.Development.json`. This sends verification messages to a local test inbox, not to Gmail. To test actual Gmail delivery, select `Smtp` mode in Visual Studio User Secrets and provide a Gmail sender account with an app password. Do not put credentials in `appsettings*.json`, source control, screenshots, or issue reports.
 
-From the web project directory, run this in one terminal:
+## Configure real Gmail SMTP in Visual Studio
 
-```powershell
-node Tools/DevMail/server.js
+1. Enable 2-Step Verification on the Google account that will **send** email. Create a Google App Password for this application. The normal Google account password is not the SMTP password. Google may disable App Passwords for some managed or Advanced Protection accounts.
+2. In Visual Studio, right-click the **Orange-Tendering-System** web project (the project containing `Orange-Tendering-System.csproj`) in Solution Explorer and choose **Manage User Secrets**. The project already has a `UserSecretsId`; do not run `dotnet user-secrets init`.
+3. In the opened `secrets.json`, add or merge the following `Smtp` object. Replace the two descriptive values with the Gmail sender address and its app password. Use the same sender Gmail address for `From` and `Username`. Keep any other existing secrets in the file.
+
+```json
+{
+  "Smtp": {
+    "Mode": "Smtp",
+    "Host": "smtp.gmail.com",
+    "Port": 587,
+    "From": "YOUR_SENDER_GMAIL_ADDRESS",
+    "Username": "YOUR_SENDER_GMAIL_ADDRESS",
+    "Password": "YOUR_GOOGLE_APP_PASSWORD",
+    "AllowInsecureLoopback": false
+  }
+}
 ```
 
-Run or restart the web application with the `https` launch profile in another terminal or from Visual Studio. Open [the local inbox](http://127.0.0.1:8025), submit the supplier registration form, and read the six-digit verification code there. Any syntactically valid test email address can be used locally. The supplier still needs Admin approval after email verification.
+4. Save `secrets.json`, stop any running web application, and run the **https** launch profile again with `ASPNETCORE_ENVIRONMENT=Development`. The app reads User Secrets at startup. `Smtp:Mode=Smtp` switches away from the local inbox and uses STARTTLS on port 587. The Node local inbox does not need to run.
 
-The SMTP and inbox ports bind to `127.0.0.1` only. Messages are held in memory and disappear when the process stops. Production deployments continue to require a real STARTTLS SMTP provider configured through secrets or environment variables; the local inbox setting exists only in `appsettings.Development.json`.
+## End-to-end test
+
+1. Open `https://localhost:7182/Identity/Account/Register` and register a new supplier with a real inbox you control as the contact email. You may use the sender Gmail address as the recipient for this test. If an unverified supplier already exists, wait at least one minute and use **Send a new code** on its Verify Email page instead.
+2. Check that the Verify Email page no longer links to the local inbox. Check the real recipient's Gmail Inbox and Spam folders for the message. A message appearing in the Node inbox is **not** proof of real delivery.
+3. Enter the six-digit code from the real Gmail message into Verify Email within 10 minutes. Success is the page stating that the email is verified and the company awaits administrator approval. Do not put the code in logs, screenshots, or source control.
+4. If registration fails, read the non-secret error on the page. Confirm the app runs in Development, that User Secrets belong to the web project, that the sender Gmail account has an active App Password, and that outbound port 587 is reachable. Never paste your app password or OTP into a chat or issue.
+
+Real delivery is verified only after the recipient observes the email in Gmail and completes verification. SMTP acceptance or a passing build alone is insufficient.
+
+## Local inbox mode
+
+For synthetic testing, remove the `Smtp` override from User Secrets or set `Mode` to `LocalInbox` with the default loopback host, no username or password, then run `node Tools/DevMail/server.js`. The inbox is at http://127.0.0.1:8025/. It binds only to loopback and stores messages in memory until the process stops.
+
+References: [Google SMTP server settings](https://support.google.com/mail/answer/7104828?hl=en), [Google App Passwords](https://support.google.com/mail/answer/185833?hl=en), and [Visual Studio User Secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets?tabs=visual-studio&view=aspnetcore-10.0).

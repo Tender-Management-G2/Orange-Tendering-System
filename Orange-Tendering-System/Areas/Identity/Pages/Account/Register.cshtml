@@ -2,6 +2,7 @@
 @model RegisterModel
 @inject IWebHostEnvironment HostEnvironment
 @inject IConfiguration Configuration
+@using Orange_Tendering_System.Services
 @{
     ViewData["Title"] = "Supplier Registration";
 }
@@ -10,7 +11,7 @@
         <span class="eyebrow">SUPPLIER ONBOARDING</span>
         <h1>Register your company</h1>
         <p>Registration is for supplier companies. Your company can participate only after administrator approval.</p>
-        @if (HostEnvironment.IsDevelopment() && Configuration["Smtp:Host"] == "127.0.0.1")
+        @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
         {
             <p class="auth-note">Local development: start <code>node Tools/DevMail/server.js</code> and read verification emails at <a href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">the local inbox</a>.</p>
         }
