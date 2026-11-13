@@ -455,6 +455,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                     foreach (var member in assignedTop) Notify(member.UserId, id, "Revised report requires a fresh Top decision", "Previous report decisions and signatures remain historical. Review and sign the new report version.");
                 }
             }
+            else if (Policy.FinalConfigured) await RecordFinalDecision(t, s, 0, 0, true);
         }
         Audit(a, id, "ManagerDecisionEvidence", new { decision, comment, s.ReportId });
         await NotifyOfficer(id, "Manager decision", $"{decision}: {comment}");
@@ -489,11 +490,18 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var cr = await db.CommitteeRounds.SingleAsync(x => x.TenderRoundId == s.TenderRoundId && x.CommitteeType == CommitteeType.Top && x.TenderReportId == s.ReportId);
         Require(!await db.CommitteeVotes.AnyAsync(x => x.CommitteeRoundId == cr.Id && x.CommitteeMemberId == member.Id), "Your final decision is already recorded.");
         db.CommitteeVotes.Add(new CommitteeVote { CommitteeRoundId = cr.Id, CommitteeMemberId = member.Id, Decision = decision, Comment = comment, VotedAt = Now });
+        var priorVotes = await db.CommitteeVotes.Where(x => x.CommitteeRoundId == cr.Id).Select(x => x.Decision).ToListAsync();
+        var approvesNow = priorVotes.Count(d => d == VoteDecision.Approve) + (decision == VoteDecision.Approve ? 1 : 0);
+        if (approvesNow >= FinalPolicy(s).TopApprovalsRequired) await RecordFinalDecision(t, s, approvesNow, priorVotes.Count + 1, false);
         Audit(a, id, "TopDecisionEvidence", new { decision, comment, s.ReportId, PolicyVersion = FinalPolicy(s).Version });
     });
     public Task Award(int id, ClaimsPrincipal principal) => Change(id, principal, "TenderAwardedAndClosed", async (t, a) =>
     {
         await Officer(t, a); var s = await Session(id); var top = RequiresTop(t, s); var finalPolicy = FinalPolicy(s);
+        // Chain of custody: Top approvals -> assigned Manager acknowledges and forwards -> Officer. Legacy non-Top tenders get their notice here.
+        var relay = await db.Set<FinalDecisionNotice>().FirstOrDefaultAsync(x => x.TenderId == id && x.TenderReportId == s.ReportId);
+        if (relay == null && !top) await RecordFinalDecision(t, s, 0, 0, true);
+        else Require(relay != null && relay.Status != FinalDecisionStatus.AwaitingManager, "The assigned Sourcing Manager must acknowledge and forward the Top Committee decision before the tender can be awarded.");
         Require(s.State == SessionState.ManagerApproved && s.Report?.Status == ReportStatus.Accepted && t.AwardedBidId == null && t.Status is not (TenderStatus.Rejected or TenderStatus.Cancelled), "Final manager approval is required; rejected or returned recommendations cannot be awarded.");
         await reportDocuments.RequireCommitteeSignatures(s.Report, s);
         Require(await db.Set<ReportSignature>().AnyAsync(x => x.TenderReportId == s.ReportId && x.Stage == ReportSigningStage.Manager && x.Decision == "Approve" && x.InvalidatedAt == null), "The manager must sign the current generated report before award.");
@@ -517,17 +525,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         t.AwardedBidId = bid.Id; t.AwardedAt = Now; t.ClosedAt = Now; t.Status = TenderStatus.Awarded; s.State = SessionState.Awarded;
         t.AwardedByUserId = a.Id;
         t.AwardApprovalEvidenceJson = JsonSerializer.Serialize(new { EvaluationSessionId = s.Id, Policy = finalPolicy, s.ReportId, s.Report.ReviewedByUserId, s.Report.ReviewedAt, WeightApproval = s.WeightRoundId, Votes = votes.Select(x => new { x.CommitteeMemberId, x.Decision, x.VotedAt }) });
-        var recipients = (await Members(id, CommitteeType.Evaluation)).Select(x => x.UserId).Append(a.Id).ToList();
-        var supplierId = await db.TenderInvitations.Where(x => x.Id == bid.TenderInvitationId).Select(x => x.SupplierId).SingleAsync();
-        recipients.AddRange(await db.Users.Where(x => x.SupplierId == supplierId && x.IsActive).Select(x => x.Id).ToListAsync());
-        foreach (var user in recipients.Distinct()) Notify(user, id, "Tender awarded and closed", "The official supplier selection has completed all configured approval gates.");
-        var offers = await db.Bids.Where(b => b.TenderInvitation.TenderRound.TenderId == id && b.Status == BidStatus.Submitted)
-            .Select(b => new { b.Id, b.TenderInvitation.SupplierId }).ToListAsync();
-        foreach (var offer in offers)
-            foreach (var userId in await db.Users.Where(u => u.SupplierId == offer.SupplierId && u.IsActive).Select(u => u.Id).ToListAsync())
-                db.Notifications.Add(new Notification { UserId = userId, Title = "Tender result", Link = $"/Supplier/Offers/Details/{offer.Id}",
-                    Message = offer.SupplierId == supplierId ? "Your company has been selected after all mandatory approvals." : "The tender has been awarded. Your company was not selected.", CreatedAt = Now });
-
+        // Suppliers are deliberately NOT notified here. Only the Officer's "Notify Suppliers" action announces results.
+        foreach (var user in (await Members(id, CommitteeType.Evaluation)).Select(x => x.UserId).Append(a.Id).Distinct())
+            Notify(user, id, "Tender awarded and closed", "The official supplier selection has completed all configured approval gates. Suppliers are notified separately by the Sourcing Officer.");
     });
 
     public async Task<bool> CanRead(Tender t, ApplicationUser a)
