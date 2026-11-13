@@ -40,6 +40,12 @@ builder.Services.AddTransient<SmtpEmailSender>();
 builder.Services.AddTransient<IEmailSender>(services => services.GetRequiredService<SmtpEmailSender>());
 builder.Services.AddScoped<EmployeeProvisioning>();
 builder.Services.AddControllersWithViews();
+builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierProfileService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierInvitationService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierOfferService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierCommunicationService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDocumentService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDashboardService>();
 
 var app = builder.Build();
 

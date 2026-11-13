@@ -64,6 +64,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("My Offers", "Offers", "Index", "layers"),
                 new("Documents", "Documents", "Index", "folder"),
                 new("Profile", "Profile", "Index", "user"),
+                new("Notifications", "Notifications", "Index", "bell"),
                 new("Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("EvaluationCommittee", "Evaluation Committee", SystemRoles.EvaluationCommittee,

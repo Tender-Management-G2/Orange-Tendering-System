@@ -1,54 +1,30 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Invitation Details
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Supplier Portal
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Show one invitation: tender description, items to price,
-requirements and deadline.
-
-BUSINESS ACCESS:
-Supplier (own company only, Admin-approved)
-
-ROUTE: /Supplier/Invitations/Details/{id?}
-
-FUTURE IMPLEMENTATION:
-- Load the invitation only if it belongs to the user’s
-  company; otherwise NotFound.
-
-DEPENDENCIES:
-TenderInvitations, Tenders, TenderItems, Documents.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Every query must be filtered by the signed-in user’s
-SupplierId. Never show other suppliers’ invitations, offers,
-prices or evaluations.
-===========================================================
-*@
+@model SupplierInvitationDetailsViewModel
+@* Owner: Saja. Read-only details for the signed-in supplier's own invitation. *@
 @{
     ViewData["Title"] = "Invitation Details";
     ViewData["WorkspaceSection"] = "Invitations";
     ViewData["Description"] = "What the tender asks for and its deadline.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
+
+@if (TempData["InvitationSuccess"] is string success)
+{
+    <p class="pg-note" role="status">@success</p>
+}
+@if (TempData["InvitationError"] is string error)
+{
+    <p class="pg-note" role="alert">@error</p>
+}
 
 <section class="ws-panel pg-panel">
     <h2>Tender</h2>
     <dl class="pg-dl">
-        <div><dt>Tender</dt><dd>—</dd></div>
-        <div><dt>Round</dt><dd>—</dd></div>
-        <div><dt>Opens</dt><dd>—</dd></div>
-        <div><dt>Deadline</dt><dd>—</dd></div>
-        <div><dt>Invitation status</dt><dd>—</dd></div>
+        <div><dt>Tender</dt><dd>@Model.TenderTitle</dd></div>
+        <div><dt>Description</dt><dd style="white-space: pre-wrap">@Model.Description</dd></div>
+        <div><dt>Round</dt><dd>@Model.RoundNumber</dd></div>
+        <div><dt>Opens</dt><dd>@(Model.OpensAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Deadline</dt><dd>@(Model.Deadline?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Invitation status</dt><dd>@Model.DisplayStatus</dd></div>
     </dl>
 </section>
 
@@ -57,7 +33,24 @@ prices or evaluations.
     <div class="pg-table-wrap">
         <table class="pg-table">
             <thead><tr><th scope="col">Item</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Items not loaded."' /></td></tr></tbody>
+            <tbody>
+                @if (Model.Items.Count == 0)
+                {
+                    <tr><td colspan="4"><partial name="_EmptyState" model='"No items have been added to this tender."' /></td></tr>
+                }
+                else
+                {
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>@item.Name</td>
+                            <td style="white-space: pre-wrap">@(item.Specifications ?? "—")</td>
+                            <td>@item.Quantity.ToString("0.###")</td>
+                            <td>@item.Unit</td>
+                        </tr>
+                    }
+                }
+            </tbody>
         </table>
     </div>
 </section>
@@ -65,14 +58,39 @@ prices or evaluations.
 <section class="ws-panel pg-panel">
     <h2>Requirements</h2>
     <dl class="pg-dl">
-        <div><dt>Mandatory documents and conditions</dt><dd>—</dd></div>
+        <div><dt>Mandatory documents and conditions</dt><dd style="white-space: pre-wrap">@(Model.Requirements ?? "No requirements specified.")</dd></div>
     </dl>
 </section>
 
 <nav class="pg-links" aria-label="Related pages">
+    @if (Model.Documents.Count > 0) {
+        <h2>Tender attachments</h2>
+        <ul>@foreach (var document in Model.Documents) {
+            <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@document.Id">@document.FileName</a></li>
+        }</ul>
+    }
     <ul>
-        <li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Respond">Accept or decline</a></li>
-        <li><a asp-area="Supplier" asp-controller="Offers" asp-action="Create">Create offer</a></li>
-        <li><a asp-area="Supplier" asp-controller="Clarifications" asp-action="Index">Ask a question</a></li>
+        @if (Model.IsBiddingOpen) {
+            <li><a asp-controller="Clarifications" asp-action="Create" asp-route-invitationId="@Model.Id">Ask Sourcing Officer about this tender</a></li>
+        }
+        @if (Model.CanCreateDraft)
+        {
+            <li><a asp-area="Supplier" asp-controller="Offers" asp-action="Create"
+                   asp-route-id="@Model.Id" class="pg-btn pg-btn-primary">Create draft offer</a></li>
+        }
+        @if (Model.HasOffer)
+        {
+            <li><a asp-area="Supplier" asp-controller="Offers" asp-action="Index">View your offers</a></li>
+        }
+        @if (Model.CanRespond)
+        {
+            <li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Respond"
+                   asp-route-id="@Model.Id" class="pg-btn pg-btn-primary">Accept or decline</a></li>
+        }
+        else
+        {
+            <li>Responses are unavailable: the invitation was answered or the bidding period is not open.</li>
+        }
+        <li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Index">Back to invitations</a></li>
     </ul>
 </nav>

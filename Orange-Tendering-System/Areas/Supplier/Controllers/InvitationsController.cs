@@ -1,37 +1,109 @@
 // ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: UNASSIGNED — Team assignment required
+// Owner: Saja
 // Module: Supplier Portal
 // Purpose: MVC endpoints for the Invitations pages of the Supplier workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+// Status: Own invitation list, details and accept/decline responses.
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Services;
+using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Areas.Supplier.Controllers
 {
     [Area("Supplier")]
     [Authorize(Roles = SystemRoles.Supplier)]
-    public class InvitationsController : Controller
+    public class InvitationsController(SupplierInvitationService invitationService) : Controller
     {
-        // My Invitations — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Supplier/Invitations. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
+        // GET /Supplier/Invitations: عرض دعوات شركة المستخدم فقط.
+        public async Task<IActionResult> Index(string? search, string? status)
         {
-            return View();
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Challenge();
+            }
+
+            if (search?.Length > 200) return BadRequest();
+            var model = await invitationService.GetInvitationsAsync(userId, search, status);
+            if (model.AccessMessage != null)
+            {
+                Response.StatusCode = StatusCodes.Status403Forbidden;
+            }
+
+            return View(model);
         }
 
-        // Invitation Details — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Supplier/Invitations/Details/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Details(int? id)
+        // تفاصيل دعوة تخص شركة المستخدم فقط.
+        public async Task<IActionResult> Details(int? id)
         {
-            return View();
+            if (id == null || id <= 0)
+            {
+                return NotFound();
+            }
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Challenge();
+            }
+
+            var model = await invitationService.GetDetailsAsync(userId, id.Value);
+            if (model == null)
+            {
+                return NotFound();
+            }
+
+            return View(model);
         }
 
-        // Accept / Decline Invitation — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Supplier/Invitations/Respond/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Respond(int? id)
+        // Accept / Decline Invitation — Owner: Saja
+        // GET: preview response options for an owned invitation; POST: save the response.
+        [HttpGet]
+        public async Task<IActionResult> Respond(int? id)
         {
-            return View();
+            if (id == null || id <= 0)
+                return NotFound();
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Challenge();
+
+            var model = await invitationService.GetDetailsAsync(userId, id.Value);
+            if (model == null)
+                return NotFound();
+
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Respond(int id, InvitationStatus decision)
+        {
+            if (!ModelState.IsValid || id <= 0
+                || (decision != InvitationStatus.Accepted && decision != InvitationStatus.Declined))
+                return BadRequest();
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Challenge();
+
+            var invitation = await invitationService.GetDetailsAsync(userId, id);
+            if (invitation == null)
+                return NotFound();
+
+            bool saved = await invitationService.RespondAsync(userId, id, decision);
+            if (saved == false)
+            {
+                TempData["InvitationError"] = "Response not saved. The invitation has already been answered or is not open for responses.";
+                return RedirectToAction("Details", new { id });
+            }
+
+            TempData["InvitationSuccess"] = decision == InvitationStatus.Accepted
+                ? "Invitation accepted. Submitting an offer is a separate step."
+                : "Invitation declined.";
+            return RedirectToAction("Details", new { id });
         }
     }
 }

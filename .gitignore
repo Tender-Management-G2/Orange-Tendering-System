@@ -487,3 +487,7 @@ CLAUDE.md
 
 # Local archives (e.g. the supplied layout ZIP, 130+ MB)
 *.zip
+
+# Private supplier attachments (metadata is stored in SQL Server).
+Orange-Tendering-System/App_Data/SupplierUploads/
+.build/
