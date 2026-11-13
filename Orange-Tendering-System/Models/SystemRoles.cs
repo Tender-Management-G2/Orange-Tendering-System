@@ -3,8 +3,7 @@ namespace Orange_Tendering_System.Models
     // ORANGE TENDER MANAGEMENT SYSTEM
     // Owner: Ahmad — Authentication & Database (role seeding)
     // Purpose: The seven Identity role names used by [Authorize(Roles = ...)] on every workspace area.
-    // Status: Names only. The roles are NOT seeded yet — until they exist in AspNetRoles and users are
-    //         assigned to them, every workspace page correctly answers "Access denied".
+    // Roles are seeded idempotently at startup by IdentityBootstrap.
     public static class SystemRoles
     {
         public const string Admin = "Admin";

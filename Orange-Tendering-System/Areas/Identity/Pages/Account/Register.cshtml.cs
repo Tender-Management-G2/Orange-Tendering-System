@@ -1,183 +1,153 @@
-// ORANGE TENDER MANAGEMENT SYSTEM — Owner: Ahmad (Authentication). Scaffolded from ASP.NET Core Identity UI 10; logic unchanged.
-// Status: existing Identity behavior. See the TODO list in Register.cshtml.
-// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-#nullable disable
-
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
-namespace Orange_Tendering_System.Areas.Identity.Pages.Account
+namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
+
+public class RegisterModel(
+    ApplicationDbContext db,
+    UserManager<ApplicationUser> users,
+    IEmailSender emailSender,
+    IWebHostEnvironment environment,
+    ILogger<RegisterModel> logger) : PageModel
 {
-    public class RegisterModel : PageModel
+    [BindProperty] public InputModel Input { get; set; } = new();
+    [BindProperty] public IFormFile? CommercialRegistrationCertificate { get; set; }
+    [BindProperty] public IFormFile? TaxCertificate { get; set; }
+    [BindProperty] public List<IFormFile> LegalDocuments { get; set; } = [];
+
+    public class InputModel
     {
-        private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IUserStore<ApplicationUser> _userStore;
-        private readonly IUserEmailStore<ApplicationUser> _emailStore;
-        private readonly ILogger<RegisterModel> _logger;
-        private readonly IEmailSender _emailSender;
+        [Required, StringLength(150)] public string FullName { get; set; } = string.Empty;
+        [Required, EmailAddress, StringLength(256)] public string Email { get; set; } = string.Empty;
+        [Required, StringLength(100, MinimumLength = 8), DataType(DataType.Password)] public string Password { get; set; } = string.Empty;
+        [Required, Compare(nameof(Password)), DataType(DataType.Password)] public string ConfirmPassword { get; set; } = string.Empty;
+        [Required, StringLength(200)] public string CompanyName { get; set; } = string.Empty;
+        [Required, StringLength(80)] public string RegistrationNumber { get; set; } = string.Empty;
+        [StringLength(80)] public string? TaxNumber { get; set; }
+        [Required, EmailAddress, StringLength(256)] public string CompanyEmail { get; set; } = string.Empty;
+        [Required, Phone, StringLength(40)] public string CompanyPhone { get; set; } = string.Empty;
+        [Required, StringLength(500)] public string CompanyAddress { get; set; } = string.Empty;
+    }
 
-        public RegisterModel(
-            UserManager<ApplicationUser> userManager,
-            IUserStore<ApplicationUser> userStore,
-            SignInManager<ApplicationUser> signInManager,
-            ILogger<RegisterModel> logger,
-            IEmailSender emailSender)
+    public async Task<IActionResult> OnPostAsync()
+    {
+        if (CommercialRegistrationCertificate == null)
+            ModelState.AddModelError(nameof(CommercialRegistrationCertificate), "Commercial registration certificate is required.");
+        if (!string.IsNullOrWhiteSpace(Input.TaxNumber) && TaxCertificate == null)
+            ModelState.AddModelError(nameof(TaxCertificate), "Tax certificate is required when a tax number is provided.");
+        if (LegalDocuments.Count == 0)
+            ModelState.AddModelError(nameof(LegalDocuments), "At least one business license or legal document is required.");
+
+        var files = new List<(IFormFile File, string Type)>();
+        if (CommercialRegistrationCertificate != null) files.Add((CommercialRegistrationCertificate, "CommercialRegistration"));
+        if (TaxCertificate != null) files.Add((TaxCertificate, "TaxCertificate"));
+        files.AddRange(LegalDocuments.Select(f => (f, "BusinessLicense")));
+        if (files.Count > 7)
+            ModelState.AddModelError(nameof(LegalDocuments), "Upload no more than seven documents.");
+        foreach (var (file, _) in files)
+            if (!SupplierDocumentStorage.IsAllowed(file))
+                ModelState.AddModelError(nameof(LegalDocuments), "Documents must be PDF, PNG, or JPEG files of at most 10 MB each.");
+        if (!ModelState.IsValid) return Page();
+
+        var email = Input.Email.Trim();
+        var registration = Input.RegistrationNumber.Trim();
+        if (await users.FindByEmailAsync(email) != null ||
+            await db.Suppliers.AnyAsync(s => s.RegistrationNumber == registration))
         {
-            _userManager = userManager;
-            _userStore = userStore;
-            _emailStore = GetEmailStore();
-            _signInManager = signInManager;
-            _logger = logger;
-            _emailSender = emailSender;
-        }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [BindProperty]
-        public InputModel Input { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public string ReturnUrl { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public IList<AuthenticationScheme> ExternalLogins { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public class InputModel
-        {
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            [EmailAddress]
-            [Display(Name = "Email")]
-            public string Email { get; set; }
-
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-            [DataType(DataType.Password)]
-            [Display(Name = "Password")]
-            public string Password { get; set; }
-
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [DataType(DataType.Password)]
-            [Display(Name = "Confirm password")]
-            [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
-            public string ConfirmPassword { get; set; }
-        }
-
-
-        public async Task OnGetAsync(string returnUrl = null)
-        {
-            ReturnUrl = returnUrl;
-            ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
-        }
-
-        public async Task<IActionResult> OnPostAsync(string returnUrl = null)
-        {
-            returnUrl ??= Url.Content("~/");
-            ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
-            if (ModelState.IsValid)
-            {
-                var user = CreateUser();
-
-                await _userStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-                await _emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-                var result = await _userManager.CreateAsync(user, Input.Password);
-
-                if (result.Succeeded)
-                {
-                    _logger.LogInformation("User created a new account with password.");
-
-                    var userId = await _userManager.GetUserIdAsync(user);
-                    var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                    code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-                    var callbackUrl = Url.Page(
-                        "/Account/ConfirmEmail",
-                        pageHandler: null,
-                        values: new { area = "Identity", userId = userId, code = code, returnUrl = returnUrl },
-                        protocol: Request.Scheme);
-
-                    await _emailSender.SendEmailAsync(Input.Email, "Confirm your email",
-                        $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.");
-
-                    if (_userManager.Options.SignIn.RequireConfirmedAccount)
-                    {
-                        return RedirectToPage("RegisterConfirmation", new { email = Input.Email, returnUrl = returnUrl });
-                    }
-                    else
-                    {
-                        await _signInManager.SignInAsync(user, isPersistent: false);
-                        return LocalRedirect(returnUrl);
-                    }
-                }
-                foreach (var error in result.Errors)
-                {
-                    ModelState.AddModelError(string.Empty, error.Description);
-                }
-            }
-
-            // If we got this far, something failed, redisplay form
+            ModelState.AddModelError(string.Empty, "This account or commercial registration is already registered.");
             return Page();
         }
 
-        private ApplicationUser CreateUser()
+        var savedPaths = new List<string>();
+        var committed = false;
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        try
         {
-            try
+            var supplier = new Orange_Tendering_System.Models.Entities.Supplier
             {
-                return Activator.CreateInstance<ApplicationUser>();
-            }
-            catch
-            {
-                throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                    $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor, or alternatively " +
-                    $"override the register page in /Areas/Identity/Pages/Account/Register.cshtml");
-            }
-        }
+                CompanyName = Input.CompanyName.Trim(), RegistrationNumber = registration,
+                TaxNumber = Input.TaxNumber?.Trim(), Email = Input.CompanyEmail.Trim(),
+                Phone = Input.CompanyPhone.Trim(), Address = Input.CompanyAddress.Trim(),
+                Status = SupplierStatus.Pending, CreatedAt = DateTime.UtcNow
+            };
+            db.Suppliers.Add(supplier);
+            await db.SaveChangesAsync();
 
-        private IUserEmailStore<ApplicationUser> GetEmailStore()
-        {
-            if (!_userManager.SupportsUserEmail)
+            var user = new ApplicationUser
             {
-                throw new NotSupportedException("The default UI requires a user store with email support.");
+                UserName = email, Email = email, FullName = Input.FullName.Trim(),
+                SupplierId = supplier.Id, IsActive = true, EmailOtpSentAt = DateTime.UtcNow
+            };
+            var created = await users.CreateAsync(user, Input.Password);
+            if (!created.Succeeded)
+            {
+                foreach (var error in created.Errors)
+                    ModelState.AddModelError(string.Empty, error.Description);
+                await transaction.RollbackAsync();
+                return Page();
             }
-            return (IUserEmailStore<ApplicationUser>)_userStore;
+            var assigned = await users.AddToRoleAsync(user, SystemRoles.Supplier);
+            if (!assigned.Succeeded)
+                throw new InvalidOperationException("Could not assign Supplier role.");
+
+            foreach (var (file, type) in files)
+            {
+                var stored = await SupplierDocumentStorage.SaveAsync(file, environment.ContentRootPath);
+                savedPaths.Add(stored.Path);
+                db.Documents.Add(new Document
+                {
+                    SupplierId = supplier.Id, UploadedByUserId = user.Id,
+                    FileName = Path.GetFileName(file.FileName), StoragePath = stored.Path,
+                    ContentType = stored.ContentType, SizeBytes = file.Length,
+                    DocumentType = type, VerificationStatus = DocumentVerificationStatus.Pending,
+                    UploadedAt = DateTime.UtcNow
+                });
+            }
+
+            var admins = await users.GetUsersInRoleAsync(SystemRoles.Admin);
+            foreach (var admin in admins)
+                db.Notifications.Add(new Notification
+                {
+                    UserId = admin.Id, Title = "Supplier awaiting review",
+                    Message = $"{supplier.CompanyName} submitted a supplier registration.",
+                    Link = "/Admin/Suppliers/Review/" + supplier.Id,
+                    CreatedAt = DateTime.UtcNow
+                });
+            db.AuditLogs.Add(new AuditLog
+            {
+                UserId = user.Id, Action = "SupplierRegistered", EntityName = "Supplier",
+                EntityId = supplier.Id.ToString(), CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+
+            var code = await users.GenerateUserTokenAsync(user, TokenOptions.DefaultEmailProvider, "SupplierEmailOtp");
+            await emailSender.SendEmailAsync(email, "Verify your supplier email",
+                $"<p>Your Orange Tendering verification code is <strong>{code}</strong>.</p><p>It expires in 10 minutes. Your company will still require administrator approval.</p>");
+            await transaction.CommitAsync();
+            committed = true;
+            logger.LogInformation("Pending supplier registration created for user {UserId}.", user.Id);
+            return RedirectToPage("./VerifyEmail", new { email });
+        }
+        catch (Exception exception) when (exception is DbUpdateException or IOException or InvalidOperationException or FormatException or System.Net.Mail.SmtpException)
+        {
+            await transaction.RollbackAsync();
+            logger.LogError(exception, "Supplier registration failed.");
+            ModelState.AddModelError(string.Empty, "Registration could not be completed. Please try again later.");
+            return Page();
+        }
+        finally
+        {
+            if (!committed)
+                foreach (var path in savedPaths)
+                    System.IO.File.Delete(path);
         }
     }
 }

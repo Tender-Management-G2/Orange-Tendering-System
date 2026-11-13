@@ -1,143 +1,89 @@
-// ORANGE TENDER MANAGEMENT SYSTEM — Owner: Ahmad (Authentication). Scaffolded from ASP.NET Core Identity UI 10; logic unchanged.
-// Status: existing Identity behavior. See the TODO list in Login.cshtml.
-// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-#nullable disable
-
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.ViewModels;
 
-namespace Orange_Tendering_System.Areas.Identity.Pages.Account
+namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
+
+public class LoginModel(
+    UserManager<ApplicationUser> users,
+    SignInManager<ApplicationUser> signIn,
+    ApplicationDbContext db,
+    ILogger<LoginModel> logger) : PageModel
 {
-    public class LoginModel : PageModel
+    [BindProperty] public InputModel Input { get; set; } = new();
+    public string? ReturnUrl { get; private set; }
+
+    public class InputModel
     {
-        private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly ILogger<LoginModel> _logger;
+        [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+        [Required, DataType(DataType.Password)] public string Password { get; set; } = string.Empty;
+        [Display(Name = "Remember me")] public bool RememberMe { get; set; }
+    }
 
-        public LoginModel(SignInManager<ApplicationUser> signInManager, ILogger<LoginModel> logger)
+    public async Task OnGetAsync(string? returnUrl = null)
+    {
+        ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
+        await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+    }
+
+    public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
+    {
+        ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
+        if (!ModelState.IsValid) return Page();
+
+        var user = await users.FindByEmailAsync(Input.Email.Trim());
+        if (user == null)
         {
-            _signInManager = signInManager;
-            _logger = logger;
-        }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [BindProperty]
-        public InputModel Input { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public IList<AuthenticationScheme> ExternalLogins { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public string ReturnUrl { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [TempData]
-        public string ErrorMessage { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public class InputModel
-        {
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            [EmailAddress]
-            public string Email { get; set; }
-
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            [DataType(DataType.Password)]
-            public string Password { get; set; }
-
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Display(Name = "Remember me?")]
-            public bool RememberMe { get; set; }
-        }
-
-        public async Task OnGetAsync(string returnUrl = null)
-        {
-            if (!string.IsNullOrEmpty(ErrorMessage))
-            {
-                ModelState.AddModelError(string.Empty, ErrorMessage);
-            }
-
-            returnUrl ??= Url.Content("~/");
-
-            // Clear the existing external cookie to ensure a clean login process
-            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
-
-            ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
-
-            ReturnUrl = returnUrl;
-        }
-
-        public async Task<IActionResult> OnPostAsync(string returnUrl = null)
-        {
-            returnUrl ??= Url.Content("~/");
-
-            ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
-
-            if (ModelState.IsValid)
-            {
-                // This doesn't count login failures towards account lockout
-                // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-                var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
-                if (result.Succeeded)
-                {
-                    _logger.LogInformation("User logged in.");
-                    return LocalRedirect(returnUrl);
-                }
-                if (result.RequiresTwoFactor)
-                {
-                    return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, RememberMe = Input.RememberMe });
-                }
-                if (result.IsLockedOut)
-                {
-                    _logger.LogWarning("User account locked out.");
-                    return RedirectToPage("./Lockout");
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-                    return Page();
-                }
-            }
-
-            // If we got this far, something failed, redisplay form
+            ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");
+            logger.LogWarning("Identity sign-in failed.");
             return Page();
         }
+
+        var result = await signIn.CheckPasswordSignInAsync(user, Input.Password, lockoutOnFailure: true);
+        if (!result.Succeeded)
+        {
+            logger.LogWarning(result.IsLockedOut ? "Identity account locked out." : "Identity sign-in failed.");
+            ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");
+            return Page();
+        }
+
+        var isSupplier = await users.IsInRoleAsync(user, SystemRoles.Supplier);
+        var supplierAllowed = (!isSupplier && user.SupplierId == null) ||
+            (user.SupplierId != null && await db.Suppliers
+                .AnyAsync(s => s.Id == user.SupplierId && s.Status == SupplierStatus.Approved));
+        if (!user.IsActive || !supplierAllowed)
+        {
+            logger.LogWarning("Identity sign-in denied by account state for user {UserId}.", user.Id);
+            ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");
+            return Page();
+        }
+
+        await signIn.SignInAsync(user, Input.RememberMe);
+        logger.LogInformation("Identity sign-in succeeded for user {UserId}.", user.Id);
+        db.AuditLogs.Add(new AuditLog
+        {
+            UserId = user.Id, Action = "SignIn", EntityName = "ApplicationUser", EntityId = user.Id,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        if (user.MustChangePassword)
+            return RedirectToPage("./FirstLoginPasswordChange");
+        if (ReturnUrl != null)
+            return LocalRedirect(ReturnUrl);
+
+        var roles = await users.GetRolesAsync(user);
+        var workspace = WorkspaceNavigation.Workspaces
+            .Where(w => roles.Contains(w.Role))
+            .OrderBy(w => w.Role == SystemRoles.SourcingManager ? -1 : 0)
+            .FirstOrDefault();
+        return LocalRedirect(workspace == null ? "/Workspace" : "/" + workspace.Area);
     }
 }

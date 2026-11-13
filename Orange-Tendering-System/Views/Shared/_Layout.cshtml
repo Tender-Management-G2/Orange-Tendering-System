@@ -57,6 +57,10 @@ INTEGRATED. No business logic.
     <partial name="_Footer" />
     <dialog aria-labelledby="dialog-title"><button class="close" aria-label="Close dialog">×</button><div class="dialog-content"></div></dialog>
     @await RenderSectionAsync("Scripts", required: false)
+    @if (isIdentityPage)
+    {
+        <script src="~/js/auth-forms.js" asp-append-version="true"></script>
+    }
     <script src="~/js/experience.js" asp-append-version="true"></script>
     <script src="~/js/public-pages.js" asp-append-version="true"></script>
 </body>
