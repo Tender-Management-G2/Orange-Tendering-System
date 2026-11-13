@@ -48,14 +48,9 @@ namespace Orange_Tendering_System.ViewModels
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Requests", "PurchaseRequests", "Index", "request"),
                 new("Tenders", "Tenders", "Index", "tender"),
-                new("Tender Rounds", "Tenders", "Rounds", "rounds"),
-                new("Invitations", "Invitations", "Index", "mail"),
                 new("Received Bids", "Bids", "Index", "layers"),
-                new("Compliance", "Bids", "Compliance", "check"),
-                new("Comparison", "Bids", "Compare", "compare"),
                 new("Reports", "Reports", "Index", "report"),
-                new("Supplier Clarifications", "Clarifications", "Index", "chat"),
-                new("Analytics & Exports", "Analytics", "Index", "chart", "")
+                  new("Supplier Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
             [

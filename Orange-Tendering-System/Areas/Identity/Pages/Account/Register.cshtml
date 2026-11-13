@@ -30,6 +30,12 @@
                 <label asp-for="Input.CompanyName">Legal company name</label>
                 <input asp-for="Input.CompanyName" />
                 <span asp-validation-for="Input.CompanyName" class="field-error"></span>
+                <label asp-for="Input.Category">Main supply category</label>
+                <select asp-for="Input.Category">
+                    <option value="">Choose your category</option>
+                    @foreach (var category in Model.Categories) { <option value="@category">@category</option> }
+                </select>
+                <span asp-validation-for="Input.Category" class="field-error"></span>
                 <label asp-for="Input.RegistrationNumber">Commercial registration number</label>
                 <input asp-for="Input.RegistrationNumber" />
                 <span asp-validation-for="Input.RegistrationNumber" class="field-error"></span>
