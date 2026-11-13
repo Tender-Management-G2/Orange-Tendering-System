@@ -67,14 +67,9 @@ namespace Orange_Tendering_System.ViewModels
             new("EvaluationCommittee", "Evaluation Committee", SystemRoles.EvaluationCommittee,
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
-                new("Assigned Evaluations", "Evaluations", "Index", "request"),
-                new("Criteria & Weights", "Criteria", "Index", "scale"),
-                new("Technical Evaluation", "Evaluations", "Technical", "settings"),
-                new("Financial Evaluation", "Evaluations", "Financial", "chart"),
-                new("Scores", "Evaluations", "Scores", "vote"),
-                new("AI Analysis", "Evaluations", "AiAnalysis", "ai"),
-                new("Unified Report", "Reports", "Unified", "report"),
-                new("History", "Evaluations", "History", "history")
+                // Criteria, Technical/Financial, Scores, AI Analysis, Unified Report and History were scaffold pages that all redirected
+                // to the weighted workflow, so they are not listed separately: every step is on the tender workflow page.
+                new("Assigned Evaluations", "Workflow", "Index", "request")
             ]),
             new("SourcingManager", "Sourcing Manager", SystemRoles.SourcingManager,
             [

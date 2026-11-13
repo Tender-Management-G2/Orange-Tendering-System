@@ -78,6 +78,10 @@
             <li><a asp-area="Supplier" asp-controller="Offers" asp-action="Create"
                    asp-route-id="@Model.Id" class="pg-btn pg-btn-primary">Create draft offer</a></li>
         }
+        @if (Model.WaitingForWeights)
+        {
+            <li><span class="pg-status">Offers open soon: waiting for evaluation weights approval</span></li>
+        }
         @if (Model.HasOffer)
         {
             <li><a asp-area="Supplier" asp-controller="Offers" asp-action="Index">View your offers</a></li>

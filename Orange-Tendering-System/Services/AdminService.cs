@@ -415,6 +415,7 @@ namespace Orange_Tendering_System.Services
                     FullName = u.FullName,
                     Email = u.Email ?? "",
                     IsActive = u.IsActive,
+                    SupplierStatus = u.Supplier != null ? (SupplierStatus?)u.Supplier.Status : null,
 
                     DepartmentOrCompany = u.Department != null
                         ? u.Department.Name
@@ -666,6 +667,7 @@ namespace Orange_Tendering_System.Services
 
                 DepartmentName = user.Department?.Name ?? "—",
                 SupplierName = user.Supplier?.CompanyName ?? "—",
+                SupplierStatus = user.Supplier?.Status,
 
                 IsActive = user.IsActive,
                 EmailConfirmed = user.EmailConfirmed,

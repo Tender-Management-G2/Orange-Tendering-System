@@ -106,18 +106,7 @@ public registration.
                             <td>@user.DepartmentOrCompany</td>
 
                             <td>
-                                @if (user.IsActive)
-                                {
-                                    <span class="pg-status">
-                                        Active
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="pg-status">
-                                        Inactive
-                                    </span>
-                                }
+                                <span class="pg-status">@user.StatusLabel</span>
                             </td>
 
                             <td>

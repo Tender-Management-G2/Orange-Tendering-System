@@ -153,6 +153,28 @@ public sealed class InternalDashboardService(ApplicationDbContext db)
         return hits;
     }
 
+    // Supplier search: only this supplier's own invitations and offers (same ownership rule as the supplier pages).
+    public async Task<List<SearchHit>> SearchSupplierAsync(ClaimsPrincipal principal, string q)
+    {
+        q = q.Trim();
+        if (q.Length < 2) return [];
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var supplierId = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.SupplierId).SingleOrDefaultAsync();
+        if (supplierId == null) return [];
+        var hits = new List<SearchHit>();
+        foreach (var i in await db.TenderInvitations.AsNoTracking()
+            .Where(i => i.SupplierId == supplierId && (i.TenderRound.Tender.Title.Contains(q) || ("T-" + i.TenderRound.TenderId).Contains(q)))
+            .OrderByDescending(i => i.Id).Take(6)
+            .Select(i => new { i.Id, i.TenderRound.Tender.Title, i.TenderRound.TenderId, i.Status }).ToListAsync())
+            hits.Add(new("Invitation", i.Title, $"T-{i.TenderId:0000} · {i.Status}", "/Supplier/Invitations/Details/" + i.Id));
+        foreach (var b in await db.Bids.AsNoTracking()
+            .Where(b => b.TenderInvitation.SupplierId == supplierId && b.TenderInvitation.TenderRound.Tender.Title.Contains(q))
+            .OrderByDescending(b => b.Id).Take(5)
+            .Select(b => new { b.Id, b.TenderInvitation.TenderRound.Tender.Title, b.Status }).ToListAsync())
+            hits.Add(new("Offer", b.Title, b.Status.ToString(), "/Supplier/Offers/Details/" + b.Id));
+        return hits;
+    }
+
     private IQueryable<Tender> ScopedTenders(string role, ApplicationUser user)
     {
         var q = db.Tenders.AsNoTracking();
