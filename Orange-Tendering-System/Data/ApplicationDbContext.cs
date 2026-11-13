@@ -38,6 +38,37 @@ namespace Orange_Tendering_System.Data
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+        private void ProtectReportHistory()
+        {
+            ChangeTracker.DetectChanges();
+            foreach (var entry in ChangeTracker.Entries<TenderReport>())
+            {
+                if (entry.State == EntityState.Deleted) throw new InvalidOperationException("Report history cannot be deleted.");
+                if (entry.State != EntityState.Modified || entry.Property(x => x.PdfSha256).OriginalValue == null) continue;
+                var frozen = new[] { nameof(TenderReport.Content), nameof(TenderReport.PdfContent), nameof(TenderReport.PdfSha256), nameof(TenderReport.SnapshotJson),
+                    nameof(TenderReport.SnapshotSha256), nameof(TenderReport.SourceSha256), nameof(TenderReport.TemplateVersion), nameof(TenderReport.SignaturePageIndex),
+                    nameof(TenderReport.VersionNumber), nameof(TenderReport.PreviousReportId), nameof(TenderReport.RankingSnapshotJson), nameof(TenderReport.RecommendedBidId) };
+                if (frozen.Any(name => entry.Property(name).IsModified)) throw new InvalidOperationException("Frozen report content cannot be overwritten. Create a controlled new version.");
+            }
+            foreach (var entry in ChangeTracker.Entries<ReportSignature>())
+            {
+                if (entry.State == EntityState.Deleted || entry.State == EntityState.Modified && entry.Properties.Any(p => p.IsModified && p.Metadata.Name is not (nameof(ReportSignature.InvalidatedAt) or nameof(ReportSignature.InvalidationReason))))
+                    throw new InvalidOperationException("Signature receipts are immutable; only endorsement invalidation metadata may change.");
+            }
+            foreach (var entry in ChangeTracker.Entries<ReportRevision>())
+            {
+                if (entry.State == EntityState.Deleted) throw new InvalidOperationException("Revision history cannot be deleted.");
+                if (entry.State != EntityState.Modified) continue;
+                var fixedFields = new[] { nameof(ReportRevision.RequestId), nameof(ReportRevision.TenderReportId), nameof(ReportRevision.SourceStage), nameof(ReportRevision.SourceSessionState),
+                    nameof(ReportRevision.TargetStage), nameof(ReportRevision.Correction), nameof(ReportRevision.ReturningUserId), nameof(ReportRevision.ResponsibleUserId), nameof(ReportRevision.Feedback), nameof(ReportRevision.RequiredAction), nameof(ReportRevision.RequestedAt) };
+                if (fixedFields.Any(name => entry.Property(name).IsModified)) throw new InvalidOperationException("Revision feedback, scope and responsibility cannot be overwritten.");
+            }
+        }
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        { ProtectReportHistory(); return base.SaveChanges(acceptAllChangesOnSuccess); }
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        { ProtectReportHistory(); return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken); }
+
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {
             // Store every enum as readable text (e.g. "Submitted") instead of a number.
@@ -47,6 +78,20 @@ namespace Orange_Tendering_System.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            builder.Entity<WeightRound>();
+            builder.Entity<WeightProposal>().ToTable(t => t.HasCheckConstraint("CK_WeightProposal_Valid",
+                "[Financial] >= 0 AND [Financial] <= 100 AND [Technical] >= 0 AND [Technical] <= 100 AND [Financial] + [Technical] = 100"));
+            builder.Entity<WeightRound>().ToTable(t => t.HasCheckConstraint("CK_WeightRound_Approved",
+                "[State] <> 'Approved' OR ([ApprovedFinancial] IS NOT NULL AND [ApprovedTechnical] IS NOT NULL AND [ApprovedFinancial] + [ApprovedTechnical] = 100 AND [ApprovedByUserId] IS NOT NULL AND [ApprovedAt] IS NOT NULL)"));
+            builder.Entity<EvaluationSession>().ToTable(t => t.HasCheckConstraint("CK_EvaluationSession_Window", "[EndsAt] > [StartsAt]"));
+            builder.Entity<SessionBid>();
+            builder.Entity<EvaluationParticipation>();
+            builder.Entity<AiAnalysis>();
+            builder.Entity<ReportSignature>();
+            builder.Entity<ReportRevision>();
+            builder.Entity<RoundDecision>();
+            builder.Entity<ExternalSupplierInvitation>();
 
             // Supplier and ApplicationUser are linked twice (account's company, and the Admin who reviewed it),
             // so EF needs to be told these are two separate relationships.

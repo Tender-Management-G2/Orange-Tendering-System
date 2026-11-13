@@ -1,0 +1,156 @@
+@model Orange_Tendering_System.ViewModels.WorkflowDetails
+@using Orange_Tendering_System.Models.Entities
+@inject Microsoft.Extensions.Options.IOptions<Orange_Tendering_System.Services.ZoomOptions> ZoomSettings
+@inject Orange_Tendering_System.Services.IExternalInvitationChannel ExternalChannel
+@*
+    Round control shared by the role-specific Workflow/Details pages (each page keeps its own layout).
+    Officer: round history, Proceed / Re-Tender, external invitations. Assigned Sourcing Manager: decision on a
+    request to proceed with fewer suppliers. Supplier: own bids from earlier rounds. All rules are enforced again
+    by TenderWorkflowService; nothing here grants authority.
+*@
+@{
+    var id = Model.Tender.Id;
+    var round = Model.Tender.Rounds.OrderByDescending(x => x.RoundNumber).FirstOrDefault();
+    var awaitingDecision = round?.Status == TenderRoundStatus.Closed && Model.Session == null;
+    var requests = Model.RoundDecisions.Where(x => x.TenderRoundId == round?.Id && x.Kind == RoundDecisionKind.ProceedException).ToList();
+    var pending = requests.FirstOrDefault(x => x.Status == RoundDecisionStatus.Pending);
+    var approved = requests.FirstOrDefault(x => x.Status == RoundDecisionStatus.Approved);
+    Func<int, int?> roundNumber = roundId => Model.Tender.Rounds.FirstOrDefault(x => x.Id == roundId)?.RoundNumber;
+}
+@if (Model.IsOfficer && round != null)
+{
+    <section>
+        <h2>Tendering rounds · Round @round.RoundNumber of @Model.MaxRounds</h2>
+        <p>Supplier registrations, accounts, documents, invitations and bids from every round stay on record. Each round needs a new bid submission; earlier bids are never carried into a later round.</p>
+        <div class="scroll"><table><thead><tr><th>Round</th><th>Status</th><th>Opened</th><th>Deadline</th><th>Registered suppliers invited</th><th>Submitted bids</th><th>External invitations</th></tr></thead><tbody>
+        @foreach (var row in Model.RoundHistory)
+        {
+            <tr><td>@row.RoundNumber</td><td>@row.Status</td><td>@row.OpensAt?.ToString("u")</td><td>@row.Deadline?.ToString("u")</td><td>@row.Invitations</td><td>@row.SubmittedBids</td><td>@row.ExternalInvitations</td></tr>
+        }
+        </tbody></table></div>
+        @if (round.RoundNumber > 1 && round.Status == TenderRoundStatus.Draft)
+        {
+            <p>When you open bidding for this round, every still-approved supplier invited in an earlier round is invited and notified automatically, and earlier external contacts are queued for the external channel.</p>
+        }
+        @if (Model.EarlierBids.Count > 0)
+        {
+            <details><summary>Bids from earlier rounds (@Model.EarlierBids.Count, read-only history)</summary>
+            <table><thead><tr><th>Round</th><th>Bid</th><th>Supplier</th><th>Status</th><th>Submitted UTC</th><th>Compliance</th></tr></thead><tbody>
+            @foreach (var bid in Model.EarlierBids.OrderBy(x => x.TenderInvitation.TenderRound.RoundNumber).ThenBy(x => x.Id))
+            {
+                <tr><td>@bid.TenderInvitation.TenderRound.RoundNumber</td><td>#@bid.Id</td><td>#@bid.TenderInvitation.SupplierId</td><td>@bid.Status</td><td>@bid.SubmittedAt?.ToString("u")</td><td>@bid.ComplianceStatus</td></tr>
+            }
+            </tbody></table></details>
+        }
+    </section>
+}
+@if (Model.IsOfficer && round != null && awaitingDecision)
+{
+    <section>
+        <h2>Proceed or re-tender · Round @round.RoundNumber</h2>
+        <p>@Model.DistinctOffers supplier(s) submitted offers. The minimum for this round is @Model.MinimumOffers.</p>
+        @if (Model.DistinctOffers >= Model.MinimumOffers || approved != null)
+        {
+            @if (Model.RoundDecisions.Any(x => x.TenderRoundId == round.Id && x.Kind == RoundDecisionKind.Proceed)) { <p role="status">Proceed recorded. Complete compliance, review AI, then schedule evaluation.</p> }
+            else { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Proceed" asp-route-id="@id" method="post"><button>Proceed with this closed round</button></form> }
+        }
+        @if (Model.DistinctOffers >= Model.MinimumOffers)
+        {
+            <p><strong>Proceed:</strong> enough offers were received. Record the compliance check for every offer, run and review the AI analysis, then schedule the evaluation below. You may re-tender instead.</p>
+        }
+        else if (approved != null)
+        {
+            <p role="status"><strong>Approved to proceed with @approved.OfferCount supplier(s).</strong> Decided by @approved.DecidedByUserId at @approved.DecidedAt?.ToString("u"). Compliance, committee evaluation and every approval still apply; nothing is awarded automatically. Schedule the evaluation below.</p>
+        }
+        else if (pending != null)
+        {
+            <p class="blocker">Your request to proceed with @pending.OfferCount supplier(s) is awaiting the assigned Sourcing Manager's decision.</p>
+        }
+        else if (Model.DistinctOffers >= 1)
+        {
+            <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RequestProceed" asp-route-id="@id" method="post">
+                <p>Proceeding with fewer than @Model.MinimumOffers suppliers needs documented approval from the assigned Sourcing Manager. Approval relaxes only the offer count for this round.</p>
+                <label>Justification for proceeding with @Model.DistinctOffers supplier(s)<textarea name="justification" maxlength="2000" required></textarea></label>
+                <button>Request approval to proceed</button>
+            </form>
+        }
+        @if (round.RoundNumber >= Model.MaxRounds)
+        {
+            <p class="blocker">Round @Model.MaxRounds was the final permitted round. Round @(Model.MaxRounds + 1) cannot be created.@(Model.DistinctOffers == 0 ? " No offers were received, so this tender cannot proceed to evaluation." : "")</p>
+        }
+        else
+        {
+            <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Retender" asp-route-id="@id" method="post">
+                <p>Re-tendering is your decision after any closed round, whatever the number of offers. It marks round @round.RoundNumber as failed and creates round @(round.RoundNumber + 1) of @Model.MaxRounds (re-tender @round.RoundNumber of @(Model.MaxRounds - 1)). Approved weights stay locked. Earlier invitations and bids remain on record and are not evaluated.@(pending != null ? " Your pending request to proceed will be withdrawn." : "")</p>
+                <label>Reason for re-tendering<textarea name="reason" maxlength="2000" required></textarea></label>
+                <label><input type="checkbox" required /> I confirm that the @Model.DistinctOffers offer(s) of this round will not be evaluated.</label>
+                <button>Re-tender: create round @(round.RoundNumber + 1)</button>
+            </form>
+        }
+        <p><small>Automatic Zoom meeting creation is @(ZoomSettings.Value.Configured ? "configured." : "not configured; paste an existing Zoom link when scheduling.")</small></p>
+    </section>
+}
+@if (Model.IsManager && pending != null && awaitingDecision && round != null)
+{
+    <section>
+        <h2>Decision required: proceed with fewer suppliers · Round @round.RoundNumber</h2>
+        <p>The Sourcing Officer requests to continue with @pending.OfferCount supplier(s); the normal minimum for this round is @Model.MinimumOffers. Requested @pending.RequestedAt.ToString("u") by @pending.RequestedByUserId.</p>
+        <pre>@pending.Justification</pre>
+        <form asp-area="SourcingManager" asp-controller="Workflow" asp-action="DecideProceed" asp-route-id="@id" method="post">
+            <input type="hidden" name="decisionId" value="@pending.Id" />
+            <p>Approval only allows the evaluation to be scheduled with fewer offers. It does not award any supplier or waive compliance.</p>
+            <label>Decision comment<textarea name="comment" maxlength="2000" required></textarea></label>
+            <button name="approve" value="true">Approve proceeding</button> <button name="approve" value="false">Reject request</button>
+        </form>
+    </section>
+}
+@if (Model.RoundDecisions.Count > 0)
+{
+    <section>
+        <h2>Recorded round decisions</h2>
+        @foreach (var decision in Model.RoundDecisions)
+        {
+            <details><summary>Round @roundNumber(decision.TenderRoundId) · @(decision.Kind == RoundDecisionKind.Retender ? "Re-tender" : "Proceed with fewer suppliers") · @decision.Status · @decision.OfferCount offer(s) · @decision.RequestedAt.ToString("u")</summary>
+                <p>Requested by @decision.RequestedByUserId</p><pre>@decision.Justification</pre>
+                @if (decision.Kind == RoundDecisionKind.ProceedException && decision.DecidedAt != null) { <p>Decided by @decision.DecidedByUserId at @decision.DecidedAt?.ToString("u")</p><pre>@decision.DecisionComment</pre> }
+            </details>
+        }
+    </section>
+}
+@if (Model.IsOfficer && round != null && (round.Status == TenderRoundStatus.Open || Model.ExternalInvitations.Count > 0))
+{
+    <section>
+        <h2>Unregistered suppliers · external invitations</h2>
+        @if (!ExternalChannel.Configured) { <p class="blocker">No external invitation channel is configured. Contacts are saved, but nothing is sent until an administrator configures ExternalInvitations.</p> }
+        @if (round.Status == TenderRoundStatus.Open && round.Deadline > Model.UtcNow)
+        {
+            <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteExternal" asp-route-id="@id" method="post">
+                <p>For companies without a supplier registration. They receive a registration invitation only; an offer still requires an approved registration and a normal invitation.</p>
+                <label>Company name<input name="companyName" maxlength="200" required /></label>
+                <label>Email<input name="email" type="email" maxlength="256" required /></label>
+                <label>Phone (optional)<input name="phone" maxlength="40" /></label>
+                <button>Queue external invitation</button>
+            </form>
+        }
+        @if (Model.ExternalInvitations.Count > 0)
+        {
+            <div class="scroll"><table><thead><tr><th>Round</th><th>Company</th><th>Email</th><th>Channel</th><th>Status</th><th>Attempts</th><th>Sent UTC</th><th>Last error</th></tr></thead><tbody>
+            @foreach (var external in Model.ExternalInvitations)
+            {
+                <tr><td>@roundNumber(external.TenderRoundId)</td><td>@external.CompanyName</td><td>@external.Email</td><td>@external.Channel</td><td>@external.Status</td><td>@external.Attempts</td><td>@external.SentAt?.ToString("u")</td><td>@external.LastError</td></tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+}
+@if (Model.IsSupplier && Model.EarlierBids.Count > 0)
+{
+    <section>
+        <h2>Your bids from earlier rounds</h2>
+        <p>These bids stay on record but are not considered in the current round. Submit a new bid for the current round.</p>
+        @foreach (var bid in Model.EarlierBids.OrderBy(x => x.TenderInvitation.TenderRound.RoundNumber))
+        {
+            <p>Round @bid.TenderInvitation.TenderRound.RoundNumber · Bid #@bid.Id · @bid.Status · Submitted @bid.SubmittedAt?.ToString("u")</p>
+        }
+    </section>
+}

@@ -8,7 +8,7 @@ namespace Orange_Tendering_System.Services;
 
 // Private storage: never serve procurement files from wwwroot.
 public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHostEnvironment environment,
-    SupplierCommunicationService communication)
+    SupplierCommunicationService communication, TimeProvider clock)
 {
     private string StorageRoot => Path.Combine(environment.ContentRootPath, "App_Data", "SupplierUploads");
 
@@ -28,10 +28,10 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
     {
         var doc = await OwnDocuments(userId).AsNoTracking().SingleOrDefaultAsync(d => d.Id == id);
         if (doc == null) return null;
-        var path = Path.GetFullPath(Path.Combine(environment.ContentRootPath, doc.StoragePath));
-        // Only private App_Data paths are allowed, including company files created by the team.
-        var privateRoot = Path.GetFullPath(Path.Combine(environment.ContentRootPath, "App_Data")) + Path.DirectorySeparatorChar;
-        if (!path.StartsWith(privateRoot, StringComparison.OrdinalIgnoreCase) || !File.Exists(path)) return null;
+        string path;
+        try { path = PrivateDocumentPaths.Resolve(environment.ContentRootPath, doc.StoragePath); }
+        catch (WorkflowException) { return null; }
+        if (!File.Exists(path)) return null;
         return (path, Path.GetFileName(doc.FileName), "application/octet-stream");
     }
 
@@ -53,12 +53,15 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
         if (account == null) return "Your approved supplier account is required.";
         var doc = new Document
         {
-            FileName = name, SizeBytes = bytes.Length, UploadedByUserId = userId, UploadedAt = DateTime.UtcNow,
+            FileName = name, SizeBytes = bytes.Length, UploadedByUserId = userId, UploadedAt = clock.GetUtcNow().UtcDateTime,
             ContentType = extension == ".pdf" ? "application/pdf" : extension == ".png" ? "image/png" : "image/jpeg"
         };
         if (bidId.HasValue)
         {
-            var now = DateTime.UtcNow;
+            var tenderId = await context.Bids.Where(b => b.Id == bidId).Select(b => (int?)b.TenderInvitation.TenderRound.TenderId).SingleOrDefaultAsync();
+            if (!tenderId.HasValue) return "Draft offer is unavailable.";
+            await context.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={tenderId.Value}").SingleAsync();
+            var now = clock.GetUtcNow().UtcDateTime;
             bool allowed = await context.Bids.AnyAsync(b => b.Id == bidId && b.Status == BidStatus.Draft
                 && b.TenderInvitation.SupplierId == account.SupplierId && b.TenderInvitation.Status == InvitationStatus.Accepted
                 && b.TenderInvitation.TenderRound.Status == TenderRoundStatus.Open
@@ -80,7 +83,7 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
             {
                 UserId = thread.FromUserId == userId ? thread.ToUserId : thread.FromUserId,
                 Title = "Supplier clarification attachment", Message = $"A document was added to clarification #{thread.Id}.",
-                Link = $"/SourcingOfficer/Clarifications?id={thread.Id}", CreatedAt = DateTime.UtcNow
+                Link = $"/SourcingOfficer/Clarifications?id={thread.Id}", CreatedAt = clock.GetUtcNow().UtcDateTime
             });
         }
         else
@@ -101,9 +104,11 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
             context.AuditLogs.Add(new AuditLog
             {
                 UserId = userId, EntityName = nameof(Document), EntityId = doc.Id.ToString(),
-                Action = "UploadSupplierDocument", CreatedAt = DateTime.UtcNow
+                Action = "UploadSupplierDocument", CreatedAt = clock.GetUtcNow().UtcDateTime
             });
             await context.SaveChangesAsync();
+            if (bidId.HasValue && !await context.Bids.AnyAsync(b => b.Id == bidId && b.Status == BidStatus.Draft && b.TenderInvitation.TenderRound.Deadline > clock.GetUtcNow().UtcDateTime))
+                throw new WorkflowException("The attachment deadline has passed. Nothing was submitted.");
             await transaction.CommitAsync();
         }
         catch

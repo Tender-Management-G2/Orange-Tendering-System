@@ -7,16 +7,17 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Services;
 
 // Owner: Saja. First step: create one draft for an accepted invitation.
-public sealed partial class SupplierOfferService(ApplicationDbContext context)
+public sealed partial class SupplierOfferService(ApplicationDbContext context, TenderWorkflowService workflow)
 {
     // شروط السماح بالإنشاء تستخدم عند فتح الصفحة وعند الحفظ أيضا.
     private IQueryable<TenderInvitation> AvailableInvitations(string userId, int invitationId)
     {
-        var now = DateTime.UtcNow;
+        var now = workflow.Now;
         return context.TenderInvitations.Where(i => i.Id == invitationId
             && i.Status == InvitationStatus.Accepted
             && i.TenderRound.Status == TenderRoundStatus.Open
             && i.TenderRound.Tender.Status == TenderStatus.Bidding
+            && context.Set<WeightRound>().Any(w => w.TenderId == i.TenderRound.TenderId && w.State == WeightState.Approved)
             && i.TenderRound.Deadline.HasValue && i.TenderRound.Deadline > now
             && (!i.TenderRound.OpensAt.HasValue || i.TenderRound.OpensAt <= now)
             && context.Users.Any(u => u.Id == userId && u.IsActive
@@ -50,6 +51,9 @@ public sealed partial class SupplierOfferService(ApplicationDbContext context)
     {
         // المعاملة تمنع إنشاء نسختين لنفس الدعوة عند تكرار الضغط.
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var tenderId = await context.TenderInvitations.Where(i => i.Id == invitationId).Select(i => (int?)i.TenderRound.TenderId).SingleOrDefaultAsync();
+        if (!tenderId.HasValue) return false;
+        await context.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={tenderId.Value}").SingleAsync();
         var model = await GetCreateAsync(userId, invitationId);
         if (model == null)
             return false;

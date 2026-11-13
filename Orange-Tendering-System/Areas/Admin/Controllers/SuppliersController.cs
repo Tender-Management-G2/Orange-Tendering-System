@@ -1,37 +1,19 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Rjoub
-// Module: Administration
-// Purpose: MVC endpoints for the Suppliers pages of the Admin workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
-
-namespace Orange_Tendering_System.Areas.Admin.Controllers
+using Orange_Tendering_System.Services;
+namespace Orange_Tendering_System.Areas.Admin.Controllers;
+[Area("Admin"),Authorize(Roles=SystemRoles.Admin),AutoValidateAntiforgeryToken]
+public class SuppliersController(SupplierReviewService registrations) : Controller
 {
-    [Area("Admin")]
-    [Authorize(Roles = SystemRoles.Admin)]
-    public class SuppliersController : Controller
+    public async Task<IActionResult> Index()=>View(await registrations.List(User));
+    public async Task<IActionResult> Review(int id)=>View(await registrations.Read(id,User));
+    public IActionResult Details(int id)=>RedirectToAction(nameof(Review),new { id });
+    [HttpPost] public async Task<IActionResult> Review(int id,bool approve,string notes)
     {
-        // Supplier Administration — Owner: Rjoub · Trello: Supplier Administration (https://trello.com/c/zvMwn4LD)
-        // GET /Admin/Suppliers. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
-        {
-            return View();
-        }
-
-        // Supplier Registration Review — Owner: Rjoub · Trello: Supplier Administration (https://trello.com/c/zvMwn4LD)
-        // GET /Admin/Suppliers/Review/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Review(int? id)
-        {
-            return View();
-        }
-
-        // Supplier Details — Owner: Rjoub · Trello: Supplier Administration (https://trello.com/c/zvMwn4LD)
-        // GET /Admin/Suppliers/Details/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Details(int? id)
-        {
-            return View();
-        }
+        try { if(!ModelState.IsValid) throw new WorkflowException("Invalid supplier decision."); await registrations.Decide(id,approve,notes,User); return RedirectToAction(nameof(Review),new { id }); }
+        catch(WorkflowException ex) { ModelState.AddModelError("",ex.Message); return View(await registrations.Read(id,User)); }
     }
+    public async Task<IActionResult> Document(int id)
+    { var file=await registrations.Document(id,User); Response.Headers.CacheControl="no-store"; Response.Headers["X-Content-Type-Options"]="nosniff"; return PhysicalFile(file.Path,"application/octet-stream",file.Name); }
 }
