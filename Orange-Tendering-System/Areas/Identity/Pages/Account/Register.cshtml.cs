@@ -42,6 +42,16 @@ public class RegisterModel(
 
     public async Task<IActionResult> OnPostAsync()
     {
+        // A previous OTP attempt already stored the documents. Resume it without
+        // requiring the browser to upload those files again.
+        if (!string.IsNullOrWhiteSpace(Input.Email) && !string.IsNullOrWhiteSpace(Input.Password))
+        {
+            var pending = await users.FindByEmailAsync(Input.Email.Trim());
+            if (pending is { SupplierId: not null, EmailConfirmed: false } &&
+                await users.CheckPasswordAsync(pending, Input.Password))
+                return RedirectToPage("./VerifyEmail", new { email = Input.Email.Trim() });
+        }
+
         if (!SupplierCategories.All.Contains(Input.Category))
             ModelState.AddModelError("Input.Category", "Choose one of the listed supplier categories.");
         if (CommercialRegistrationCertificate == null)
@@ -64,10 +74,12 @@ public class RegisterModel(
 
         var email = Input.Email.Trim();
         var registration = Input.RegistrationNumber.Trim();
-        if (await users.FindByEmailAsync(email) != null ||
+        var existingUser = await users.FindByEmailAsync(email);
+        if (existingUser != null ||
             await db.Suppliers.AnyAsync(s => s.RegistrationNumber == registration))
         {
-            ModelState.AddModelError(string.Empty, "This account or commercial registration is already registered.");
+            ModelState.AddModelError(string.Empty,
+                "An account or company with these details already exists. If you started an application, use Verify Email with your original contact address to request a new code.");
             return Page();
         }
 
@@ -90,7 +102,7 @@ public class RegisterModel(
             var user = new ApplicationUser
             {
                 UserName = email, Email = email, FullName = Input.FullName.Trim(),
-                SupplierId = supplier.Id, IsActive = true, EmailOtpSentAt = DateTime.UtcNow
+                SupplierId = supplier.Id, IsActive = false, EmailOtpSentAt = DateTime.UtcNow
             };
             var created = await users.CreateAsync(user, Input.Password);
             if (!created.Succeeded)
@@ -118,18 +130,9 @@ public class RegisterModel(
                 });
             }
 
-            var admins = await users.GetUsersInRoleAsync(SystemRoles.Admin);
-            foreach (var admin in admins)
-                db.Notifications.Add(new Notification
-                {
-                    UserId = admin.Id, Title = "Supplier awaiting review",
-                    Message = $"{supplier.CompanyName} submitted a supplier registration.",
-                    Link = "/Admin/Suppliers/Review/" + supplier.Id,
-                    CreatedAt = DateTime.UtcNow
-                });
             db.AuditLogs.Add(new AuditLog
             {
-                UserId = user.Id, Action = "SupplierRegistered", EntityName = "Supplier",
+                UserId = user.Id, Action = "SupplierRegistrationStarted", EntityName = "Supplier",
                 EntityId = supplier.Id.ToString(), CreatedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync();

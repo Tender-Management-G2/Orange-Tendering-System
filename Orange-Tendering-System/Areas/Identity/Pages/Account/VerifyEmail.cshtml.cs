@@ -3,20 +3,22 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
 public class VerifyEmailModel(
     UserManager<ApplicationUser> users,
+    SignInManager<ApplicationUser> signIn,
     ApplicationDbContext db,
     IEmailSender emailSender,
     ILogger<VerifyEmailModel> logger) : PageModel
 {
     private const string Purpose = "SupplierEmailOtp";
     [BindProperty] public InputModel Input { get; set; } = new();
-    public bool Verified { get; private set; }
 
     public class InputModel
     {
@@ -50,11 +52,27 @@ public class VerifyEmailModel(
 
         await using var transaction = await db.Database.BeginTransactionAsync();
         user.EmailConfirmed = true;
+        user.IsActive = true;
         user.EmailOtpSentAt = null;
         user.EmailOtpFailedAttempts = 0;
         var updated = await users.UpdateAsync(user);
         if (!updated.Succeeded) throw new InvalidOperationException("Could not update supplier OTP state.");
         await users.UpdateSecurityStampAsync(user);
+        var supplier = await db.Suppliers.SingleAsync(s => s.Id == user.SupplierId);
+        var admins = await users.GetUsersInRoleAsync(SystemRoles.Admin);
+        foreach (var admin in admins)
+            db.Notifications.Add(new Notification
+            {
+                UserId = admin.Id, Title = "Supplier awaiting review",
+                Message = $"{supplier.CompanyName} submitted a supplier registration.",
+                Link = "/Admin/Suppliers/Review/" + supplier.Id,
+                CreatedAt = DateTime.UtcNow
+            });
+        db.AuditLogs.Add(new AuditLog
+        {
+            UserId = user.Id, Action = "SupplierRegistered", EntityName = "Supplier",
+            EntityId = supplier.Id.ToString(), CreatedAt = DateTime.UtcNow
+        });
         db.AuditLogs.Add(new AuditLog
         {
             UserId = user.Id, Action = "EmailVerified", EntityName = "ApplicationUser",
@@ -63,8 +81,8 @@ public class VerifyEmailModel(
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         logger.LogInformation("Supplier email verified for user {UserId}.", user.Id);
-        Verified = true;
-        return Page();
+        await signIn.SignInAsync(user, isPersistent: false);
+        return RedirectToPage("./PendingApproval");
     }
 
     public async Task<IActionResult> OnPostResendAsync(string email)

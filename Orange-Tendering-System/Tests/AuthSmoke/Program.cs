@@ -19,6 +19,7 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Services;
+using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
@@ -130,15 +131,46 @@ using (var scope = factory.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var company = await db.Suppliers.SingleAsync(s => s.RegistrationNumber == "CR-" + suffix);
     var user = await db.Users.SingleAsync(u => u.Email == supplierEmail);
-    Check(company.Status == SupplierStatus.Pending && user.SupplierId == company.Id && !user.EmailConfirmed,
-        "pending supplier, linked unconfirmed Identity user");
+    Check(company.Status == SupplierStatus.Pending && user.SupplierId == company.Id && !user.EmailConfirmed && !user.IsActive,
+        "provisional supplier and inactive unconfirmed Identity user");
     Check(await db.Documents.CountAsync(d => d.SupplierId == company.Id) == 2, "supplier document metadata stored");
     Check(await db.UserRoles.CountAsync(r => r.UserId == user.Id) == 1, "supplier has one role");
+    Check(!await db.Notifications.AnyAsync(n => n.Link == "/Admin/Suppliers/Review/" + company.Id),
+        "unverified application does not notify Admin");
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.GetSupplierDetailsAsync(company.Id) == null &&
+        !(await review.GetSuppliersAsync(null, null)).Suppliers.Any(s => s.Id == company.Id),
+        "unverified supplier is not in Admin review");
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    Check(await review.ReviewSupplierAsync(new SupplierReviewDecisionViewModel
+    { SupplierId = company.Id, Decision = SupplierStatus.Approved }, adminId) == "EmailUnverified",
+        "Admin cannot approve an unverified supplier");
+    var adminPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+        [new Claim(ClaimTypes.NameIdentifier, adminId)], "test"));
+    var workflowReview = scope.ServiceProvider.GetRequiredService<SupplierReviewService>();
+    Check(!(await workflowReview.List(adminPrincipal)).Any(s => s.Id == company.Id),
+        "workflow review hides unverified supplier");
+    var workflowDenied = false;
+    try { await workflowReview.Decide(company.Id, true, "Document review", adminPrincipal); }
+    catch (WorkflowException e) { workflowDenied = e.Message.Contains("verify", StringComparison.OrdinalIgnoreCase); }
+    Check(workflowDenied, "workflow review cannot approve an unverified supplier");
 }
 var duplicateToken = await Token(supplier, "/Identity/Account/Register");
 var duplicate = await supplier.PostAsync("/Identity/Account/Register",
-    RegistrationContent(supplierEmail, supplierPassword, suffix, duplicateToken));
-Check(duplicate.StatusCode == HttpStatusCode.OK, "duplicate supplier registration rejected");
+    Form(new() { ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = duplicateToken }));
+Check(duplicate.StatusCode == HttpStatusCode.Redirect && duplicate.Headers.Location?.ToString().Contains("VerifyEmail") == true,
+    "unverified supplier resumes OTP without reuploading files");
+using (var unverifiedVisitor = Client(factory))
+{
+    var unverifiedLoginToken = await Token(unverifiedVisitor, "/Identity/Account/Login");
+    var unverifiedLogin = await unverifiedVisitor.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = unverifiedLoginToken
+    }));
+    Check(unverifiedLogin.StatusCode == HttpStatusCode.OK, "unverified supplier cannot sign in");
+}
 var message = mail.Messages.Last(m => m.Subject.Contains("Verify"));
 Check(message.To == supplierEmail, "OTP sent through IEmailSender");
 var otp = Regex.Match(message.Body, @"\b\d{6}\b").Value;
@@ -155,18 +187,39 @@ var verified = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(ne
     ["Input.Email"] = supplierEmail, ["Input.Code"] = otp,
     ["__RequestVerificationToken"] = verifyToken
 }));
-Check((await verified.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "email verified, approval pending");
+Check(verified.StatusCode == HttpStatusCode.Redirect &&
+    verified.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "valid OTP signs supplier in and redirects to pending approval");
+Check((await supplier.GetAsync("/Identity/Account/PendingApproval")).StatusCode == HttpStatusCode.OK,
+    "pending approval page opens with Identity cookie");
+var pendingWorkspace = await supplier.GetAsync("/Supplier");
+Check(pendingWorkspace.StatusCode == HttpStatusCode.Redirect &&
+    pendingWorkspace.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "pending supplier cannot enter tender workspace");
+var pendingOffer = await supplier.PostAsync("/Supplier/Workflow/SubmitBid/1", Form(new()));
+Check(pendingOffer.StatusCode == HttpStatusCode.Forbidden,
+    $"pending supplier cannot submit offer request (HTTP {(int)pendingOffer.StatusCode})");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    Check(await db.Users.Where(u => u.Email == supplierEmail).Select(u => u.EmailConfirmed).SingleAsync(), "Identity email confirmed");
+    var user = await db.Users.SingleAsync(u => u.Email == supplierEmail);
+    Check(user.EmailConfirmed && user.IsActive, "verified supplier contact activated");
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.GetSupplierDetailsAsync(user.SupplierId!.Value) != null,
+        "verified supplier enters Admin review");
+    Check(await db.Notifications.AnyAsync(n => n.Link == "/Admin/Suppliers/Review/" + user.SupplierId),
+        "Admin notified only after OTP verification");
 }
-var replay = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new()
+using (var replayVisitor = Client(factory))
 {
-    ["Input.Email"] = supplierEmail, ["Input.Code"] = otp,
-    ["__RequestVerificationToken"] = verifyToken
-}));
-Check(!(await replay.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "OTP replay rejected");
+    var replayToken = await Token(replayVisitor, "/Identity/Account/VerifyEmail?email=" + Uri.EscapeDataString(supplierEmail));
+    var replay = await replayVisitor.PostAsync("/Identity/Account/VerifyEmail", Form(new()
+    {
+        ["Input.Email"] = supplierEmail, ["Input.Code"] = otp,
+        ["__RequestVerificationToken"] = replayToken
+    }));
+    Check(replay.StatusCode == HttpStatusCode.OK, "OTP replay rejected");
+}
 Check((await supplier.GetAsync("/Identity/Account/ConfirmEmail?code=unused")).StatusCode == HttpStatusCode.NotFound,
     "default confirmation-link route cannot bypass OTP");
 Check((await supplier.GetAsync("/Identity/Account/ResendEmailConfirmation")).Headers.Location?.ToString().Contains("VerifyEmail") == true,
@@ -192,7 +245,7 @@ var expiredAttempt = await supplier.PostAsync("/Identity/Account/VerifyEmail", F
     ["Input.Email"] = expiredEmail, ["Input.Code"] = expiredOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check(!(await expiredAttempt.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "expired OTP rejected");
+Check(expiredAttempt.StatusCode == HttpStatusCode.OK, "expired OTP rejected");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -212,7 +265,7 @@ var limited = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new
     ["Input.Email"] = expiredEmail, ["Input.Code"] = expiredOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check(!(await limited.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "five wrong OTPs block verification");
+Check(limited.StatusCode == HttpStatusCode.OK, "five wrong OTPs block verification");
 var mailCount = mail.Messages.Count;
 await supplier.PostAsync("/Identity/Account/VerifyEmail?handler=Resend", Form(new()
 {
@@ -237,13 +290,15 @@ var oldOtpAttempt = await supplier.PostAsync("/Identity/Account/VerifyEmail", Fo
     ["Input.Email"] = expiredEmail, ["Input.Code"] = expiredOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check(!(await oldOtpAttempt.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "resend invalidates old OTP");
+Check(oldOtpAttempt.StatusCode == HttpStatusCode.OK, "resend invalidates old OTP");
 var resentVerified = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new()
 {
     ["Input.Email"] = expiredEmail, ["Input.Code"] = resentOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check((await resentVerified.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "new OTP verifies after resend");
+Check(resentVerified.StatusCode == HttpStatusCode.Redirect &&
+    resentVerified.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "new OTP signs in after resend");
 var failedEmail = $"delivery-fail-{suffix}@example.test";
 mail.FailNext = true;
 var failedRegisterToken = await Token(supplier, "/Identity/Account/Register");
@@ -264,7 +319,9 @@ var pendingLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new(
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
     ["__RequestVerificationToken"] = supplierLoginToken
 }));
-Check(pendingLogin.StatusCode == HttpStatusCode.OK, "pending supplier cannot sign in");
+Check(pendingLogin.StatusCode == HttpStatusCode.Redirect &&
+    pendingLogin.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "verified pending supplier can sign in again without OTP");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -272,10 +329,11 @@ using (var scope = factory.Services.CreateScope())
     company.Status = SupplierStatus.Approved;
     await db.SaveChangesAsync();
 }
+var approvedLoginToken = await Token(supplier, "/Identity/Account/Login");
 var approvedLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new()
 {
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
-    ["__RequestVerificationToken"] = supplierLoginToken
+    ["__RequestVerificationToken"] = approvedLoginToken
 }));
 Check(approvedLogin.StatusCode == HttpStatusCode.Redirect && approvedLogin.Headers.Location?.ToString() == "/Supplier",
     "approved supplier redirected to Supplier workspace");

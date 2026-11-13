@@ -108,6 +108,8 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     "ReasonRequired" => "A rejection reason is required.",
                     "DocumentExpired" =>
                         "An expired document cannot be verified.",
+                    "EmailUnverified" =>
+                        "The supplier must verify its contact email before review.",
                     "SupplierApproved" =>
                         "Suspend the supplier before changing document verification.",
                     _ => "Unable to review the document."
@@ -161,6 +163,8 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
 
                     "InvalidTransition" =>
                         "This status change is not allowed.",
+                    "EmailUnverified" =>
+                        "The supplier must verify its contact email before review.",
 
                     _ => "Unable to complete supplier review."
                 };

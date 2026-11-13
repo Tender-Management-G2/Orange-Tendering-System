@@ -55,10 +55,13 @@ public class LoginModel(
         }
 
         var isSupplier = await users.IsInRoleAsync(user, SystemRoles.Supplier);
+        var supplierStatus = user.SupplierId == null ? null : await db.Suppliers
+            .Where(s => s.Id == user.SupplierId)
+            .Select(s => (SupplierStatus?)s.Status)
+            .SingleOrDefaultAsync();
         var supplierAllowed = (!isSupplier && user.SupplierId == null) ||
-            (user.SupplierId != null && await db.Suppliers
-                .AnyAsync(s => s.Id == user.SupplierId && s.Status == SupplierStatus.Approved));
-        if (!user.IsActive || !supplierAllowed)
+            (isSupplier && (supplierStatus is SupplierStatus.Pending or SupplierStatus.Approved));
+        if (!user.IsActive || !user.EmailConfirmed || !supplierAllowed)
         {
             logger.LogWarning("Identity sign-in denied by account state for user {UserId}.", user.Id);
             ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");
@@ -76,6 +79,8 @@ public class LoginModel(
 
         if (user.MustChangePassword)
             return RedirectToPage("./FirstLoginPasswordChange");
+        if (isSupplier && supplierStatus == SupplierStatus.Pending)
+            return RedirectToPage("./PendingApproval");
         if (ReturnUrl != null)
             return LocalRedirect(ReturnUrl);
 

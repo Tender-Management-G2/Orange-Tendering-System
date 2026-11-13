@@ -25,6 +25,13 @@ namespace Orange_Tendering_System.Services
             _userManager = userManager;
             _roleManager = roleManager;
         }
+
+        // A supplier application enters Admin review only after its contact verifies the OTP.
+        // Keep legacy companies without a linked account visible.
+        private IQueryable<Supplier> SubmittedSuppliers() => _context.Suppliers.Where(s =>
+            !_context.Users.Any(u => u.SupplierId == s.Id) ||
+            _context.Users.Any(u => u.SupplierId == s.Id && u.EmailConfirmed));
+
         // 1. ADMIN DASHBOARD
 
         public async Task<WorkspaceDashboardViewModel> GetDashboardAsync()
@@ -38,15 +45,15 @@ namespace Orange_Tendering_System.Services
                     await _context.Departments.CountAsync(),
 
                 ["registered-suppliers"] =
-                    await _context.Suppliers.CountAsync(),
+                    await SubmittedSuppliers().CountAsync(),
 
                 ["pending-suppliers"] =
-                    await _context.Suppliers.CountAsync(
+                    await SubmittedSuppliers().CountAsync(
                         s => s.Status == SupplierStatus.Pending),
                 // SupplierStatus.Pending بيعطينا عدد الموردين اللي لسه بانتظار مراجعة الـAdmin
 
                 ["approved-suppliers"] =
-                    await _context.Suppliers.CountAsync(
+                    await SubmittedSuppliers().CountAsync(
                         s => s.Status == SupplierStatus.Approved),
 
                 ["purchase-requests"] =
@@ -1095,19 +1102,19 @@ namespace Orange_Tendering_System.Services
             statusFilter = statusFilter?.Trim();
 
             // Real supplier statistics
-            var pendingCount = await _context.Suppliers
+            var pendingCount = await SubmittedSuppliers()
                 .CountAsync(s => s.Status == SupplierStatus.Pending);
 
-            var approvedCount = await _context.Suppliers
+            var approvedCount = await SubmittedSuppliers()
                 .CountAsync(s => s.Status == SupplierStatus.Approved);
 
-            var rejectedCount = await _context.Suppliers
+            var rejectedCount = await SubmittedSuppliers()
                 .CountAsync(s => s.Status == SupplierStatus.Rejected);
 
-            var suspendedCount = await _context.Suppliers
+            var suspendedCount = await SubmittedSuppliers()
                 .CountAsync(s => s.Status == SupplierStatus.Suspended);
 
-            var query = _context.Suppliers
+            var query = SubmittedSuppliers()
                 .AsNoTracking()
                 .AsQueryable();
 
@@ -1189,7 +1196,7 @@ namespace Orange_Tendering_System.Services
             GetSupplierDetailsAsync(int id)
         {
             // 1. Get supplier company information
-            var supplier = await _context.Suppliers
+            var supplier = await SubmittedSuppliers()
                 .AsNoTracking()
                 .Where(s => s.Id == id)
                 .Select(s => new SupplierDetailsViewModel
@@ -1317,6 +1324,10 @@ namespace Orange_Tendering_System.Services
             if (supplier == null)
                 return "NotFound";
 
+            if (await _context.Users.AnyAsync(u => u.SupplierId == supplier.Id && !u.EmailConfirmed) &&
+                !await _context.Users.AnyAsync(u => u.SupplierId == supplier.Id && u.EmailConfirmed))
+                return "EmailUnverified";
+
             // Avoid invalidating an approved supplier's
             // documents without reviewing its approval.
             if (supplier.Status == SupplierStatus.Approved)
@@ -1380,6 +1391,10 @@ namespace Orange_Tendering_System.Services
 
             if (supplier == null)
                 return "NotFound";
+
+            if (await _context.Users.AnyAsync(u => u.SupplierId == supplier.Id && !u.EmailConfirmed) &&
+                !await _context.Users.AnyAsync(u => u.SupplierId == supplier.Id && u.EmailConfirmed))
+                return "EmailUnverified";
 
             // Allowed status transitions
             var allowed =
