@@ -1,17 +1,149 @@
-@model List<Orange_Tendering_System.Models.Entities.ApplicationUser>
-@{ ViewData["Title"] = "User management"; ViewData["WorkspaceSection"] = "Users"; ViewData["Description"] = "Create employee accounts, assign roles and enable or disable access."; }
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: User Management
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: User Management
+TRELLO URL: https://trello.com/c/UYxdWeUv
+
+PURPOSE:
+List every account with its roles, department (employees) or
+company (suppliers) and active status.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Users
+
+FUTURE IMPLEMENTATION:
+- Query AspNetUsers with UserManager, including roles and
+  Department/Supplier names.
+- Server-side search, filters and paging.
+- Deactivate with ApplicationUser.IsActive instead of
+  deleting (history keeps foreign keys to users).
+- Audit every role or status change.
+
+DEPENDENCIES:
+AspNetUsers, AspNetUserRoles, AspNetRoles, Departments,
+Suppliers, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Internal accounts are created only by Admin, never through
+public registration.
+===========================================================
+*@
+
+@model List<UserListViewModel>
+
+@{
+    ViewData["Title"] = "User Management";
+    ViewData["WorkspaceSection"] = "Users";
+    ViewData["Description"] =
+        "Manage employee and supplier accounts.";
+}
+
 <partial name="_PageHeader" />
-<section class="ws-panel pg-panel" aria-labelledby="users-title">
-    <div class="pg-panel-head"><h2 id="users-title">Accounts</h2><a class="pg-btn pg-btn-primary" asp-action="Create">+ Create employee account</a></div>
+
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <div>
+            <h2>User Accounts</h2>
+            <p>
+                Total Users: @(Model?.Count ?? 0)
+            </p>
+        </div>
+
+        <a class="pg-btn pg-btn-primary"
+           asp-area="Admin"
+           asp-controller="Users"
+           asp-action="Create">
+            Create User
+        </a>
+    </div>
+
     <div class="pg-table-wrap">
+
         <table class="pg-table">
-            <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Active</th><th scope="col">Confirmed</th><th scope="col" data-nosort>Actions</th></tr></thead>
+
+            <thead>
+                <tr>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Role(s)</th>
+                    <th>Department / Company</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
             <tbody>
-            @foreach (var u in Model)
-            {
-                <tr><td><strong>@(string.IsNullOrWhiteSpace(u.FullName) ? "—" : u.FullName)</strong></td><td>@u.Email</td><td>@(u.IsActive ? "Yes" : "No")</td><td>@(u.EmailConfirmed ? "Yes" : "No")</td><td><a class="pg-btn" asp-action="Details" asp-route-id="@u.Id">Details</a></td></tr>
-            }
+
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            No user accounts found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var user in Model)
+                    {
+                        <tr>
+                            <td>@user.FullName</td>
+
+                            <td>@user.Email</td>
+
+                            <td>@user.Roles</td>
+
+                            <td>@user.DepartmentOrCompany</td>
+
+                            <td>
+                                @if (user.IsActive)
+                                {
+                                    <span class="pg-status">
+                                        Active
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="pg-status">
+                                        Inactive
+                                    </span>
+                                }
+                            </td>
+
+                            <td>
+                                <a class="pg-btn"
+                                   asp-area="Admin"
+                                   asp-controller="Users"
+                                   asp-action="Details"
+                                   asp-route-id="@user.Id">
+                                    Details
+                                </a>
+
+                                <a class="pg-btn"
+                                   asp-area="Admin"
+                                   asp-controller="Users"
+                                   asp-action="Edit"
+                                   asp-route-id="@user.Id">
+                                    Edit
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+
             </tbody>
         </table>
+
     </div>
+
 </section>

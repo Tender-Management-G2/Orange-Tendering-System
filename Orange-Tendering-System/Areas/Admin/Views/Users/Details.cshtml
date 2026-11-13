@@ -1,14 +1,200 @@
-@model Orange_Tendering_System.Models.Entities.ApplicationUser
-@{ ViewData["Title"] = string.IsNullOrWhiteSpace(Model.FullName) ? "User" : Model.FullName; ViewData["WorkspaceSection"] = "Users"; ViewData["Description"] = Model.Email; }
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: User Details
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: User Management
+TRELLO URL: https://trello.com/c/UYxdWeUv
+
+PURPOSE:
+Read-only view of one account and its recent audited
+changes.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Users/Details/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the user, roles, department and supplier.
+- Show AuditLogs where EntityName = AspNetUsers and EntityId
+  = user id.
+
+DEPENDENCIES:
+AspNetUsers, AspNetUserRoles, Departments, Suppliers,
+AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+
+@model UserDetailsViewModel
+
+@{
+    ViewData["Title"] = "User Details";
+    ViewData["WorkspaceSection"] = "Users";
+    ViewData["Description"] =
+        "Account information, roles and recent audited changes.";
+}
+
 <partial name="_PageHeader" />
+
+<!-- User Information -->
 <section class="ws-panel pg-panel">
-    <dl class="ui-facts">
-        <div><dt>Email</dt><dd>@Model.Email</dd></div>
-        <div><dt>Account</dt><dd><span class="ui-pill ui-pill--@(Model.IsActive ? "good" : "bad")">@(Model.IsActive ? "Active" : "Disabled")</span></dd></div>
-        <div><dt>Email confirmed</dt><dd><span class="ui-pill ui-pill--@(Model.EmailConfirmed ? "good" : "warn")">@(Model.EmailConfirmed ? "Confirmed" : "Awaiting activation")</span></dd></div>
+
+    <div class="pg-panel-head">
+        <h2>Account Information</h2>
+
+        <a class="pg-btn pg-btn-primary"
+           asp-area="Admin"
+           asp-controller="Users"
+           asp-action="Edit"
+           asp-route-id="@Model.Id">
+            Edit User
+        </a>
+    </div>
+
+    <dl class="pg-dl">
+
+        <div>
+            <dt>Full Name</dt>
+            <dd>@Model.FullName</dd>
+        </div>
+
+        <div>
+            <dt>Email</dt>
+            <dd>@Model.Email</dd>
+        </div>
+
+        <div>
+            <dt>Role(s)</dt>
+            <dd>@Model.Roles</dd>
+        </div>
+
+        <div>
+            <dt>Department</dt>
+            <dd>@Model.DepartmentName</dd>
+        </div>
+
+        <div>
+            <dt>Supplier Company</dt>
+            <dd>@Model.SupplierName</dd>
+        </div>
+
+        <div>
+            <dt>Account Status</dt>
+            <dd>
+                @if (Model.IsActive)
+                {
+                    <span class="pg-status">Active</span>
+                }
+                else
+                {
+                    <span class="pg-status">Inactive</span>
+                }
+            </dd>
+        </div>
+
+        <div>
+            <dt>Email Confirmed</dt>
+            <dd>@(Model.EmailConfirmed ? "Yes" : "No")</dd>
+        </div>
+
+        <div>
+            <dt>Locked Out Until</dt>
+            <dd>
+                @(Model.LockoutEnd.HasValue
+                    ? Model.LockoutEnd.Value.ToString("yyyy-MM-dd HH:mm")
+                    : "—")
+            </dd>
+        </div>
+
     </dl>
-    <form asp-action="SetActive" method="post" class="pg-form">
-        <input name="id" value="@Model.Id" type="hidden" />
-        <div class="pg-actions"><button type="submit" class="pg-btn @(Model.IsActive ? "pg-btn-danger" : "pg-btn-primary")" name="active" value="@((!Model.IsActive).ToString().ToLowerInvariant())">@(Model.IsActive ? "Deactivate account" : "Activate account")</button><a class="pg-btn" asp-action="Index">Close</a></div>
-    </form>
+
 </section>
+
+<!-- Recent Audit Logs -->
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <h2>Recent Audit Entries</h2>
+    </div>
+
+    <div class="pg-table-wrap">
+
+        <table class="pg-table">
+
+            <thead>
+                <tr>
+                    <th>Date (UTC)</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Changed By</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (!Model.RecentActivities.Any())
+                {
+                    <tr>
+                        <td colspan="4">
+                            No audit entries found for this account.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var activity in Model.RecentActivities)
+                    {
+                        <tr>
+                            <td>
+                                @activity.CreatedAt.ToString(
+                                    "yyyy-MM-dd HH:mm")
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @activity.Action
+                                </span>
+                            </td>
+
+                            <td>@activity.EntityName</td>
+
+                            <td>@activity.ChangedBy</td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+<!-- Navigation -->
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Edit"
+               asp-route-id="@Model.Id">
+                Edit User
+            </a>
+        </li>
+
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index">
+                Back to Users
+            </a>
+        </li>
+    </ul>
+</nav>

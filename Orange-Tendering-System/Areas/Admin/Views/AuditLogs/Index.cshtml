@@ -2,59 +2,278 @@
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
 PAGE: Audit Logs
-
 DEVELOPER OWNER: Rjoub
 MODULE: Administration
-TRELLO TASK: Audit Logs
-TRELLO URL: https://trello.com/c/eL9BCtiB
 
 PURPOSE:
-Search and read the AuditLogs table.
+Search, filter and read the AuditLogs table.
 
-BUSINESS ACCESS:
-Admin
-
+BUSINESS ACCESS: Admin
 ROUTE: /Admin/AuditLogs
 
-FUTURE IMPLEMENTATION:
-- Query AuditLogs newest first with paging and filters
-  (indexed by EntityName + EntityId).
-- Pretty-print OldValues / NewValues JSON.
-- Coordinate with ALL TEAM: every module writes its own
-  audit entries.
-
-DEPENDENCIES:
-AuditLogs, AspNetUsers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
 IMPORTANT:
-Audit records never contain passwords, tokens or biometric
-data.
+Audit records must never contain passwords,
+tokens or biometric data.
 ===========================================================
 *@
+
+@model AuditLogPageViewModel
+
 @{
     ViewData["Title"] = "Audit Logs";
-    ViewData["WorkspaceSection"] = "Audit Logs";
-    ViewData["Description"] = "Who changed what, and when, across the system.";
+    ViewData["WorkspaceSection"] = "AuditLogs";
+    ViewData["Description"] = "Search and review recorded system activities.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search entity name or record ID" aria-label="Search entity name or record ID" />
-    <select aria-label="Action"><option>Action: All</option><option>Action: Create</option><option>Action: Update</option><option>Action: Delete</option><option>Action: Submit</option><option>Action: Approve</option><option>Action: Reject</option><option>Action: Vote</option></select>
-    <select aria-label="Entity"><option>Entity: All</option><option>Entity: PurchaseRequests</option><option>Entity: Tenders</option><option>Entity: TenderRounds</option><option>Entity: Bids</option><option>Entity: TenderReports</option><option>Entity: CommitteeVotes</option><option>Entity: Suppliers</option></select>
-    <span class="pg-hint">Search and filters update the records shown on this page.</span>
-</section>
+<section class="ws-panel pg-panel">
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-audit-entries">
-    <div class="pg-panel-head"><h2 id="tbl-audit-entries">Audit entries</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Date (UTC)</th><th scope="col">User</th><th scope="col">Action</th><th scope="col">Entity</th><th scope="col">Record ID</th><th scope="col">Old / new values</th></tr></thead>
-            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No audit entries are loaded yet."' /></td></tr></tbody>
-        </table>
+    <div class="pg-panel-head">
+        <div>
+            <h2>System Audit Logs</h2>
+            <p>
+                Review system operations and administrative changes.
+            </p>
+        </div>
     </div>
+
+    <!-- Search and Filters -->
+    <form asp-area="Admin"
+          asp-controller="AuditLogs"
+          asp-action="Index"
+          method="get"
+          class="pg-form">
+
+        <div class="pg-form-grid">
+
+            <!-- Search -->
+            <div class="pg-field">
+                <label for="search">Search</label>
+
+                <input type="text"
+                       id="search"
+                       name="search"
+                       value="@Model.Search"
+                       class="form-control"
+                       maxlength="100"
+                       placeholder="User, action or entity" />
+            </div>
+
+            <!-- Action Filter -->
+            <div class="pg-field">
+                <label for="actionFilter">Action</label>
+
+                <input type="text"
+                       id="actionFilter"
+                       name="actionFilter"
+                       value="@Model.Action"
+                       class="form-control"
+                       maxlength="100"
+                       placeholder="e.g. Created, Updated" />
+            </div>
+
+            <!-- From Date -->
+            <div class="pg-field">
+                <label for="fromDate">From Date</label>
+
+                <input type="date"
+                       id="fromDate"
+                       name="fromDate"
+                       value="@(Model.FromDate?.ToString("yyyy-MM-dd"))"
+                       class="form-control" />
+            </div>
+
+            <!-- To Date -->
+            <div class="pg-field">
+                <label for="toDate">To Date</label>
+
+                <input type="date"
+                       id="toDate"
+                       name="toDate"
+                       value="@(Model.ToDate?.ToString("yyyy-MM-dd"))"
+                       class="form-control" />
+            </div>
+
+        </div>
+
+        <div asp-validation-summary="All"
+             class="text-danger"></div>
+
+        <div class="pg-actions">
+
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Apply Filters
+            </button>
+
+            <a asp-area="Admin"
+               asp-controller="AuditLogs"
+               asp-action="Index"
+               class="pg-btn">
+                Clear Filters
+            </a>
+
+        </div>
+
+    </form>
+
+    <!-- Results -->
+    <div class="pg-panel-head">
+        <div>
+            <h2>Recorded Activities</h2>
+
+            <p>
+                Total matching records: @Model.TotalRecords
+            </p>
+        </div>
+    </div>
+
+    <!-- Audit Logs Table -->
+    <div class="pg-table-wrap">
+
+        <table class="pg-table">
+
+            <thead>
+                <tr>
+                    <th>Date &amp; Time (UTC)</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Record ID</th>
+                    <th>Changes</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (!Model.Logs.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            No matching audit logs found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var log in Model.Logs)
+                    {
+                        <tr>
+
+                            <!-- Date -->
+                            <td>
+                                @log.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                            </td>
+
+                            <!-- User -->
+                            <td>
+                                @log.UserName
+                            </td>
+
+                            <!-- Action -->
+                            <td>
+                                <span class="pg-status">
+                                    @log.Action
+                                </span>
+                            </td>
+
+                            <!-- Entity -->
+                            <td>
+                                @log.EntityName
+                            </td>
+
+                            <!-- Record ID -->
+                            <td>
+                                @log.EntityId
+                            </td>
+
+                            <!-- Changes -->
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(log.OldValues) ||
+                                     !string.IsNullOrWhiteSpace(log.NewValues))
+                                {
+                                    <details>
+                                        <summary>View Changes</summary>
+
+                                        @if (!string.IsNullOrWhiteSpace(log.OldValues))
+                                        {
+                                            <p>
+                                                <strong>Before:</strong>
+                                            </p>
+
+                                            <pre style="white-space:pre-wrap;overflow-wrap:anywhere;">@log.OldValues</pre>
+                                        }
+
+                                        @if (!string.IsNullOrWhiteSpace(log.NewValues))
+                                        {
+                                            <p>
+                                                <strong>After:</strong>
+                                            </p>
+
+                                            <pre style="white-space:pre-wrap;overflow-wrap:anywhere;">@log.NewValues</pre>
+                                        }
+                                    </details>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
+
+                        </tr>
+                    }
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <!-- Pagination -->
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="pg-actions" aria-label="Audit log pages">
+
+            <!-- Previous Page -->
+            @if (Model.CurrentPage > 1)
+            {
+                <a class="pg-btn"
+                   asp-area="Admin"
+                   asp-controller="AuditLogs"
+                   asp-action="Index"
+                   asp-route-search="@Model.Search"
+                   asp-route-actionFilter="@Model.Action"
+                   asp-route-fromDate="@(Model.FromDate?.ToString("yyyy-MM-dd"))"
+                   asp-route-toDate="@(Model.ToDate?.ToString("yyyy-MM-dd"))"
+                   asp-route-page="@(Model.CurrentPage - 1)">
+                    Previous
+                </a>
+            }
+
+            <!-- Current Page -->
+            <span>
+                Page @Model.CurrentPage of @Model.TotalPages
+            </span>
+
+            <!-- Next Page -->
+            @if (Model.CurrentPage < Model.TotalPages)
+            {
+                <a class="pg-btn pg-btn-primary"
+                   asp-area="Admin"
+                   asp-controller="AuditLogs"
+                   asp-action="Index"
+                   asp-route-search="@Model.Search"
+                   asp-route-actionFilter="@Model.Action"
+                   asp-route-fromDate="@(Model.FromDate?.ToString("yyyy-MM-dd"))"
+                   asp-route-toDate="@(Model.ToDate?.ToString("yyyy-MM-dd"))"
+                   asp-route-page="@(Model.CurrentPage + 1)">
+                    Next
+                </a>
+            }
+
+        </nav>
+    }
+
 </section>

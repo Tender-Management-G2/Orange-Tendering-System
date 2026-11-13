@@ -79,6 +79,8 @@ builder.Services.AddScoped<ExternalInvitationDispatcher>();
 builder.Services.AddScoped<SupplierReviewService>();
 builder.Services.AddHostedService<EvaluationDeadlineWorker>();
 
+builder.Services.AddScoped<AdminService>(); // sara rjoub
+builder.Services.AddScoped<SettingsService>(); // sara rjoub
 
 var app = builder.Build();
 

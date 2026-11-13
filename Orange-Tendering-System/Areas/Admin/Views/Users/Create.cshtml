@@ -1,16 +1,177 @@
-@using Orange_Tendering_System.Models
-@using Orange_Tendering_System.Models.Entities
-@{ ViewData["Title"] = "Create employee account"; ViewData["WorkspaceSection"] = "Users"; ViewData["Description"] = "The employee sets their private password through a secure activation email."; }
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Create User
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: User Management
+TRELLO URL: https://trello.com/c/UYxdWeUv
+
+PURPOSE:
+Form to create an internal employee account with department
+and role(s).
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Users/Create
+
+FUTURE IMPLEMENTATION:
+- Add [HttpPost, ValidateAntiForgeryToken] Create with
+  server-side validation.
+- Create the user with UserManager and set FullName,
+  DepartmentId and IsActive.
+- Assign roles with UserManager.AddToRoleAsync using the
+  SystemRoles names.
+- Write an AuditLog entry without the password.
+
+DEPENDENCIES:
+AspNetUsers, AspNetRoles, Departments, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+No hardcoded passwords or demo accounts.
+===========================================================
+*@
+
+@model CreateUserViewModel
+
+@{
+    ViewData["Title"] = "Create User";
+    ViewData["WorkspaceSection"] = "Users";
+    ViewData["Description"] =
+        "Create an internal employee account.";
+}
+
 <partial name="_PageHeader" />
+
 <section class="ws-panel pg-panel">
-    <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
-    <form method="post" asp-action="Create" class="pg-form">
+
+    <h2>Create Employee Account</h2>
+
+    <form asp-area="Admin"
+          asp-controller="Users"
+          asp-action="Create"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="All"
+             class="text-danger"></div>
+
         <div class="pg-form-grid">
-            <div class="pg-field"><label for="fullName">Full name</label><input id="fullName" name="fullName" required /></div>
-            <div class="pg-field"><label for="email">Email</label><input id="email" name="email" type="email" required /></div>
-            <div class="pg-field"><label for="departmentId">Department</label><select id="departmentId" name="departmentId">@foreach (Department d in ViewBag.Departments) { <option value="@d.Id">@d.Name</option> }</select></div>
-            <div class="pg-field"><label for="role">Role</label><select id="role" name="role">@foreach (var role in SystemRoles.All.Where(r => r != SystemRoles.Supplier)) { <option>@role</option> }</select></div>
+
+            <div class="pg-field">
+                <label asp-for="FullName">Full Name</label>
+
+                <input asp-for="FullName"
+                       class="form-control"
+                       maxlength="150" />
+
+                <span asp-validation-for="FullName"
+                      class="text-danger"></span>
+            </div>
+
+            <div class="pg-field">
+                <label asp-for="Email">Email</label>
+
+                <input asp-for="Email"
+                       class="form-control"
+                       type="email" />
+
+                <span asp-validation-for="Email"
+                      class="text-danger"></span>
+            </div>
+
+            <div class="pg-field">
+                <label asp-for="DepartmentId">Department</label>
+
+                <select asp-for="DepartmentId"
+                        asp-items="Model.Departments"
+                        class="form-control">
+                    <option value="">Select Department</option>
+                </select>
+
+                <span asp-validation-for="DepartmentId"
+                      class="text-danger"></span>
+            </div>
+
+            <div class="pg-field">
+                <label asp-for="Role">Role</label>
+
+                <select asp-for="Role"
+                        asp-items="Model.Roles"
+                        class="form-control">
+                    <option value="">Select Role</option>
+                </select>
+
+                <span asp-validation-for="Role"
+                      class="text-danger"></span>
+            </div>
+
+            <div class="pg-field">
+                <label asp-for="Password">
+                    Temporary Password
+                </label>
+
+                <input asp-for="Password"
+                       type="password"
+                       class="form-control"
+                       autocomplete="new-password" />
+
+                <span asp-validation-for="Password"
+                      class="text-danger"></span>
+
+                <small class="pg-hint">
+                    Password must follow Identity security requirements.
+                    The account must be confirmed before sign-in.
+                </small>
+            </div>
+
+            <div class="pg-field">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Account
+                </label>
+            </div>
+
         </div>
-        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Create employee and send activation</button><a class="pg-btn" asp-action="Index">Cancel</a></div>
+
+        <div class="pg-actions">
+
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Create Account
+            </button>
+
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index"
+               class="pg-btn">
+                Cancel
+            </a>
+
+        </div>
+
     </form>
 </section>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index">
+                Back to Users
+            </a>
+        </li>
+    </ul>
+</nav>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
