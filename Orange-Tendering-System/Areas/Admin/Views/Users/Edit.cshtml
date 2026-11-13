@@ -76,20 +76,25 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                       class="text-danger"></span>
             </div>
 
+          
             <!-- Email: Display only -->
             <div class="pg-field">
-                <label>Email</label>
+                <label asp-for="Email">Email</label>
 
-                <input type="email"
-                       value="@Model.Email"
+                <input asp-for="Email"
+                       type="email"
                        class="form-control"
                        readonly />
+
+                <span asp-validation-for="Email"
+                      class="text-danger"></span>
 
                 <small class="pg-hint">
                     Email changes are handled through
                     the account verification process.
                 </small>
             </div>
+
 
             <!-- Department -->
             <div class="pg-field">

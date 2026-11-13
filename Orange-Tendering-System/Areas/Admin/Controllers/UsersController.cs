@@ -24,12 +24,20 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             _userManager = userManager;
         }
 
-        // GET: /Admin/Users
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+      string? search,
+      string? roleFilter,
+      string? statusFilter,
+      int page = 1)
         {
-            var users = await _adminService.GetUsersAsync();
-            return View(users);
+            var model = await _adminService.GetUsersAsync(
+                search,
+                roleFilter,
+                statusFilter,
+                page);
+
+            return View(model);
         }
 
         // GET: /Admin/Users/Create

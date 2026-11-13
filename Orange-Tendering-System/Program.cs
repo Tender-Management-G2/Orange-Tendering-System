@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services;// sara rjoub
+using Orange_Tendering_System.Models; // sara rjoub 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,5 +60,99 @@ app.MapControllerRoute(
 
 app.MapRazorPages()
    .WithStaticAssets();
+
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+
+    var roleManager = scope.ServiceProvider
+        .GetRequiredService<RoleManager<IdentityRole>>();
+
+    var userManager = scope.ServiceProvider
+        .GetRequiredService<UserManager<ApplicationUser>>();
+
+    // Create Admin role if missing
+    //if (!await roleManager.RoleExistsAsync(SystemRoles.Admin))
+    //  {
+    //  var roleResult = await roleManager.CreateAsync(
+    //  new IdentityRole(SystemRoles.Admin));
+
+    //if (!roleResult.Succeeded)
+    // {
+    // throw new InvalidOperationException(
+    //    string.Join("; ",
+    //      roleResult.Errors.Select(e => e.Description)));
+    //  }
+    // }
+
+    // Create all predefined system roles for local testing
+    foreach (var roleName in SystemRoles.All)
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            var roleResult = await roleManager.CreateAsync(
+                new IdentityRole(roleName));
+
+            if (!roleResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    string.Join("; ",
+                        roleResult.Errors.Select(e => e.Description)));
+            }
+        }
+    }
+
+    // Local-only test account
+    // sara rjoub 
+    var testEmail = "admin.test@example.com";
+
+    var testPassword = builder.Configuration[
+        "DevelopmentTestAdmin:Password"];
+
+    if (string.IsNullOrWhiteSpace(testPassword))
+    {
+        throw new InvalidOperationException(
+            "Set DevelopmentTestAdmin:Password in user-secrets first.");
+    }
+
+    var admin = await userManager.FindByEmailAsync(testEmail);
+
+    if (admin == null)
+    {
+        admin = new ApplicationUser
+        {
+            UserName = testEmail,
+            Email = testEmail,
+            FullName = "Test Administrator",
+            IsActive = true,
+            EmailConfirmed = true
+        };
+
+        var createResult = await userManager.CreateAsync(
+            admin, testPassword);
+
+        if (!createResult.Succeeded)
+        {
+            throw new InvalidOperationException(
+                string.Join("; ",
+                    createResult.Errors.Select(e => e.Description)));
+        }
+    }
+
+    if (!await userManager.IsInRoleAsync(admin, SystemRoles.Admin))
+    {
+        var assignResult = await userManager.AddToRoleAsync(
+            admin, SystemRoles.Admin);
+
+        if (!assignResult.Succeeded)
+        {
+            throw new InvalidOperationException(
+                string.Join("; ",
+                    assignResult.Errors.Select(e => e.Description)));
+        }
+    }
+}
+
 
 app.Run();

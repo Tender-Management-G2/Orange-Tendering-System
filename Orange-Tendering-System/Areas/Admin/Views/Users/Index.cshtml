@@ -2,43 +2,36 @@
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
 PAGE: User Management
-
 DEVELOPER OWNER: Rjoub
 MODULE: Administration
 TRELLO TASK: User Management
 TRELLO URL: https://trello.com/c/UYxdWeUv
 
 PURPOSE:
-List every account with its roles, department (employees) or
-company (suppliers) and active status.
+List user accounts with their roles, departments,
+companies, and account status.
 
-BUSINESS ACCESS:
-Admin
-
+BUSINESS ACCESS: Admin
 ROUTE: /Admin/Users
 
-FUTURE IMPLEMENTATION:
-- Query AspNetUsers with UserManager, including roles and
-  Department/Supplier names.
-- Server-side search, filters and paging.
-- Deactivate with ApplicationUser.IsActive instead of
-  deleting (history keeps foreign keys to users).
-- Audit every role or status change.
+FEATURES:
+- Manual Search
+- Voice Search
+- Role Filter
+- Status Filter
+- Server-side Pagination
+- User Details
+- Edit User
+- Create User
 
 DEPENDENCIES:
-AspNetUsers, AspNetUserRoles, AspNetRoles, Departments,
-Suppliers, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Internal accounts are created only by Admin, never through
-public registration.
+AspNetUsers, AspNetUserRoles, AspNetRoles,
+Departments, Suppliers, AuditLogs.
 ===========================================================
 *@
 
-@model List<UserListViewModel>
+@using Orange_Tendering_System.Models
+@model UserIndexViewModel
 
 @{
     ViewData["Title"] = "User Management";
@@ -49,24 +42,129 @@ public registration.
 
 <partial name="_PageHeader" />
 
+<!-- =====================================
+     SEARCH AND FILTERS
+===================================== -->
+
+<form asp-area="Admin"
+      asp-controller="Users"
+      asp-action="Index"
+      method="get"
+      class="pg-toolbar">
+
+    <!-- Manual Search -->
+    <input type="search"
+           id="userSearch"
+           name="search"
+           value="@Model.Search"
+           placeholder="Search by name or email..."
+           aria-label="Search users"
+           maxlength="150" />
+
+    <!-- Voice Search -->
+    <button type="button"
+            class="pg-btn voice-search-btn"
+            data-target="userSearch"
+            aria-label="Search users by voice"
+            title="Search by voice">
+        🎤
+    </button>
+
+    <!-- Role Filter -->
+    <select name="roleFilter"
+            aria-label="Filter by role">
+
+        <option value="All"
+                selected="@(string.IsNullOrEmpty(Model.RoleFilter) ||
+                                        Model.RoleFilter == "All")">
+            All Roles
+        </option>
+
+        @foreach (var role in SystemRoles.All)
+        {
+            <option value="@role"
+                    selected="@(Model.RoleFilter == role)">
+                @role
+            </option>
+        }
+
+    </select>
+
+    <!-- Status Filter -->
+    <select name="statusFilter"
+            aria-label="Filter by status">
+
+        <option value="All"
+                selected="@(string.IsNullOrEmpty(Model.StatusFilter) ||
+                                        Model.StatusFilter == "All")">
+            All Statuses
+        </option>
+
+        <option value="Active"
+                selected="@(Model.StatusFilter == "Active")">
+            Active
+        </option>
+
+        <option value="Inactive"
+                selected="@(Model.StatusFilter == "Inactive")">
+            Inactive
+        </option>
+
+    </select>
+
+    <!-- Search Button -->
+    <button type="submit"
+            class="pg-btn pg-btn-primary">
+        Search
+    </button>
+
+    <!-- Clear Button -->
+    <a asp-area="Admin"
+       asp-controller="Users"
+       asp-action="Index"
+       class="pg-btn">
+        Clear
+    </a>
+
+</form>
+
+<!-- Voice Recognition Status -->
+<p id="voiceSearchStatus"
+   role="status"
+   aria-live="polite"
+   class="pg-hint">
+</p>
+
+
+<!-- =====================================
+     USER ACCOUNTS TABLE
+===================================== -->
+
 <section class="ws-panel pg-panel">
 
+    <!-- Panel Header -->
     <div class="pg-panel-head">
+
         <div>
             <h2>User Accounts</h2>
+
             <p>
-                Total Users: @(Model?.Count ?? 0)
+                Matching Users: @Model.TotalRecords
             </p>
         </div>
 
+        <!-- Create User -->
         <a class="pg-btn pg-btn-primary"
            asp-area="Admin"
            asp-controller="Users"
            asp-action="Create">
             Create User
         </a>
+
     </div>
 
+
+    <!-- Users Table -->
     <div class="pg-table-wrap">
 
         <table class="pg-table">
@@ -84,43 +182,52 @@ public registration.
 
             <tbody>
 
-                @if (Model == null || !Model.Any())
+                @if (!Model.Users.Any())
                 {
                     <tr>
                         <td colspan="6">
-                            No user accounts found.
+                            No matching users found.
                         </td>
                     </tr>
                 }
                 else
                 {
-                    @foreach (var user in Model)
+                    @foreach (var user in Model.Users)
                     {
                         <tr>
-                            <td>@user.FullName</td>
 
-                            <td>@user.Email</td>
-
-                            <td>@user.Roles</td>
-
-                            <td>@user.DepartmentOrCompany</td>
-
+                            <!-- Full Name -->
                             <td>
-                                @if (user.IsActive)
-                                {
-                                    <span class="pg-status">
-                                        Active
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="pg-status">
-                                        Inactive
-                                    </span>
-                                }
+                                @user.FullName
                             </td>
 
+                            <!-- Email -->
                             <td>
+                                @user.Email
+                            </td>
+
+                            <!-- Roles -->
+                            <td>
+                                @user.Roles
+                            </td>
+
+                            <!-- Department / Company -->
+                            <td>
+                                @user.DepartmentOrCompany
+                            </td>
+
+                            <!-- Account Status -->
+                            <td>
+                                <span class="pg-status">
+                                    @(user.IsActive
+                                        ? "Active"
+                                        : "Inactive")
+                                </span>
+                            </td>
+
+                            <!-- Actions -->
+                            <td>
+
                                 <a class="pg-btn"
                                    asp-area="Admin"
                                    asp-controller="Users"
@@ -136,14 +243,76 @@ public registration.
                                    asp-route-id="@user.Id">
                                     Edit
                                 </a>
+
                             </td>
+
                         </tr>
                     }
                 }
 
             </tbody>
+
         </table>
 
     </div>
 
+
+    <!-- =====================================
+         PAGINATION
+    ===================================== -->
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="pg-actions"
+             aria-label="User pages">
+
+            <!-- Previous Page -->
+            @if (Model.CurrentPage > 1)
+            {
+                <a class="pg-btn"
+                   asp-area="Admin"
+                   asp-controller="Users"
+                   asp-action="Index"
+                   asp-route-search="@Model.Search"
+                   asp-route-roleFilter="@Model.RoleFilter"
+                   asp-route-statusFilter="@Model.StatusFilter"
+                   asp-route-page="@(Model.CurrentPage - 1)">
+                    Previous
+                </a>
+            }
+
+            <!-- Current Page -->
+            <span>
+                Page @Model.CurrentPage of @Model.TotalPages
+            </span>
+
+            <!-- Next Page -->
+            @if (Model.CurrentPage < Model.TotalPages)
+            {
+                <a class="pg-btn pg-btn-primary"
+                   asp-area="Admin"
+                   asp-controller="Users"
+                   asp-action="Index"
+                   asp-route-search="@Model.Search"
+                   asp-route-roleFilter="@Model.RoleFilter"
+                   asp-route-statusFilter="@Model.StatusFilter"
+                   asp-route-page="@(Model.CurrentPage + 1)">
+                    Next
+                </a>
+            }
+
+        </nav>
+    }
+
 </section>
+
+
+<!-- =====================================
+     VOICE SEARCH JAVASCRIPT
+===================================== -->
+@section Scripts {
+
+    <script src="~/js/voice-search.js"
+            asp-append-version="true">
+    </script>
+
+}

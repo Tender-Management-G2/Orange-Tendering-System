@@ -394,14 +394,86 @@ namespace Orange_Tendering_System.Services
             };
         }
 
-        // ADMIN - MANAGE USERS - INDEX
-        
-        public async Task<List<UserListViewModel>> GetUsersAsync()
+
+        public async Task<UserIndexViewModel> GetUsersAsync(
+            string? search,
+            string? roleFilter,
+            string? statusFilter,
+            int page = 1)
         {
-            // Get user accounts with their department/company
-            var users = await _context.Users
+            const int pageSize = 10;
+
+            search = search?.Trim();
+            roleFilter = roleFilter?.Trim();
+            statusFilter = statusFilter?.Trim();
+
+            var query = _context.Users
                 .AsNoTracking()
+                .AsQueryable();
+
+            // Manual and voice search use the same query
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(u =>
+                    u.FullName.Contains(search) ||
+                    (u.Email != null && u.Email.Contains(search)));
+            }
+
+            // Filter by Identity role
+            if (!string.IsNullOrWhiteSpace(roleFilter) &&
+                roleFilter != "All")
+            {
+                if (SystemRoles.All.Contains(roleFilter))
+                {
+                    query = query.Where(u =>
+                        _context.UserRoles.Any(ur =>
+                            ur.UserId == u.Id &&
+                            _context.Roles.Any(r =>
+                                r.Id == ur.RoleId &&
+                                r.Name == roleFilter)));
+                }
+                else
+                {
+                    roleFilter = "All";
+                }
+            }
+
+            // Filter by account status
+            if (statusFilter == "Active")
+            {
+                query = query.Where(u => u.IsActive);
+            }
+            else if (statusFilter == "Inactive")
+            {
+                query = query.Where(u => !u.IsActive);
+            }
+            else
+            {
+                statusFilter = "All";
+            }
+
+            var totalRecords = await query.CountAsync();
+
+            var totalPages = (int)Math.Ceiling(
+                (double)totalRecords / pageSize);
+
+            page = Math.Max(1, page);
+
+            if (totalPages > 0)
+            {
+                page = Math.Min(page, totalPages);
+            }
+            else
+            {
+                page = 1;
+            }
+
+            // Get only the requested page
+            var users = await query
                 .OrderBy(u => u.FullName)
+                .ThenBy(u => u.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(u => new UserListViewModel
                 {
                     Id = u.Id,
@@ -409,48 +481,55 @@ namespace Orange_Tendering_System.Services
                     Email = u.Email ?? "",
                     IsActive = u.IsActive,
 
-                    DepartmentOrCompany = u.Department != null
-                        ? u.Department.Name
-                        : u.Supplier != null
-                            ? u.Supplier.CompanyName
-                            : "—"
+                    DepartmentOrCompany =
+                        u.Department != null
+                            ? u.Department.Name
+                            : u.Supplier != null
+                                ? u.Supplier.CompanyName
+                                : "—"
                 })
                 .ToListAsync();
 
-            // Get Identity role assignments
+            // Load roles only for users on this page
+            var userIds = users.Select(u => u.Id).ToList();
+
             var userRoles = await (
-                from userRole in _context.UserRoles
-                join role in _context.Roles
-                    on userRole.RoleId equals role.Id
+                from ur in _context.UserRoles
+                join r in _context.Roles
+                    on ur.RoleId equals r.Id
+                where userIds.Contains(ur.UserId)
                 select new
                 {
-                    userRole.UserId,
-                    RoleName = role.Name
+                    ur.UserId,
+                    RoleName = r.Name
                 }
-            ).ToListAsync();
+            ).AsNoTracking().ToListAsync();
 
-            // Group roles by user
-            var rolesByUser = userRoles
-                .GroupBy(r => r.UserId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => string.Join(", ",
-                        g.Select(r => r.RoleName ?? "")
-                         .Where(r => r != "")
-                         .OrderBy(r => r))
-                );
-
-            // Assign role names to users
             foreach (var user in users)
             {
-                user.Roles = rolesByUser.TryGetValue(
-                    user.Id, out var roles)
-                    ? roles
+                var roles = userRoles
+                    .Where(r => r.UserId == user.Id)
+                    .Select(r => r.RoleName)
+                    .Where(r => !string.IsNullOrEmpty(r))
+                    .OrderBy(r => r);
+
+                user.Roles = roles.Any()
+                    ? string.Join(", ", roles)
                     : "No Role";
             }
 
-            return users;
+            return new UserIndexViewModel
+            {
+                Users = users,
+                Search = search,
+                RoleFilter = roleFilter,
+                StatusFilter = statusFilter,
+                CurrentPage = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords
+            };
         }
+
 
         public async Task FillCreateUserOptionsAsync(
             CreateUserViewModel model)
