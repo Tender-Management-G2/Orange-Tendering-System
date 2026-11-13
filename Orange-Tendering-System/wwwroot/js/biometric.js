@@ -348,9 +348,9 @@
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) {
             faceLoginButton.addEventListener('click', function () {
-                var emailBox = $('faceEmail') || $('Input_Email');
+                var emailBox = $('Input_Email');
                 var email = ((emailBox && emailBox.value) || '').trim();
-                if (!email) { setStatus('Enter your supplier email first.', 'danger'); return; }
+                if (!email) { setStatus('Enter your email above first.', 'danger'); return; }
                 if (panel) { panel.classList.remove('bio-hidden'); }
                 guarded(function () { return faceLogin(faceOptions, email, returnUrl); }, 'Signed in.');
             });
@@ -497,7 +497,7 @@
         init();
         initFaceDemo();
         if ($('btnFaceEnroll') || $('face-demo-root')) { preloadFace(); }
-        var supplierEmail = $('faceEmail');
+        var supplierEmail = $('Input_Email');
         if (supplierEmail) { supplierEmail.addEventListener('focus', preloadFace, { once: true }); }
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) { faceLoginButton.addEventListener('pointerenter', preloadFace, { once: true }); }
