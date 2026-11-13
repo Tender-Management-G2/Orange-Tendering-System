@@ -1,2 +1,14 @@
 @model Orange_Tendering_System.Models.Entities.ApplicationUser
-<h1>@Model.FullName</h1><p>@Model.Email · Active: @Model.IsActive · Email confirmed: @Model.EmailConfirmed</p><form asp-action="SetActive" method="post"><input name="id" value="@Model.Id" type="hidden"/><button name="active" value="@((!Model.IsActive).ToString().ToLowerInvariant())">@(Model.IsActive?"Deactivate account":"Activate account")</button></form>
+@{ ViewData["Title"] = string.IsNullOrWhiteSpace(Model.FullName) ? "User" : Model.FullName; ViewData["WorkspaceSection"] = "Users"; ViewData["Description"] = Model.Email; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <dl class="ui-facts">
+        <div><dt>Email</dt><dd>@Model.Email</dd></div>
+        <div><dt>Account</dt><dd><span class="ui-pill ui-pill--@(Model.IsActive ? "good" : "bad")">@(Model.IsActive ? "Active" : "Disabled")</span></dd></div>
+        <div><dt>Email confirmed</dt><dd><span class="ui-pill ui-pill--@(Model.EmailConfirmed ? "good" : "warn")">@(Model.EmailConfirmed ? "Confirmed" : "Awaiting activation")</span></dd></div>
+    </dl>
+    <form asp-action="SetActive" method="post" class="pg-form">
+        <input name="id" value="@Model.Id" type="hidden" />
+        <div class="pg-actions"><button type="submit" class="pg-btn @(Model.IsActive ? "pg-btn-danger" : "pg-btn-primary")" name="active" value="@((!Model.IsActive).ToString().ToLowerInvariant())">@(Model.IsActive ? "Deactivate account" : "Activate account")</button><a class="pg-btn" asp-action="Index">Close</a></div>
+    </form>
+</section>

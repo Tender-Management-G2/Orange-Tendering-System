@@ -1,2 +1,17 @@
 @model Orange_Tendering_System.Models.Entities.PurchaseRequest
-<h1>@Model.Title</h1><p>Request #@Model.Id · <strong>@Model.Status</strong></p><p>@Model.Justification</p><table>@foreach(var i in Model.Items){<tr><td>@i.Name</td><td>@i.Quantity @i.Unit</td><td>@i.Specifications</td></tr>}</table><h2>Submission history</h2>@foreach(var h in Model.Reviews){<p>Submission @h.SubmissionNumber · @h.Decision · @h.Comment</p>}
+@{ ViewData["Title"] = Model.Title; ViewData["WorkspaceSection"] = "My Requests"; ViewData["Description"] = "Request details and review history."; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <dl class="ui-facts">
+        <div><dt>Request</dt><dd>PR-@Model.Id.ToString("0000")</dd></div>
+        <div><dt>Status</dt><dd>@Model.Status</dd></div>
+    </dl>
+    <p>@Model.Justification</p>
+    <div class="pg-table-wrap"><table class="pg-table" data-no-enhance><thead><tr><th scope="col">Item</th><th scope="col">Quantity</th><th scope="col">Specifications</th></tr></thead><tbody>
+    @foreach (var i in Model.Items) { <tr><td>@i.Name</td><td>@i.Quantity @i.Unit</td><td>@i.Specifications</td></tr> }
+    </tbody></table></div>
+    <h3>Submission history</h3>
+    @if (!Model.Reviews.Any()) { <p class="pg-hint">No review decisions yet.</p> }
+    <ul class="ui-timeline">@foreach (var h in Model.Reviews) { <li><strong>Submission @h.SubmissionNumber · @h.Decision</strong><span>@h.Comment</span></li> }</ul>
+    <div class="pg-actions"><a class="pg-btn" asp-action="Index">Close</a></div>
+</section>

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -22,6 +22,7 @@ using Orange_Tendering_System.Services;
 using System.Security.Claims;
 
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
+if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
 
 var connection = Environment.GetEnvironmentVariable("AUTH_TEST_CONNECTION")
     ?? throw new InvalidOperationException("Set AUTH_TEST_CONNECTION to a migrated, isolated test database.");
@@ -457,6 +458,8 @@ using (var scope = factory.Services.CreateScope())
     Check(await workflow.IsOfficer(officer), "single active Officer authority restored");
 }
 
+await BiometricChecks.Run(() => Client(factory), Token, Check, factory.Services, suffix);
+
 Console.WriteLine("Authentication smoke checks passed.");
 
 WebApplicationFactory<Orange_Tendering_System.WebAppMarker> CreateFactory() => new WebApplicationFactory<Orange_Tendering_System.WebAppMarker>().WithWebHostBuilder(builder =>
@@ -471,7 +474,8 @@ WebApplicationFactory<Orange_Tendering_System.WebAppMarker> CreateFactory() => n
         ["ConnectionStrings:Default Connection"] = connection,
         ["BootstrapAdmin:Email"] = adminEmail,
         ["BootstrapAdmin:Password"] = adminPassword,
-        ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test"
+        ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test",
+        ["Biometric:MaxFailuresPerWindow"] = "100"
     }));
     builder.ConfigureTestServices(services =>
     {

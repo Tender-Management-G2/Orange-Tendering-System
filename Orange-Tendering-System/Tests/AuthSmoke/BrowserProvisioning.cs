@@ -51,6 +51,28 @@ public static class BrowserProvisioning
                 supplier["resetCode"] = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(await users.GeneratePasswordResetTokenAsync(user)));
                 await File.WriteAllTextAsync(path,state.ToJsonString());
             }
+            else if (guardAction.StartsWith("bio-",StringComparison.Ordinal))
+            {
+                var fixture = state["accounts"]!.AsArray().Single(x => x!["name"]!.GetValue<string>() == "supplier1")!;
+                var user = (await users.FindByIdAsync(fixture["id"]!.GetValue<string>()))!;
+                switch (guardAction)
+                {
+                    case "bio-inactive": user.IsActive=false; result=await users.UpdateAsync(user); break;
+                    case "bio-active": user.IsActive=true; result=await users.UpdateAsync(user); break;
+                    case "bio-unconfirmed": user.EmailConfirmed=false; result=await users.UpdateAsync(user); break;
+                    case "bio-confirmed": result=await users.ConfirmEmailAsync(user,await users.GenerateEmailConfirmationTokenAsync(user)); break;
+                    case "bio-lock": await users.SetLockoutEnabledAsync(user,true); result=await users.SetLockoutEndDateAsync(user,DateTimeOffset.UtcNow.AddMinutes(5)); break;
+                    case "bio-unlock": result=await users.SetLockoutEndDateAsync(user,null); break;
+                    case "bio-mfa-on": result=await users.SetTwoFactorEnabledAsync(user,true); break;
+                    case "bio-mfa-off": result=await users.SetTwoFactorEnabledAsync(user,false); break;
+                    case "bio-supplier-pending":
+                    case "bio-supplier-approved":
+                        var company=await db.Suppliers.SingleAsync(s=>s.Id==user.SupplierId);
+                        company.Status=guardAction=="bio-supplier-pending"?SupplierStatus.Pending:SupplierStatus.Approved;
+                        await db.SaveChangesAsync(); break;
+                    default: throw new InvalidOperationException("Unknown biometric fixture operation.");
+                }
+            }
             else throw new InvalidOperationException("Unknown isolated fixture operation.");
             if (!result.Succeeded) throw new InvalidOperationException("Fixture operation rejected by Identity.");
             Console.WriteLine("Isolated fixture operation completed through Identity; no email delivery claimed."); return;
@@ -86,6 +108,6 @@ public static class BrowserProvisioning
             else a["activationCode"]=WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(await users.GeneratePasswordResetTokenAsync(user)));
         }
         await db.SaveChangesAsync(); await File.WriteAllTextAsync(path,state.ToJsonString());
-        Console.WriteLine("Provisioned 14 isolated Identity accounts; staff activation and supplier OTP/admin approval still required. No email delivery claimed.");
+        Console.WriteLine($"Isolated Identity account count: {await db.Users.CountAsync()}. Staff activation and supplier OTP/admin approval remain required. No email delivery claimed.");
     }
 }

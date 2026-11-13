@@ -17,8 +17,12 @@ public sealed class SupplierDashboardService(ApplicationDbContext context, Suppl
         var bids = await context.Bids.AsNoTracking().Where(b => b.TenderInvitation.SupplierId == user.SupplierId)
             .Select(b => b.Status).ToListAsync();
         var notices = await communication.GetNotificationsAsync(userId);
+        var months = Enumerable.Range(0, 6).Select(i => new DateTime(now.Year, now.Month, 1).AddMonths(i - 5)).ToList();
+        var submitted = await context.Bids.AsNoTracking().Where(b => b.TenderInvitation.SupplierId == user.SupplierId && b.SubmittedAt != null && b.SubmittedAt >= months[0])
+            .Select(b => b.SubmittedAt!.Value).ToListAsync();
         return new WorkspaceDashboardViewModel
         {
+            Monthly = months.Select(m => new DashboardPoint(m.ToString("MMM"), submitted.Count(d => d.Year == m.Year && d.Month == m.Month))).ToList(),
             DataConnected = true, DisplayName = user.Supplier!.CompanyName,
             Metrics = new Dictionary<string, int>
             {

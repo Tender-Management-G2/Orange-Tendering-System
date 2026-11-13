@@ -2,7 +2,7 @@
 // Owner: Amal
 // Module: Sourcing Officer / Tender Management
 // Purpose: MVC endpoints for the Dashboard pages of the Sourcing Officer workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+// Status: Dashboard data comes from InternalDashboardService (real, role-scoped SQL Server counts).
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
@@ -16,9 +16,6 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
     {
         // Sourcing Officer Dashboard — Owner: Amal · Trello: Sourcing Officer Dashboard (https://trello.com/c/VeRtD4Tn)
         // GET /SourcingOfficer. TODO: build the view model from real data in a service.
-        public IActionResult Index()
-        {
-            return View(new WorkspaceDashboardViewModel());
-        }
+        public async Task<IActionResult> Index([FromServices] Orange_Tendering_System.Services.InternalDashboardService dashboard) => View(await dashboard.GetAsync(SystemRoles.SourcingOfficer, User));
     }
 }

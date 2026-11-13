@@ -1,3 +1,16 @@
-<h1>Create purchase request</h1><div asp-validation-summary="All"></div><form method="post" asp-action="Create">
-<label>Title<input name="title" required maxlength="200" /></label><label>Justification<textarea name="justification" required></textarea></label>
-<label>Item name<input name="itemName" required /></label><label>Quantity<input name="quantity" type="number" min="0.001" step="0.001" required /></label><label>Unit<input name="unit" required maxlength="30" /></label><label>Specifications<textarea name="specifications"></textarea></label><button>Submit purchase request</button></form>
+@{ ViewData["Title"] = "New purchase request"; ViewData["WorkspaceSection"] = "New Request"; ViewData["Description"] = "Describe what your department needs. Sourcing reviews it before a tender is created."; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
+    <form method="post" asp-action="Create" class="pg-form">
+        <div class="pg-form-grid">
+            <div class="pg-field pg-field-wide"><label for="title">Title</label><input id="title" name="title" required maxlength="200" /></div>
+            <div class="pg-field pg-field-wide"><label for="justification">Justification</label><textarea id="justification" name="justification" required></textarea></div>
+            <div class="pg-field"><label for="itemName">Item name</label><input id="itemName" name="itemName" required /></div>
+            <div class="pg-field"><label for="quantity">Quantity</label><input id="quantity" name="quantity" type="number" min="0.001" step="0.001" required /></div>
+            <div class="pg-field"><label for="unit">Unit</label><input id="unit" name="unit" required maxlength="30" /></div>
+            <div class="pg-field pg-field-wide"><label for="specifications">Specifications</label><textarea id="specifications" name="specifications"></textarea></div>
+        </div>
+        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Submit purchase request</button><a class="pg-btn" asp-action="Index">Cancel</a></div>
+    </form>
+</section>

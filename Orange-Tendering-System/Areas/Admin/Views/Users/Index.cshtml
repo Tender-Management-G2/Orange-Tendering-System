@@ -1,2 +1,17 @@
 @model List<Orange_Tendering_System.Models.Entities.ApplicationUser>
-<h1>User management</h1><a asp-action="Create">Create employee account</a><table><tr><th>Name</th><th>Email</th><th>Active</th><th>Confirmed</th></tr>@foreach(var u in Model){<tr><td><a asp-action="Details" asp-route-id="@u.Id">@u.FullName</a></td><td>@u.Email</td><td>@u.IsActive</td><td>@u.EmailConfirmed</td></tr>}</table>
+@{ ViewData["Title"] = "User management"; ViewData["WorkspaceSection"] = "Users"; ViewData["Description"] = "Create employee accounts, assign roles and enable or disable access."; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel" aria-labelledby="users-title">
+    <div class="pg-panel-head"><h2 id="users-title">Accounts</h2><a class="pg-btn pg-btn-primary" asp-action="Create">+ Create employee account</a></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Active</th><th scope="col">Confirmed</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <tbody>
+            @foreach (var u in Model)
+            {
+                <tr><td><strong>@(string.IsNullOrWhiteSpace(u.FullName) ? "—" : u.FullName)</strong></td><td>@u.Email</td><td>@(u.IsActive ? "Yes" : "No")</td><td>@(u.EmailConfirmed ? "Yes" : "No")</td><td><a class="pg-btn" asp-action="Details" asp-route-id="@u.Id">Details</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>

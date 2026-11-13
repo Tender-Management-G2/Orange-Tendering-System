@@ -1,2 +1,17 @@
 @model List<Orange_Tendering_System.Models.Entities.PurchaseRequest>
-<h1>Purchase requests</h1><table><tr><th>ID</th><th>Title</th><th>Status</th></tr>@foreach(var p in Model){<tr><td>@p.Id</td><td><a asp-action="Review" asp-route-id="@p.Id">@p.Title</a></td><td>@p.Status</td></tr>}</table>
+@{ ViewData["Title"] = "Purchase requests"; ViewData["WorkspaceSection"] = "Requests"; ViewData["Description"] = "Review requests from every department."; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel" aria-labelledby="pr-title">
+    <div class="pg-panel-head"><h2 id="pr-title">Requests</h2></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <tbody>
+            @foreach (var p in Model)
+            {
+                <tr><td>PR-@p.Id.ToString("0000")</td><td><strong>@p.Title</strong></td><td>@p.Status</td><td><a class="pg-btn" asp-action="Review" asp-route-id="@p.Id">Review</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
