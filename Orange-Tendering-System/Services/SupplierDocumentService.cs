@@ -83,7 +83,7 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
             {
                 UserId = thread.FromUserId == userId ? thread.ToUserId : thread.FromUserId,
                 Title = "Supplier clarification attachment", Message = $"A document was added to clarification #{thread.Id}.",
-                Link = $"/SourcingOfficer/Clarifications?id={thread.Id}", CreatedAt = clock.GetUtcNow().UtcDateTime
+                Link = $"/Clarifications/Details/{thread.Id}", CreatedAt = clock.GetUtcNow().UtcDateTime
             });
         }
         else

@@ -1,0 +1,46 @@
+@model Orange_Tendering_System.ViewModels.SourcingOfficerBidsViewModel
+@{
+    ViewData["Title"] = "Committee forwarding";
+    ViewData["WorkspaceSection"] = "Received Bids";
+    ViewData["Description"] = "Choose the compliant supplier offers to send to the Technical & Financial Evaluation Committee.";
+}
+<div class="so-page"><partial name="_PageHeader" />
+<section class="ws-panel pg-panel so-forward-panel">
+    <div class="pg-panel-head"><div><span class="so-eyebrow">COMMITTEE REVIEW</span><h2>Rounds ready for forwarding</h2><span class="pg-hint">Normally each round needs three compliant suppliers. After two earlier failed attempts, two compliant suppliers are enough.</span></div><a class="pg-btn" asp-action="Index">← Received bids</a></div>
+    @if (Model.Rounds.Count == 0)
+    {
+        <div class="so-empty">Submitted offers will appear here. Review their compliance in Received Bids first.</div>
+    }
+    else
+    {
+        <div class="so-round-forward-list">
+        @foreach (var round in Model.Rounds)
+        {
+            <article class="so-round-forward">
+                <div>
+                    <strong>@round.TenderTitle</strong>
+                    <small>Round @round.RoundNumber · @round.Status</small>
+                    <small>@round.CompliantOffers of @round.MinimumOffers required compliant supplier offers · @round.EvaluationMembers of 4 committee members assigned</small>
+                    @if (round.PreviousFailedAttempts > 0) { <small>@round.PreviousFailedAttempts previous failed attempt(s) recorded</small> }
+                </div>
+                @if (round.CanForward)
+                {
+                    <a class="pg-btn pg-btn-primary" asp-action="ForwardToCommittee" asp-route-id="@round.RoundId">Choose offers and send <span aria-hidden="true">→</span></a>
+                }
+                else if (round.Status != Orange_Tendering_System.Models.Entities.TenderRoundStatus.Open)
+                {
+                    <span class="pg-badge">Round @round.Status</span>
+                }
+                else if (round.CompliantOffers < round.MinimumOffers)
+                {
+                    <span class="pg-badge is-warn">Need @(round.MinimumOffers - round.CompliantOffers) more compliant offer(s)</span>
+                }
+                else
+                {
+                    <span class="pg-badge is-warn">Assign @(4 - round.EvaluationMembers) more committee member(s)</span>
+                }
+            </article>
+        }
+        </div>
+    }
+</section></div>

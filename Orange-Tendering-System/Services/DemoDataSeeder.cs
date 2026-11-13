@@ -44,8 +44,20 @@ public static class DemoDataSeeder
             if (existingOfficer != null && existingSupplier != null && existingBid != null && !await db.Clarifications.AnyAsync(c => c.BidId == existingBid.Id && c.Subject == "DEMO - Warranty document question"))
             {
                 db.Clarifications.Add(new Clarification { BidId = existingBid.Id, FromUserId = existingSupplier.Id, ToUserId = existingOfficer.Id, Subject = "DEMO - Warranty document question", Status = ClarificationStatus.Open, CreatedAt = DateTime.UtcNow.AddHours(-2), Messages = { new ClarificationMessage { SenderUserId = existingSupplier.Id, Message = "I uploaded the warranty document. Could you confirm it is the required form?", SentAt = DateTime.UtcNow.AddHours(-2) } } });
-                db.Notifications.Add(new Notification { UserId = existingOfficer.Id, Title = "Supplier clarification", Message = "A supplier sent a message about a submitted offer.", Link = "/SourcingOfficer/Clarifications", CreatedAt = DateTime.UtcNow.AddHours(-2) });
+                db.Notifications.Add(new Notification { UserId = existingOfficer.Id, Title = "Supplier clarification", Message = "A supplier sent a message about a submitted offer.", Link = "/Clarifications", CreatedAt = DateTime.UtcNow.AddHours(-2) });
                 await db.SaveChangesAsync();
+            }
+            if (existingOfficer != null)
+            {
+                var demoSuppliers = await db.Suppliers.Where(s => s.CompanyName.StartsWith("DEMO Supplier "))
+                    .OrderBy(s => s.CompanyName).Take(4).ToListAsync();
+                var demoCommittee = new List<ApplicationUser>();
+                for (var i = 1; i <= 4; i++)
+                {
+                    var member = await users.FindByEmailAsync($"committee{i}@orange-demo.local");
+                    if (member != null) demoCommittee.Add(member);
+                }
+                await EnsureThreeAttemptExceptionDemoAsync(db, existingOfficer, demoSuppliers, demoCommittee);
             }
             return;
         }
@@ -146,8 +158,9 @@ public static class DemoDataSeeder
             Messages = { new ClarificationMessage { SenderUserId = supplierUsers[2].User.Id, Message = "I uploaded the warranty document. Could you confirm it is the required form?", SentAt = now.AddHours(-2) } }
         };
         db.Clarifications.Add(clarificationThread);
-        db.Notifications.Add(new Notification { UserId = officer.Id, Title = "Supplier clarification", Message = "A supplier sent a message about a submitted offer.", Link = "/SourcingOfficer/Clarifications", CreatedAt = now.AddHours(-2) });
+        db.Notifications.Add(new Notification { UserId = officer.Id, Title = "Supplier clarification", Message = "A supplier sent a message about a submitted offer.", Link = "/Clarifications", CreatedAt = now.AddHours(-2) });
         await db.SaveChangesAsync();
+        await EnsureThreeAttemptExceptionDemoAsync(db, officer, supplierUsers.Select(x => x.Supplier).ToList(), committeeUsers);
         await transaction.CommitAsync();
 
         async Task<ApplicationUser> CreateUser(string email, string name, string role, int? departmentId, int? supplierId = null)
@@ -165,6 +178,103 @@ public static class DemoDataSeeder
                 if (!roleResult.Succeeded) throw new InvalidOperationException($"Could not assign demo role {role} to {email}.");
             }
             return user;
+        }
+    }
+
+    private static async Task EnsureThreeAttemptExceptionDemoAsync(
+        ApplicationDbContext db,
+        ApplicationUser officer,
+        IReadOnlyList<Supplier> suppliers,
+        IReadOnlyList<ApplicationUser> committeeUsers)
+    {
+        if (!officer.DepartmentId.HasValue || suppliers.Count < 2 || committeeUsers.Count < 4) return;
+
+        const string tenderTitle = "DEMO Tender - Limited supplier response (3 attempts)";
+        var existingTender = await db.Tenders.AsNoTracking().AnyAsync(t => t.Title == tenderTitle);
+        if (existingTender) return;
+
+        var now = DateTime.UtcNow;
+        var request = new PurchaseRequest
+        {
+            DepartmentId = officer.DepartmentId.Value,
+            CreatedByUserId = officer.Id,
+            Title = "DEMO - Limited supplier response request",
+            Justification = "Test the three-attempt exception when only two suppliers submit offers per attempt.",
+            Priority = RequestPriority.High,
+            NeededBy = now.AddMonths(2),
+            Status = PurchaseRequestStatus.Accepted,
+            CreatedAt = now.AddDays(-40),
+            SubmittedAt = now.AddDays(-39),
+            Items = { new PurchaseRequestItem { Name = "Network laptop", Specifications = "16 GB RAM, 512 GB SSD", Quantity = 5, Unit = "unit" } }
+        };
+        db.PurchaseRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var tender = new Tender
+        {
+            PurchaseRequestId = request.Id,
+            Title = tenderTitle,
+            Description = "Development sample: three supplier attempts with two responses each.",
+            Requirements = "Commercial registration; tax certificate; warranty terms",
+            CreatedByUserId = officer.Id,
+            CreatedAt = now.AddDays(-40),
+            Status = TenderStatus.Bidding
+        };
+        var item = new TenderItem { Name = "Network laptop", Specifications = "16 GB RAM, 512 GB SSD", Quantity = 5, Unit = "unit" };
+        tender.Items.Add(item);
+        tender.Rounds.Add(new TenderRound { RoundNumber = 1, Status = TenderRoundStatus.Failed, OpensAt = now.AddDays(-39), Deadline = now.AddDays(-32), ClosedAt = now.AddDays(-32), CreatedByUserId = officer.Id, CreatedAt = now.AddDays(-39) });
+        tender.Rounds.Add(new TenderRound { RoundNumber = 2, Status = TenderRoundStatus.Failed, OpensAt = now.AddDays(-30), Deadline = now.AddDays(-23), ClosedAt = now.AddDays(-23), CreatedByUserId = officer.Id, CreatedAt = now.AddDays(-30) });
+        tender.Rounds.Add(new TenderRound { RoundNumber = 3, Status = TenderRoundStatus.Open, OpensAt = now.AddDays(-1), Deadline = now.AddDays(7), CreatedByUserId = officer.Id, CreatedAt = now.AddDays(-1) });
+        AddCommittee(tender, committeeUsers, now);
+        db.Tenders.Add(tender);
+        await db.SaveChangesAsync();
+
+        foreach (var round in tender.Rounds.OrderBy(r => r.RoundNumber))
+        {
+            foreach (var supplier in suppliers.Take(2))
+            {
+                var attemptDate = round.RoundNumber switch { 1 => now.AddDays(-35), 2 => now.AddDays(-26), _ => now.AddHours(-12) };
+                var invitation = new TenderInvitation
+                {
+                    TenderRoundId = round.Id, SupplierId = supplier.Id, InvitedByUserId = officer.Id,
+                    InvitedAt = attemptDate, RespondedAt = attemptDate.AddHours(2), Status = InvitationStatus.Accepted
+                };
+                var bid = new Bid
+                {
+                    TenderInvitation = invitation, RevisionNumber = 1, Status = BidStatus.Submitted,
+                    CurrencyCode = "JOD", DeliveryDays = 10, PaymentTerms = "30 days",
+                    TechnicalProposal = "DEMO offer: meets the required specifications.",
+                    SubmittedAt = attemptDate.AddHours(3), CreatedAt = attemptDate.AddHours(2),
+                    ComplianceStatus = ComplianceStatus.Compliant,
+                    ComplianceNotes = "Demo offer meets the tender requirements.",
+                    ComplianceCheckedByUserId = officer.Id, ComplianceCheckedAt = attemptDate.AddHours(4)
+                };
+                bid.Items.Add(new BidItem { TenderItem = item, Quantity = 5, UnitPrice = 420 + supplier.Id % 3 * 25, OfferedSpecifications = "16 GB RAM, 512 GB SSD" });
+                db.Bids.Add(bid);
+            }
+        }
+        await db.SaveChangesAsync();
+
+        var thirdRoundBid = await db.Bids.Include(b => b.TenderInvitation)
+            .FirstAsync(b => b.TenderInvitation.TenderRoundId == tender.Rounds.Single(r => r.RoundNumber == 3).Id);
+        if (!await db.Clarifications.AnyAsync(c => c.BidId == thirdRoundBid.Id && c.Subject == "DEMO - Supplier asks about delivery terms"))
+        {
+            var supplierUser = await db.Users.SingleAsync(u => u.SupplierId == thirdRoundBid.TenderInvitation.SupplierId && u.IsActive);
+            var messageAt = now.AddHours(-2);
+            db.Clarifications.Add(new Clarification
+            {
+                BidId = thirdRoundBid.Id, FromUserId = supplierUser.Id, ToUserId = officer.Id,
+                Subject = "DEMO - Supplier asks about delivery terms", Status = ClarificationStatus.Open,
+                CreatedAt = messageAt,
+                Messages = { new ClarificationMessage { SenderUserId = supplierUser.Id, Message = "Can you confirm the delivery location for this tender?", SentAt = messageAt } }
+            });
+            db.Notifications.Add(new Notification
+            {
+                UserId = officer.Id, Title = "Supplier clarification",
+                Message = "A supplier asked about delivery terms for the three-attempt demo tender.",
+                Link = "/Clarifications", CreatedAt = messageAt
+            });
+            await db.SaveChangesAsync();
         }
     }
 
