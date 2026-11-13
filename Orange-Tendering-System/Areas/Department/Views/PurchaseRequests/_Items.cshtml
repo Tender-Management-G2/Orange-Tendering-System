@@ -1,0 +1,5 @@
+@model List<RequestItemForm>
+<div class="pg-table-wrap"><table class="pg-table">
+<thead><tr><th scope="col">Item / service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead>
+<tbody>@foreach (var item in Model) { <tr><td>@item.Name</td><td style="white-space:pre-wrap">@item.Specifications</td><td>@item.Quantity.ToString("0.###")</td><td>@item.Unit</td></tr> }</tbody>
+</table></div>

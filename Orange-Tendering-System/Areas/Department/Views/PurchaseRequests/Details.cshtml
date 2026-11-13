@@ -1,17 +1,81 @@
-@model Orange_Tendering_System.Models.Entities.PurchaseRequest
-@{ ViewData["Title"] = Model.Title; ViewData["WorkspaceSection"] = "My Requests"; ViewData["Description"] = "Request details and review history."; }
+@model RequestDetails
+@using System.Text.Json
+@{
+    var request = Model.Request;
+    ViewData["Title"] = $"PR-{request.Id} — {request.Title}";
+    ViewData["WorkspaceSection"] = "My Requests";
+    ViewData["Description"] = "Request information, supporting files and preserved submission history.";
+}
 <partial name="_PageHeader" />
+@if (TempData["DepartmentMessage"] is string message) { <p class="pg-note" role="status">@message</p> }
+<nav class="pg-links"><ul>
+    <li><a asp-action="Index">Back to my requests</a></li>
+    @if (Model.CanEdit) { <li><a asp-action="Edit" asp-route-id="@request.Id">Edit / resubmit</a></li> }
+</ul></nav>
 <section class="ws-panel pg-panel">
-    <dl class="ui-facts">
-        <div><dt>Request</dt><dd>PR-@Model.Id.ToString("0000")</dd></div>
-        <div><dt>Status</dt><dd>@Model.Status</dd></div>
+    <h2>Request information</h2>
+    <dl class="pg-dl">
+        <div><dt>Reference</dt><dd>PR-@request.Id</dd></div>
+        <div><dt>Department</dt><dd>@request.Department.Name</dd></div>
+        <div><dt>Created by</dt><dd>@request.CreatedByUser?.FullName</dd></div>
+        <div><dt>Status</dt><dd>@RequestDisplay.Status(request)</dd></div>
+        <div><dt>Priority</dt><dd>@request.Priority</dd></div>
+        <div><dt>Needed by</dt><dd>@request.NeededBy?.ToString("yyyy-MM-dd")</dd></div>
+        <div><dt>Created</dt><dd>@RequestDisplay.Date(request.CreatedAt)</dd></div>
+        <div><dt>Last submitted</dt><dd>@RequestDisplay.Date(request.SubmittedAt)</dd></div>
     </dl>
-    <p>@Model.Justification</p>
-    <div class="pg-table-wrap"><table class="pg-table" data-no-enhance><thead><tr><th scope="col">Item</th><th scope="col">Quantity</th><th scope="col">Specifications</th></tr></thead><tbody>
-    @foreach (var i in Model.Items) { <tr><td>@i.Name</td><td>@i.Quantity @i.Unit</td><td>@i.Specifications</td></tr> }
-    </tbody></table></div>
-    <h3>Submission history</h3>
-    @if (!Model.Reviews.Any()) { <p class="pg-hint">No review decisions yet.</p> }
-    <ul class="ui-timeline">@foreach (var h in Model.Reviews) { <li><strong>Submission @h.SubmissionNumber · @h.Decision</strong><span>@h.Comment</span></li> }</ul>
-    <div class="pg-actions"><a class="pg-btn" asp-action="Index">Close</a></div>
+    <h3>Justification</h3><p style="white-space:pre-wrap">@request.Justification</p>
+    @if (request.Tenders.Count > 0) { <p>Converted to tender: @string.Join(", ", request.Tenders.Select(t => $"T-{t.Id}: {t.Title}"))</p> }
+</section>
+<section class="ws-panel pg-panel">
+    <h2>Requested items</h2>
+    <partial name="_Items" model='request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm { Name = i.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList()' />
+</section>
+<section class="ws-panel pg-panel">
+    <h2>Supporting attachments</h2>
+    @if (request.Documents.Count == 0) { <p>No attachments.</p> }
+    <ul>@foreach (var file in request.Documents.OrderBy(d => d.UploadedAt))
+    {
+        <li>@if (file.DocumentType == "DepartmentSupportingDocument") { <a asp-action="Download" asp-route-id="@file.Id">@file.FileName</a> } else { <span>@file.FileName — shared download integration pending</span> }
+        <small>(@file.SizeBytes bytes · @RequestDisplay.Date(file.UploadedAt))</small></li>
+    }</ul>
+</section>
+<section class="ws-panel pg-panel">
+    <h2>Submission history & Officer review notes</h2>
+    @if (request.Reviews.Count == 0) { <p>This request has not been submitted.</p> }
+    @foreach (var review in request.Reviews.OrderByDescending(r => r.SubmissionNumber))
+    {
+        <article>
+            <h3>Submission @review.SubmissionNumber</h3>
+            <p>Submitted: @RequestDisplay.Date(review.SubmittedAt) · Decision: @review.Decision</p>
+            @if (review.ReviewedAt.HasValue) { <p>Reviewed: @RequestDisplay.Date(review.ReviewedAt) · @review.ReviewedByUser?.FullName</p> }
+            @if (!string.IsNullOrWhiteSpace(review.Comment)) { <p style="white-space:pre-wrap"><strong>Officer comments / reason:</strong> @review.Comment</p> }
+            @{
+                RequestSnapshot? snapshot = null;
+                try { snapshot = JsonSerializer.Deserialize<RequestSnapshot>(review.SubmittedSnapshotJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }); }
+                catch (JsonException) { }
+            }
+            @if (snapshot is not null && snapshot.Items is not null)
+            {
+                <details><summary>View submitted version</summary>
+                    <h4>@snapshot.Title</h4><p style="white-space:pre-wrap">@snapshot.Justification</p>
+                    <p>Priority: @snapshot.Priority · Needed by: @snapshot.NeededBy?.ToString("yyyy-MM-dd")</p>
+                    <partial name="_Items" model="snapshot.Items" />
+                    @if (snapshot.Attachments is { Count: > 0 }) { <p>Files at submission: @string.Join(", ", snapshot.Attachments)</p> }
+                </details>
+            }
+            else { <p>The earlier snapshot cannot be displayed. Its stored record has been preserved.</p> }
+        </article>
+    }
+</section>
+<section class="ws-panel pg-panel">
+    <h2>Your related clarifications</h2>
+    <p class="pg-hint">Read-only history for threads you participate in. Sending and replying depends on the shared clarification module.</p>
+    @if (Model.Clarifications.Count == 0) { <p>No related clarifications.</p> }
+    @foreach (var thread in Model.Clarifications)
+    {
+        <details><summary>@thread.Subject · @thread.Status</summary>
+        @foreach (var reply in thread.Messages.OrderBy(m => m.SentAt)) { <p style="white-space:pre-wrap">@RequestDisplay.Date(reply.SentAt): @reply.Message</p> }
+        </details>
+    }
 </section>

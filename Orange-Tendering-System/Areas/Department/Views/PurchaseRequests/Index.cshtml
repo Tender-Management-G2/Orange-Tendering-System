@@ -1,17 +1,26 @@
-@model List<Orange_Tendering_System.Models.Entities.PurchaseRequest>
-@{ ViewData["Title"] = "My purchase requests"; ViewData["WorkspaceSection"] = "My Requests"; ViewData["Description"] = "Track every request your department has submitted."; }
+@model RequestList
+@{
+    ViewData["Title"] = "My Purchase Requests";
+    ViewData["WorkspaceSection"] = "My Requests";
+    ViewData["Description"] = "Requests belonging to your department. Only the creator can edit a Draft or Returned request.";
+}
 <partial name="_PageHeader" />
-<section class="ws-panel pg-panel" aria-labelledby="pr-title">
-    <div class="pg-panel-head"><h2 id="pr-title">Requests</h2><a class="pg-btn pg-btn-primary" asp-action="Create">+ New purchase request</a></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
-            <tbody>
-            @foreach (var p in Model)
-            {
-                <tr><td>PR-@p.Id.ToString("0000")</td><td><strong>@p.Title</strong></td><td>@p.Status</td><td><a class="pg-btn" asp-action="Details" asp-route-id="@p.Id">Details</a></td></tr>
-            }
-            </tbody>
-        </table>
-    </div>
+<form method="get" asp-action="Index" class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" name="search" value="@Model.Search" placeholder="Title or PR reference" aria-label="Title or PR reference" maxlength="200" />
+    <select name="status" aria-label="Status"><option value="">All statuses</option>
+    @foreach (var status in RequestDisplay.Statuses) { <option value="@status" selected="@(Model.Status == status)">@status</option> }
+    </select>
+    <select name="priority" aria-label="Priority"><option value="">All priorities</option>
+    @foreach (var priority in Enum.GetValues<RequestPriority>()) { <option value="@priority" selected="@(Model.Priority == priority)">@priority</option> }
+    </select>
+    <button type="submit" class="pg-btn pg-btn-primary">Search</button><a asp-action="Index" class="pg-btn">Clear</a>
+</form>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Purchase requests (@Model.Total)</h2><a class="pg-btn pg-btn-primary" asp-action="Create">New request</a></div>
+    <partial name="_RequestTable" model='new RequestTable(Model.Requests, Model.UserId)' />
+    <nav class="pg-actions" aria-label="Request pages">
+    @if (Model.Page > 1) { <a class="pg-btn" asp-route-page="@(Model.Page - 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-priority="@Model.Priority">Previous</a> }
+    <span>Page @Model.Page of @Model.Pages</span>
+    @if (Model.Page < Model.Pages) { <a class="pg-btn" asp-route-page="@(Model.Page + 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-priority="@Model.Priority">Next</a> }
+    </nav>
 </section>

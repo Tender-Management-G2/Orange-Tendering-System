@@ -1,8 +1,71 @@
-@* Role dashboard: all six internal roles share Views/Shared/_InternalDashboard.cshtml; the numbers come from InternalDashboardService. *@
-@model WorkspaceDashboardViewModel
+@* Owner: Doulat. Existing project dashboard design, bound to Department-scoped data. *@
+@model DepartmentDashboard
 @{
-    ViewData["Title"] = "Department Dashboard";
+    ViewData["Title"] = "Requesting Department Dashboard";
     ViewData["WorkspaceSection"] = "Dashboard";
-    ViewData["DashboardRole"] = "Department";
+    var data = Model.Presentation;
+    var displayName = data.DisplayName ?? "Requesting Department";
+    var total = data.Statuses.Sum(status => (long)Math.Max(0, status.Count));
+    var palette = new[] { "#ff8a00", "#098fff", "#aa6dda", "#00bf81", "#e5604f", "#ffbd45", "#c6cbd2" };
+    var segments = new List<string>();
+    decimal angle = 0;
+    for (var i = 0; i < data.Statuses.Count && total > 0; i++) {
+        var end = angle + Math.Max(0, data.Statuses[i].Count) * 360m / total;
+        segments.Add($"{palette[i % palette.Length]} {angle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg {end.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg");
+        angle = end;
+    }
+    var distribution = total > 0 ? $"conic-gradient({string.Join(",", segments)})" : "conic-gradient(var(--dash-empty-ring) 0deg 360deg)";
 }
-<partial name="_InternalDashboard" model="Model" />
+<div class="dash-board dash-internal" data-dashboard-body="true" data-dashboard-role="Requesting Department">
+    <nav class="pg-links" aria-label="Department shortcuts"><ul>
+        <li><a asp-controller="PurchaseRequests" asp-action="Create">New purchase request</a></li>
+        <li><a asp-controller="PurchaseRequests" asp-action="Index">All department requests</a></li>
+    </ul></nav>
+    <section class="dash-welcome" aria-labelledby="dashboard-title">
+        <div class="dash-welcome-photo" aria-hidden="true"></div>
+        <div class="dash-welcome-waves" aria-hidden="true"></div>
+        <div class="dash-welcome-copy"><h1 id="dashboard-title">Welcome back,<strong>@displayName</strong></h1><p>Manage purchase requirements and follow your procurement requests.</p></div>
+    </section>
+    <section class="dash-metrics" aria-label="Dashboard statistics">
+        <article class="dash-metric dash-orange"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM9 13h6M9 17h6"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("awaiting-review")</strong><span>Awaiting Officer Review</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("awaiting-review",out var trendactivetenders)) { <span class="dash-trend @(trendactivetenders >= 0 ? "is-positive" : "is-negative")">@(trendactivetenders >= 0 ? "↑" : "↓") @trendactivetenders.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
+        <article class="dash-metric dash-blue"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("purchase-requests")</strong><span>Purchase Requests</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("purchase-requests",out var trendpurchaserequests)) { <span class="dash-trend @(trendpurchaserequests >= 0 ? "is-positive" : "is-negative")">@(trendpurchaserequests >= 0 ? "↑" : "↓") @trendpurchaserequests.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
+        <article class="dash-metric dash-green"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-3c0-7 14-7 14 0v3M17 4c5 0 5 7 0 7M18 14c4 0 4 4 4 7"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("accepted")</strong><span>Accepted Requests</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("accepted",out var trendregisteredsuppliers)) { <span class="dash-trend @(trendregisteredsuppliers >= 0 ? "is-positive" : "is-negative")">@(trendregisteredsuppliers >= 0 ? "↑" : "↓") @trendregisteredsuppliers.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
+        <article class="dash-metric dash-purple"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("returned")</strong><span>Returned Requests</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("returned",out var trendpendingevaluations)) { <span class="dash-trend @(trendpendingevaluations >= 0 ? "is-positive" : "is-negative")">@(trendpendingevaluations >= 0 ? "↑" : "↓") @trendpendingevaluations.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
+    </section>
+    <section class="dash-middle-row">
+        <article class="dash-panel dash-workflow"><div class="dash-panel-heading"><h2>Sourcing Workflow</h2><a asp-area="" asp-controller="Home" asp-action="HowItWorks" class="dash-text-action">View Process <span aria-hidden="true">→</span></a></div><ol class="dash-workflow-stages"><li class="@(data.CurrentWorkflowStage == 0 ? "is-current" : data.CurrentWorkflowStage > 0 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></span><span>Purchase<br />Request</span></li><li class="@(data.CurrentWorkflowStage == 1 ? "is-current" : data.CurrentWorkflowStage > 1 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM9 13h6M9 17h6"/></svg></span><span>Tender<br />Creation</span></li><li class="@(data.CurrentWorkflowStage == 2 ? "is-current" : data.CurrentWorkflowStage > 2 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></span><span>Bidding<br /><small>(by Suppliers)</small></span></li><li class="@(data.CurrentWorkflowStage == 3 ? "is-current" : data.CurrentWorkflowStage > 3 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v19M7 22h10M3 6h18M5 6l-4 9h8zM19 6l-4 9h8z"/></svg></span><span>Evaluation<br /><small>(Technical &amp; Financial)</small></span></li><li class="@(data.CurrentWorkflowStage == 4 ? "is-current" : data.CurrentWorkflowStage > 4 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></span><span>Manager<br />Review</span></li><li class="@(data.CurrentWorkflowStage == 5 ? "is-current" : data.CurrentWorkflowStage > 5 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-3c0-7 14-7 14 0v3M17 4c5 0 5 7 0 7M18 14c4 0 4 4 4 7"/></svg></span><span>Top<br />Committee</span></li><li class="@(data.CurrentWorkflowStage == 6 ? "is-current" : data.CurrentWorkflowStage > 6 ? "is-complete" : "")"><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10"/></svg></span><span>Award<br />&amp; Closure</span></li></ol><span class="dash-data-caption">@(data.CurrentWorkflowStage.HasValue ? "Verified workflow position" : "Process overview · requests are submitted directly to the Sourcing Officer")</span></article>
+        <article class="dash-panel dash-ongoing">
+    <div class="dash-panel-heading"><h2>Latest Department Request</h2></div>
+    <svg class="dash-tower" viewBox="0 0 160 190" aria-hidden="true"><path d="m80 45-40 140h80L80 45M80 45v140M65 95l40 30-55 35 70 25M95 95l-40 30 55 35-70 25" /></svg>
+    <div class="dash-ongoing-copy">
+    @if (Model.Recent.FirstOrDefault() is { } latest)
+    {
+        <strong>PR-@latest.Id</strong><p>@latest.Title</p>
+        <span class="dash-status-pill">@RequestDisplay.Status(latest)</span>
+        <div class="pg-actions"><a class="pg-btn" asp-controller="PurchaseRequests" asp-action="Details" asp-route-id="@latest.Id">View request</a></div>
+    }
+    else { <strong>0</strong><p>No department requests yet.</p> }
+    </div>
+</article>
+    </section>
+    <section class="dash-bottom-row">
+        <article class="dash-panel dash-tasks"><div class="dash-panel-heading"><h2>My Requests Needing Action</h2><a asp-controller="PurchaseRequests" asp-action="Index" class="dash-text-action">View All <span aria-hidden="true">→</span></a></div><div class="dash-task-list">@if(data.Tasks.Count > 0) { foreach(var taskRequest in Model.ActionRequired) { var task = new Orange_Tendering_System.ViewModels.DashboardTask(taskRequest.Title, $"PR-{taskRequest.Id}", RequestDisplay.Status(taskRequest)); <div class="dash-task-item"><span class="dash-task-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></span><div><strong><a asp-controller="PurchaseRequests" asp-action="Details" asp-route-id="@taskRequest.Id">@task.Title</a></strong><small>@task.Context</small></div><span class="dash-status-pill">@task.Status</span></div> } } else { <div class="dash-empty-rows" aria-hidden="true"></div><div class="dash-empty-state"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg><span>@(data.DataConnected ? "No assigned tasks." : "Assigned tasks are not connected.")</span></div> }</div></article>
+        <article class="dash-panel dash-distribution"><div class="dash-panel-heading"><h2>Requests by Status</h2></div><div class="dash-distribution-body"><div class="dash-donut @(total > 0 ? "has-data" : "")" style="--dash-distribution:@distribution"><span><strong>@data.Number("purchase-requests")</strong><small>Requests</small></span></div><div class="dash-legend">@if(data.Statuses.Count > 0) { foreach(var status in data.Statuses) { <div><i style="background:@palette[Array.IndexOf(RequestDisplay.Statuses, status.Label)]" aria-hidden="true"></i><a asp-controller="PurchaseRequests" asp-action="Index" asp-route-status="@status.Label">@status.Label</a><b>@status.Count</b></div> } } else { <div><i></i><span>Open</span><b>—</b></div><div><i></i><span>Under Evaluation</span><b>—</b></div><div><i></i><span>Under Review</span><b>—</b></div><div><i></i><span>Closed</span><b>—</b></div> }</div></div><span class="dash-data-caption">@(data.DataConnected ? "Verified system data" : "Waiting for verified data")</span></article>
+        <article class="dash-panel dash-activity"><div class="dash-panel-heading"><h2>Recent Activities</h2><a asp-controller="PurchaseRequests" asp-action="Index" class="dash-text-action">View All <span aria-hidden="true">→</span></a></div><div class="dash-activity-list">@if (data.Activities.Count > 0) { foreach(var activity in data.Activities) { <div class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@activity.Title</strong><span>@activity.Context</span></div><time>@activity.Time</time></div> } } else { <div class="dash-empty-timeline" aria-hidden="true"><i></i><i></i><i></i></div><div class="dash-empty-state"><span>@(data.DataConnected ? "No recent activities." : "Activity history is not connected.")</span></div> }</div></article>
+    </section>
+    <section class="dash-panel">
+        <div class="dash-panel-heading"><h2>Recent Department Requests</h2></div>
+        <partial name="~/Areas/Department/Views/PurchaseRequests/_RequestTable.cshtml" model='new RequestTable(Model.Recent, Model.UserId)' />
+    </section>
+    <section class="dash-panel dash-activity">
+        <div class="dash-panel-heading"><h2>Your Department Notifications</h2></div>
+        <div class="dash-activity-list">
+        @if (Model.Notifications.Count == 0) { <div class="dash-empty-state"><span>No department notifications yet.</span></div> }
+        @foreach (var notification in Model.Notifications)
+        {
+            <article class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@notification.Title</strong><span>@notification.Message</span><span>@(notification.IsRead ? "Read" : "Unread")</span></div><time>@RequestDisplay.Date(notification.CreatedAt)</time></article>
+        }
+        </div>
+    </section>
+</div>
+@section Styles { <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" /> }
