@@ -90,11 +90,12 @@ public class VerifyEmailModel(
         Input.Email = email;
         ModelState.Clear();
         if (string.IsNullOrWhiteSpace(email)) return Page();
+        // Post/Redirect/Get: back to the plain Verify Email URL, so the verify form and a page refresh behave normally.
         var user = await FindPendingSupplierAsync();
         if (user == null)
         {
             TempData["Notice"] = "If a pending registration exists and resending is allowed, a new code will be sent.";
-            return Page();
+            return RedirectToPage(new { email });
         }
         var elapsed = user.EmailOtpSentAt is DateTime sent ? DateTime.UtcNow - sent : TimeSpan.MaxValue;
         if (user.EmailOtpSentAt != null &&
@@ -102,7 +103,7 @@ public class VerifyEmailModel(
              (user.EmailOtpFailedAttempts >= 5 && elapsed < TimeSpan.FromMinutes(10))))
         {
             TempData["Notice"] = "If a pending registration exists and resending is allowed, a new code will be sent.";
-            return Page();
+            return RedirectToPage(new { email });
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync();
@@ -119,6 +120,7 @@ public class VerifyEmailModel(
                 $"<p>Your new Orange Tendering verification code is <strong>{code}</strong>.</p><p>It expires in 10 minutes.</p>");
             await transaction.CommitAsync();
             TempData["Notice"] = "If a pending registration exists and resending is allowed, a new code will be sent.";
+            return RedirectToPage(new { email });
         }
         catch (Exception exception)
         {

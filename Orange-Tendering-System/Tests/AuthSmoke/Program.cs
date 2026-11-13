@@ -267,11 +267,17 @@ var limited = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new
 }));
 Check(limited.StatusCode == HttpStatusCode.OK, "five wrong OTPs block verification");
 var mailCount = mail.Messages.Count;
-await supplier.PostAsync("/Identity/Account/VerifyEmail?handler=Resend", Form(new()
+var cooldownResend = await supplier.PostAsync("/Identity/Account/VerifyEmail?handler=Resend", Form(new()
 {
     ["email"] = expiredEmail, ["__RequestVerificationToken"] = expiredToken
 }));
 Check(mail.Messages.Count == mailCount, "OTP resend cooldown enforced");
+Check(cooldownResend.StatusCode == HttpStatusCode.Redirect &&
+    cooldownResend.Headers.Location?.ToString().Contains("handler=", StringComparison.OrdinalIgnoreCase) == false,
+    "resend returns to the plain Verify Email URL");
+var verifyPage = await (await supplier.GetAsync("/Identity/Account/VerifyEmail?handler=Resend")).Content.ReadAsStringAsync();
+Check(verifyPage.Contains("<form method=\"post\" action=\"/Identity/Account/VerifyEmail\">"),
+    "verify form posts to the verify handler even from a ?handler=Resend address");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

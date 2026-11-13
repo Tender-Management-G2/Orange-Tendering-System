@@ -1,0 +1,55 @@
+@model Orange_Tendering_System.Models.Biometric.FaceDemoViewModel
+@*
+    DEVELOPMENT-ONLY face recognition test bench (Controllers/FaceDemoController.cs, wwwroot/js/biometric.js).
+    Uses the real instant capture, sample checks and matching threshold; never creates an account or signs anyone in.
+*@
+@{
+    Layout = "/Views/Shared/_Layout.cshtml";
+    ViewData["IdentityPage"] = true;
+    ViewData["Title"] = "Face Recognition Demo";
+}
+<section class="section auth-section">
+    <div class="glass auth-card auth-card-wide" id="face-demo-root">
+        @Html.AntiForgeryToken()
+        <span class="eyebrow">DEVELOPMENT ONLY · FACE RECOGNITION TEST</span>
+        <h1>Face Recognition Demo</h1>
+        <p>Register a test face once, then verify as often as you like, or let someone else try. This page uses the same instant capture and matching threshold as supplier face sign-in, but it does not create an account, does not touch real supplier faces and never signs you in. The test face is kept in server memory for this browser until you reset it or the app restarts.</p>
+        <p><small>Note: there is no liveness check, so a photo of a registered person can also match.</small></p>
+
+        <div class="pg-actions face-demo-actions">
+            <button id="btnDemoRegister" type="button" class="primary">Register Test Face</button>
+            <button id="btnDemoVerify" type="button" class="overview">Verify Face</button>
+            <button id="btnDemoReset" type="button" class="overview">Reset Test Face</button>
+        </div>
+
+        <div id="demoResult" class="bio-status" role="status" aria-live="polite"></div>
+
+        <div id="facePanel" class="bio-face-panel bio-hidden">
+            <video id="faceVideo" playsinline muted autoplay></video>
+            <div id="faceHint" class="bio-face-hint"></div>
+        </div>
+
+        <fieldset class="auth-fieldset">
+            <legend>Debug information</legend>
+            <dl class="face-demo-debug">
+                <dt>Test face</dt><dd id="demoTestFace">@(Model.TestFaceSamples > 0 ? $"Registered ({Model.TestFaceSamples} samples)" : "None registered")</dd>
+                <dt>Camera</dt><dd id="dbgCamera">Off</dd>
+                <dt>Status</dt><dd id="dbgStatus">Idle</dd>
+                <dt>Face detection</dt><dd id="dbgDetection">—</dd>
+                <dt>Samples</dt><dd id="dbgSamples">—</dd>
+                <dt>Time</dt><dd id="dbgTime">—</dd>
+                <dt>Face match</dt><dd id="dbgMatch">—</dd>
+                <dt>Distance</dt><dd id="dbgDistance">—</dd>
+                <dt>Threshold</dt><dd id="dbgThreshold">@Model.Threshold</dd>
+            </dl>
+            <small>Distance is the Euclidean distance between 128-number face descriptors: lower means more similar. A match needs at least 70% of the live samples (minimum 3) and the average distance to be at or below the threshold (setting <code>Biometric:FaceMatchThreshold</code>).</small>
+        </fieldset>
+    </div>
+</section>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+}
+@section Scripts {
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
+}

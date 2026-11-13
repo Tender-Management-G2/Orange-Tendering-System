@@ -68,6 +68,15 @@ public class LoginModel(
             return Page();
         }
 
+        // Approved suppliers with biometrics enrolled must use them; the password is only for registration/setup.
+        if (isSupplier && supplierStatus == SupplierStatus.Approved &&
+            (await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id) ||
+             await db.UserPasskeyCredentials.AnyAsync(c => c.UserId == user.Id)))
+        {
+            ModelState.AddModelError(string.Empty, "Supplier accounts sign in with face recognition (or a passkey) in the Suppliers section.");
+            return Page();
+        }
+
         await signIn.SignInAsync(user, Input.RememberMe);
         logger.LogInformation("Identity sign-in succeeded for user {UserId}.", user.Id);
         db.AuditLogs.Add(new AuditLog

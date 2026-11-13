@@ -10,3 +10,10 @@
 .bio-list{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}
 .bio-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--ws-rule);border-radius:10px}
 .bio-list small{display:block;color:var(--ws-muted)}
+
+/* Development-only /face-demo page */
+.face-demo-actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 6px}
+.face-demo-actions button{flex:1 1 160px;min-height:44px;border-radius:10px}
+.face-demo-debug{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:8px 0 12px;font-size:13px}
+.face-demo-debug dt{color:var(--secondary,var(--ws-muted));font-weight:600}
+.face-demo-debug dd{margin:0;word-break:break-word}
