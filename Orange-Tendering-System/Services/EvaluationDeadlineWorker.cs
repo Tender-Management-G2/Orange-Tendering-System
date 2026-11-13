@@ -18,7 +18,6 @@ public class EvaluationDeadlineWorker(IServiceScopeFactory scopes, ILogger<Evalu
                 await Step("Approved registration invitations", s => s.GetRequiredService<TenderWorkflowService>().LinkRegisteredContacts(stoppingToken), stoppingToken);
             }
         }
-        // Normal shutdown: the host cancels the token while the timer is waiting. Not an error, so it must not surface as an unhandled exception.
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
     private async Task Step(string name, Func<IServiceProvider, Task> work, CancellationToken stoppingToken)
