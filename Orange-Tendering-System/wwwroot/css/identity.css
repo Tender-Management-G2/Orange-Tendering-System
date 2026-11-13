@@ -73,3 +73,33 @@
 .reg-steps li.is-done{border-color:#2f9e6a;color:#2f9e6a}
 .reg-steps li.is-done::before{content:"\2713  "}
 .reg-steps li.is-current{border-color:var(--orange-ink);color:var(--orange-ink);font-weight:600}
+
+/* Single sign-in page (Areas/Identity/Pages/Account/Login.cshtml) */
+.login-shell{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);max-width:960px;margin:0 auto;padding:0;overflow:hidden;border-radius:22px}
+.login-brand{background:linear-gradient(155deg,#ff7900,#c75b00);color:#17100a;padding:clamp(26px,4vw,44px);display:flex;flex-direction:column;gap:14px;justify-content:center}
+.login-brand .logo{font-weight:800;font-size:30px;letter-spacing:-.04em}
+.login-brand h2{margin:0;font-size:22px;line-height:1.25;letter-spacing:-.02em}
+.login-brand p{margin:0;color:#17100acc}
+.login-brand ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:10px;font-size:14px}
+.login-brand li{padding-left:22px;position:relative}
+.login-brand li::before{content:"\2713";position:absolute;left:0;font-weight:800}
+.login-main,.login-main.auth-card{width:auto;padding:clamp(24px,4vw,44px);display:grid;gap:4px;align-content:center}
+.login-main .auth-link{display:inline;margin:0;font-size:13px}
+.login-main h1{font-size:34px}
+.login-main h1{margin:4px 0 0}
+.login-lead{margin:0 0 10px;color:var(--secondary)}
+.login-main form{display:grid;gap:7px}
+.login-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
+.login-row .auth-check{margin:0}
+.login-main #login-submit{margin-top:12px;width:100%;height:48px;font-size:15px}
+.login-main .login-bio-buttons button{margin:0}
+.login-or{display:flex;align-items:center;gap:12px;margin:22px 0 12px;color:var(--secondary);font-size:12px}
+.login-or::before,.login-or::after{content:"";flex:1;border-top:1px solid var(--rule)}
+.login-bio{display:grid;gap:10px}
+.login-bio-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.login-bio-buttons button{height:44px;border-radius:10px;border:1px solid var(--rule);background:transparent;color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+.login-bio-buttons button:hover{border-color:var(--orange-ink)}
+.login-bio small{color:var(--secondary);line-height:1.6}
+.login-foot{margin:18px 0 0;font-size:13px;color:var(--secondary)}
+@media (max-width:760px){.login-shell{grid-template-columns:1fr}.login-brand{display:none}.login-bio-buttons{grid-template-columns:1fr}}
+.login-main label{margin:12px 0 6px}.login-main .field-error{min-height:0;margin:0}.login-main .auth-password-toggle{margin:0}.login-main .validation-summary:empty{display:none}

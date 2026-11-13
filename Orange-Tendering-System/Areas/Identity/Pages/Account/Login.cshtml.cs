@@ -73,7 +73,7 @@ public class LoginModel(
             (await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id) ||
              (await users.GetPasskeysAsync(user)).Count > 0))
         {
-            ModelState.AddModelError(string.Empty, "Supplier accounts sign in with face recognition (or a passkey) in the Suppliers section.");
+            ModelState.AddModelError(string.Empty, "This supplier account signs in with face recognition or a passkey. Use the buttons below the form.");
             return Page();
         }
 
