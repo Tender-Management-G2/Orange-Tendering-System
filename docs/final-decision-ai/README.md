@@ -28,3 +28,5 @@ Chain enforced by data (`Services/TenderWorkflowService.FinalDecision.cs`):
 - **BLOCKED — live SMTP**: no SMTP provider is configured; Sent/Failed/retry were verified with a scripted sender, and `NotConfigured` with the real server.
 - **Not exercised end to end in a browser**: casting the four signed Top Committee votes (requires the multi-phase timed lifecycle in `docs/test-evidence`). The 3-of-4 trigger is called through the real service code path in the fixture (`RecordFinalDecision`); the votes/signatures themselves are unchanged existing workflow.
 - Demo seeder (`DemoData:Enabled`) creates a second Sourcing Officer, which makes the single-Officer guard fail closed; tests run with it disabled.
+
+- After merging `main`, `appsettings.Development.json` configures SMTP at 127.0.0.1:1025 (no listener in the test environment): the real server then records e-mail status `Failed` (attempt 1) with the Retry button, which is the correct behavior; `NotConfigured` applies when no `Smtp` section exists.

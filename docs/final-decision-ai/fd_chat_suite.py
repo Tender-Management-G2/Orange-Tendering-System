@@ -106,7 +106,7 @@ try:
         check(notice_status() == "SuppliersNotified" and deliveries() == 2, "Officer's Notify Suppliers announced the result (2 delivery rows)", f"{notice_status()}, {deliveries()}")
         shot(po, "Officer-final-decision-delivered-dark")
         body = po.inner_text("section:has-text('Site Maintenance Services')")
-        check("Won" in body and "Unsuccessful" in body and "NotConfigured" in body and "Delivered" in body, "Delivery table shows Won / Unsuccessful, in-app Delivered and e-mail NotConfigured (SMTP not configured)")
+        check("Won" in body and "Unsuccessful" in body and ("NotConfigured" in body or "Failed" in body) and "Delivered" in body, "Delivery table shows Won / Unsuccessful, in-app Delivered and the e-mail delivery status")
         check(po.locator("section:has-text('Site Maintenance Services') button:has-text('Notify Suppliers')").count() == 0, "Notify Suppliers button disappears after announcing")
         check(sql(f"SELECT COUNT(*) FROM AuditLogs WHERE Action='SupplierResultsAnnounced' AND EntityId='{TID}'") == "1", "Audit log recorded the announcement")
         # duplicate prevention
