@@ -1,76 +1,68 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Company Profile
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Supplier Portal
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Show the supplier company profile and let the supplier
-update contact details.
-
-BUSINESS ACCESS:
-Supplier (own company only, Admin-approved)
-
-ROUTE: /Supplier/Profile
-
-FUTURE IMPLEMENTATION:
-- Load the Supplier of the signed-in user.
-- POST: update only contact fields; registration number and
-  status are Admin-controlled.
-
-DEPENDENCIES:
-Suppliers, AspNetUsers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Every query must be filtered by the signed-in user’s
-SupplierId. Never show other suppliers’ invitations, offers,
-prices or evaluations.
-===========================================================
-*@
+@model SupplierProfileViewModel
+@* Owner: Saja. Own company profile and contact editing. *@
 @{
     ViewData["Title"] = "Company Profile";
     ViewData["WorkspaceSection"] = "Profile";
     ViewData["Description"] = "Your company registration details and approval status.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<section class="ws-panel pg-panel">
-    <h2>Company</h2>
-    <dl class="pg-dl">
-        <div><dt>Company name</dt><dd>—</dd></div>
-        <div><dt>Registration number</dt><dd>—</dd></div>
-        <div><dt>Tax number</dt><dd>—</dd></div>
-        <div><dt>Email</dt><dd>—</dd></div>
-        <div><dt>Phone</dt><dd>—</dd></div>
-        <div><dt>Address</dt><dd>—</dd></div>
-        <div><dt>Approval status</dt><dd>—</dd></div>
-        <div><dt>Reviewed at</dt><dd>—</dd></div>
-    </dl>
-</section>
+@if (Model.AccessMessage is not null)
+{
+    <section class="ws-panel pg-panel" role="alert">
+        <h2>Company profile unavailable</h2>
+        <p>@Model.AccessMessage</p>
+    </section>
+}
+else
+{
+    @if (TempData["ProfileSuccess"] is string message)
+    {
+        <p class="pg-note" role="status">@message</p>
+    }
+    <section class="ws-panel pg-panel">
+        <h2>Company</h2>
+        <dl class="pg-dl">
+            <div><dt>Company name</dt><dd>@Model.CompanyName</dd></div>
+            <div><dt>Registration number</dt><dd>@Model.RegistrationNumber</dd></div>
+            <div><dt>Tax number</dt><dd>@(Model.TaxNumber ?? "—")</dd></div>
+            <div><dt>Email</dt><dd>@Model.Email</dd></div>
+            <div><dt>Phone</dt><dd>@(Model.Phone ?? "—")</dd></div>
+            <div><dt>Address</dt><dd>@(Model.Address ?? "—")</dd></div>
+            <div><dt>Approval status</dt><dd>@Model.Status</dd></div>
+            <div><dt>Reviewed at</dt><dd>@(Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        </dl>
+    </section>
 
-<section class="ws-panel pg-panel">
-    <h2>Update contact details</h2>
-    <form class="pg-form">
-        <fieldset disabled>
+    <section class="ws-panel pg-panel">
+        <h2>Update contact details</h2>
+        <form asp-area="Supplier" asp-controller="Profile" asp-action="UpdateContact" method="post" class="pg-form">
+            <div asp-validation-summary="All" role="alert"></div>
             <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-phone-1">Phone</label><input id="f-phone-1" type="tel" /></div>
-                <div class="pg-field pg-field-wide"><label for="f-address-2">Address</label><textarea id="f-address-2" rows="4"></textarea></div>
+                <div class="pg-field">
+                    <label asp-for="Contact.Phone">Phone</label>
+                    <input asp-for="Contact.Phone" type="tel" maxlength="40" />
+                    <span asp-validation-for="Contact.Phone"></span>
+                </div>
+                <div class="pg-field pg-field-wide">
+                    <label asp-for="Contact.Address">Address</label>
+                    <textarea asp-for="Contact.Address" rows="4" maxlength="500"></textarea>
+                    <span asp-validation-for="Contact.Address"></span>
+                </div>
             </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save changes</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
+            <div class="pg-actions">
+                <button type="submit" class="pg-btn pg-btn-primary">Save changes</button>
+            </div>
+        </form>
+    </section>
 
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="Supplier" asp-controller="Documents" asp-action="Index">My documents</a></li>
-    </ul>
-</nav>
+    <nav class="pg-links" aria-label="Related pages">
+        <ul>
+            <li><a asp-area="Supplier" asp-controller="Documents" asp-action="Index">My documents</a></li>
+        </ul>
+    </nav>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

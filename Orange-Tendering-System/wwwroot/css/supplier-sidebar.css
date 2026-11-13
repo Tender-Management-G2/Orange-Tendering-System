@@ -1,0 +1,30 @@
+/* Supplier-only overrides; other workspaces keep their existing layout. */
+.ws-supplier.ws-internal .ws-stage { min-width: 0; }
+.ws-supplier.ws-internal .ws-sidebar-brand { padding: 24px 20px; min-height: 108px; }
+.ws-supplier.ws-internal .ws-sidebar-brand .ws-brand { gap: 14px; font-size: 13px; }
+.ws-supplier.ws-internal .ws-sidebar-brand .ws-logo { width: 54px; height: 56px; font-size: 17px; }
+.ws-supplier.ws-internal .ws-sidebar-bottom { padding: 24px; border-top: 1px solid var(--ws-soft-rule); }
+.ws-supplier.ws-internal .ws-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border-bottom: 1px solid var(--ws-soft-rule);
+    background: var(--ws-bg);
+    padding-inline: 24px;
+    gap: 16px;
+}
+.ws-supplier-page-name { color: var(--ws-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-supplier.ws-internal .ws-supplier-main { padding: 24px 24px 40px; }
+.ws-supplier.ws-internal .ws-supplier-footer:before { display: none; }
+@media (max-width: 1079px) {
+    .ws-supplier.ws-internal .ws-sidebar-brand { padding-right: 12px; }
+    .ws-supplier.ws-internal .ws-topbar { padding-inline: 16px; gap: 12px; }
+}
+@media (max-width: 767px) {
+    .ws-supplier.ws-internal .ws-supplier-main { padding: 16px 12px 28px; }
+    .ws-supplier.ws-internal .ws-topbar { gap: 8px; padding-inline: 12px; }
+    .ws-supplier.ws-internal .ws-topbar .ws-account-label,
+    .ws-supplier-page-name { display: none; }
+    .ws-supplier.ws-internal .ws-topbar-actions { gap: 4px; }
+    .ws-supplier.ws-internal .ws-topbar .ws-portal-label { display: inline-block; }
+}
