@@ -10,8 +10,8 @@ every URL is in [ROUTE_MAP.md](ROUTE_MAP.md). **Business rules are in [`Tenderin
 
 1. Pull `main`, build, and run. Public pages work immediately.
 2. **Workspace pages need roles.** Every area controller has `[Authorize(Roles = ...)]` with the names in
-   `Models/SystemRoles.cs`. The roles are not seeded yet (Ahmad's task), so until then every workspace page
-   correctly shows *Access denied*. Do not remove `[Authorize]` to see your page — ask Ahmad for the seed, then
+   `Models/SystemRoles.cs`. The seven roles are seeded at startup on a migrated database; until a user is assigned a role, workspace pages
+   correctly show *Access denied*. Do not remove `[Authorize]` to see your page — ask Admin for role assignment, then
    give your local test account the role.
 3. Open your page file and read its comment block: purpose, business role, future implementation list,
    dependencies. Remove `<partial name="_ScaffoldNotice" />` only when the page really works.
@@ -52,10 +52,10 @@ preview). Never edit committee scores or votes. Decisions are stored on the exac
 |---|---|
 | User Registration | `Areas/Identity/Pages/Account/Register.cshtml(.cs)` — make it supplier registration: the disabled company section (name, registration no., tax no., email, phone, address, legal documents) must create a Pending `Supplier` + `Documents` + `Supplier` role |
 | Login & Role Redirect | `Areas/Identity/Pages/Account/Login.cshtml(.cs)`, `Controllers/WorkspaceController` + `Views/Workspace/Index` |
-| Forgot / Reset Password | `Areas/Identity/Pages/Account/ForgotPassword`, `ResetPassword` (needs an `IEmailSender`) |
+| Forgot / Reset Password | `Areas/Identity/Pages/Account/ForgotPassword`, `ResetPassword` (SMTP `IEmailSender` implemented; runtime configuration required) |
 | Fingerprint / Face | `Controllers/BiometricsController`, `Views/Biometrics/Fingerprint`, `Face`; disabled buttons on Login |
 | Database Design & ERD | `Models/Entities/*`, `Data/ApplicationDbContext.cs` (an ERD diagram is still to be drawn) |
-| Implementation & Seed Data | `Data/Migrations/*`; **next step: seed the seven roles** from `Models/SystemRoles.cs` (no demo users or passwords in Git) |
+| Implementation & Seed Data | `Data/Migrations/*`; seven roles seeded by `Services/IdentityBootstrap.cs` (no demo users or passwords in Git) |
 | GitHub & Team Workflow | repository, `.gitignore`, this document |
 
 Already done in this scaffold: `Program.cs` now calls `.AddRoles<IdentityRole>()` — without it role checks never pass.
@@ -63,7 +63,7 @@ Rules: one authentication system (Identity); no fake biometric checks; no static
 
 ### Ahmad's checklist — roles, initial Admin and accounts (blocks the whole team)
 
-None of this exists yet; nothing is seeded. Tick each item only when it works against a real database.
+The Ahmad branch implements role seeding, supplier registration, OTP, email delivery, cookie gates, and first-login password state. Database and SMTP end-to-end verification remain environment dependent. Admin screens and supplier approval remain Rjoub's work.
 
 1. **Seed the seven roles** idempotently at startup (or via an explicit command) from `Models/SystemRoles.cs`:
    `Admin`, `Requesting Department`, `Sourcing Officer`, `Supplier`, `Evaluation Committee`, `Sourcing Manager`,
@@ -171,8 +171,14 @@ Admin has no committee vote.
 | Export bar | Disabled "Download PDF / Excel" buttons on report pages — see `Views/Analytics/*` |
 | CSS `pg-*` classes | Panels, tables, forms, badges, notes — see `wwwroot/css/workspace-pages.css` |
 
-## Not implemented anywhere yet
+## Remaining business implementation
 
-All database reads and writes, every POST action, the workflow rules (3-offer gate, retendering, 4/4 votes,
-report versioning), scoring, notifications, clarification messaging, audit writing, file upload/download,
-Ollama, biometrics, voice search, email delivery and role seeding.
+Most domain workflows remain scaffolds, including tender rules, scoring, approvals, clarification messaging, analytics, document download authorization, Ollama, biometrics, and voice search. The Admin Users, Roles, and Supplier Review POST actions remain Rjoub's work.
+
+### Authentication integration on Ahmad branch
+
+- Apply `20261113091517_AddAuthenticationState` to each intended local database before running the app. It adds `MustChangePassword`, `EmailOtpSentAt`, and `EmailOtpFailedAttempts` to `AspNetUsers`; no tables are added (30 tables remain).
+- Configure SMTP through User Secrets or environment variables (`Smtp:Host`, `Smtp:Port`, `Smtp:From`, optionally `Smtp:Username` and `Smtp:Password`). Registration rolls back if OTP delivery fails. Forgot Password reports an unavailable service if SMTP is missing.
+- Optional first Admin bootstrap uses `BootstrapAdmin:Email`, `BootstrapAdmin:Password`, and optionally `BootstrapAdmin:FullName` from runtime configuration. It never promotes an existing non-Admin account and forces a password change on first sign-in.
+- Rjoub owns Admin Users, Roles, and Supplier Review POST actions. For new employees, call `EmployeeProvisioning.CreateAsync(HttpContext, fullName, email, departmentId, roles)` from an Admin-only action; it emails a one-hour activation link and never sends a password. After changing roles, call `UserManager.UpdateSecurityStampAsync` so existing cookies refresh. Supplier approval sets `Supplier.Status = Approved` only after document review; pending and suspended suppliers are blocked on login and each authenticated request.
+- Ahmad owns Identity pages, role seeding, SMTP integration, account-state cookie checks, and the provisioning contract. Fingerprint and Face ID remain deferred and disabled.

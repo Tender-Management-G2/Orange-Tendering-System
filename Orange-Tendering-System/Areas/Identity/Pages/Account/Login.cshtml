@@ -13,29 +13,21 @@ TRELLO TASK: User Login & Role Redirect
 TRELLO URL: https://trello.com/c/WoTewqHd
 
 PURPOSE:
-Email/password sign-in for every user (employees and approved
-suppliers), using the existing Identity LoginModel unchanged.
+One Identity email/password sign-in for employees and approved suppliers.
 
 BUSINESS ACCESS:
 Anonymous visitors.
 
 FUTURE IMPLEMENTATION:
-- After sign-in, redirect to the user's workspace by role
-  (see WorkspaceController / Workspace/Index) instead of "/".
-- Block suppliers whose Supplier.Status is not Approved, and
-  users with ApplicationUser.IsActive = false.
-- Fingerprint and face sign-in: replace the disabled buttons
-  below with a real, demonstrable verification flow. Never
-  accept a static photo as live face verification.
-- Audit failed and successful sign-ins (without secrets).
+- Fingerprint and face sign-in remain disabled until a real verification flow exists.
 
 DEPENDENCIES:
 AspNetUsers, ApplicationUser, Supplier, SignInManager,
 Biometrics pages, AuditLogs.
 
 STATUS:
-PASSWORD SIGN-IN WORKS (existing Identity). Role redirect and
-biometric sign-in are NOT IMPLEMENTED.
+Identity sign-in, role redirect, account-state checks, and lockout are implemented.
+Biometric sign-in is deferred.
 
 IMPORTANT:
 Do not add a second authentication system next to Identity.
@@ -68,19 +60,9 @@ Do not add a second authentication system next to Identity.
             <button type="button" class="overview" disabled title="Face recognition sign-in is not implemented yet">Sign in with face recognition</button>
         </div>
 
-        @if ((Model.ExternalLogins?.Count ?? 0) > 0)
-        {
-            <form id="external-account" asp-page="./ExternalLogin" asp-route-returnUrl="@Model.ReturnUrl" method="post">
-                @foreach (var provider in Model.ExternalLogins!)
-                {
-                    <button type="submit" class="overview" name="provider" value="@provider.Name" title="Log in using your @provider.DisplayName account">@provider.DisplayName</button>
-                }
-            </form>
-        }
-
         <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
-        <a class="auth-link" asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl">Register as a supplier ↗</a>
-        <a class="auth-link" id="resend-confirmation" asp-page="./ResendEmailConfirmation">Resend email confirmation</a>
+        <a class="auth-link" asp-page="./Register">Register as a supplier ↗</a>
+        <a class="auth-link" id="resend-confirmation" asp-page="./VerifyEmail">Verify supplier email</a>
     </div>
 </section>
 

@@ -16,5 +16,12 @@ namespace Orange_Tendering_System.Models.Entities
         public Supplier? Supplier { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        // Admin-provisioned employees cannot enter a workspace until this is cleared.
+        public bool MustChangePassword { get; set; }
+
+        // Supplier email OTP state; the code itself is generated and validated by Identity.
+        public DateTime? EmailOtpSentAt { get; set; }
+        public int EmailOtpFailedAttempts { get; set; }
     }
 }
