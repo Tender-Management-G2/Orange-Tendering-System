@@ -50,6 +50,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Tenders", "Tenders", "Index", "tender"),
                 new("Received Bids", "Bids", "Index", "layers"),
                 new("Reports", "Reports", "Index", "report"),
+                new("Final Decisions", "FinalDecisions", "Index", "check"),
                   new("Supplier Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
@@ -81,6 +82,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Pending Reports", "Reports", "Index", "request"),
                 new("Report Review", "Reports", "Index", "check"),
                 new("Forwarding", "Reports", "Forward", "send"),
+                new("Final Decisions", "FinalDecisions", "Index", "check"),
                 new("Decision History", "Reports", "History", "history"),
                 new("Analytics & Exports", "Analytics", "Index", "chart", "")
             ]),

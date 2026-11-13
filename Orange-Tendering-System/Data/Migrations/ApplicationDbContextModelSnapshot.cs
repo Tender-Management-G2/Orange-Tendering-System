@@ -206,6 +206,67 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.ToTable("AiAnalysis");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.AiChatConversation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "UpdatedAt");
+
+                    b.ToTable("AiChatConversations");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.AiChatMessage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ConversationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId", "Id");
+
+                    b.ToTable("AiChatMessages");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
@@ -1111,6 +1172,64 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.ToTable("FaceTemplates");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.FinalDecisionNotice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ManagerAcknowledgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ManagerComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ManagerUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OfficerUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("SuppliersNotifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("TenderId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TenderReportId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TopApprovals")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TopVotes")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenderId", "TenderReportId")
+                        .IsUnique()
+                        .HasFilter("[TenderReportId] IS NOT NULL");
+
+                    b.ToTable("FinalDecisionNotices");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -1570,15 +1689,15 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("CompanyName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -1624,6 +1743,69 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.HasIndex("ReviewedByUserId");
 
                     b.ToTable("Suppliers");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.SupplierResultDelivery", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BidId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmailAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EmailSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmailStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("FinalDecisionNoticeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("InAppStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("NotificationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("RecipientUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenderId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinalDecisionNoticeId", "RecipientUserId")
+                        .IsUnique();
+
+                    b.ToTable("SupplierResultDeliveries");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Tender", b =>
@@ -2166,6 +2348,28 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Navigation("TenderRound");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.AiChatConversation", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.AiChatMessage", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.AiChatConversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.ApplicationUser", b =>
                 {
                     b.HasOne("Orange_Tendering_System.Models.Entities.Department", "Department")
@@ -2555,6 +2759,17 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.FinalDecisionNotice", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.Tender", "Tender")
+                        .WithMany()
+                        .HasForeignKey("TenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Tender");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Notification", b =>
                 {
                     b.HasOne("Orange_Tendering_System.Models.Entities.ApplicationUser", "User")
@@ -2720,6 +2935,17 @@ namespace Orange_Tendering_System.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ReviewedByUser");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.SupplierResultDelivery", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.FinalDecisionNotice", "FinalDecisionNotice")
+                        .WithMany("Deliveries")
+                        .HasForeignKey("FinalDecisionNoticeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FinalDecisionNotice");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Tender", b =>
@@ -2908,6 +3134,11 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Navigation("Tender");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.AiChatConversation", b =>
+                {
+                    b.Navigation("Messages");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Bid", b =>
                 {
                     b.Navigation("Documents");
@@ -2947,6 +3178,11 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Navigation("EligibleBids");
 
                     b.Navigation("Invitations");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.FinalDecisionNotice", b =>
+                {
+                    b.Navigation("Deliveries");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.PurchaseRequest", b =>

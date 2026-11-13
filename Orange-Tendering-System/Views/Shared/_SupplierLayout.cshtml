@@ -63,12 +63,14 @@ SupplierId on the server (UI hiding is not authorization).
         <nav aria-label="Supplier footer navigation"><a asp-area="" asp-controller="Home" asp-action="About">About</a><span aria-disabled="true" title="Terms of use have not been supplied">Terms of Use</span><a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy Policy</a><a asp-area="" asp-controller="Home" asp-action="Contact">Contact Us</a></nav>
         <small>© @DateTime.UtcNow.Year Sourcing &amp; Tender Management System.</small>
     </footer>
+    <partial name="_AiChatWidget" />
     <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
     <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
     <script src="~/js/vendor/signalr.min.js" asp-append-version="true"></script>
     <script src="~/js/notification-bell.js" asp-append-version="true"></script>
     <partial name="_JQueryScripts" />
     <script src="~/js/orange-ui.js" asp-append-version="true"></script>
+    <script src="~/js/ai-chat.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

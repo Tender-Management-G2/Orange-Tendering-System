@@ -23,6 +23,7 @@ using System.Security.Claims;
 
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
+if (args.Contains("--final-decision-checks")) { await FinalDecisionChecks.Run(); return; }
 
 var connection = Environment.GetEnvironmentVariable("AUTH_TEST_CONNECTION")
     ?? throw new InvalidOperationException("Set AUTH_TEST_CONNECTION to a migrated, isolated test database.");
@@ -108,7 +109,7 @@ foreach (var field in new Dictionary<string, string>
 {
     ["Input.FullName"] = "Test Contact", ["Input.Email"] = supplierEmail,
     ["Input.Password"] = supplierPassword, ["Input.ConfirmPassword"] = supplierPassword,
-    ["Input.CompanyName"] = "Test Supplier " + suffix,
+    ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
     ["Input.RegistrationNumber"] = "CR-" + suffix,
     ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
     ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
@@ -514,7 +515,7 @@ static MultipartFormDataContent RegistrationContent(string email, string passwor
     {
         ["Input.FullName"] = "Test Contact", ["Input.Email"] = email,
         ["Input.Password"] = password, ["Input.ConfirmPassword"] = password,
-        ["Input.CompanyName"] = "Test Supplier " + suffix,
+        ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
         ["Input.RegistrationNumber"] = "CR-" + suffix,
         ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
         ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",

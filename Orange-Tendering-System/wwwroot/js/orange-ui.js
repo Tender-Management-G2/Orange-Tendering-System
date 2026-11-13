@@ -86,7 +86,7 @@
   }
 
   /* ---------- Popup-first modals and drawers ---------- */
-  const ACTION = /\/(Create|Edit|Details|Review|Approve|Reject|Return|Forward|Upload|Sign|Confirm|Respond|Submit|Decide|Delete|Remove|Add|New|Compliance|Compare)(\/|\?|$)/i;
+  const ACTION = /\/(Create|Edit|Details|Review|Approve|Reject|Return|Forward|Upload|Sign|Confirm|Respond|Submit|Decide|Delete|Remove|Add|New|Compliance|Compare|Acknowledge)(\/|\?|$)/i;
   const DRAWER = /\/(Details|Review|Compare|Compliance)(\/|\?|$)/i;
   const COMPLEX = /\/(Workflow|Identity|Biometrics|Notifications|Tasks)(\/|\?|$)/i;
   const dialog = el('dialog', 'ui-dialog');
@@ -167,6 +167,17 @@
     if (!explicit && (!ACTION.test(url.pathname + url.search) || COMPLEX.test(url.pathname) || !a.closest('main'))) return;
     ev.preventDefault(); opener = a;
     open(url.href, a.dataset.modalTitle || a.textContent.trim(), explicit ? a.dataset.modal === 'drawer' : DRAWER.test(url.pathname));
+  });
+
+  /* ---------- Confirm before irreversible actions (button[data-confirm]) ---------- */
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-confirm]');
+    if (!b || b.dataset.confirmed) return;
+    ev.preventDefault();
+    const d = el('dialog', 'ui-dialog'); d.innerHTML = '<div class="ui-dialog-head"><h2>Please confirm</h2></div><div class="ui-dialog-body"><p class="ui-confirm-text"></p><div class="pg-actions"><button type="button" class="pg-btn pg-btn-primary" data-ok>Confirm</button><button type="button" class="pg-btn" data-no>Cancel</button></div></div>';
+    $('.ui-confirm-text', d).textContent = b.dataset.confirm; body.append(d); d.showModal();
+    $('[data-no]', d).addEventListener('click', () => { d.close(); d.remove(); });
+    $('[data-ok]', d).addEventListener('click', () => { d.close(); d.remove(); b.dataset.confirmed = '1'; b.click(); });
   });
 
   /* ---------- Table kit ---------- */

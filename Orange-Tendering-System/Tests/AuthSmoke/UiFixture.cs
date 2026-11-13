@@ -27,6 +27,7 @@ public static class UiFixture
         string Pw() => "Ui!9" + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12));
         var adminEmail = $"admin-{suffix}@example.test"; var adminPw = Pw();
         Environment.SetEnvironmentVariable("ConnectionStrings__Default Connection", connection);
+        Environment.SetEnvironmentVariable("DemoData__Enabled", "false");
         Environment.SetEnvironmentVariable("BootstrapAdmin__Email", adminEmail);
         Environment.SetEnvironmentVariable("BootstrapAdmin__Password", adminPw);
 
@@ -96,13 +97,20 @@ public static class UiFixture
         TenderInvitation Inv(TenderRound r, Supplier s, InvitationStatus st) => new() { TenderRoundId = r.Id, SupplierId = s.Id, Status = st, InvitedByUserId = officer.Id, InvitedAt = r.OpensAt!.Value, RespondedAt = st == InvitationStatus.Pending ? null : r.OpensAt!.Value.AddDays(1) };
         var i11 = Inv(r1, s1, InvitationStatus.Pending); var i12 = Inv(r1, s2, InvitationStatus.Accepted);
         var i21 = Inv(r2, s1, InvitationStatus.Accepted); var i22 = Inv(r2, s2, InvitationStatus.Accepted);
-        var i31 = Inv(r3, s1, InvitationStatus.Accepted);
-        db.TenderInvitations.AddRange(i11, i12, i21, i22, i31); await db.SaveChangesAsync();
+        var i31 = Inv(r3, s1, InvitationStatus.Accepted); var i32 = Inv(r3, s2, InvitationStatus.Accepted);
+        var t4 = Tender(pr1, TenderStatus.Awarded, 40, 9000); t4.Title = "Printer Consumables"; db.Tenders.Add(t4); await db.SaveChangesAsync();
+        var r4 = Round(t4, TenderRoundStatus.Closed, now.AddDays(-38), now.AddDays(-30)); db.TenderRounds.Add(r4); await db.SaveChangesAsync();
+        var i41 = Inv(r4, s1, InvitationStatus.Accepted); var i42 = Inv(r4, s2, InvitationStatus.Accepted);
+        db.TenderInvitations.AddRange(i11, i12, i21, i22, i31, i32, i41, i42); await db.SaveChangesAsync();
         Bid B(TenderInvitation i, BidStatus st, int delivery, int daysAgo) => new() { TenderInvitationId = i.Id, Status = st, TechnicalProposal = "Full technical proposal.", DeliveryDays = delivery, PaymentTerms = "30 days", ValidUntil = now.AddDays(60), CreatedAt = now.AddDays(-daysAgo - 1), SubmittedAt = st == BidStatus.Submitted ? now.AddDays(-daysAgo) : null };
         var b12 = B(i12, BidStatus.Submitted, 21, 7); var b21 = B(i21, BidStatus.Submitted, 14, 38); var b22 = B(i22, BidStatus.Submitted, 30, 37); var b31 = B(i31, BidStatus.Submitted, 10, 95);
-        db.Bids.AddRange(b12, b21, b22, b31); await db.SaveChangesAsync();
+        var b32 = B(i32, BidStatus.Submitted, 25, 94); var b41 = B(i41, BidStatus.Submitted, 8, 36); var b42 = B(i42, BidStatus.Submitted, 9, 35);
+        db.Bids.AddRange(b12, b21, b22, b31, b32, b41, b42); await db.SaveChangesAsync();
+        t4.AwardedBidId = b41.Id; t4.AwardedAt = now.AddDays(-20); t4.AwardedByUserId = officer.Id; t4.ClosedAt = now.AddDays(-20);
         t3.AwardedBidId = b31.Id; t3.AwardedAt = now.AddDays(-50); t3.AwardedByUserId = top.Id; t3.ClosedAt = now.AddDays(-50);
         db.CommitteeMembers.Add(new CommitteeMember { TenderId = t2.Id, CommitteeType = CommitteeType.Evaluation, Responsibility = CommitteeResponsibility.TechnicalRepresentative, UserId = evaluator.Id, AssignedAt = now.AddDays(-20) });
+        foreach (var tender in new[] { t3, t4 })
+            db.CommitteeMembers.Add(new CommitteeMember { TenderId = tender.Id, CommitteeType = CommitteeType.Evaluation, Responsibility = CommitteeResponsibility.SourcingManager, UserId = manager.Id, AssignedAt = now.AddDays(-70) });
         db.Clarifications.Add(new Clarification { TenderId = t1.Id, FromUserId = sup2.Id, ToUserId = officer.Id, Subject = "Question about delivery site", Status = ClarificationStatus.Open, CreatedAt = now.AddHours(-5) });
 
         Notification N(ApplicationUser u, string title, string message, string link, bool read, int minutesAgo) => new() { UserId = u.Id, Title = title, Message = message, Link = link, IsRead = read, CreatedAt = now.AddMinutes(-minutesAgo) };
@@ -124,7 +132,16 @@ public static class UiFixture
             new AuditLog { UserId = requester.Id, Action = "RequestSubmitted", EntityName = "PurchaseRequest", EntityId = pr3.Id.ToString(), CreatedAt = now.AddDays(-3) });
         await db.SaveChangesAsync();
 
-        await File.WriteAllTextAsync(statePath, new JsonObject { ["connection"] = connection, ["accounts"] = accounts, ["tenderId"] = t1.Id }.ToJsonString());
+        // Final-decision relay: t3 has just collected 3 of 4 Top approvals (created through the real service code path, awaiting the Manager);
+        // t4 is already forwarded by the Manager (reserved for the e-mail delivery checks).
+        var workflow = scope.ServiceProvider.GetRequiredService<Orange_Tendering_System.Services.TenderWorkflowService>();
+        var record = typeof(Orange_Tendering_System.Services.TenderWorkflowService).GetMethod("RecordFinalDecision", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        await (Task)record.Invoke(workflow, [t3, new EvaluationSession(), 3, 4, false])!;
+        db.Set<FinalDecisionNotice>().Add(new FinalDecisionNotice { TenderId = t4.Id, TopApprovals = 4, TopVotes = 4, CreatedAt = now.AddDays(-21), ManagerUserId = manager.Id,
+            Status = FinalDecisionStatus.ForwardedToOfficer, ManagerAcknowledgedAt = now.AddDays(-20), ManagerComment = "Reviewed" });
+        await db.SaveChangesAsync();
+
+        await File.WriteAllTextAsync(statePath, new JsonObject { ["connection"] = connection, ["accounts"] = accounts, ["tenderId"] = t1.Id, ["finalTenderId"] = t3.Id, ["emailTenderId"] = t4.Id }.ToJsonString());
         Console.WriteLine("UI fixture ready: " + accounts.Count + " accounts, 3 tenders, 5 requests, 2 suppliers + 1 pending.");
     }
 }
