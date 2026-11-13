@@ -1,34 +1,212 @@
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services;
-namespace Orange_Tendering_System.Areas.Admin.Controllers;
-[Area("Admin"),Authorize(Roles=SystemRoles.Admin),AutoValidateAntiforgeryToken]
-public class UsersController(ApplicationDbContext db,UserManager<ApplicationUser> users,EmployeeProvisioning provision):Controller
+using Orange_Tendering_System.ViewModels;
+
+namespace Orange_Tendering_System.Areas.Admin.Controllers
 {
- public async Task<IActionResult> Index()=>View(await db.Users.AsNoTracking().OrderBy(u=>u.Email).ToListAsync());
- private async Task Departments(){ViewBag.Departments=await db.Departments.Where(d=>d.IsActive).ToListAsync();}
- public async Task<IActionResult> Create(){await Departments();return View();}
- [HttpPost] public async Task<IActionResult> Create(string fullName,string email,int departmentId,string role)
- {
-  if(ModelState.IsValid) try { var result=await provision.CreateAsync(HttpContext,fullName,email,departmentId,[role]);if(result.Succeeded)return RedirectToAction(nameof(Index));foreach(var e in result.Errors)ModelState.AddModelError("",e.Description); }
-  catch(Exception e) when(e is System.Net.Mail.SmtpException or InvalidOperationException){ModelState.AddModelError("","Account was not created: secure activation email delivery is unavailable. Configure SMTP and retry.");}
-  await Departments();return View();
- }
- public async Task<IActionResult> Details(string id){var user=await users.FindByIdAsync(id);return user==null?NotFound():View(user);}
- public Task<IActionResult> Edit(string id)=>Details(id);
- [HttpPost] public async Task<IActionResult> SetActive(string id,bool active)
- {
-  if(!ModelState.IsValid)return BadRequest("Invalid account state.");
-  var user=await users.FindByIdAsync(id);if(user==null)return NotFound();
-  if(!active && user.Id==users.GetUserId(User))return BadRequest("You cannot deactivate your own administrator account.");
-  await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-  user.IsActive=active;var result=await users.UpdateAsync(user);if(!result.Succeeded)return BadRequest("Account state update failed.");
-  await users.UpdateSecurityStampAsync(user);db.AuditLogs.Add(new AuditLog{UserId=users.GetUserId(User),EntityName="ApplicationUser",EntityId=id,Action=active?"UserActivated":"UserDeactivated",CreatedAt=DateTime.UtcNow});
-  await db.SaveChangesAsync();await tx.CommitAsync();return RedirectToAction(nameof(Details),new{id});
- }
+    [Area("Admin")]
+    [Authorize(Roles = SystemRoles.Admin)]
+    public class UsersController : Controller
+    {
+        private readonly AdminService _adminService;
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public UsersController(
+            AdminService adminService,
+            UserManager<ApplicationUser> userManager)
+        {
+            _adminService = adminService;
+            _userManager = userManager;
+        }
+
+        // GET: /Admin/Users
+        [HttpGet]
+        public async Task<IActionResult> Index()
+        {
+            var users = await _adminService.GetUsersAsync();
+            return View(users);
+        }
+
+        // GET: /Admin/Users/Create
+        [HttpGet]
+        public async Task<IActionResult> Create()
+        {
+            var model = new CreateUserViewModel();
+
+            await _adminService.FillCreateUserOptionsAsync(model);
+
+            return View(model);
+        }
+
+        // POST: /Admin/Users/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(
+            CreateUserViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                await _adminService.FillCreateUserOptionsAsync(model);
+                return View(model);
+            }
+
+            var adminId = _userManager.GetUserId(User);
+
+            if (string.IsNullOrEmpty(adminId))
+            {
+                return Challenge();
+            }
+
+            var result = await _adminService.CreateUserAsync(
+                model, adminId);
+
+            if (!result.Succeeded)
+            {
+                foreach (var error in result.Errors)
+                {
+                    ModelState.AddModelError(
+                        string.Empty,
+                        error.Description);
+                }
+
+                await _adminService.FillCreateUserOptionsAsync(model);
+                return View(model);
+            }
+
+            TempData["SuccessMessage"] =
+                "User created successfully. Account confirmation is required.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+
+        // GET: /Admin/Users/Edit/{id}
+        [HttpGet]
+        public async Task<IActionResult> Edit(string? id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return NotFound();
+
+            var model = await _adminService.GetUserForEditAsync(id);
+
+            if (model == null)
+                return NotFound();
+
+            return View(model);
+        }
+
+        // POST: /Admin/Users/Edit/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(
+            string id,
+            EditUserViewModel model)
+        {
+            if (id != model.Id)
+                return BadRequest();
+
+            if (!ModelState.IsValid)
+            {
+                var original = await _adminService
+                    .GetUserForEditAsync(id);
+
+                if (original == null)
+                    return NotFound();
+
+                model.Departments = original.Departments;
+                model.CurrentRoles = original.CurrentRoles;
+                model.Email = original.Email;
+
+                return View(model);
+            }
+
+            var adminId = _userManager.GetUserId(User);
+
+            if (string.IsNullOrEmpty(adminId))
+                return Challenge();
+
+            var result = await _adminService.UpdateUserAsync(
+                model, adminId);
+
+            if (result == "NotFound")
+                return NotFound();
+
+            if (result != "Success")
+            {
+                var messages = new Dictionary<string, string>
+                {
+                    ["SupplierAccount"] =
+                        "Supplier accounts must be managed through Supplier Verification.",
+
+                    ["InvalidName"] =
+                        "Full name must contain 2 to 150 characters.",
+
+                    ["InvalidDepartment"] =
+                        "Please select an active department.",
+
+                    ["DepartmentRequired"] =
+                        "A department is required for this role.",
+
+                    ["SelfDeactivate"] =
+                        "You cannot deactivate your own account.",
+
+                    ["LastAdmin"] =
+                        "You cannot deactivate the last active Admin.",
+
+                    ["UpdateFailed"] =
+                        "Unable to update the account."
+                };
+
+                ModelState.AddModelError(
+                    "",
+                    messages.TryGetValue(result, out var message)
+                        ? message
+                        : "Unable to update the account.");
+
+                var original = await _adminService
+                    .GetUserForEditAsync(id);
+
+                if (original == null)
+                    return NotFound();
+
+                model.Departments = original.Departments;
+                model.CurrentRoles = original.CurrentRoles;
+                model.Email = original.Email;
+
+                return View(model);
+            }
+
+            TempData["SuccessMessage"] =
+                "User updated successfully.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+
+
+        [HttpGet]
+        public async Task<IActionResult> Details(string? id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return NotFound();
+            }
+
+            var user = await _adminService.GetUserDetailsAsync(id);
+
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            return View(user);
+        }
+
+    }
+
 }

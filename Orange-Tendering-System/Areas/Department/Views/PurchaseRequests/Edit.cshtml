@@ -1,117 +1,13 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Edit & Resubmit Purchase Request
-
-DEVELOPER OWNER: Doulat
-MODULE: Department / Purchase Requests
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Edit a Draft request, or correct a Returned request and
-resubmit it, while every earlier submitted snapshot stays
-readable.
-
-BUSINESS ACCESS:
-Requesting Department (original owner / own department; only
-Draft or Returned requests)
-
-ROUTE: /Department/PurchaseRequests/Edit/{id?}
-
-FUTURE IMPLEMENTATION:
-- GET: load the request only if it belongs to the user’s
-  department and Status is Draft or Returned; otherwise
-  NotFound/Forbid.
-- POST Save: update the current request and its items (the
-  request row is the working copy).
-- POST Resubmit: Status = Submitted and a NEW
-  PurchaseRequestReview with SubmissionNumber + 1 and a
-  fresh SubmittedSnapshotJson; never modify earlier review
-  rows.
-- Notify the Sourcing Officer; audit.
-
-DEPENDENCIES:
-PurchaseRequests, PurchaseRequestItems,
-PurchaseRequestReviews (SubmittedSnapshotJson), Documents,
-Notifications, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-No dedicated Trello card; part of Doulat’s Department
-request module (spec §15.2 / §18.9). A sender edits only
-after a return (owner rule).
-===========================================================
-*@
+@model RequestForm
 @{
     ViewData["Title"] = "Edit & Resubmit Purchase Request";
     ViewData["WorkspaceSection"] = "My Requests";
-    ViewData["Description"] = "Correct a draft, or a request the Sourcing Officer returned, and submit it again. Earlier submissions stay unchanged.";
+    ViewData["Description"] = "Save corrections or resubmit directly to the Sourcing Officer. Previous submissions stay unchanged.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<aside class="pg-note"><strong>Why this request was returned</strong><p>The Sourcing Officer’s return reason and date from the latest PurchaseRequestReview are shown here. Only Draft and Returned requests can be edited; Submitted, Accepted and Rejected requests are read-only.</p></aside>
-
-<section class="ws-panel pg-panel">
-    <h2>Request</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-title-1">Title</label><input id="f-title-1" type="text" /></div>
-                <div class="pg-field pg-field-wide"><label for="f-justification-2">Justification</label><textarea id="f-justification-2" rows="4"></textarea></div>
-                <div class="pg-field"><label for="f-priority-3">Priority</label><select id="f-priority-3"><option>Normal</option><option>Low</option><option>High</option><option>Urgent</option></select></div>
-                <div class="pg-field"><label for="f-needed-by-4">Needed by</label><input id="f-needed-by-4" type="date" /></div>
-            </div>
-        </fieldset>
-    </form>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-requested-items-editable">
-    <div class="pg-panel-head"><h2 id="tbl-requested-items-editable">Requested items (editable)</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Item / service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"Items of this request are not loaded."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Attachments</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-add-supporting-documents-5">Add supporting documents</label><input id="f-add-supporting-documents-5" type="file" /><small class="pg-hint">Earlier attachments stay linked to the request.</small></div>
-            </div>
-        </fieldset>
-    </form>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-previous-submissions-read-only">
-    <div class="pg-panel-head"><h2 id="tbl-previous-submissions-read-only">Previous submissions (read-only)</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Submission #</th><th scope="col">Submitted</th><th scope="col">Items / quantities at that time</th><th scope="col">Officer decision</th><th scope="col">Comment</th></tr></thead>
-            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No earlier submissions loaded."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Resubmit</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Resubmit to Sourcing Officer</button><button type="button" class="pg-btn">Save changes as draft</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="Department" asp-controller="PurchaseRequests" asp-action="Details">Request details &amp; history</a></li>
-        <li><a asp-area="Department" asp-controller="PurchaseRequests" asp-action="Index">Back to my requests</a></li>
-    </ul>
-</nav>
+<nav class="pg-links"><ul><li><a asp-action="Details" asp-route-id="@Model.Id">View earlier submissions & Officer review history</a></li></ul></nav>
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form department-form">
+    <partial name="_RequestForm" model="Model" />
+</form>
+@section Styles { <style>.department-form{display:grid;gap:20px}.department-form [role=alert],.department-form .field-validation-error{color:#b43e24}.department-form [role=alert]:empty{display:none}.department-form .pg-table input{min-width:110px}</style> }
+@section Scripts { <partial name="_FormScripts" /> }

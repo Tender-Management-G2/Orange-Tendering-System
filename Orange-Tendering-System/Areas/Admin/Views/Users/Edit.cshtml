@@ -1,2 +1,197 @@
-@model Orange_Tendering_System.Models.Entities.ApplicationUser
-<partial name="Details" model="Model" />
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Edit User
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: User Management
+TRELLO URL: https://trello.com/c/UYxdWeUv
+
+PURPOSE:
+Edit an existing account’s name, department, roles and
+active status.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Users/Edit/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the user by id; return NotFound when missing.
+- POST Edit: update fields, add/remove roles, keep at least
+  one active Admin.
+- Audit role and status changes.
+
+DEPENDENCIES:
+AspNetUsers, AspNetUserRoles, Departments, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+===========================================================
+*@
+
+@model EditUserViewModel
+
+@{
+    ViewData["Title"] = "Edit User";
+    ViewData["WorkspaceSection"] = "Users";
+    ViewData["Description"] =
+        "Update account information and active status.";
+}
+
+<partial name="_PageHeader" />
+
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <h2>Edit Account</h2>
+    </div>
+
+    <form asp-area="Admin"
+          asp-controller="Users"
+          asp-action="Edit"
+          asp-route-id="@Model.Id"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" asp-for="Id" />
+
+        <div asp-validation-summary="All"
+             class="text-danger"></div>
+
+        <div class="pg-form-grid">
+
+            <!-- Full Name -->
+            <div class="pg-field">
+                <label asp-for="FullName">Full Name</label>
+
+                <input asp-for="FullName"
+                       class="form-control"
+                       maxlength="150" />
+
+                <span asp-validation-for="FullName"
+                      class="text-danger"></span>
+            </div>
+
+            <!-- Email: Display only -->
+            <div class="pg-field">
+                <label>Email</label>
+
+                <input type="email"
+                       value="@Model.Email"
+                       class="form-control"
+                       readonly />
+
+                <small class="pg-hint">
+                    Email changes are handled through
+                    the account verification process.
+                </small>
+            </div>
+
+            <!-- Department -->
+            <div class="pg-field">
+                <label asp-for="DepartmentId">Department</label>
+
+                <select asp-for="DepartmentId"
+                        asp-items="Model.Departments"
+                        class="form-control">
+
+                    <option value="">Select Department</option>
+
+                </select>
+
+                <span asp-validation-for="DepartmentId"
+                      class="text-danger"></span>
+            </div>
+
+            <!-- Current Roles -->
+            <div class="pg-field">
+                <label>Current Role(s)</label>
+
+                <input type="text"
+                       value="@Model.CurrentRoles"
+                       class="form-control"
+                       readonly />
+
+                <small class="pg-hint">
+                    Roles are managed separately in
+                    the Roles Management page.
+                </small>
+            </div>
+
+            <!-- Account Status -->
+            <div class="pg-field">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Account
+                </label>
+
+                <small class="pg-hint">
+                    Deactivating an account should
+                    prevent further access to the system.
+                </small>
+            </div>
+
+        </div>
+
+        <!-- Actions -->
+        <div class="pg-actions">
+
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Save Changes
+            </button>
+
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index"
+               class="pg-btn">
+                Cancel
+            </a>
+
+        </div>
+
+    </form>
+
+</section>
+
+<!-- Information -->
+<aside class="pg-note">
+    <strong>Deactivate, do not delete</strong>
+
+    <p>
+        Accounts linked to purchase requests,
+        tenders, bids, evaluations or decisions
+        should remain in the database.
+        Deactivate them to preserve history.
+    </p>
+</aside>
+
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Details"
+               asp-route-id="@Model.Id">
+                User Details
+            </a>
+        </li>
+
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index">
+                Back to Users
+            </a>
+        </li>
+    </ul>
+</nav>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

@@ -29,26 +29,98 @@ STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 ===========================================================
 *@
+
+@model List<DepartmentListViewModel>
+
 @{
     ViewData["Title"] = "Department Management";
     ViewData["WorkspaceSection"] = "Departments";
-    ViewData["Description"] = "Organization departments that create purchase requests.";
+    ViewData["Description"] = "Manage organization departments and their activity.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search departments" aria-label="Search departments" disabled />
-    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Active</option><option>Status: Inactive</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
+<section class="ws-panel pg-panel">
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-departments">
-    <div class="pg-panel-head"><h2 id="tbl-departments">Departments</h2><a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Departments" asp-action="Create">Add department</a></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Name</th><th scope="col">Description</th><th scope="col">Employees</th><th scope="col">Purchase requests</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No departments are loaded yet."' /></td></tr></tbody>
-        </table>
+    <div class="pg-panel-head">
+        <h2>Departments</h2>
+
+        <a class="pg-btn pg-btn-primary"
+           asp-area="Admin"
+           asp-controller="Departments"
+           asp-action="Create">
+            Add Department
+        </a>
     </div>
+
+    <div class="pg-table-wrap">
+
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Employees</th>
+                    <th>Purchase Requests</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            No departments found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var department in Model)
+                    {
+                        <tr>
+                            <td>@department.Name</td>
+
+                            <td>@department.Description</td>
+
+                            <td>@department.EmployeeCount</td>
+
+                            <td>@department.PurchaseRequestCount</td>
+
+                            <td>
+                                @if (department.IsActive)
+                                {
+                                    <span class="pg-status">
+                                        Active
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="pg-status">
+                                        Inactive
+                                    </span>
+                                }
+                            </td>
+
+                            <td>
+                                <a class="pg-btn"
+                                   asp-area="Admin"
+                                   asp-controller="Departments"
+                                   asp-action="Edit"
+                                   asp-route-id="@department.Id">
+                                    Edit
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
+        </table>
+
+    </div>
+
 </section>

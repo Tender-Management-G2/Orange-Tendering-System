@@ -1,60 +1,26 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Tendering / Retendering Rounds
-
-DEVELOPER OWNER: Amal
-MODULE: Sourcing Officer / Tender Management
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Show all tendering rounds of a tender and start a new round
-when too few offers were received.
-
-BUSINESS ACCESS:
-Sourcing Officer
-
-ROUTE: /SourcingOfficer/Tenders/Rounds/{id?}
-
-FUTURE IMPLEMENTATION:
-- List TenderRounds for the tender with invitation and
-  distinct-supplier offer counts.
-- POST New round: mark the current round Failed, create the
-  next RoundNumber.
-- Business rule service: minimum offers per round (3, or 2
-  after the allowed failed attempts) — finalize the counting
-  convention in code, not in the schema.
-
-DEPENDENCIES:
-Tenders, TenderRounds, TenderInvitations, Bids.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-No dedicated Trello card: listed under Amal’s Tender
-Management module — confirm ownership with the team.
-===========================================================
-*@
+@model Orange_Tendering_System.ViewModels.TenderRoundsViewModel
 @{
-    ViewData["Title"] = "Tendering / Retendering Rounds";
-    ViewData["WorkspaceSection"] = "Tender Rounds";
-    ViewData["Description"] = "Every tendering attempt of a tender, its invitations and the offers it received.";
+    ViewData["Title"] = "Tender rounds";
+    ViewData["WorkspaceSection"] = "Tenders";
+    ViewData["Description"] = Model.TenderTitle;
 }
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-tendering-rounds">
-    <div class="pg-panel-head"><h2 id="tbl-tendering-rounds">Tendering rounds</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Round #</th><th scope="col">Status</th><th scope="col">Opens</th><th scope="col">Deadline</th><th scope="col">Invited</th><th scope="col">Submitted offers</th><th scope="col">Distinct suppliers</th><th scope="col">Outcome</th></tr></thead>
-            <tbody><tr><td colspan="8"><partial name="_EmptyState" model='"Select a tender to see its rounds."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<aside class="pg-note"><strong>Retendering rule</strong><p>Normally 3 submitted offers from 3 different suppliers are needed in the current round. With fewer, close the round as failed, start a NEW round and select/invite suppliers again from scratch. Earlier rounds and their offers stay recorded and are never counted in the new round. After three unsuccessful tendering attempts the approved exception permits proceeding with at least 2 offers from 2 distinct suppliers — a permission, not automatic advancement. Whether the initial round counts among the three is still to be confirmed (spec §21).</p></aside>
-
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Start a new tendering round", "Open the next attempt for this tender.", "Creates TenderRound N+1 with no invitations. Previous rounds and their offers stay unchanged.", false, false)' />
+<div class="so-page"><partial name="_PageHeader" />
+@if (TempData["RoundError"] is string error) { <p class="pg-note" role="alert">@error</p> }
+@if (TempData["RoundStarted"] is string message) { <p class="pg-note" role="status">@message</p> }
+<section class="ws-panel pg-panel"><h2>Offer rule</h2><p>Normally, send at least <strong>3 compliant offers from 3 suppliers</strong> to the Evaluation Committee. Starting with the third attempt—after <strong>2 previous failed attempts</strong>—you can proceed with <strong>2 compliant suppliers</strong>. Offers must come from the current round only.</p></section>
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>Attempts for this tender</h2><span class="pg-hint">A failed attempt is recorded when you start a new round after an expired round with fewer than 3 submitted offers.</span></div><a class="pg-btn" asp-action="Details" asp-route-id="@Model.TenderId">Back to tender</a></div>
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Round</th><th>Status</th><th>Invited</th><th>Submitted offers</th><th>Distinct suppliers</th><th>Deadline</th></tr></thead><tbody>
+@foreach (var round in Model.Rounds)
+{
+    <tr><td>Round @round.RoundNumber</td><td>@round.Status</td><td>@round.Invitations</td><td>@round.SubmittedOffers</td><td>@round.DistinctSuppliers</td><td>@(round.Deadline?.ToLocalTime().ToString("d MMM yyyy h:mm tt") ?? "—")</td></tr>
+}
+@if (Model.Rounds.Count == 0) { <tr><td colspan="6">No tendering attempts are available.</td></tr> }
+</tbody></table></div></section>
+<section class="ws-panel pg-panel"><h2>Start another supplier attempt</h2>
+@if (Model.CanStartNextRound)
+{
+    <p>The previous round received fewer than 3 submitted offers and has expired. Starting a new round keeps the old invitations and offers in the history.</p>
+    <form asp-action="StartNextRound" method="post"><input type="hidden" name="tenderId" value="@Model.TenderId" /><button class="pg-btn pg-btn-primary" type="submit">Start next round</button></form>
+}
+else { <p>@Model.NextRoundMessage</p> }
+</section></div>

@@ -46,6 +46,83 @@ public class TendersController(ApplicationDbContext db) : Controller
         return tender == null ? NotFound() : View(tender);
     }
 
+    public async Task<IActionResult> Rounds(int id)
+    {
+        var tender = await db.Tenders.AsNoTracking()
+            .Include(t => t.Rounds).ThenInclude(r => r.Invitations).ThenInclude(i => i.Bids)
+            .SingleOrDefaultAsync(t => t.Id == id);
+        if (tender == null) return NotFound();
+
+        var orderedRounds = tender.Rounds.OrderBy(r => r.RoundNumber).ToList();
+        var latest = orderedRounds.LastOrDefault();
+        var latestSuppliers = latest?.Invitations.Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted))
+            .Select(i => i.SupplierId).Distinct().Count() ?? 0;
+        var canStart = latest != null && latest.Invitations.Count > 0 && latestSuppliers < 3
+            && latest.Status is TenderRoundStatus.Open or TenderRoundStatus.Failed or TenderRoundStatus.Closed
+            && (latest.Status is TenderRoundStatus.Failed or TenderRoundStatus.Closed
+                || (latest.Deadline.HasValue && latest.Deadline.Value <= DateTime.UtcNow));
+
+        var model = new TenderRoundsViewModel
+        {
+            TenderId = tender.Id,
+            TenderTitle = tender.Title,
+            CanStartNextRound = canStart,
+            NextRoundMessage = canStart ? null : latest == null
+                ? "This tender has no rounds yet."
+                : latest.Invitations.Count == 0
+                    ? "Invite suppliers in the current round before starting another attempt."
+                    : latestSuppliers >= 3
+                        ? "This round received at least three supplier offers; continue to the committee review."
+                        : latest.Deadline > DateTime.UtcNow && latest.Status == TenderRoundStatus.Open
+                            ? "Wait until the current bidding deadline before starting another attempt."
+                            : "Only a failed or expired round can be retried." ,
+            Rounds = orderedRounds.Select(r =>
+            {
+                var submitted = r.Invitations.SelectMany(i => i.Bids).Where(b => b.Status == BidStatus.Submitted).ToList();
+                var suppliers = r.Invitations.Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted))
+                    .Select(i => i.SupplierId).Distinct().Count();
+                return new TenderRoundRowViewModel(r.Id, r.RoundNumber, r.Status, r.OpensAt, r.Deadline,
+                    r.Invitations.Count, submitted.Count, suppliers);
+            }).ToList()
+        };
+        return View(model);
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> StartNextRound(int tenderId)
+    {
+        var tender = await db.Tenders.Include(t => t.Rounds).ThenInclude(r => r.Invitations).ThenInclude(i => i.Bids)
+            .SingleOrDefaultAsync(t => t.Id == tenderId);
+        if (tender == null) return NotFound();
+        var latest = tender.Rounds.OrderByDescending(r => r.RoundNumber).FirstOrDefault();
+        if (latest == null || latest.Invitations.Count == 0) return BadRequest();
+        var distinctSuppliers = latest.Invitations.Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted))
+            .Select(i => i.SupplierId).Distinct().Count();
+        var roundExpired = latest.Status is TenderRoundStatus.Failed or TenderRoundStatus.Closed
+            || (latest.Status == TenderRoundStatus.Open && latest.Deadline.HasValue && latest.Deadline.Value <= DateTime.UtcNow);
+        if (!roundExpired || distinctSuppliers >= 3 || tender.Status != TenderStatus.Bidding)
+        {
+            TempData["RoundError"] = "A new round can start only after an expired/failed attempt that received fewer than three supplier offers.";
+            return RedirectToAction(nameof(Rounds), new { id = tenderId });
+        }
+
+        var now = DateTime.UtcNow;
+        latest.Status = TenderRoundStatus.Failed;
+        latest.ClosedAt = now;
+        tender.Rounds.Add(new TenderRound
+        {
+            RoundNumber = latest.RoundNumber + 1,
+            Status = TenderRoundStatus.Open,
+            OpensAt = now,
+            Deadline = now.AddDays(7),
+            CreatedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value,
+            CreatedAt = now
+        });
+        await db.SaveChangesAsync();
+        TempData["RoundStarted"] = $"Round {latest.RoundNumber + 1} is open. Choose suppliers to invite.";
+        return RedirectToAction(nameof(Rounds), new { id = tenderId });
+    }
+
     public async Task<IActionResult> SelectSuppliers(int id, string? category = null)
     {
         return await SelectSuppliersView(id, category);
@@ -95,11 +172,14 @@ public class TendersController(ApplicationDbContext db) : Controller
             return RedirectToAction(nameof(SelectSuppliers), new { id = roundId, category });
         }
         var now = DateTime.UtcNow;
-        round.Invitations.Add(new TenderInvitation { SupplierId = supplier.Id, InvitedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value, InvitedAt = now });
+        var invitation = new TenderInvitation { SupplierId = supplier.Id, InvitedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value, InvitedAt = now };
+        round.Invitations.Add(invitation);
+        round.Status = TenderRoundStatus.Open; round.Tender.Status = TenderStatus.Bidding;
+        await db.SaveChangesAsync();
         var accounts = await db.Users.Where(u => u.IsActive && u.SupplierId == supplier.Id).ToListAsync();
         foreach (var user in accounts)
-            db.Notifications.Add(new Notification { UserId = user.Id, Title = "Tender invitation", Message = $"You are invited to submit an offer for {round.Tender.Title}.", Link = "/Supplier/Invitations", CreatedAt = now });
-        round.Status = TenderRoundStatus.Open; round.Tender.Status = TenderStatus.Bidding; await db.SaveChangesAsync();
+            db.Notifications.Add(new Notification { UserId = user.Id, Title = "Tender invitation", Message = $"You are invited to submit an offer for {round.Tender.Title}.", Link = $"/Supplier/Invitations/Details/{invitation.Id}", CreatedAt = now });
+        await db.SaveChangesAsync();
         TempData["SupplierInviteMessage"] = $"Invitation sent to {supplier.CompanyName}.";
         return RedirectToAction(nameof(SelectSuppliers), new { id = roundId, category });
     }
