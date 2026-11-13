@@ -56,13 +56,7 @@ public class BiometricResult
 
 public class PasskeyRegisterRequest
 {
-    public string Token { get; set; } = string.Empty;
-
-    /// <summary>Credential id (base64url).</summary>
-    public string Id { get; set; } = string.Empty;
-
-    public string ClientDataJson { get; set; } = string.Empty;
-    public string AttestationObject { get; set; } = string.Empty;
+    public string? CredentialJson { get; set; }
     public string? Label { get; set; }
 }
 
@@ -74,12 +68,7 @@ public class EnrollStartRequest
 
 public class PasskeyLoginRequest
 {
-    public string Token { get; set; } = string.Empty;
-    public string Id { get; set; } = string.Empty;
-    public string ClientDataJson { get; set; } = string.Empty;
-    public string AuthenticatorData { get; set; } = string.Empty;
-    public string Signature { get; set; } = string.Empty;
-    public string? UserHandle { get; set; }
+    public string? CredentialJson { get; set; }
     public string? ReturnUrl { get; set; }
 }
 
@@ -145,7 +134,7 @@ public class BiometricManageViewModel
 
 public class PasskeyRow
 {
-    public long Id { get; set; }
+    public string Id { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }

@@ -1,7 +1,7 @@
 @model Orange_Tendering_System.Models.Biometric.FaceDemoViewModel
 @*
     DEVELOPMENT-ONLY face recognition test bench (Controllers/FaceDemoController.cs, wwwroot/js/biometric.js).
-    Uses the real instant capture, sample checks and matching threshold; never creates an account or signs anyone in.
+    Uses the real five-second capture, sample checks and matching threshold; never creates an account or signs anyone in.
 *@
 @{
     Layout = "/Views/Shared/_Layout.cshtml";
@@ -13,7 +13,7 @@
         @Html.AntiForgeryToken()
         <span class="eyebrow">DEVELOPMENT ONLY · FACE RECOGNITION TEST</span>
         <h1>Face Recognition Demo</h1>
-        <p>Register a test face once, then verify as often as you like, or let someone else try. This page uses the same instant capture and matching threshold as supplier face sign-in, but it does not create an account, does not touch real supplier faces and never signs you in. The test face is kept in server memory for this browser until you reset it or the app restarts.</p>
+        <p>Register a test face once, then verify as often as you like, or let someone else try. This page uses the same five-second capture and matching threshold as supplier face sign-in, but it does not create an account, does not touch real supplier faces and never signs you in. The test face is kept in server memory for this browser until you reset it or the app restarts.</p>
         <p><small>Note: there is no liveness check, so a photo of a registered person can also match.</small></p>
 
         <div class="pg-actions face-demo-actions">

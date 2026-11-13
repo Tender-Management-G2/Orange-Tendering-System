@@ -1,227 +1,131 @@
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using Orange_Tendering_System.Data;
-using Orange_Tendering_System.Models;
-using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Models.Biometric;
+using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Services.Biometric;
 
 /// <summary>
-/// Fingerprint (and face unlock / PIN) sign-in through the device's own authenticator, using WebAuthn
-/// passkeys. The private key never leaves the device; the server keeps the public key in the
-/// team's UserPasskeyCredentials table.
+/// Fingerprint / passkey sign-in (WebAuthn) on top of ASP.NET Core Identity's built-in passkey support (.NET 10).
+/// Identity does the real work: it builds the options the browser needs, keeps the one-time challenge in a short-lived
+/// protected cookie, verifies the authenticator's signed answer (challenge, origin, site id, user verification,
+/// signature, sign counter) and stores the credential in its AspNetUserPasskeys table. This class only adds the
+/// project's own rules around those calls. Settings: AddBiometrics (IdentityPasskeyOptions).
+///
+/// The private key and the fingerprint never leave the authenticator (a phone, this computer's sensor or a security
+/// key); the server keeps the public key. The authenticator decides how it verifies the person, so the site cannot
+/// tell whether a fingerprint, face unlock or the device PIN was used.
 /// </summary>
-public class PasskeyService(ApplicationDbContext db, ChallengeStore challenges, IOptions<BiometricOptions> options)
+public class PasskeyService(
+    UserManager<ApplicationUser> users,
+    SignInManager<ApplicationUser> signInManager,
+    IOptions<BiometricOptions> options)
 {
-    private const string RegisterPurpose = "passkey-register";
-    private const string LoginPurpose = "passkey-login";
+    private const string Expired = "The request expired. Try again.";
 
-    private TimeSpan Lifetime => TimeSpan.FromSeconds(options.Value.PasskeyChallengeSeconds);
-    private int BrowserTimeoutMs => options.Value.PasskeyChallengeSeconds * 1000;
-
-    public (string Token, object Options) CreateRegistrationOptions(
-        ApplicationUser user, IEnumerable<string> existingCredentialIds, RpInfo rp)
+    /// <summary>Options (WebAuthn JSON) for navigator.credentials.create(): a new passkey for this account.</summary>
+    public Task<string> CreateRegistrationOptionsAsync(ApplicationUser user)
     {
-        var challenge = RandomNumberGenerator.GetBytes(32);
-        var token = challenges.Create(RegisterPurpose, challenge, user.Id, lifetime: Lifetime);
-
-        var publicKeyOptions = new
+        var name = user.Email ?? user.UserName ?? user.Id;
+        return signInManager.MakePasskeyCreationOptionsAsync(new PasskeyUserEntity
         {
-            challenge = Base64Url.Encode(challenge),
-            rp = new { name = rp.RpName, id = rp.RpId },
-            user = new
-            {
-                id = Base64Url.Encode(Encoding.UTF8.GetBytes(user.Id)),
-                name = user.Email ?? user.UserName ?? user.Id,
-                displayName = string.IsNullOrWhiteSpace(user.FullName) ? user.Email ?? user.UserName ?? user.Id : user.FullName
-            },
-            pubKeyCredParams = new[]
-            {
-                new { type = "public-key", alg = (int)WebAuthnVerifier.Es256 },
-                new { type = "public-key", alg = (int)WebAuthnVerifier.Rs256 }
-            },
-            timeout = BrowserTimeoutMs,
-            // No attachment is forced: the browser offers whatever the person has (Windows Hello or
-            // Touch ID on this device, or a phone through the QR code, or a security key). The
-            // authenticator must verify the person (fingerprint, face or PIN), not just their presence.
-            authenticatorSelection = new
-            {
-                residentKey = "required",
-                requireResidentKey = true,
-                userVerification = "required"
-            },
-            attestation = "none",
-            excludeCredentials = existingCredentialIds.Select(id => new { type = "public-key", id }).ToArray()
-        };
-
-        return (token, publicKeyOptions);
+            Id = user.Id,
+            Name = name,
+            DisplayName = string.IsNullOrWhiteSpace(user.FullName) ? name : user.FullName
+        });
     }
 
-    public async Task<BiometricResult> RegisterAsync(ApplicationUser user, PasskeyRegisterRequest request, RpInfo rp)
+    /// <summary>Verifies the browser's answer to the registration options and links the new passkey to the account.</summary>
+    public async Task<BiometricResult> RegisterAsync(ApplicationUser user, string? credentialJson, string? label)
     {
-        const string expired = "The request expired. Try again.";
-
-        var entry = challenges.Consume(request.Token, RegisterPurpose);
-        if (entry is null || entry.UserId != user.Id)
-        {
-            return BiometricResult.Fail(expired);
-        }
-
-        if (!Base64Url.TryDecode(request.ClientDataJson, out var clientData) ||
-            !Base64Url.TryDecode(request.AttestationObject, out var attestation))
-        {
-            return BiometricResult.Fail("The device response was malformed.");
-        }
-
-        var clientDataError = WebAuthnVerifier.CheckClientData(clientData, "webauthn.create", entry.Challenge, rp.Origins);
-        if (clientDataError is not null)
-        {
-            return BiometricResult.Fail(clientDataError);
-        }
-
-        var authDataBytes = WebAuthnVerifier.AuthDataFromAttestation(attestation);
-        var authData = authDataBytes is null ? null : WebAuthnVerifier.ParseAuthData(authDataBytes);
-        if (authData is null || !authData.HasAttestedCredential || authData.CredentialId is null || authData.CoseKey is null)
+        if (string.IsNullOrWhiteSpace(credentialJson))
         {
             return BiometricResult.Fail("The device did not return a credential.");
         }
 
-        if (!CryptographicOperations.FixedTimeEquals(authData.RpIdHash, WebAuthnVerifier.RpIdHash(rp.RpId)))
+        PasskeyAttestationResult attestation;
+        try
         {
-            return BiometricResult.Fail("The credential was created for another site.");
+            attestation = await signInManager.PerformPasskeyAttestationAsync(credentialJson);
+        }
+        catch (InvalidOperationException)
+        {
+            // No registration was started in this browser, or it was already answered or has expired.
+            return BiometricResult.Fail(Expired);
         }
 
-        if (!authData.UserPresent || !authData.UserVerified)
+        if (!attestation.Succeeded)
         {
-            return BiometricResult.Fail("The device must verify you with a fingerprint, face or PIN.");
+            return BiometricResult.Fail(attestation.Failure.Message);
         }
 
-        var credentialId = Base64Url.Encode(authData.CredentialId);
-        if (credentialId != request.Id)
+        // The options must have been issued to this same account.
+        if (attestation.UserEntity.Id != user.Id)
         {
-            return BiometricResult.Fail("The credential id does not match.");
+            return BiometricResult.Fail(Expired);
         }
 
-        if (!WebAuthnVerifier.IsSupportedKey(authData.CoseKey))
-        {
-            return BiometricResult.Fail("This device uses a key type the system does not support.");
-        }
-
-        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-        // Serialize each account's credential count/enrollment across requests and instances.
-        await db.Users.FromSqlInterpolated($"SELECT * FROM AspNetUsers WITH (UPDLOCK,HOLDLOCK) WHERE Id={user.Id}").SingleAsync();
-        if (await db.UserPasskeyCredentials.AnyAsync(c => c.CredentialId == credentialId))
-        {
-            return BiometricResult.Fail("This device credential is already registered.");
-        }
-
-        if (await db.UserPasskeyCredentials.CountAsync(c => c.UserId == user.Id) >= options.Value.MaxPasskeysPerUser)
+        if ((await users.GetPasskeysAsync(user)).Count >= options.Value.MaxPasskeysPerUser)
         {
             return BiometricResult.Fail("You reached the maximum number of registered devices.");
         }
 
-        var label = string.IsNullOrWhiteSpace(request.Label) ? "My device" : request.Label.Trim();
-        db.UserPasskeyCredentials.Add(new UserPasskeyCredential
-        {
-            UserId = user.Id,
-            CredentialId = credentialId,
-            PublicKey = authData.CoseKey,
-            SignCount = authData.SignCount,
-            DeviceLabel = label.Length > 150 ? label[..150] : label,
-            AddedAt = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync();
-        await transaction.CommitAsync();
-        return BiometricResult.Ok(user);
+        var name = string.IsNullOrWhiteSpace(label) ? "My device" : label.Trim();
+        attestation.Passkey.Name = name.Length > 150 ? name[..150] : name;
+        var saved = await users.AddOrUpdatePasskeyAsync(user, attestation.Passkey);
+        return saved.Succeeded ? BiometricResult.Ok(user) : BiometricResult.Fail("The passkey could not be saved. Try again.");
     }
 
-    public (string Token, object Options) CreateLoginOptions(RpInfo rp)
+    /// <summary>
+    /// Options (WebAuthn JSON) for navigator.credentials.get(). Without a user no account name is asked: the
+    /// authenticator offers the passkeys it holds for this site, so the login page never reveals whether an account
+    /// exists. With a user (the /fingerprint-demo page) only that account's passkeys are accepted.
+    /// </summary>
+    public Task<string> CreateLoginOptionsAsync(ApplicationUser? user = null) =>
+        signInManager.MakePasskeyRequestOptionsAsync(user);
+
+    /// <summary>
+    /// Verifies the signed answer to the login options. On success the result carries the account the passkey belongs
+    /// to; nobody is signed in here (BiometricSignInService applies the account rules and signs in).
+    /// </summary>
+    public async Task<BiometricResult> VerifyLoginAsync(string? credentialJson)
     {
-        var challenge = RandomNumberGenerator.GetBytes(32);
-        var token = challenges.Create(LoginPurpose, challenge, lifetime: Lifetime);
-
-        // No account name is asked: the device offers the passkeys it holds for this site, so the
-        // login page never reveals whether an account exists.
-        var publicKeyOptions = new
+        if (string.IsNullOrWhiteSpace(credentialJson))
         {
-            challenge = Base64Url.Encode(challenge),
-            rpId = rp.RpId,
-            timeout = BrowserTimeoutMs,
-            userVerification = "required",
-            allowCredentials = Array.Empty<object>()
-        };
+            return BiometricResult.Fail("The device did not return a credential.");
+        }
 
-        return (token, publicKeyOptions);
+        PasskeyAssertionResult<ApplicationUser> assertion;
+        try
+        {
+            assertion = await signInManager.PerformPasskeyAssertionAsync(credentialJson);
+        }
+        catch (InvalidOperationException)
+        {
+            // No sign-in was started in this browser, or it was already answered or has expired.
+            return BiometricResult.Fail(Expired);
+        }
+
+        if (!assertion.Succeeded)
+        {
+            return BiometricResult.Fail(assertion.Failure.Message);
+        }
+
+        // Keep the stored sign counter and backup state up to date (a counter that goes backwards is refused).
+        var saved = await users.AddOrUpdatePasskeyAsync(assertion.User, assertion.Passkey);
+        return saved.Succeeded ? BiometricResult.Ok(assertion.User) : BiometricResult.Fail("The passkey could not be updated.");
     }
 
-    public async Task<BiometricResult> VerifyLoginAsync(PasskeyLoginRequest request, RpInfo rp)
+    public Task<IList<UserPasskeyInfo>> ListAsync(ApplicationUser user) => users.GetPasskeysAsync(user);
+
+    /// <summary>Removes one passkey of the account (credential id as base64url text); false when it is not theirs.</summary>
+    public async Task<bool> RemoveAsync(ApplicationUser user, string? credentialId)
     {
-        const string failed = "The fingerprint check failed.";
-
-        var entry = challenges.Consume(request.Token, LoginPurpose);
-        if (entry is null)
+        if (!Base64Url.TryDecode(credentialId, out var id) || await users.GetPasskeyAsync(user, id) is null)
         {
-            return BiometricResult.Fail("The request expired. Try again.");
+            return false;
         }
 
-        if (!Base64Url.TryDecode(request.ClientDataJson, out var clientData) ||
-            !Base64Url.TryDecode(request.AuthenticatorData, out var authenticatorData) ||
-            !Base64Url.TryDecode(request.Signature, out var signature))
-        {
-            return BiometricResult.Fail(failed);
-        }
-
-        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-        var credential = string.IsNullOrEmpty(request.Id)
-            ? null
-            : await db.UserPasskeyCredentials.FromSqlInterpolated($"SELECT * FROM UserPasskeyCredentials WITH (UPDLOCK,HOLDLOCK) WHERE CredentialId={request.Id}")
-                .Include(c => c.User).FirstOrDefaultAsync();
-        if (credential is null)
-        {
-            return BiometricResult.Fail(failed);
-        }
-
-        if (!string.IsNullOrEmpty(request.UserHandle))
-        {
-            if (!Base64Url.TryDecode(request.UserHandle, out var handle) || Encoding.UTF8.GetString(handle) != credential.UserId)
-            {
-                return BiometricResult.Fail(failed);
-            }
-        }
-
-        if (WebAuthnVerifier.CheckClientData(clientData, "webauthn.get", entry.Challenge, rp.Origins) is not null)
-        {
-            return BiometricResult.Fail(failed);
-        }
-
-        var authData = WebAuthnVerifier.ParseAuthData(authenticatorData);
-        if (authData is null || authData.HasAttestedCredential ||
-            !CryptographicOperations.FixedTimeEquals(authData.RpIdHash, WebAuthnVerifier.RpIdHash(rp.RpId)) ||
-            !authData.UserPresent || !authData.UserVerified)
-        {
-            return BiometricResult.Fail(failed);
-        }
-
-        var signedData = authenticatorData.Concat(SHA256.HashData(clientData)).ToArray();
-        if (!WebAuthnVerifier.VerifySignature(credential.PublicKey, signedData, signature))
-        {
-            return BiometricResult.Fail(failed);
-        }
-
-        // A counter that does not move forward means the credential may have been cloned. Many
-        // platform authenticators always report 0, which is fine.
-        if ((authData.SignCount != 0 || credential.SignCount != 0) && authData.SignCount <= credential.SignCount)
-        {
-            return BiometricResult.Fail(failed);
-        }
-
-        credential.SignCount = authData.SignCount;
-        credential.LastUsedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-        await transaction.CommitAsync();
-        return BiometricResult.Ok(credential.User);
+        return (await users.RemovePasskeyAsync(user, id)).Succeeded;
     }
 }

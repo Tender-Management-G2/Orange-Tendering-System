@@ -57,8 +57,9 @@
             ? ' [' + error.name + (error.message ? ': ' + error.message : '') + ']'
             : '';
         if (error && (error.name === 'NotAllowedError' || error.name === 'AbortError')) {
-            return new Error('The request was cancelled or timed out. If you did not cancel it, make sure Windows Hello ' +
-                '(fingerprint, face or PIN) is set up on this device.' + detail);
+            var cancelled = new Error('Authentication Cancelled — the prompt was cancelled, timed out, or no compatible passkey was available. Try again and select a phone or tablet.' + detail);
+            cancelled.code = 'cancelled';
+            return cancelled;
         }
         if (error && error.name === 'InvalidStateError') {
             return new Error('This device is already registered.' + detail);
@@ -72,16 +73,35 @@
     // ---------- Fingerprint / device passkey (WebAuthn) ----------
 
     function ensureWebAuthn() {
+        if (!window.isSecureContext) { throw new Error('Open this page over HTTPS to use passkeys.'); }
         if (!window.PublicKeyCredential || !navigator.credentials) {
             throw new Error('This browser does not support fingerprint sign-in.');
         }
     }
 
-    async function passkeyLogin(returnUrl) {
+    function credentialJson(credential) {
+        if (!credential) { throw new Error('The device did not return a credential.'); }
+        if (credential.toJSON) { return JSON.stringify(credential.toJSON()); }
+        var r = credential.response;
+        var response = { clientDataJSON: enc(r.clientDataJSON) };
+        if (r.attestationObject) {
+            response.attestationObject = enc(r.attestationObject);
+            response.transports = r.getTransports ? r.getTransports() : [];
+        } else {
+            response.authenticatorData = enc(r.authenticatorData);
+            response.signature = enc(r.signature);
+            response.userHandle = r.userHandle ? enc(r.userHandle) : null;
+        }
+        return JSON.stringify({ id: credential.id, rawId: enc(credential.rawId), type: credential.type,
+            authenticatorAttachment: credential.authenticatorAttachment, response: response,
+            clientExtensionResults: credential.getClientExtensionResults() });
+    }
+
+    async function passkeyLogin(returnUrl, base) {
         ensureWebAuthn();
-        var start = await post('/Biometrics/PasskeyLoginOptions');
-        var options = start.options;
+        var options = await post(base ? base + '/login-options' : '/Biometrics/PasskeyLoginOptions');
         options.challenge = dec(options.challenge);
+        (options.allowCredentials || []).forEach(function (c) { c.id = dec(c.id); });
 
         var credential;
         try {
@@ -90,22 +110,15 @@
             throw friendly(e);
         }
 
-        var r = credential.response;
-        return post('/Biometrics/PasskeyLogin', {
-            token: start.token,
-            id: enc(credential.rawId),
-            clientDataJson: enc(r.clientDataJSON),
-            authenticatorData: enc(r.authenticatorData),
-            signature: enc(r.signature),
-            userHandle: r.userHandle ? enc(r.userHandle) : null,
+        return post(base ? base + '/verify' : '/Biometrics/PasskeyLogin', {
+            credentialJson: credentialJson(credential),
             returnUrl: returnUrl
         });
     }
 
-    async function passkeyRegister(label, password) {
+    async function passkeyRegister(label, password, base) {
         ensureWebAuthn();
-        var start = await post('/Biometrics/PasskeyRegisterOptions', { password: password });
-        var options = start.options;
+        var options = await post(base ? base + '/register-options' : '/Biometrics/PasskeyRegisterOptions', { password: password });
         options.challenge = dec(options.challenge);
         options.user.id = dec(options.user.id);
         (options.excludeCredentials || []).forEach(function (c) { c.id = dec(c.id); });
@@ -117,21 +130,18 @@
             throw friendly(e);
         }
 
-        return post('/Biometrics/PasskeyRegister', {
-            token: start.token,
-            id: enc(credential.rawId),
-            clientDataJson: enc(credential.response.clientDataJSON),
-            attestationObject: enc(credential.response.attestationObject),
+        return post(base ? base + '/register' : '/Biometrics/PasskeyRegister', {
+            credentialJson: credentialJson(credential),
             label: label
         });
     }
 
-    // ---------- Face recognition (instant capture) ----------
+    // ---------- Face recognition (five-second capture) ----------
     // Detect a face, take a few descriptors from consecutive camera frames, send them. There are no liveness
     // steps (owner decision for the academic demo), so a photo of the person held up to the camera can pass.
 
-    var SAMPLES = 3;               // descriptors per attempt (server accepts 3-8: FaceService.CheckSamples)
-    var NO_FACE_TIMEOUT_MS = 10000; // give up after 10 s without a clear face
+    var CAPTURE_MS = 5000;
+    var NO_FACE_TIMEOUT_MS = 30000; // time to position the face and complete a continuous capture
     var MIN_FACE_WIDTH = 80;       // pixels in the analysed frame; smaller faces give unreliable descriptors
 
     function loadScript(src) {
@@ -187,7 +197,8 @@
             throw new Error('The camera is not available. Allow camera access and try again.');
         }
         video.srcObject = stream;
-        await video.play();
+        try { await video.play(); }
+        catch (e) { stopCamera(stream, video); throw new Error('The camera preview could not start. Try again.'); }
 
         // Wait until the camera is really delivering frames (some cameras need a moment after play()).
         for (var i = 0; i < 50 && (!video.videoWidth || video.readyState < 2); i++) { await sleep(60); }
@@ -225,7 +236,9 @@
         var started = performance.now();
         var lastSeen = started;
         var lastFrameTime = -1;
-        setHint('Look at the camera.');
+        var captureStarted = null;
+        var lastSample = -Infinity;
+        setHint('Look at the camera for 5 seconds.');
 
         while (performance.now() - started < NO_FACE_TIMEOUT_MS) {
             // Only analyse a new camera frame, so every sample comes from a different picture.
@@ -240,17 +253,26 @@
                 catch (e) { console.error('Could not switch to the CPU backend:', e); }
             }
 
-            var found = await faceapi.detectSingleFace(grab(), missing > 1500 ? sensitive : fast)
-                .withFaceLandmarks().withFaceDescriptor();
+            var detected = await faceapi.detectAllFaces(grab(), missing > 1500 ? sensitive : fast)
+                .withFaceLandmarks().withFaceDescriptors();
+            var found = detected.length === 1 ? detected[0] : null;
             if (onDetect) { onDetect(!!found); }
 
             if (found && found.detection.box.width >= MIN_FACE_WIDTH) {
                 lastSeen = performance.now();
-                descriptors.push({ t: Math.round(lastSeen - started), v: Array.from(found.descriptor) });
-                setHint('Face detected (' + descriptors.length + '/' + SAMPLES + ')');
-                if (descriptors.length >= SAMPLES) { return { descriptors: descriptors }; }
+                if (captureStarted === null) { captureStarted = lastSeen; }
+                var elapsed = lastSeen - captureStarted;
+                if (lastSeen - lastSample >= 1000 || elapsed >= CAPTURE_MS) {
+                    descriptors.push({ t: Math.round(elapsed), v: Array.from(found.descriptor) });
+                    lastSample = lastSeen;
+                }
+                setHint('Keep looking at the camera: ' + Math.max(0, Math.ceil((CAPTURE_MS - elapsed) / 1000)) + ' seconds remaining.');
+                if (elapsed >= CAPTURE_MS && descriptors.length >= 3) { return { descriptors: descriptors }; }
             } else {
-                setHint(found ? 'Move a little closer to the camera.' : 'No face found yet. Look straight at the camera, with light on your face.');
+                captureStarted = null;
+                descriptors = [];
+                lastSample = -Infinity;
+                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 5-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 5-second capture will restart.');
             }
         }
 
@@ -363,11 +385,20 @@
                 var password = ($('bioPassword') || {}).value || '';
                 if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
                 setStatus('Use your fingerprint, face or PIN when your device asks.');
-                guarded(function () { return passkeyRegister(label, password); }, 'Device registered.').then(function (ok) {
+                guarded(function () { return passkeyRegister(label, password); }, 'Fingerprint / Passkey Registered Successfully').then(function (ok) {
                     if (ok) { window.location.reload(); }
                 });
             });
         }
+
+        root.querySelectorAll('[data-remove-passkey]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                if (!window.confirm('Remove this passkey from your account?')) { return; }
+                guarded(function () { return post('/Biometrics/PasskeyRemove?id=' + encodeURIComponent(button.dataset.removePasskey)); }, 'Passkey removed.').then(function (ok) {
+                    if (ok) { window.location.reload(); }
+                });
+            });
+        });
 
         var faceEnrollButton = $('btnFaceEnroll');
         if (faceEnrollButton) {
@@ -489,6 +520,40 @@
         });
     }
 
+    function initPasskeyDemo() {
+        var root = $('passkey-demo-root');
+        if (!root) { return; }
+        $('passkeyDemoSupport').textContent = window.isSecureContext && window.PublicKeyCredential ? 'Supported (HTTPS)' : 'Unavailable — use HTTPS and a compatible browser';
+        async function run(action, success, verification) {
+            var started = performance.now();
+            root.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+            var resultBox = $('passkeyDemoResult');
+            resultBox.className = 'bio-status';
+            resultBox.textContent = 'Follow the browser and phone instructions…';
+            try {
+                var result = await action();
+                resultBox.textContent = success;
+                resultBox.className = 'bio-status bio-status--success';
+                if (verification) { $('passkeyDemoAuth').textContent = success; }
+                if (result.count !== undefined) { $('passkeyDemoCount').textContent = result.count + ' registered'; }
+            } catch (e) {
+                resultBox.textContent = e.message;
+                resultBox.className = 'bio-status bio-status--danger';
+                if (verification) { $('passkeyDemoAuth').textContent = e.code === 'cancelled' ? 'Authentication Cancelled' : e.message === 'No Passkey Registered' ? e.message : 'Authentication Failed'; }
+            } finally {
+                $('passkeyDemoTime').textContent = ((performance.now() - started) / 1000).toFixed(1) + ' seconds';
+                root.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+            }
+        }
+        $('btnPasskeyDemoRegister').onclick = function () { run(function () { return passkeyRegister('Demo phone', null, '/fingerprint-demo'); }, 'Fingerprint / Passkey Registered Successfully', false); };
+        $('btnPasskeyDemoVerify').onclick = function () { run(function () { return passkeyLogin(null, '/fingerprint-demo'); }, 'Authentication Successful', true); };
+        $('btnPasskeyDemoReset').onclick = function () { run(async function () {
+            await post('/fingerprint-demo/reset');
+            $('passkeyDemoAuth').textContent = 'Not attempted';
+            return { count: 0 };
+        }, 'Demo reset. Delete the saved passkey on your phone separately if needed.', false); };
+    }
+
     // Load the face models in the background as soon as a page can use them, so the first click is fast.
     // On the Login page (also used by employees) only once the supplier starts using the face sign-in.
     function preloadFace() { loadFaceApi().catch(function (e) { console.error('Face models could not be preloaded:', e); }); }
@@ -496,6 +561,7 @@
     function start() {
         init();
         initFaceDemo();
+        initPasskeyDemo();
         if ($('btnFaceEnroll') || $('face-demo-root')) { preloadFace(); }
         var supplierEmail = $('faceEmail');
         if (supplierEmail) { supplierEmail.addEventListener('focus', preloadFace, { once: true }); }

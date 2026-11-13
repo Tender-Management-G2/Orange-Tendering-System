@@ -26,6 +26,9 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
         options.Lockout.MaxFailedAccessAttempts = 5;
         options.Lockout.AllowedForNewUsers = true;
+        // Identity schema version 3 adds the AspNetUserPasskeys table used by fingerprint / passkey sign-in
+        // (Services/Biometric/PasskeyService.cs).
+        options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -99,6 +102,18 @@ else
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
+// Hide all development demo actions before authorization / antiforgery filters in deployed environments.
+app.Use(async (context, next) =>
+{
+    if (!app.Environment.IsDevelopment() &&
+        (context.Request.Path.StartsWithSegments("/fingerprint-demo") || context.Request.Path.StartsWithSegments("/face-demo")))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    await next(context);
+});
 
 // Friendly pages for 404 and other empty error responses (HomeController.HttpStatus).
 app.UseStatusCodePagesWithReExecute("/status/{0}");
