@@ -7,7 +7,7 @@ namespace Orange_Tendering_System.Areas.Department.ViewModels;
 public class RequestForm
 {
     public int Id { get; set; }
-    public string Version { get; set; } = "";
+    public string? Version { get; set; }
     [Required, StringLength(200)] public string Title { get; set; } = "";
     [Required, StringLength(10000)] public string Justification { get; set; } = "";
     [EnumDataType(typeof(RequestPriority))] public RequestPriority Priority { get; set; } = RequestPriority.Normal;

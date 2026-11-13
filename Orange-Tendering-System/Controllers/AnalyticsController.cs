@@ -1,57 +1,52 @@
 // ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: UNASSIGNED — Team assignment required
-// Module: Reports, Analytics & Exports
-// Purpose: MVC endpoints for the Analytics pages of the shared signed-in pages.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+// Module: Reports, Analytics & Exports (spec section 7)
+// Purpose: role-filtered reports computed from live SQL Server data (ReportingService), with Excel and PDF export of exactly what is shown.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Controllers
 {
     [Authorize(Roles = SystemRoles.Admin + "," + SystemRoles.SourcingOfficer + "," + SystemRoles.SourcingManager + "," + SystemRoles.TopCommittee)]
-    public class AnalyticsController : Controller
+    public class AnalyticsController(ReportingService reports, ReportExport export) : Controller
     {
-        // Reports & Analytics — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Analytics. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
+        // Who may open which report. Admin takes no part in evaluations; management statistics belong to the Top Committee.
+        public static readonly Dictionary<string, string[]> Audience = new()
         {
-            return View();
-        }
+            ["purchase-requests"] = [SystemRoles.Admin, SystemRoles.SourcingOfficer, SystemRoles.SourcingManager, SystemRoles.TopCommittee],
+            ["tenders"] = [SystemRoles.Admin, SystemRoles.SourcingOfficer, SystemRoles.SourcingManager, SystemRoles.TopCommittee],
+            ["suppliers"] = [SystemRoles.Admin, SystemRoles.SourcingOfficer, SystemRoles.SourcingManager, SystemRoles.TopCommittee],
+            ["evaluations"] = [SystemRoles.SourcingOfficer, SystemRoles.SourcingManager, SystemRoles.TopCommittee],
+            ["governance"] = [SystemRoles.Admin, SystemRoles.SourcingManager, SystemRoles.TopCommittee],
+            ["management"] = [SystemRoles.TopCommittee]
+        };
 
-        // Purchase Request Reports — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Analytics/PurchaseRequests. TODO: query the data in a service and pass a view model.
-        public IActionResult PurchaseRequests()
-        {
-            return View();
-        }
+        private bool Allowed(string key) => Audience.TryGetValue(key, out var roles) && roles.Any(User.IsInRole);
 
-        // Tender Reports — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Analytics/Tenders. TODO: query the data in a service and pass a view model.
-        public IActionResult Tenders()
-        {
-            return View();
-        }
+        public IActionResult Index() => View(ReportingService.Catalog.Where(c => Allowed(c.Key)).ToList());
 
-        // Supplier Reports — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Analytics/Suppliers. TODO: query the data in a service and pass a view model.
-        public IActionResult Suppliers()
-        {
-            return View();
-        }
+        public Task<IActionResult> PurchaseRequests() => Show("purchase-requests");
+        public Task<IActionResult> Tenders() => Show("tenders");
+        public Task<IActionResult> Suppliers() => Show("suppliers");
+        public Task<IActionResult> Evaluations() => Show("evaluations");
+        public Task<IActionResult> Governance() => Show("governance");
+        public Task<IActionResult> Management() => Show("management");
 
-        // Bids & Evaluation Reports — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Analytics/Evaluations. TODO: query the data in a service and pass a view model.
-        public IActionResult Evaluations()
-        {
-            return View();
-        }
+        private async Task<IActionResult> Show(string key) => !Allowed(key) ? Forbid() : View("Report", await reports.BuildAsync(key));
 
-        // Approvals & Governance Reports — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /Analytics/Governance. TODO: query the data in a service and pass a view model.
-        public IActionResult Governance()
+        [HttpGet]
+        public async Task<IActionResult> Export(string key, string format)
         {
-            return View();
+            if (!Allowed(key ?? "")) return Forbid();
+            var model = await reports.BuildAsync(key!);
+            var name = $"{key}-{DateTime.UtcNow:yyyyMMdd-HHmm}";
+            return format?.ToLowerInvariant() switch
+            {
+                "xlsx" => File(export.ToXlsx(model), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", name + ".xlsx"),
+                "pdf" => File(export.ToPdf(model), "application/pdf", name + ".pdf"),
+                _ => BadRequest("Use format=xlsx or format=pdf.")
+            };
         }
     }
 }
