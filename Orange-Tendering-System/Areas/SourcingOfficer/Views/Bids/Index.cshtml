@@ -1,67 +1,10 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Received Bids
+@model Orange_Tendering_System.ViewModels.SourcingOfficerBidsViewModel
+@{ ViewData["Title"] = "Received offers"; ViewData["WorkspaceSection"] = "Received Bids"; ViewData["Description"] = "Check each offer, record compliance, then send the eligible offers to the evaluation committee."; var rows=Model.Offers; }
+<div class="so-page"><partial name="_PageHeader" />
+<section class="pg-cards"><article class="pg-card"><span>Submitted offers</span><strong>@rows.Count</strong></article><article class="pg-card"><span>Need a compliance check</span><strong>@rows.Count(b=>b.ComplianceStatus==Orange_Tendering_System.Models.Entities.ComplianceStatus.NotChecked)</strong></article><article class="pg-card"><span>Compliant</span><strong>@rows.Count(b=>b.ComplianceStatus==Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant)</strong></article></section>
 
-DEVELOPER OWNER: Saja
-MODULE: Sourcing Officer / Bid Management
-TRELLO TASK: Received Bids
-TRELLO URL: https://trello.com/c/06s4zwV2
+<section class="ws-panel pg-panel so-forward-panel"><div class="pg-panel-head"><div><span class="so-eyebrow">NEXT STEP AFTER COMPLIANCE</span><h2>Send offers to the Technical &amp; Financial Evaluation Committee</h2><span class="pg-hint">Choose compliant offers to include in the committee review.</span></div></div>
+@if(Model.Rounds.Count==0){<p class="so-empty">Submitted offers will appear here. Check each one, then send the compliant offers to the committee.</p>}
+else{<div class="so-round-forward-list">@foreach(var round in Model.Rounds){<article class="so-round-forward"><div><strong>@round.TenderTitle</strong><small>Round @round.RoundNumber · @round.Status</small><small>@round.CompliantOffers / 3 compliant supplier offers · @round.EvaluationMembers / 4 committee members assigned</small></div>@if(round.CanForward){<a class="pg-btn pg-btn-primary" asp-action="ForwardToCommittee" asp-route-id="@round.RoundId">Choose offers and send →</a>}else if(round.Status!=Orange_Tendering_System.Models.Entities.TenderRoundStatus.Open){<span class="pg-badge">Round @round.Status</span>}else{<span class="pg-badge is-warn">@(round.CompliantOffers<3?$"Need {3-round.CompliantOffers} more compliant offer(s)":$"Assign {4-round.EvaluationMembers} more committee member(s)")</span>}</article>}</div>}</section>
 
-PURPOSE:
-List the offers received for a tender round with their
-compliance status.
-
-BUSINESS ACCESS:
-Sourcing Officer
-
-ROUTE: /SourcingOfficer/Bids/Index/{id?}
-
-FUTURE IMPLEMENTATION:
-- Query the latest Submitted Bid per TenderInvitation in the
-  selected TenderRound.
-- Quoted total = Σ(Quantity × UnitPrice) + extra costs
-  (calculated, not stored).
-- Row actions: Details, Compliance.
-
-DEPENDENCIES:
-Bids, BidItems, TenderInvitations, Suppliers, TenderRounds.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Only offers of the current round count; offers from earlier
-rounds are history.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "Received Bids";
-    ViewData["WorkspaceSection"] = "Received Bids";
-    ViewData["Description"] = "Offers submitted by invited suppliers in the selected tendering round.";
-}
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="pg-cards" aria-label="Summary">
-    <article class="pg-card"><span>Invited suppliers</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Submitted offers</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Distinct suppliers</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Compliance pending</span><strong>—</strong><small>Not connected</small></article>
-</section>
-
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search supplier" aria-label="Search supplier" disabled />
-    <select aria-label="Compliance" disabled><option>Compliance: All</option><option>Compliance: Not checked</option><option>Compliance: Compliant</option><option>Compliance: Non-Compliant</option><option>Compliance: Pending Clarification</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-offers">
-    <div class="pg-panel-head"><h2 id="tbl-offers">Offers</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Supplier</th><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Revision</th><th scope="col">Submitted</th><th scope="col">Quoted total</th><th scope="col">Compliance</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="8"><partial name="_EmptyState" model='"No offers have been received for this round."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>All submitted offers</h2><span class="pg-hint">Check requirements before selecting offers for the committee.</span></div><a class="pg-btn" asp-controller="Tenders" asp-action="Index">← Tenders</a></div><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Tender</th><th>Supplier</th><th>Submitted</th><th>Compliance</th><th>Next step</th></tr></thead><tbody>@if(rows.Count==0){<tr><td colspan="5" class="so-empty">No submitted offers yet. Suppliers can submit after accepting their invitation.</td></tr>}@foreach(var b in rows){var cls=b.ComplianceStatus switch{Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant=>"is-ok",Orange_Tendering_System.Models.Entities.ComplianceStatus.NonCompliant=>"is-bad",Orange_Tendering_System.Models.Entities.ComplianceStatus.PendingClarification=>"is-warn",_=>""};<tr><td><strong>@b.TenderInvitation.TenderRound.Tender.Title</strong><br/><small class="pg-hint">Round @b.TenderInvitation.TenderRound.RoundNumber · Offer #@b.Id</small></td><td>@b.TenderInvitation.Supplier.CompanyName</td><td>@b.SubmittedAt?.ToLocalTime().ToString("d MMM yyyy")</td><td><span class="pg-badge @cls">@b.ComplianceStatus</span></td><td><div class="so-actions"><a class="pg-btn" asp-action="Details" asp-route-id="@b.Id">Read offer</a><a class="pg-btn pg-btn-primary" asp-action="Compliance" asp-route-id="@b.Id">@(b.ComplianceStatus==Orange_Tendering_System.Models.Entities.ComplianceStatus.NotChecked?"Check requirements":"Update check")</a></div></td></tr>}</tbody></table></div></section></div>

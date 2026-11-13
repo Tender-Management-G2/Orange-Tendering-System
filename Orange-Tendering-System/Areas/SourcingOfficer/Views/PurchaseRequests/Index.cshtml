@@ -1,17 +1,8 @@
-@model List<Orange_Tendering_System.Models.Entities.PurchaseRequest>
-@{ ViewData["Title"] = "Purchase requests"; ViewData["WorkspaceSection"] = "Requests"; ViewData["Description"] = "Review requests from every department."; }
-<partial name="_PageHeader" />
-<section class="ws-panel pg-panel" aria-labelledby="pr-title">
-    <div class="pg-panel-head"><h2 id="pr-title">Requests</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
-            <tbody>
-            @foreach (var p in Model)
-            {
-                <tr><td>PR-@p.Id.ToString("0000")</td><td><strong>@p.Title</strong></td><td>@p.Status</td><td><a class="pg-btn" asp-action="Review" asp-route-id="@p.Id">Review</a></td></tr>
-            }
-            </tbody>
-        </table>
-    </div>
-</section>
+@model IEnumerable<Orange_Tendering_System.Models.Entities.PurchaseRequest>
+@{ ViewData["Title"] = "Department requests"; ViewData["WorkspaceSection"] = "Requests"; ViewData["Description"] = "Review requests sent by departments. Accepted requests can be turned into tenders."; var rows=Model.ToList(); }
+<div class="so-page"><partial name="_PageHeader" />
+<div class="pg-cards"><article class="pg-card"><span>Waiting for your review</span><strong>@rows.Count(r=>r.Status==Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Submitted)</strong></article><article class="pg-card"><span>Accepted and ready for tender</span><strong>@rows.Count(r=>r.Status==Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted && !r.Tenders.Any())</strong></article><article class="pg-card"><span>Returned or rejected</span><strong>@rows.Count(r=>r.Status is Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Returned or Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Rejected)</strong></article></div>
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>All requests</h2><span class="pg-hint">Open a submitted request to decide. Accepted requests show a Create tender button.</span></div></div><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Request</th><th>Department</th><th>Priority</th><th>Needed by</th><th>Status</th><th>Next step</th></tr></thead><tbody>
+@if(rows.Count==0){<tr><td colspan="6" class="so-empty">No requests yet. New requests from departments will appear here.</td></tr>}
+@foreach(var r in rows){var cls=r.Status switch{Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted=>"is-ok",Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Returned=>"is-warn",Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Rejected=>"is-bad",_=>""};<tr><td><strong>@r.Title</strong><br/><small class="pg-hint">Request #@r.Id · @r.SubmittedAt?.ToLocalTime().ToString("d MMM yyyy")</small></td><td>@r.Department.Name</td><td>@r.Priority</td><td>@(r.NeededBy?.ToLocalTime().ToString("d MMM yyyy")??"—")</td><td><span class="pg-badge @cls">@r.Status</span></td><td><div class="so-actions">@if(r.Status==Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Submitted){<a class="pg-btn pg-btn-primary" asp-action="Review" asp-route-id="@r.Id">Review request</a>}else if(r.Status==Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted && !r.Tenders.Any()){<a class="pg-btn pg-btn-primary" asp-controller="Tenders" asp-action="Create" asp-route-id="@r.Id">Create tender</a>}else if(r.Tenders.Any()){<a class="pg-btn" asp-controller="Tenders" asp-action="Details" asp-route-id="@r.Tenders.First().Id">View tender</a>}else{<span class="pg-hint">No action needed</span>}</div></td></tr>}
+</tbody></table></div></section></div>

@@ -87,9 +87,23 @@
             <li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Respond"
                    asp-route-id="@Model.Id" class="pg-btn pg-btn-primary">Accept or decline</a></li>
         }
-        else
+        else if (Model.Status == Orange_Tendering_System.Models.Entities.InvitationStatus.Pending
+            && Model.OpensAt.HasValue && Model.OpensAt.Value > DateTime.UtcNow)
         {
-            <li>Responses are unavailable: the invitation was answered or the bidding period is not open.</li>
+            <li class="pg-hint">This invitation opens on @Model.OpensAt.Value.ToLocalTime().ToString("d MMM yyyy h:mm tt"). You can accept or decline it after opening.</li>
+        }
+        else if (Model.Status == Orange_Tendering_System.Models.Entities.InvitationStatus.Pending
+            && Model.Deadline.HasValue && Model.Deadline.Value <= DateTime.UtcNow)
+        {
+            <li class="pg-hint">This invitation has expired. Contact the Sourcing Officer if you need help.</li>
+        }
+        else if (Model.Status == Orange_Tendering_System.Models.Entities.InvitationStatus.Accepted && !Model.IsBiddingOpen)
+        {
+            <li class="pg-hint">You accepted this invitation, but the bidding window is not open. Check the opening and deadline dates above.</li>
+        }
+        else if (Model.Status == Orange_Tendering_System.Models.Entities.InvitationStatus.Declined)
+        {
+            <li class="pg-hint">You declined this invitation, so an offer cannot be created for this round.</li>
         }
         <li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Index">Back to invitations</a></li>
     </ul>

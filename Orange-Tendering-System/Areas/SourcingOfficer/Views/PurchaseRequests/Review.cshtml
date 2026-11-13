@@ -1,32 +1,4 @@
 @model Orange_Tendering_System.Models.Entities.PurchaseRequest
-@{ ViewData["Title"] = Model.Title; ViewData["WorkspaceSection"] = "Requests"; ViewData["Description"] = "Review the request, then accept, return or reject it."; }
-<partial name="_PageHeader" />
-<section class="ws-panel pg-panel">
-    <dl class="ui-facts">
-        <div><dt>Request</dt><dd>PR-@Model.Id.ToString("0000")</dd></div>
-        <div><dt>Status</dt><dd>@Model.Status</dd></div>
-    </dl>
-    <p>@Model.Justification</p>
-    <div class="pg-table-wrap"><table class="pg-table" data-no-enhance><thead><tr><th scope="col">Item</th><th scope="col">Quantity</th><th scope="col">Specifications</th></tr></thead><tbody>
-    @foreach (var i in Model.Items) { <tr><td>@i.Name</td><td>@i.Quantity @i.Unit</td><td>@i.Specifications</td></tr> }
-    </tbody></table></div>
-    <h3>Submission history</h3>
-    @if (!Model.Reviews.Any()) { <p class="pg-hint">No review decisions yet.</p> }
-    <ul class="ui-timeline">@foreach (var h in Model.Reviews) { <li><strong>Submission @h.SubmissionNumber · @h.Decision</strong><span>@h.Comment</span></li> }</ul>
-    <div asp-validation-summary="All" class="validation-summary" role="alert"></div>
-    @if (Model.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Submitted)
-    {
-        <form method="post" asp-action="Review" asp-route-id="@Model.Id" class="pg-form">
-            <div class="pg-field pg-field-wide"><label for="comment">Review feedback</label><textarea id="comment" name="comment" required></textarea></div>
-            <div class="pg-actions">
-                <button type="submit" class="pg-btn pg-btn-primary" name="decision" value="Accepted">Accept purchase request</button>
-                <button type="submit" class="pg-btn" name="decision" value="Returned">Return for changes</button>
-                <button type="submit" class="pg-btn pg-btn-danger" name="decision" value="Rejected">Reject</button>
-            </div>
-        </form>
-    }
-    @if (Model.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted)
-    {
-        <div class="pg-actions"><a class="pg-btn pg-btn-primary" data-no-modal asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create" asp-route-id="@Model.Id">Prepare tender</a></div>
-    }
-</section>
+@{ ViewData["Title"] = "Review request"; ViewData["WorkspaceSection"] = "Requests"; ViewData["Description"] = "Read what the department needs, then choose the next step."; }
+<div class="so-page"><partial name="_PageHeader" /><section class="ws-panel pg-panel"><div class="pg-panel-head"><div><span class="pg-badge">Request #@Model.Id</span> <span class="pg-badge">@Model.Status</span></div><a class="pg-btn" asp-action="Index">← All requests</a></div><h2>@Model.Title</h2><dl class="pg-dl"><div><dt>Department</dt><dd>@Model.Department.Name</dd></div><div><dt>Priority</dt><dd>@Model.Priority</dd></div><div><dt>Needed by</dt><dd>@(Model.NeededBy?.ToLocalTime().ToString("d MMM yyyy")??"Not specified")</dd></div><div><dt>Submitted</dt><dd>@(Model.SubmittedAt?.ToLocalTime().ToString("d MMM yyyy")??"—")</dd></div></dl><h3 class="so-subheading">Why this is needed</h3><p>@Model.Justification</p><h3 class="so-subheading">Requested items</h3><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Specifications</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>@foreach(var item in Model.Items){<tr><td><strong>@item.Name</strong></td><td>@item.Specifications</td><td>@item.Quantity</td><td>@item.Unit</td></tr>}</tbody></table></div></section>
+<section class="ws-panel pg-panel"><h2>Choose an outcome</h2><p class="pg-hint">Accept it to create a tender. Return it if the department must add information. Reject it to close the request.</p><form asp-action="Review" method="post" class="pg-form"><input type="hidden" name="id" value="@Model.Id"/><div class="pg-field"><label for="comment">Comment for the department</label><textarea id="comment" name="comment" rows="3" placeholder="Explain what needs to change, if anything"></textarea></div><div class="pg-actions"><button class="pg-btn pg-btn-primary" name="decision" value="Accepted">Accept request</button><button class="pg-btn" name="decision" value="Returned">Return for changes</button><button class="pg-btn pg-btn-danger" name="decision" value="Rejected">Reject request</button></div></form></section></div>

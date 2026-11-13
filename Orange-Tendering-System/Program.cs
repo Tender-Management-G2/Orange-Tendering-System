@@ -119,7 +119,16 @@ app.MapHub<Orange_Tendering_System.Hubs.NotificationHub>("/hubs/notifications");
 app.MapRazorPages()
    .WithStaticAssets();
 
+if (app.Environment.IsDevelopment())
+{
+    using var migrationScope = app.Services.CreateScope();
+    var db = migrationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 await IdentityBootstrap.SeedAsync(app.Services, app.Configuration);
+if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DemoData:Enabled"))
+    await DemoDataSeeder.SeedAsync(app.Services);
 
 app.Run();
 
