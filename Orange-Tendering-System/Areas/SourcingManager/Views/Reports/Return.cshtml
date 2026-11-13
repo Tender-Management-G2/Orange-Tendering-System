@@ -1,58 +1,119 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Return Report for Review
+@model Orange_Tendering_System.Models.Entities.TenderReport
 
-DEVELOPER OWNER: Haya
-MODULE: Sourcing Manager Review
-TRELLO TASK: Return Report for Review
-TRELLO URL: https://trello.com/c/r1oVUbDr
-
-PURPOSE:
-Return the report to the Sourcing Officer for correction.
-The decision is stored on the report version it applies to.
-
-BUSINESS ACCESS:
-Sourcing Manager
-
-ROUTE: /SourcingManager/Reports/Return/{id?}
-
-FUTURE IMPLEMENTATION:
-- POST Return: set ReviewedByUserId, ReviewComment,
-  ReviewedAt and the report Status on this version only.
-- Notify the Sourcing Officer; write AuditLogs.
-- Never change committee scores or votes.
-
-DEPENDENCIES:
-TenderReports, Notifications, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
 @{
     ViewData["Title"] = "Return Report for Review";
     ViewData["WorkspaceSection"] = "Report Review";
-    ViewData["Description"] = "Return the report to the Sourcing Officer for correction. Earlier versions and decisions stay in history.";
+    ViewData["Description"] = "Return the report to the Sourcing Officer for correction.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
 
 <section class="ws-panel pg-panel">
     <h2>Report</h2>
+
     <dl class="pg-dl">
-        <div><dt>Tender</dt><dd>—</dd></div>
-        <div><dt>Version</dt><dd>—</dd></div>
-        <div><dt>Submitted by</dt><dd>—</dd></div>
-        <div><dt>Submitted</dt><dd>—</dd></div>
-        <div><dt>Recommended offer</dt><dd>—</dd></div>
+        <div>
+            <dt>Tender</dt>
+            <dd>@Model.TenderRound.Tender.Title</dd>
+        </div>
+
+        <div>
+            <dt>Version</dt>
+            <dd>v@Model.VersionNumber</dd>
+        </div>
+
+        <div>
+            <dt>Submitted by</dt>
+            <dd>
+                @(Model.CreatedByUser?.UserName
+                    ?? Model.CreatedByUserId)
+            </dd>
+        </div>
+
+        <div>
+            <dt>Submitted</dt>
+            <dd>
+                @(Model.SubmittedAt?.ToString("yyyy-MM-dd HH:mm")
+                    ?? "Not submitted")
+            </dd>
+        </div>
+
+        <div>
+            <dt>Recommended offer</dt>
+            <dd>
+                @(Model.RecommendedBidId?.ToString()
+                    ?? "No recommendation")
+            </dd>
+        </div>
+
+        <div>
+            <dt>Status</dt>
+            <dd>@Model.Status</dd>
+        </div>
     </dl>
 </section>
 
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Return Report for Review", "Return the report to the Sourcing Officer for correction.", "Sets the report version to Returned with your comment. The Officer submits a new version; this one is kept.", true, false)' />
+<section class="ws-panel pg-panel pg-confirm"
+         aria-labelledby="confirm-title">
 
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="SourcingManager" asp-controller="Reports" asp-action="Review">Back to review</a></li>
-    </ul>
-</nav>
+    <h2 id="confirm-title">Return Report for Review</h2>
+
+    <p>
+        Return the evaluation report to the Sourcing Officer
+        for correction.
+    </p>
+
+    <p class="pg-consequence">
+        <strong>What this will do:</strong>
+        Sets this report version to Returned.
+        The Officer must submit a new version.
+        The current version will be preserved.
+    </p>
+
+    <form asp-area="SourcingManager"
+          asp-controller="Reports"
+          asp-action="Return"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden"
+               name="id"
+               value="@Model.Id" />
+
+        <div class="pg-field">
+            <label for="comment">
+                Return reason (required)
+            </label>
+
+            <textarea id="comment"
+                      name="comment"
+                      rows="4"
+                      maxlength="2000"
+                      required
+                      placeholder="Explain what needs to be corrected..."></textarea>
+        </div>
+
+        <div class="pg-actions">
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Confirm Return
+            </button>
+
+            <a asp-area="SourcingManager"
+               asp-controller="Reports"
+               asp-action="Review"
+               asp-route-id="@Model.Id">
+                Cancel
+            </a>
+        </div>
+    </form>
+</section>

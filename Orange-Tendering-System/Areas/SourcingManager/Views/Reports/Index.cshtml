@@ -1,54 +1,168 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Evaluation Reports List
+@model List<Orange_Tendering_System.Models.Entities.TenderReport>
+@using Orange_Tendering_System.Models.Entities
 
-DEVELOPER OWNER: Haya
-MODULE: Sourcing Manager Review
-TRELLO TASK: Evaluation Reports List
-TRELLO URL: https://trello.com/c/CWgcYFbk
+@* ===========================================================
+   ORANGE TENDER MANAGEMENT SYSTEM
+   PAGE: Evaluation Reports List
+   DEVELOPER OWNER: Haya
+   MODULE: Sourcing Manager Review
+   =========================================================== *@
 
-PURPOSE:
-List detailed evaluation reports submitted by the Officer
-for managerial review.
-
-BUSINESS ACCESS:
-Sourcing Manager
-
-ROUTE: /SourcingManager/Reports
-
-FUTURE IMPLEMENTATION:
-- Query TenderReports (ReportType = FullEvaluation) by
-  status.
-- Row action: Review.
-
-DEPENDENCIES:
-TenderReports, Tenders, AspNetUsers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
 @{
     ViewData["Title"] = "Evaluation Reports List";
     ViewData["WorkspaceSection"] = "Pending Reports";
-    ViewData["Description"] = "Detailed evaluation reports submitted to you by the Sourcing Officer.";
-}
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
+    ViewData["Description"] = "Detailed evaluation reports submitted for managerial review.";
 
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search tender" aria-label="Search tender" disabled />
-    <select aria-label="Status" disabled><option>Status: Submitted</option><option>Status: Returned</option><option>Status: Rejected</option><option>Status: Accepted</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
+    var search = Context.Request.Query["search"].ToString();
+    var status = Context.Request.Query["status"].ToString();
+
+    var reports = Model.AsEnumerable();
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        reports = reports.Where(r =>
+            r.TenderRound.Tender.Title.Contains(
+                search, StringComparison.OrdinalIgnoreCase));
+    }
+
+    if (Enum.TryParse<ReportStatus>(status, true, out var selectedStatus))
+    {
+        reports = reports.Where(r => r.Status == selectedStatus);
+    }
+
+    var filteredReports = reports.ToList();
+}
+
+<partial name="_PageHeader" />
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["Success"]
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
+
+<form method="get"
+      asp-area="SourcingManager"
+      asp-controller="Reports"
+      asp-action="Index"
+      class="pg-toolbar"
+      aria-label="Search and filters">
+
+    <input type="search"
+           name="search"
+           value="@search"
+           placeholder="Search tender"
+           aria-label="Search tender" />
+
+    <select name="status" aria-label="Status">
+        <option value="">All Statuses</option>
+
+        @foreach (var item in Enum.GetValues<ReportStatus>())
+        {
+            if (status == item.ToString())
+            {
+                <option value="@item" selected>@item</option>
+            }
+            else
+            {
+                <option value="@item">@item</option>
+            }
+        }
+    </select>
+
+    <button type="submit" class="btn btn-primary btn-sm">
+        Search
+    </button>
+
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+        Reset
+    </a>
+</form>
 
 <section class="ws-panel pg-panel" aria-labelledby="tbl-reports">
-    <div class="pg-panel-head"><h2 id="tbl-reports">Reports</h2></div>
+
+    <div class="pg-panel-head">
+        <h2 id="tbl-reports">Reports</h2>
+    </div>
+
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Report</th><th scope="col">Version</th><th scope="col">Submitted by</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No reports are waiting for review."' /></td></tr></tbody>
+
+            <thead>
+                <tr>
+                    <th scope="col">Tender</th>
+                    <th scope="col">Report</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Submitted by</th>
+                    <th scope="col">Submitted</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (!filteredReports.Any())
+                {
+                    <tr>
+                        <td colspan="7">
+                            <partial name="_EmptyState"
+                                     model='"No evaluation reports found."' />
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var report in filteredReports)
+                    {
+                        <tr>
+                            <td>
+                                @report.TenderRound.Tender.Title
+                            </td>
+
+                            <td>
+                                Full Evaluation
+                            </td>
+
+                            <td>
+                                v@report.VersionNumber
+                            </td>
+
+                            <td>
+                                @(report.CreatedByUser?.UserName
+                                    ?? report.CreatedByUserId)
+                            </td>
+
+                            <td>
+                                @(report.SubmittedAt?.ToString("yyyy-MM-dd")
+                                    ?? "Not submitted")
+                            </td>
+
+                            <td>
+                                @report.Status
+                            </td>
+
+                            <td>
+                                <a asp-area="SourcingManager"
+                                   asp-controller="Reports"
+                                   asp-action="Review"
+                                   asp-route-id="@report.Id"
+                                   class="btn btn-primary btn-sm">
+                                    Review
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+
         </table>
     </div>
 </section>
