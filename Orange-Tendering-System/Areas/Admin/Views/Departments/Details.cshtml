@@ -1,0 +1,188 @@
+﻿
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Sara Rjoub
+MODULE: Administration
+PAGE: Department Details
+===========================================================
+*@
+
+@model DepartmentDetailsViewModel
+
+@{
+    ViewData["Title"] = "Department Details";
+    ViewData["WorkspaceSection"] = "Departments";
+    ViewData["Description"] =
+        "View department information and assigned employees.";
+}
+
+<partial name="_PageHeader" />
+
+<!-- DEPARTMENT INFORMATION -->
+
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+
+        <div>
+            <h2>@Model.Name</h2>
+            <p>Department Information</p>
+        </div>
+
+        <a class="pg-btn pg-btn-primary"
+           asp-area="Admin"
+           asp-controller="Departments"
+           asp-action="Edit"
+           asp-route-id="@Model.Id">
+            Edit Department
+        </a>
+
+    </div>
+
+    <div class="pg-form-grid">
+
+        <div class="pg-field">
+            <strong>Department Name</strong>
+            <p>@Model.Name</p>
+        </div>
+
+        <div class="pg-field">
+            <strong>Status</strong>
+            <p class="pg-status">
+                @(Model.IsActive ? "Active" : "Inactive")
+            </p>
+        </div>
+
+        <div class="pg-field pg-field-wide">
+            <strong>Description</strong>
+
+            <p>
+                @(string.IsNullOrWhiteSpace(Model.Description)
+                    ? "No description provided."
+                    : Model.Description)
+            </p>
+        </div>
+
+    </div>
+
+</section>
+
+<!-- DEPARTMENT STATISTICS -->
+
+<div class="pg-form-grid">
+
+    <section class="ws-panel pg-panel">
+
+        <h3>Assigned Employees</h3>
+
+        <h2>@Model.EmployeeCount</h2>
+
+        <p class="pg-hint">
+            Users linked to this department
+        </p>
+
+    </section>
+
+    <section class="ws-panel pg-panel">
+
+        <h3>Purchase Requests</h3>
+
+        <h2>@Model.PurchaseRequestCount</h2>
+
+        <p class="pg-hint">
+            Purchase requests created by this department
+        </p>
+
+    </section>
+
+</div>
+
+<!-- EMPLOYEE LIST -->
+
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <h2>Department Employees</h2>
+    </div>
+
+    <div class="pg-table-wrap">
+
+        <table class="pg-table">
+
+            <thead>
+                <tr>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Account Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (!Model.Employees.Any())
+                {
+                    <tr>
+                        <td colspan="4">
+                            No employees are assigned
+                            to this department.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var employee in Model.Employees)
+                    {
+                        <tr>
+
+                            <td>
+                                @employee.FullName
+                            </td>
+
+                            <td>
+                                @employee.Email
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @(employee.IsActive
+                                        ? "Active"
+                                        : "Inactive")
+                                </span>
+                            </td>
+
+                            <td>
+                                <a class="pg-btn"
+                                   asp-area="Admin"
+                                   asp-controller="Users"
+                                   asp-action="Details"
+                                   asp-route-id="@employee.Id">
+                                    View User
+                                </a>
+                            </td>
+
+                        </tr>
+                    }
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+<!-- BACK BUTTON -->
+
+<div class="pg-actions">
+
+    <a class="pg-btn"
+       asp-area="Admin"
+       asp-controller="Departments"
+       asp-action="Index">
+        Back to Departments
+    </a>
+
+</div>

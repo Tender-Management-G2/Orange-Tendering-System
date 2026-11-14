@@ -1,32 +1,20 @@
+
 @*
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
 PAGE: User Management
 DEVELOPER OWNER: Rjoub
 MODULE: Administration
-TRELLO TASK: User Management
-TRELLO URL: https://trello.com/c/UYxdWeUv
-
-PURPOSE:
-List user accounts with their roles, departments,
-companies, and account status.
-
-BUSINESS ACCESS: Admin
-ROUTE: /Admin/Users
 
 FEATURES:
+- Real database KPI cards
 - Manual Search
 - Voice Search
 - Role Filter
+- Department Filter
 - Status Filter
 - Server-side Pagination
-- User Details
-- Edit User
-- Create User
-
-DEPENDENCIES:
-AspNetUsers, AspNetUserRoles, AspNetRoles,
-Departments, Suppliers, AuditLogs.
+- Create / Details / Edit User
 ===========================================================
 *@
 
@@ -42,6 +30,111 @@ Departments, Suppliers, AuditLogs.
 
 <partial name="_PageHeader" />
 
+<style>
+    .admin-user-stats {
+        display: grid;
+        grid-template-columns: repeat(
+            auto-fit, minmax(210px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .admin-user-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .admin-user-stat-label {
+        font-size: 14px;
+        opacity: .85;
+    }
+
+    .admin-user-stat-value {
+        font-size: 30px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .admin-user-stat-description {
+        font-size: 13px;
+        opacity: .75;
+    }
+</style>
+
+<!-- =====================================
+     KPI CARDS
+===================================== -->
+
+<div class="admin-user-stats">
+
+    <div class="ws-panel pg-panel admin-user-stat">
+
+        <span class="admin-user-stat-label">
+            Total Users
+        </span>
+
+        <strong class="admin-user-stat-value">
+            @Model.TotalUsers
+        </strong>
+
+        <span class="admin-user-stat-description">
+            All registered accounts
+        </span>
+
+    </div>
+
+    <div class="ws-panel pg-panel admin-user-stat">
+
+        <span class="admin-user-stat-label">
+            Active Users
+        </span>
+
+        <strong class="admin-user-stat-value">
+            @Model.ActiveUsers
+        </strong>
+
+        <span class="admin-user-stat-description">
+            Currently active accounts
+        </span>
+
+    </div>
+
+    <div class="ws-panel pg-panel admin-user-stat">
+
+        <span class="admin-user-stat-label">
+            Inactive Users
+        </span>
+
+        <strong class="admin-user-stat-value">
+            @Model.InactiveUsers
+        </strong>
+
+        <span class="admin-user-stat-description">
+            Disabled accounts
+        </span>
+
+    </div>
+
+    <div class="ws-panel pg-panel admin-user-stat">
+
+        <span class="admin-user-stat-label">
+            Department Users
+        </span>
+
+        <strong class="admin-user-stat-value">
+            @Model.DepartmentUsers
+        </strong>
+
+        <span class="admin-user-stat-description">
+            Assigned to departments
+        </span>
+
+    </div>
+
+</div>
+
+
 <!-- =====================================
      SEARCH AND FILTERS
 ===================================== -->
@@ -52,31 +145,15 @@ Departments, Suppliers, AuditLogs.
       method="get"
       class="pg-toolbar">
 
-    <!-- Manual Search -->
-    <input type="search"
-           id="userSearch"
-           name="search"
-           value="@Model.Search"
-           placeholder="Search by name or email..."
-           aria-label="Search users"
-           maxlength="150" />
-
-    <!-- Voice Search -->
-    <button type="button"
-            class="pg-btn voice-search-btn"
-            data-target="userSearch"
-            aria-label="Search users by voice"
-            title="Search by voice">
-        🎤
-    </button>
-
+   
+    
     <!-- Role Filter -->
     <select name="roleFilter"
             aria-label="Filter by role">
 
         <option value="All"
-                selected="@(string.IsNullOrEmpty(Model.RoleFilter) ||
-                                        Model.RoleFilter == "All")">
+                selected="@(string.IsNullOrEmpty(Model.RoleFilter)
+                    || Model.RoleFilter == "All")">
             All Roles
         </option>
 
@@ -90,13 +167,33 @@ Departments, Suppliers, AuditLogs.
 
     </select>
 
+    <!-- Department Filter -->
+    <select name="departmentFilter"
+            aria-label="Filter by department">
+
+        <option value="All"
+                selected="@(string.IsNullOrEmpty(Model.DepartmentFilter)
+                    || Model.DepartmentFilter == "All")">
+            All Departments
+        </option>
+
+        @foreach (var department in Model.Departments)
+        {
+            <option value="@department.Value"
+                    selected="@(Model.DepartmentFilter == department.Value)">
+                @department.Text
+            </option>
+        }
+
+    </select>
+
     <!-- Status Filter -->
     <select name="statusFilter"
             aria-label="Filter by status">
 
         <option value="All"
-                selected="@(string.IsNullOrEmpty(Model.StatusFilter) ||
-                                        Model.StatusFilter == "All")">
+                selected="@(string.IsNullOrEmpty(Model.StatusFilter)
+                    || Model.StatusFilter == "All")">
             All Statuses
         </option>
 
@@ -112,13 +209,13 @@ Departments, Suppliers, AuditLogs.
 
     </select>
 
-    <!-- Search Button -->
+    <!-- Search -->
     <button type="submit"
             class="pg-btn pg-btn-primary">
         Search
     </button>
 
-    <!-- Clear Button -->
+    <!-- Clear -->
     <a asp-area="Admin"
        asp-controller="Users"
        asp-action="Index"
@@ -128,21 +225,15 @@ Departments, Suppliers, AuditLogs.
 
 </form>
 
-<!-- Voice Recognition Status -->
-<p id="voiceSearchStatus"
-   role="status"
-   aria-live="polite"
-   class="pg-hint">
-</p>
+
 
 
 <!-- =====================================
-     USER ACCOUNTS TABLE
+     USERS TABLE
 ===================================== -->
 
 <section class="ws-panel pg-panel">
 
-    <!-- Panel Header -->
     <div class="pg-panel-head">
 
         <div>
@@ -153,7 +244,6 @@ Departments, Suppliers, AuditLogs.
             </p>
         </div>
 
-        <!-- Create User -->
         <a class="pg-btn pg-btn-primary"
            asp-area="Admin"
            asp-controller="Users"
@@ -163,8 +253,6 @@ Departments, Suppliers, AuditLogs.
 
     </div>
 
-
-    <!-- Users Table -->
     <div class="pg-table-wrap">
 
         <table class="pg-table">
@@ -173,7 +261,7 @@ Departments, Suppliers, AuditLogs.
                 <tr>
                     <th>Full Name</th>
                     <th>Email</th>
-                    <th>Role(s)</th>
+                    <th>Role</th>
                     <th>Department / Company</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -196,39 +284,29 @@ Departments, Suppliers, AuditLogs.
                     {
                         <tr>
 
-                            <!-- Full Name -->
                             <td>
                                 @user.FullName
                             </td>
 
-
-                            <!-- Email -->
                             <td>
                                 @user.Email
                             </td>
 
-                            <!-- Roles -->
                             <td>
                                 @user.Roles
                             </td>
 
-                            <!-- Department / Company -->
                             <td>
                                 @user.DepartmentOrCompany
                             </td>
 
-                           
-                            <!-- Account Status -->
                             <td>
                                 <span class="pg-status">
                                     @user.StatusLabel
                                 </span>
                             </td>
 
-
-                            <!-- Actions -->
                             <td>
-
                                 <a class="pg-btn"
                                    asp-area="Admin"
                                    asp-controller="Users"
@@ -244,7 +322,6 @@ Departments, Suppliers, AuditLogs.
                                    asp-route-id="@user.Id">
                                     Edit
                                 </a>
-
                             </td>
 
                         </tr>
@@ -261,12 +338,12 @@ Departments, Suppliers, AuditLogs.
     <!-- =====================================
          PAGINATION
     ===================================== -->
+
     @if (Model.TotalPages > 1)
     {
         <nav class="pg-actions"
              aria-label="User pages">
 
-            <!-- Previous Page -->
             @if (Model.CurrentPage > 1)
             {
                 <a class="pg-btn"
@@ -275,18 +352,17 @@ Departments, Suppliers, AuditLogs.
                    asp-action="Index"
                    asp-route-search="@Model.Search"
                    asp-route-roleFilter="@Model.RoleFilter"
+                   asp-route-departmentFilter="@Model.DepartmentFilter"
                    asp-route-statusFilter="@Model.StatusFilter"
                    asp-route-page="@(Model.CurrentPage - 1)">
                     Previous
                 </a>
             }
 
-            <!-- Current Page -->
             <span>
                 Page @Model.CurrentPage of @Model.TotalPages
             </span>
 
-            <!-- Next Page -->
             @if (Model.CurrentPage < Model.TotalPages)
             {
                 <a class="pg-btn pg-btn-primary"
@@ -295,6 +371,7 @@ Departments, Suppliers, AuditLogs.
                    asp-action="Index"
                    asp-route-search="@Model.Search"
                    asp-route-roleFilter="@Model.RoleFilter"
+                   asp-route-departmentFilter="@Model.DepartmentFilter"
                    asp-route-statusFilter="@Model.StatusFilter"
                    asp-route-page="@(Model.CurrentPage + 1)">
                     Next
@@ -308,12 +385,6 @@ Departments, Suppliers, AuditLogs.
 
 
 <!-- =====================================
-     VOICE SEARCH JAVASCRIPT
+     EXISTING VOICE SEARCH SCRIPT
 ===================================== -->
-@section Scripts {
 
-    <script src="~/js/voice-search.js"
-            asp-append-version="true">
-    </script>
-
-}

@@ -1,32 +1,8 @@
+
 @*
-===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Rjoub
 PAGE: Create Department
-
-DEVELOPER OWNER: Rjoub
-MODULE: Administration
-TRELLO TASK: Department Management
-TRELLO URL: https://trello.com/c/KHRsEmzE
-
-PURPOSE:
-Form to add a department.
-
-BUSINESS ACCESS:
-Admin
-
-ROUTE: /Admin/Departments/Create
-
-FUTURE IMPLEMENTATION:
-- POST Create with [ValidateAntiForgeryToken]; handle the
-  unique Name index violation with a friendly message.
-- Audit the creation.
-
-DEPENDENCIES:
-Departments, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
 *@
 
 @model CreateDepartmentViewModel
@@ -34,7 +10,8 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 @{
     ViewData["Title"] = "Create Department";
     ViewData["WorkspaceSection"] = "Departments";
-    ViewData["Description"] = "Add a new department to the organization.";
+    ViewData["Description"] =
+        "Add a department and assign existing employees.";
 }
 
 <partial name="_PageHeader" />
@@ -62,8 +39,8 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
                 <input asp-for="Name"
                        class="form-control"
-                       placeholder="Enter department name"
-                       maxlength="100" />
+                       maxlength="100"
+                       placeholder="Enter department name" />
 
                 <span asp-validation-for="Name"
                       class="text-danger"></span>
@@ -87,14 +64,76 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                       class="text-danger"></span>
             </div>
 
-            <!-- Status -->
-            <label class="pg-check">
-                <input asp-for="IsActive" />
-                Active
-            </label>
+            <!-- Department Status -->
+            <div class="pg-field pg-field-wide">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Department
+                </label>
+            </div>
 
         </div>
 
+        <!-- ==================================
+             EMPLOYEE ASSIGNMENT
+        =================================== -->
+
+       
+<div class="pg-field pg-field-wide">
+
+    <h3>Assign Employees</h3>
+
+    <p class="pg-hint">
+        Select existing users who are not
+        assigned to another department.
+    </p>
+
+    @if (Model.AvailableEmployees.Any())
+    {
+        <details class="department-employee-dropdown">
+
+            <summary>
+                Select Available Employees
+            </summary>
+
+            <div class="department-employee-options">
+
+                @foreach (var employee in Model.AvailableEmployees)
+                {
+                    <label class="department-employee-option">
+
+                        <input type="checkbox"
+                               name="SelectedEmployeeIds"
+                               value="@employee.Value"
+                               checked="@(Model.SelectedEmployeeIds.Contains(employee.Value))" />
+
+                        <span>@employee.Text</span>
+
+                    </label>
+                }
+
+            </div>
+
+        </details>
+
+        <small class="pg-hint">
+            You can select multiple employees.
+        </small>
+    }
+    else
+    {
+        <p class="pg-hint">
+            No unassigned employees are currently available.
+        </p>
+    }
+
+    <span asp-validation-for="SelectedEmployeeIds"
+          class="text-danger"></span>
+
+</div>
+
+
+        <!-- ACTIONS -->
         <div class="pg-actions">
 
             <button type="submit"
@@ -114,19 +153,50 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
     </form>
 
 </section>
+<style>
+    
+.department-employee-dropdown {
+    width: 100%;
+    margin-top: 12px;
+    border: 1px solid #454545;
+    border-radius: 12px;
+    background: #1b1c1e;
+    color: #fff;
+}
 
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li>
-            <a asp-area="Admin"
-               asp-controller="Departments"
-               asp-action="Index">
-                Back to Departments
-            </a>
-        </li>
-    </ul>
-</nav>
+.department-employee-dropdown summary {
+    cursor: pointer;
+    padding: 15px 18px;
+    font-weight: 500;
+}
 
+.department-employee-dropdown[open] summary {
+    border-bottom: 1px solid #454545;
+}
+
+.department-employee-options {
+    max-height: 230px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.department-employee-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.department-employee-option:hover {
+    background: rgba(255, 121, 0, 0.12);
+}
+
+.department-employee-option input {
+    accent-color: #ff7900;
+}
+</style>
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }

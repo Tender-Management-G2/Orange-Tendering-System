@@ -1,49 +1,214 @@
+
 @*
-===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Rjoub
 PAGE: Department Management
-
-DEVELOPER OWNER: Rjoub
-MODULE: Administration
-TRELLO TASK: Department Management
-TRELLO URL: https://trello.com/c/KHRsEmzE
-
-PURPOSE:
-List departments with their employees and purchase-request
-activity.
-
-BUSINESS ACCESS:
-Admin
-
-ROUTE: /Admin/Departments
-
-FUTURE IMPLEMENTATION:
-- Query Departments with counts of users and
-  PurchaseRequests.
-- Links to Edit for each row.
-
-DEPENDENCIES:
-Departments, AspNetUsers (DepartmentId), PurchaseRequests.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
 *@
 
-@model List<DepartmentListViewModel>
+@model DepartmentIndexViewModel
 
 @{
     ViewData["Title"] = "Department Management";
     ViewData["WorkspaceSection"] = "Departments";
-    ViewData["Description"] = "Manage organization departments and their activity.";
+    ViewData["Description"] =
+        "Manage organization departments and their activity.";
 }
 
 <partial name="_PageHeader" />
 
+<style>
+    .admin-department-stats {
+        display: grid;
+        grid-template-columns:
+            repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .admin-department-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .admin-department-stat-label {
+        font-size: 14px;
+        opacity: .85;
+    }
+
+    .admin-department-stat-value {
+        font-size: 30px;
+        font-weight: 700;
+    }
+
+    .admin-department-filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .admin-department-filters input,
+    .admin-department-filters select {
+        flex: 1 1 190px;
+        min-width: 150px;
+        height: 46px;
+        box-sizing: border-box;
+    }
+
+    .admin-department-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .admin-department-actions .pg-btn {
+        height: 46px;
+        min-width: 90px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+</style>
+
+<!-- ==================================
+     KPI CARDS
+=================================== -->
+
+<div class="admin-department-stats">
+
+    <div class="ws-panel pg-panel admin-department-stat">
+        <span class="admin-department-stat-label">
+            Total Departments
+        </span>
+
+        <strong class="admin-department-stat-value">
+            @Model.TotalDepartments
+        </strong>
+
+        <small class="pg-hint">
+            All registered departments
+        </small>
+    </div>
+
+    <div class="ws-panel pg-panel admin-department-stat">
+        <span class="admin-department-stat-label">
+            Active Departments
+        </span>
+
+        <strong class="admin-department-stat-value">
+            @Model.ActiveDepartments
+        </strong>
+
+        <small class="pg-hint">
+            Currently active departments
+        </small>
+    </div>
+
+    <div class="ws-panel pg-panel admin-department-stat">
+        <span class="admin-department-stat-label">
+            Inactive Departments
+        </span>
+
+        <strong class="admin-department-stat-value">
+            @Model.InactiveDepartments
+        </strong>
+
+        <small class="pg-hint">
+            Deactivated departments
+        </small>
+    </div>
+
+    <div class="ws-panel pg-panel admin-department-stat">
+        <span class="admin-department-stat-label">
+            Assigned Employees
+        </span>
+
+        <strong class="admin-department-stat-value">
+            @Model.AssignedEmployees
+        </strong>
+
+        <small class="pg-hint">
+            Users assigned to departments
+        </small>
+    </div>
+
+</div>
+
+<!-- ==================================
+     SEARCH AND FILTERS
+=================================== -->
+
+<form asp-area="Admin"
+      asp-controller="Departments"
+      asp-action="Index"
+      method="get"
+      class="admin-department-filters">
+
+    <input type="search"
+           name="search"
+           value="@Model.Search"
+           placeholder="Search departments..."
+           aria-label="Search departments"
+           maxlength="100" />
+
+    <select name="statusFilter"
+            aria-label="Filter department status">
+
+        <option value="All"
+                selected="@(string.IsNullOrEmpty(Model.StatusFilter)
+                    || Model.StatusFilter == "All")">
+            All Statuses
+        </option>
+
+        <option value="Active"
+                selected="@(Model.StatusFilter == "Active")">
+            Active
+        </option>
+
+        <option value="Inactive"
+                selected="@(Model.StatusFilter == "Inactive")">
+            Inactive
+        </option>
+
+    </select>
+
+    <div class="admin-department-actions">
+
+        <button type="submit"
+                class="pg-btn pg-btn-primary">
+            Search
+        </button>
+
+        <a asp-area="Admin"
+           asp-controller="Departments"
+           asp-action="Index"
+           class="pg-btn">
+            Clear
+        </a>
+
+    </div>
+
+</form>
+
+<!-- ==================================
+     DEPARTMENTS TABLE
+=================================== -->
+
 <section class="ws-panel pg-panel">
 
     <div class="pg-panel-head">
-        <h2>Departments</h2>
+
+        <div>
+            <h2>Departments</h2>
+
+            <p class="pg-hint">
+                Matching Departments:
+                @Model.Departments.Count
+            </p>
+        </div>
 
         <a class="pg-btn pg-btn-primary"
            asp-area="Admin"
@@ -51,11 +216,13 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
            asp-action="Create">
             Add Department
         </a>
+
     </div>
 
     <div class="pg-table-wrap">
 
         <table class="pg-table">
+
             <thead>
                 <tr>
                     <th>Name</th>
@@ -69,7 +236,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
             <tbody>
 
-                @if (Model == null || !Model.Any())
+                @if (!Model.Departments.Any())
                 {
                     <tr>
                         <td colspan="6">
@@ -79,46 +246,66 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                 }
                 else
                 {
-                    @foreach (var department in Model)
+                    @foreach (var department
+                        in Model.Departments)
                     {
                         <tr>
-                            <td>@department.Name</td>
-
-                            <td>@department.Description</td>
-
-                            <td>@department.EmployeeCount</td>
-
-                            <td>@department.PurchaseRequestCount</td>
 
                             <td>
-                                @if (department.IsActive)
-                                {
-                                    <span class="pg-status">
-                                        Active
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="pg-status">
-                                        Inactive
-                                    </span>
-                                }
+                                @department.Name
                             </td>
 
                             <td>
-                                <a class="pg-btn"
-                                   asp-area="Admin"
-                                   asp-controller="Departments"
-                                   asp-action="Edit"
-                                   asp-route-id="@department.Id">
-                                    Edit
-                                </a>
+                                @(string.IsNullOrWhiteSpace(
+                                    department.Description)
+                                    ? "—"
+                                    : department.Description)
                             </td>
+
+                            <td>
+                                @department.EmployeeCount
+                            </td>
+
+                            <td>
+                                @department.PurchaseRequestCount
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @(department.IsActive
+                                        ? "Active"
+                                        : "Inactive")
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="pg-actions">
+
+                                    <a class="pg-btn"
+                                       asp-area="Admin"
+                                       asp-controller="Departments"
+                                       asp-action="Details"
+                                       asp-route-id="@department.Id">
+                                        Details
+                                    </a>
+
+                                    <a class="pg-btn"
+                                       asp-area="Admin"
+                                       asp-controller="Departments"
+                                       asp-action="Edit"
+                                       asp-route-id="@department.Id">
+                                        Edit
+                                    </a>
+
+                                </div>
+                            </td>
+
                         </tr>
                     }
                 }
 
             </tbody>
+
         </table>
 
     </div>

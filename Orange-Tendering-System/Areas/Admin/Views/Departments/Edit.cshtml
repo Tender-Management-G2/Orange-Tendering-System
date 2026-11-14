@@ -1,30 +1,8 @@
+
 @*
-===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Rjoub
 PAGE: Edit Department
-
-DEVELOPER OWNER: Rjoub
-MODULE: Administration
-TRELLO TASK: Department Management
-TRELLO URL: https://trello.com/c/KHRsEmzE
-
-PURPOSE:
-Form to rename, describe or deactivate a department.
-
-BUSINESS ACCESS:
-Admin
-
-ROUTE: /Admin/Departments/Edit/{id?}
-
-FUTURE IMPLEMENTATION:
-- Load by id; POST Edit; audit changes.
-
-DEPENDENCIES:
-Departments, PurchaseRequests, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
 *@
 
 @model EditDepartmentViewModel
@@ -32,7 +10,8 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 @{
     ViewData["Title"] = "Edit Department";
     ViewData["WorkspaceSection"] = "Departments";
-    ViewData["Description"] = "Update department information and status.";
+    ViewData["Description"] =
+        "Update department information and employee assignments.";
 }
 
 <partial name="_PageHeader" />
@@ -74,8 +53,9 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                 </small>
             </div>
 
-            <!-- Department Description -->
+            <!-- Description -->
             <div class="pg-field pg-field-wide">
+
                 <label asp-for="Description"></label>
 
                 <textarea asp-for="Description"
@@ -88,14 +68,59 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                       class="text-danger"></span>
             </div>
 
-            <!-- Department Status -->
-            <label class="pg-check">
-                <input asp-for="IsActive" />
-                Active
-            </label>
+            <!-- Status -->
+            <div class="pg-field pg-field-wide">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Department
+                </label>
+            </div>
 
         </div>
 
+        <!-- ==================================
+             EMPLOYEE MANAGEMENT
+        =================================== -->
+
+        <div class="pg-field pg-field-wide">
+
+            <h3>Department Employees</h3>
+
+            <p class="pg-hint">
+                Selected employees belong to this department.
+                Add available employees or deselect existing
+                employees to remove their department assignment.
+            </p>
+
+            @if (Model.AvailableEmployees.Any())
+            {
+                <select asp-for="SelectedEmployeeIds"
+                        asp-items="Model.AvailableEmployees"
+                        multiple
+                        size="8"
+                        class="form-control"
+                        aria-label="Manage department employees">
+                </select>
+
+                <small class="pg-hint">
+                    Hold Ctrl to select multiple employees.
+                    Deselecting an employee will not delete
+                    their account.
+                </small>
+            }
+            else
+            {
+                <p class="pg-hint">
+                    No employees are currently available.
+                </p>
+            }
+
+            <span asp-validation-for="SelectedEmployeeIds"
+                  class="text-danger"></span>
+
+        </div>
+
+        <!-- ACTIONS -->
         <div class="pg-actions">
 
             <button type="submit"
@@ -118,24 +143,16 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
 <aside class="pg-note">
     <strong>Keep History</strong>
+
     <p>
         Departments with purchase requests should not
         be deleted. Deactivate them instead to preserve
         historical records.
+
+        Removing an employee from a department does not
+        delete their user account.
     </p>
 </aside>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li>
-            <a asp-area="Admin"
-               asp-controller="Departments"
-               asp-action="Index">
-                Back to Departments
-            </a>
-        </li>
-    </ul>
-</nav>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
