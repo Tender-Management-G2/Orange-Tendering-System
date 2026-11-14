@@ -94,6 +94,10 @@ bell (SignalR), modal host and table kit (wwwroot/js/orange-ui.js).
     <script src="~/js/notification-bell.js" asp-append-version="true"></script>
     <partial name="_JQueryScripts" />
     <script src="~/js/orange-ui.js" asp-append-version="true"></script>
+    @if (string.Equals(workspace?.Role, Orange_Tendering_System.Models.SystemRoles.SourcingManager, StringComparison.OrdinalIgnoreCase))
+    {
+        <script src="~/js/sourcing-manager-filters.js" asp-append-version="true"></script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

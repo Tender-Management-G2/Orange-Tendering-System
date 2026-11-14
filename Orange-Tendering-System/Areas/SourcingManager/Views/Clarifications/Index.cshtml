@@ -19,7 +19,7 @@
         <div><h2 id="my-clarifications">My clarifications</h2><p>Each thread is linked to a tender under your review.</p></div>
         <a class="pg-btn pg-btn-primary" asp-action="Create">Open a clarification</a>
     </div>
-    <form method="get" class="pg-toolbar">
+    <form method="get" class="pg-toolbar" data-auto-filter>
         <input name="search" value="@Model.Search" placeholder="Search subject, tender, or member" aria-label="Search clarifications" />
         <select name="status" aria-label="Clarification status">
             <option value="">All statuses</option>
@@ -28,8 +28,6 @@
                 <option value="@item" selected="@(Model.Status == item.ToString())">@item</option>
             }
         </select>
-        <button class="pg-btn" type="submit">Search</button>
-        <a class="pg-btn pg-btn-secondary" asp-action="Index">Reset</a>
     </form>
 
     <div class="pg-table-wrap">

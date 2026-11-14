@@ -41,6 +41,7 @@
       asp-controller="Reports"
       asp-action="Index"
       class="pg-toolbar"
+      data-auto-filter
       aria-label="Search and filters">
 
     @if (isForwarding)
@@ -70,21 +71,6 @@
         }
     </select>
 
-    <button type="submit" class="btn btn-primary btn-sm">
-        Search
-    </button>
-
-    @if (isForwarding)
-    {
-        <a asp-action="Index"
-           asp-route-status="Accepted"
-           asp-route-forwarding="true"
-           class="btn btn-outline-secondary btn-sm">Reset</a>
-    }
-    else
-    {
-        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Reset</a>
-    }
 </form>
 
 <section class="ws-panel pg-panel" aria-labelledby="tbl-officer-reports">
