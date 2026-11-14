@@ -30,6 +30,11 @@ FEATURES:
 
 <partial name="_PageHeader" />
 
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success" role="status">@successMessage</div>
+}
+
 <style>
     .admin-user-stats {
         display: grid;

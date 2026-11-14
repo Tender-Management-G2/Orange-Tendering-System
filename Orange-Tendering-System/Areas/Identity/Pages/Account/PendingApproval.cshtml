@@ -63,7 +63,10 @@
         </div>
 
         <a class="auth-link" asp-area="" asp-controller="Home" asp-action="Index">Return to homepage</a>
-        <a class="auth-link" asp-page="./Login">Sign in with face or fingerprint / passkey</a>
+        @if (Model.CompanyApproved)
+        {
+            <a class="auth-link" asp-page="./Login">Sign in with face or fingerprint / passkey</a>
+        }
         <form asp-page="./Logout" method="post">
             <button type="submit" class="overview">Sign out</button>
         </form>
