@@ -36,7 +36,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
 
             var model = await offerService.GetCreateAsync(userId, id.Value);
             if (model == null)
-                return NotFound();
+                return View("Unavailable", await offerService.GetCreateBlockReasonAsync(userId, id.Value));
 
             return View(model);
         }
@@ -56,7 +56,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
 
             var model = await offerService.GetCreateAsync(userId, id);
             if (model == null)
-                return NotFound();
+                return View("Unavailable", await offerService.GetCreateBlockReasonAsync(userId, id));
 
             if (!ModelState.IsValid)
                 return View(model);

@@ -1,30 +1,41 @@
-/* Supplier-only overrides; other workspaces keep their existing layout. */
-.ws-supplier.ws-internal .ws-stage { min-width: 0; }
-.ws-supplier.ws-internal .ws-sidebar-brand { padding: 24px 20px; min-height: 108px; }
-.ws-supplier.ws-internal .ws-sidebar-brand .ws-brand { gap: 14px; font-size: 13px; }
-.ws-supplier.ws-internal .ws-sidebar-brand .ws-logo { width: 54px; height: 56px; font-size: 17px; }
-.ws-supplier.ws-internal .ws-sidebar-bottom { padding: 24px; border-top: 1px solid var(--ws-soft-rule); }
-.ws-supplier.ws-internal .ws-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    border-bottom: 1px solid var(--ws-soft-rule);
-    background: var(--ws-bg);
-    padding-inline: 24px;
-    gap: 16px;
+/* One shared top navigation for every page in the Supplier portal. */
+.ws-supplier { min-height: 100vh; display: flex; flex-direction: column; }
+.ws-supplier .ws-stage { margin-left: 0; min-width: 0; flex: 1; }
+.ws-supplier-header {
+    position: sticky; top: 0; z-index: 30; width: 100%; min-height: 78px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 10px 2.3%; background: var(--ws-surface); border-bottom: 1px solid var(--ws-rule);
+    box-shadow: 0 8px 24px #0002;
 }
-.ws-supplier-page-name { color: var(--ws-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ws-supplier.ws-internal .ws-supplier-main { padding: 24px 24px 40px; }
-.ws-supplier.ws-internal .ws-supplier-footer:before { display: none; }
-@media (max-width: 1079px) {
-    .ws-supplier.ws-internal .ws-sidebar-brand { padding-right: 12px; }
-    .ws-supplier.ws-internal .ws-topbar { padding-inline: 16px; gap: 12px; }
+.ws-supplier-header > .ws-brand { gap: 14px; font-size: 13px; flex: 0 0 auto; }
+.ws-supplier-header > .ws-brand .ws-logo { width: 52px; height: 54px; font-size: 17px; }
+.ws-supplier-header .ws-portal-label { flex: 0 0 auto; }
+.ws-supplier-nav { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.ws-supplier-nav-item { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 8px 10px; border-radius: 10px; white-space: nowrap; font-size: 12px; }
+.ws-supplier-nav-item svg { width: 19px; height: 19px; flex: 0 0 auto; }
+.ws-supplier-search { flex: 0 1 210px; width: 210px; min-width: 150px; height: 38px; margin: 0; }
+.ws-supplier-search input { font-size: 12px; }
+.ws-supplier-header .ws-topbar-actions { display: flex; align-items: center; gap: 5px; margin: 0; flex: 0 0 auto; }
+.ws-supplier-header .ws-account { padding-left: 9px; }
+.ws-supplier-main { flex: 1; width: 100%; max-width: 1800px; margin: 0 auto; padding: 22px 24px 40px; }
+.ws-supplier-footer { border-top: 1px solid var(--ws-rule); }
+.ws-supplier-footer:before { display: none; }
+@media (max-width: 1599px) {
+    .ws-supplier-nav { order: 5; flex: 1 0 100%; justify-content: flex-start; overflow-x: auto; border-top: 1px solid var(--ws-soft-rule); padding-top: 8px; }
+    .ws-supplier-search { margin-left: auto; }
 }
 @media (max-width: 767px) {
-    .ws-supplier.ws-internal .ws-supplier-main { padding: 16px 12px 28px; }
-    .ws-supplier.ws-internal .ws-topbar { gap: 8px; padding-inline: 12px; }
-    .ws-supplier.ws-internal .ws-topbar .ws-account-label,
-    .ws-supplier-page-name { display: none; }
-    .ws-supplier.ws-internal .ws-topbar-actions { gap: 4px; }
-    .ws-supplier.ws-internal .ws-topbar .ws-portal-label { display: inline-block; }
+    .ws-supplier-header { gap: 9px; padding: 10px 12px; }
+    .ws-supplier-header > .ws-brand { font-size: 11px; gap: 9px; }
+    .ws-supplier-header > .ws-brand .ws-logo { width: 42px; height: 44px; font-size: 14px; }
+    .ws-supplier-header .ws-portal-label { font-size: 10px; padding: 5px 7px; }
+    .ws-supplier-header .ws-topbar-actions { margin-left: auto; gap: 2px; }
+    .ws-supplier-header .ws-account-label,
+    .ws-supplier-header .ws-account .ws-chevron { display: none; }
+    .ws-supplier-header .ws-account { border: 0; padding-left: 2px; }
+    .ws-supplier-nav { gap: 5px; }
+    .ws-supplier-nav-item { flex: 0 0 auto; justify-content: flex-start; min-height: 36px; padding: 7px 9px; font-size: 11px; }
+    .ws-supplier-search { order: 6; flex: 1 0 100%; width: 100%; min-width: 100%; margin: 0; }
+    .ws-supplier-main { padding: 15px 12px 28px; }
+    .ws-supplier-footer { justify-content: center; text-align: center; }
 }

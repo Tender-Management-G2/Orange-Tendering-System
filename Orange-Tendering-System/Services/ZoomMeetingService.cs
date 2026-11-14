@@ -98,11 +98,21 @@ public class ZoomMeetingService(HttpClient http, IOptions<ZoomOptions> options, 
 
 // Officer scheduling entry point: optionally creates the Zoom meeting, then saves the session, attaches the
 // reviewed AI analysis and eligible supplier documents, and invites the four members in one transaction.
-public class EvaluationSchedulingService(TenderWorkflowService workflow, ZoomMeetingService zoom)
+public class EvaluationSchedulingService(TenderWorkflowService workflow, ZoomMeetingService zoom, IConfiguration configuration)
 {
     public async Task Schedule(int tenderId, SessionInput input, ClaimsPrincipal principal, CancellationToken ct)
     {
-        if (!input.CreateZoomMeeting) { await workflow.Setup(tenderId, input, principal); return; }
+        // The system creates the join link by itself unless the officer pasted one: Zoom when it is configured, otherwise a private Jitsi room.
+        var automatic = input.CreateZoomMeeting || input.CreateJitsiMeeting || string.IsNullOrWhiteSpace(input.MeetingUrl);
+        if (!automatic) { await workflow.Setup(tenderId, input, principal); return; }
+        // Meetings:Provider = Jitsi (default) always uses the private Jitsi room; Auto uses Zoom when configured; Zoom insists on Zoom.
+        var provider = configuration["Meetings:Provider"] ?? "Jitsi";
+        var useZoom = provider.Equals("Zoom", StringComparison.OrdinalIgnoreCase) || (provider.Equals("Auto", StringComparison.OrdinalIgnoreCase) && zoom.Configured);
+        if (!useZoom)
+        {
+            input.MeetingUrl = $"https://meet.jit.si/OrangeTender{tenderId}-{Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(10)).ToLowerInvariant()}";
+            await workflow.Setup(tenderId, input, principal); return;
+        }
         // Check every other precondition first so a meeting is not created for a request that cannot be saved.
         await workflow.ValidateSetup(tenderId, input, principal);
         var meeting = await zoom.Create($"Orange tender {tenderId} evaluation", input.StartsAt.UtcDateTime, input.EndsAt.UtcDateTime, ct);

@@ -73,6 +73,22 @@ public partial class TenderWorkflowService
         });
         return copy!;
     }
+    // Regenerates a DRAFT report with the current template. Allowed only for the Officer, while nobody has signed and nothing was submitted.
+    // The frozen-content guard of the DbContext stays untouched: the change is written by one narrow, conditional SQL update, and audited.
+    public Task RegenerateReport(int id, ClaimsPrincipal principal) => Change(id, principal, "ReportRegenerated", async (t, a) =>
+    {
+        await Officer(t, a); var s = await Session(id);
+        Require(s.State == SessionState.ReportDraft && s.Report != null && s.Report.Status == ReportStatus.Draft && s.Report.SubmittedAt == null, "Only a draft report can be regenerated.");
+        Require(!await db.Set<ReportSignature>().AnyAsync(x => x.TenderReportId == s.ReportId), "A report that already has signatures cannot be regenerated. Return it for revision instead.");
+        var report = s.Report; var reportId = report.Id;
+        report.PdfContent = null;
+        await reportDocuments.Prepare(report, s);
+        var pdf = report.PdfContent!; var pdfHash = report.PdfSha256; var snapshot = report.SnapshotJson; var snapshotHash = report.SnapshotSha256; var source = report.SourceSha256; var template = report.TemplateVersion; var pageIndex = report.SignaturePageIndex;
+        db.Entry(report).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+        var changed = await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE TenderReports SET PdfContent = {pdf}, PdfSha256 = {pdfHash}, SnapshotJson = {snapshot}, SnapshotSha256 = {snapshotHash}, SourceSha256 = {source}, TemplateVersion = {template}, SignaturePageIndex = {pageIndex} WHERE Id = {reportId} AND SubmittedAt IS NULL AND NOT EXISTS (SELECT 1 FROM ReportSignature WHERE TenderReportId = {reportId})");
+        Require(changed == 1, "The report could not be regenerated because it changed in the meantime.");
+        Audit(a, id, "ReportRegeneratedEvidence", new { ReportId = reportId, Template = template, CanonicalHash = pdfHash });
+    });
     public async Task<object> VerifyReport(int reportId, ClaimsPrincipal principal)
     {
         var actor = await Actor(principal); var (report, session) = await ReportContext(reportId); await ReportReader(report.TenderRound.Tender, actor);

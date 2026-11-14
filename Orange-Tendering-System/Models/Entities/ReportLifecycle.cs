@@ -30,6 +30,8 @@ public class ReportSignature
     public string ManifestJson { get; set; } = "";
     public SignatureMethod Method { get; set; }
     public byte[]? CmsSignature { get; set; }
+    // Handwritten signature drawn with the mouse or touch (PNG). Shown on the signature page of the viewing copy; not part of the cryptographic manifest.
+    public byte[]? SignatureImage { get; set; }
     [MaxLength(128)] public string? CertificateThumbprint { get; set; }
     public DateTime? InvalidatedAt { get; set; }
     [MaxLength(1000)] public string? InvalidationReason { get; set; }

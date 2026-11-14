@@ -21,11 +21,11 @@ ROUTE: /Biometrics/Fingerprint
 HOW IT WORKS:
 WebAuthn passkey with user verification required. The device
 checks the fingerprint locally; this system stores only the
-public key (UserPasskeyCredentials). Registration needs the
+public key (AspNetUserPasskeys). Registration needs the
 current password. Everything is audited without biometric data.
 
 DEPENDENCIES:
-AspNetUsers, UserPasskeyCredentials, AuditLogs,
+AspNetUsers, AspNetUserPasskeys, AuditLogs,
 wwwroot/js/biometric.js, BiometricsController.
 ===========================================================
 *@
@@ -41,7 +41,7 @@ wwwroot/js/biometric.js, BiometricsController.
 
 <div id="bio-root" data-return-url="">
     @Html.AntiForgeryToken()
-    <div id="bio-status" class="bio-status bio-status--info" role="status">Your fingerprint never leaves your device; only a public key is stored. Your password keeps working.</div>
+    <div id="bio-status" class="bio-status bio-status--info" role="status">Your fingerprint never leaves your device; only a public key is stored.</div>
 
     <section class="ws-panel pg-panel">
         <h2>Registered devices</h2>
@@ -57,7 +57,7 @@ wwwroot/js/biometric.js, BiometricsController.
                     <li>
                         <div>
                             <strong>@p.Label</strong>
-                            <small>Added @p.AddedAt.ToString("yyyy-MM-dd") · @(p.LastUsedAt is { } used ? "last used " + used.ToString("yyyy-MM-dd") : "never used")</small>
+                            <small>Added @p.AddedAt.ToString("yyyy-MM-dd")</small>
                         </div>
                         <button type="button" class="pg-btn pg-btn-danger" data-remove-passkey="@p.Id">Remove</button>
                     </li>
@@ -74,7 +74,7 @@ wwwroot/js/biometric.js, BiometricsController.
                 <div class="pg-field"><label for="bioPassword">Current password</label><input id="bioPassword" type="password" autocomplete="current-password" /><small class="pg-hint">Re-checked before a new authenticator is added.</small></div>
             </div>
             <div class="pg-actions">
-                <button id="btnPasskeyRegister" type="button" class="pg-btn pg-btn-primary">Register fingerprint</button>
+                <button id="btnPasskeyRegister" type="button" class="pg-btn pg-btn-primary">Register Fingerprint / Passkey</button>
                 <span class="pg-hint">If this computer has no fingerprint reader or Windows Hello, choose "Use a phone or tablet" in the browser window and scan the QR code with your phone.</span>
             </div>
         </div>

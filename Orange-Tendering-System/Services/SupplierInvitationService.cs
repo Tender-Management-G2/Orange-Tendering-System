@@ -79,6 +79,7 @@ public sealed class SupplierInvitationService(ApplicationDbContext context)
             {
                 Id = i.Id,
                 HasOffer = i.Bids.Any(),
+                WeightsApproved = context.Set<WeightRound>().Any(w => w.TenderId == i.TenderRound.TenderId && w.State == WeightState.Approved),
                 RoundStatus = i.TenderRound.Status,
                 TenderStatus = i.TenderRound.Tender.Status,
                 TenderTitle = i.TenderRound.Tender.Title,

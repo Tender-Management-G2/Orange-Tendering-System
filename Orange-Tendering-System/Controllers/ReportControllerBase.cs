@@ -38,14 +38,31 @@ public abstract class ReportControllerBase(TenderWorkflowService workflow) : Con
         var report = await workflow.ReviewReport(id, User); TempData["ReportMessage"] = "A new report version was generated. All required signatures must be collected again.";
         return RedirectToAction(nameof(Review), new { id = report.Versions.First().Id });
     }
+    // The signature drawn on the pad arrives as a PNG data URL. It is required, must be a real PNG and must not be huge.
+    protected static byte[] ReadSignature(string? dataUrl)
+    {
+        const string prefix = "data:image/png;base64,";
+        TenderWorkflowService.Require(!string.IsNullOrWhiteSpace(dataUrl) && dataUrl!.StartsWith(prefix, StringComparison.Ordinal) && dataUrl.Length < 400_000, "Draw your signature in the box first.");
+        byte[] png;
+        try { png = Convert.FromBase64String(dataUrl![prefix.Length..]); } catch (FormatException) { throw new WorkflowException("Draw your signature in the box first."); }
+        TenderWorkflowService.Require(png.Length > 200 && png[0] == 0x89 && png[1] == 0x50 && png[2] == 0x4E && png[3] == 0x47, "Draw your signature in the box first.");
+        return png;
+    }
+    protected bool IsAjax => string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
     protected async Task<IActionResult> Execute(int id, Func<Task> action)
-    { ValidateForm(); await action(); TempData["ReportMessage"] = "The report lifecycle action was saved."; return RedirectToAction(nameof(Review), new { id }); }
+    {
+        ValidateForm(); await action();
+        // Signing, voting and forwarding happen inside the tender popup: answer it with JSON instead of redirecting to a separate page.
+        if (IsAjax) return Json(new { ok = true });
+        TempData["ReportMessage"] = "The report lifecycle action was saved."; return RedirectToAction(nameof(Review), new { id });
+    }
     private void ValidateForm()
     { if (!ModelState.IsValid) throw new WorkflowException(string.Join(" ", ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage))); }
     public override void OnActionExecuted(ActionExecutedContext context)
     {
         if (context.Exception is WorkflowException or DbUpdateException)
         {
+            if (IsAjax) { context.ExceptionHandled = true; context.Result = new JsonResult(new { error = context.Exception is WorkflowException we ? we.Message : "A concurrent or duplicate operation was rejected. Reopen the report." }) { StatusCode = 400 }; base.OnActionExecuted(context); return; }
             ViewData.Model = context.Exception is WorkflowException e ? e.Message : "A concurrent or duplicate operation was rejected. Reopen the current report.";
             context.ExceptionHandled = true; context.Result = new ViewResult { ViewName = "WorkflowError", ViewData = ViewData, TempData = TempData, StatusCode = 400 };
         }

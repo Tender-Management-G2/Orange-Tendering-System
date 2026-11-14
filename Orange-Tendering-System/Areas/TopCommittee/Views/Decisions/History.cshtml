@@ -1,18 +1,20 @@
-@model DecisionHistory
+@model List<Orange_Tendering_System.Areas.TopCommittee.Services.TopCase>
 @{
-    ViewData["Title"] = "Committee Voting & Decision History";
-    ViewData["WorkspaceSection"] = "Decision History";
-    ViewData["Description"] = "Recorded rounds and votes for tenders assigned to you. Earlier decisions remain preserved.";
+    ViewData["Title"] = "Decision History"; ViewData["WorkspaceSection"] = "Decision History";
+    ViewData["Description"] = "Past tenders you decided on, with the final outcome.";
 }
-<div class="tc-history tc-live" data-live-root>
-<partial name="_PageHeader" /><partial name="_Messages" />
-<form method="get" asp-action="History" asp-route-id="" class="pg-toolbar tc-live-toolbar" data-live-form>
-<div class="tc-live-field"><label for="tc-live-search">Tender Search</label><input id="tc-live-search" type="search" name="search" maxlength="200" value="@Model.Search" placeholder="Tender title or reference (e.g. T-4)" aria-controls="tc-live-results" autocomplete="off" /></div>
-<div class="tc-live-field"><label for="tc-live-status">Round Status</label><select id="tc-live-status" name="status" aria-controls="tc-live-results"><option value="">All statuses</option>@foreach (var status in Enum.GetValues<CommitteeRoundStatus>()) { <option value="@status" selected="@(Model.Status == status)">@CommitteeDisplay.Status(status)</option> }</select></div>
-</form>
-<p class="tc-live-status" role="status" aria-live="polite" aria-atomic="true" data-live-status></p>
-<div id="tc-live-results" data-live-results><partial name="_HistoryResults" model="Model" /></div>
-</div>
-@section Styles { <partial name="_TopStyles" /><partial name="_HistoryStyles" /><partial name="_LiveFiltersStyles" /> }
-
-@section Scripts { <partial name="_LiveFiltersScripts" /> }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Bid history</h2></div>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th scope="col">Tender</th><th scope="col">Department</th><th scope="col">Outcome</th><th scope="col">Supplier</th><th scope="col">Decisions (approve / total)</th><th scope="col">My decision</th><th scope="col">Closed</th><th scope="col" data-nosort>Actions</th></tr></thead>
+        <tbody>
+        @foreach (var c in Model)
+        {
+            <tr><td><strong>@c.Title</strong></td><td>@c.Department</td><td>@(c.Outcome ?? c.Status)</td><td>@(c.Winner ?? "—")</td><td>@c.Approvals / @c.Votes</td><td>@(c.MyVote ?? "—")</td><td>@(c.AwardedAt?.ToString("yyyy-MM-dd") ?? "—")</td>
+                <td><a class="pg-btn" data-no-modal asp-action="ReviewEvaluation" asp-route-id="@c.TenderId">Details</a></td></tr>
+        }
+        @if (Model.Count == 0) { <tr><td colspan="8"><partial name="_EmptyState" model='"No decided tenders yet."' /></td></tr> }
+        </tbody>
+    </table></div>
+</section>

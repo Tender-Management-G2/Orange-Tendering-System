@@ -1,0 +1,81 @@
+@*
+ORANGE TENDER MANAGEMENT SYSTEM
+FILE: Evaluation Committee layout (fixed sidebar + topbar)
+
+The Evaluation Committee sidebar is written out here, in this role's own layout, as a fixed list. It does not come from
+WorkspaceNavigation or a stylesheet, and it never gains or loses items depending on the page or a click. Only the
+highlighted item changes (taken from the current route). Every Evaluation Committee page takes its design from this layout.
+USED BY: Areas/EvaluationCommittee/Views/_ViewStart.cshtml and the shared signed-in pages (Tasks, Notifications, Clarifications...)
+through WorkspaceNavigation.LayoutFor.
+*@
+@{
+    Layout = null;
+    var label = "Evaluation Committee";
+    var routeArea = ViewContext.RouteData.Values["area"]?.ToString() ?? "";
+    var routeController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var routeAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+    string Active(string area, string[] controllers, string? action = null) =>
+        string.Equals(routeArea, area, StringComparison.OrdinalIgnoreCase) && controllers.Contains(routeController, StringComparer.OrdinalIgnoreCase)
+        && (action == null || (action.StartsWith("!") ? !string.Equals(routeAction, action[1..], StringComparison.OrdinalIgnoreCase) : string.Equals(routeAction, action, StringComparison.OrdinalIgnoreCase))) ? "is-active" : "";
+    var pageTitle = ViewData["Title"]?.ToString() ?? $"{label} workspace";
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="color-scheme" content="dark light" />
+    <title>@pageTitle | Orange Sourcing</title>
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/css/workspace-shell.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/orange-ui.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="ws-shell ws-internal" data-workspace-role="Evaluation Committee">
+    <a class="ws-skip" href="#workspace-main">Skip to main content</a>
+    <aside class="ws-sidebar" id="workspace-navigation" aria-label="@label workspace navigation">
+        <div class="ws-sidebar-brand">
+            <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span><span>Sourcing &amp; Tender<br />Management System</span></a>
+            <button class="ws-icon-button ws-nav-close" type="button" aria-label="Close navigation">×</button>
+        </div>
+        <nav class="ws-primary-nav" aria-label="Evaluation Committee navigation">
+            <a class="ws-nav-item @Active("EvaluationCommittee", new[] { "Dashboard" })" asp-area="EvaluationCommittee" asp-controller="Dashboard" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("home"))</svg><span>Dashboard</span></a>
+            <a class="ws-nav-item @Active("EvaluationCommittee", new[] { "Workflow", "Evaluations", "Criteria", "Reports" })" asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>Weighted Evaluation</span></a>
+            <a class="ws-nav-item @Active("", new[] { "Clarifications" })" asp-area="" asp-controller="Clarifications" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chat"))</svg><span>Clarifications</span></a>
+        </nav>
+        <div class="ws-sidebar-bottom"><span class="ws-role-label">@label</span><a asp-area="" asp-controller="Home" asp-action="Contact">Contact support <span aria-hidden="true">↗</span></a></div>
+        <div class="ws-sidebar-architecture" aria-hidden="true"></div>
+    </aside>
+    <button class="ws-backdrop" type="button" aria-label="Close navigation" hidden></button>
+    <div class="ws-stage">
+        <header class="ws-topbar">
+            <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+            <div class="ws-search" data-global-search data-search-url="/Search/Query"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Search tenders, purchase requests and suppliers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
+            <div class="ws-topbar-actions">
+                <button type="button" class="ws-icon-button" data-voice-search aria-label="Voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                <partial name="_NotificationBell" />
+                <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
+                <partial name="_WorkspaceAccountMenu" />
+            </div>
+        </header>
+        <main id="workspace-main" class="ws-main" tabindex="-1">
+            <div class="pg-page">
+                @RenderBody()
+            </div>
+        </main>
+        <footer class="ws-internal-footer"><span>© @DateTime.UtcNow.Year Sourcing &amp; Tender Management System · Academic project</span><a asp-area="" asp-controller="Home" asp-action="HowItWorks">How the workflow works ↗</a></footer>
+    </div>
+    <partial name="_AiChatWidget" />
+    <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
+    <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
+    <script src="~/js/vendor/signalr.min.js" asp-append-version="true"></script>
+    <script src="~/js/notification-bell.js" asp-append-version="true"></script>
+    <partial name="_JQueryScripts" />
+    <script src="~/js/orange-ui.js" asp-append-version="true"></script>
+    <script src="~/js/ai-chat.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

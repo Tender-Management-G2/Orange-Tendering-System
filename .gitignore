@@ -497,3 +497,6 @@ Orange-Tendering-System/App_Data/SupplierUploads/
 # Generated PDF layout artifacts are reproducible, not production business records.
 /tmp/pdfs/
 /output/pdf/
+
+# Local build/check artifacts accidentally committed on a feature branch
+**/.checks/

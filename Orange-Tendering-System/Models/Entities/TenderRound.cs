@@ -12,7 +12,7 @@ namespace Orange_Tendering_System.Models.Entities
         public int TenderId { get; set; }
         public Tender Tender { get; set; } = null!;
 
-        // 1, 2, 3, ... The minimum-offer rule (3, or 2 after the allowed failed attempts) is checked in business logic.
+        // 1, 2, 3, ... A round normally needs 3 compliant suppliers; later rounds may proceed with 2 after 2 earlier failed attempts.
         public int RoundNumber { get; set; }
 
         public TenderRoundStatus Status { get; set; } = TenderRoundStatus.Draft;

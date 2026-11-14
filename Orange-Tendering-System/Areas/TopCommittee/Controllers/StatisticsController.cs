@@ -1,58 +1,16 @@
+// ORANGE TENDER MANAGEMENT SYSTEM
+// Module: Top Committee - Management Statistics: site-wide statistics and transactions per supplier, downloadable as Excel / PDF.
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Razor;
-using Orange_Tendering_System.Areas.TopCommittee.Services;
-using Orange_Tendering_System.Areas.TopCommittee.ViewModels;
-using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
-using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
-namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
-
-[Area("TopCommittee"), Authorize(Roles = SystemRoles.TopCommittee)]
-public sealed class StatisticsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
-    IWebHostEnvironment environment, IRazorViewEngine views) : TopCommitteeControllerBase(db, users)
+namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
 {
-    public async Task<IActionResult> Index()
+    [Area("TopCommittee")]
+    [Authorize(Roles = SystemRoles.TopCommittee)]
+    public class StatisticsController(ReportingService reports) : Controller
     {
-        if (await ActiveUser() is null) return Forbid();
-        Response.Headers.CacheControl = "no-store";
-        return await FullSystemPage();
-    }
-    public async Task<IActionResult> FullSystem()
-    {
-        if (await ActiveUser() is null) return Forbid();
-        Response.Headers.CacheControl = "no-store";
-        return await FullSystemPage();
-    }
-    public async Task<IActionResult> Management()
-    {
-        if (await ActiveUser() is null) return Forbid();
-        Response.Headers.CacheControl = "no-store";
-        return await FullSystemPage();
-    }
-    private async Task<IActionResult> FullSystemPage() =>
-        View("System", new ReportingPage(await new TopCommitteeReportingService(Db).Read(), true));
-    public async Task<IActionResult> Export()
-    {
-        if (await ActiveUser() is null) return Forbid();
-        var report = await Committee.Statistics();
-        return File(StatisticsWorkbook.Create(report), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"TopCommittee-Statistics-{report.GeneratedAt:yyyyMMdd-HHmm}.xlsx");
-    }
-    public async Task<IActionResult> ExportExcel()
-    {
-        if (await ActiveUser() is null) return Forbid();
-        var page = new ReportingPage(await new TopCommitteeReportingService(Db).Read(), true);
-        Response.Headers.CacheControl = "no-store";
-        return File(ReportingWorkbook.Create(page), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"TopCommittee-FullSystem-{page.Data.GeneratedAt:yyyyMMdd-HHmm}.xlsx");
-    }
-    public async Task<IActionResult> ExportPdf(CancellationToken cancellationToken)
-    {
-        if (await ActiveUser() is null) return Forbid();
-        var page = new ReportingPage(await new TopCommitteeReportingService(Db).Read(), true);
-        Response.Headers.CacheControl = "no-store";
-        try { return File(await ReportingExport.Pdf(this, views, page, environment.ContentRootPath, cancellationToken), "application/pdf", $"TopCommittee-FullSystem-{page.Data.GeneratedAt:yyyyMMdd-HHmm}.pdf"); }
-        catch (InvalidOperationException exception) { return Problem(title: "PDF export unavailable", detail: exception.Message, statusCode: 503); }
+        public async Task<IActionResult> Index() => View(await reports.BuildAsync("management"));
     }
 }

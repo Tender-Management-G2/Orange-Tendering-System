@@ -55,13 +55,25 @@ public class LoginModel(
         }
 
         var isSupplier = await users.IsInRoleAsync(user, SystemRoles.Supplier);
+        var supplierStatus = user.SupplierId == null ? null : await db.Suppliers
+            .Where(s => s.Id == user.SupplierId)
+            .Select(s => (SupplierStatus?)s.Status)
+            .SingleOrDefaultAsync();
         var supplierAllowed = (!isSupplier && user.SupplierId == null) ||
-            (user.SupplierId != null && await db.Suppliers
-                .AnyAsync(s => s.Id == user.SupplierId && s.Status == SupplierStatus.Approved));
-        if (!user.IsActive || !supplierAllowed)
+            (isSupplier && (supplierStatus is SupplierStatus.Pending or SupplierStatus.Approved));
+        if (!user.IsActive || !user.EmailConfirmed || !supplierAllowed)
         {
             logger.LogWarning("Identity sign-in denied by account state for user {UserId}.", user.Id);
             ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");
+            return Page();
+        }
+
+        // Approved suppliers with biometrics enrolled must use them; the password is only for registration/setup.
+        if (isSupplier && supplierStatus == SupplierStatus.Approved &&
+            (await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id) ||
+             (await users.GetPasskeysAsync(user)).Count > 0))
+        {
+            ModelState.AddModelError(string.Empty, "This supplier account signs in with face recognition or a passkey. Use the buttons below the form.");
             return Page();
         }
 
@@ -76,6 +88,8 @@ public class LoginModel(
 
         if (user.MustChangePassword)
             return RedirectToPage("./FirstLoginPasswordChange");
+        if (isSupplier && supplierStatus == SupplierStatus.Pending)
+            return RedirectToPage("./PendingApproval");
         if (ReturnUrl != null)
             return LocalRedirect(ReturnUrl);
 

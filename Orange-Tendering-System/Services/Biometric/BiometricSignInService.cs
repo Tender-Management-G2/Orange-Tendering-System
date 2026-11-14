@@ -24,7 +24,7 @@ public class BiometricSignInService(
 
     public async Task<bool> SignInAsync(ApplicationUser user, string method, string? ipAddress)
     {
-        if (method != PasskeyMethod || !await AccountAllowedAsync(user))
+        if (method is not (PasskeyMethod or FaceMethod) || !await AccountAllowedAsync(user))
         {
             await AuditAsync(user.Id, "BiometricSignInDenied", method, ipAddress, "account not allowed to sign in");
             return false;
@@ -51,9 +51,21 @@ public class BiometricSignInService(
     }
 
     /// <summary>
-    /// Verifies the password with Identity's lockout accounting. Face sign-in uses this as a mandatory first
-    /// factor, because the face evidence is produced in the browser and cannot be trusted on its own.
+    /// Who may register a face or passkey: an active, email-confirmed account. Suppliers may enroll while their
+    /// company is Pending (registration step) or Approved; signing in with it still requires Approved.
     /// </summary>
+    public async Task<bool> EnrollmentAllowedAsync(ApplicationUser user)
+    {
+        if (!user.IsActive || !user.EmailConfirmed || await users.IsLockedOutAsync(user))
+            return false;
+
+        var isSupplier = await users.IsInRoleAsync(user, SystemRoles.Supplier);
+        return (!isSupplier && user.SupplierId == null) ||
+            (isSupplier && user.SupplierId != null && await db.Suppliers.AsNoTracking()
+                .AnyAsync(s => s.Id == user.SupplierId && (s.Status == SupplierStatus.Pending || s.Status == SupplierStatus.Approved)));
+    }
+
+    /// <summary>Verifies the password with Identity's lockout accounting (re-checked before biometric enrollment).</summary>
     public async Task<bool> CheckPasswordAsync(ApplicationUser user, string? password)
     {
         if (string.IsNullOrEmpty(password)) return false;

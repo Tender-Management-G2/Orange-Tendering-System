@@ -3,9 +3,9 @@
 (function () {
     'use strict';
 
-    // Legacy camera capture is retained below for future reviewed preview use only.
-    // Face authentication/enrollment is disabled. Client descriptors and liveness are untrusted.
-    var FACE_CDN = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13';
+    // Face recognition runs in the browser; the camera image never leaves the device, only 128-number
+    // descriptors are sent. face-api.js 1.7.13 and its models are served locally from wwwroot/lib/face-api.
+    var FACE_BASE = '/lib/face-api';
 
     // ---------- Small helpers ----------
 
@@ -26,7 +26,6 @@
     }
 
     function sleep(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
-    function round3(n) { return Math.round(n * 1000) / 1000; }
     function $(id) { return document.getElementById(id); }
 
     function antiForgeryToken() {
@@ -58,8 +57,9 @@
             ? ' [' + error.name + (error.message ? ': ' + error.message : '') + ']'
             : '';
         if (error && (error.name === 'NotAllowedError' || error.name === 'AbortError')) {
-            return new Error('The request was cancelled or timed out. If you did not cancel it, make sure Windows Hello ' +
-                '(fingerprint, face or PIN) is set up on this device.' + detail);
+            var cancelled = new Error('Authentication Cancelled — the prompt was cancelled, timed out, or no compatible passkey was available. Try again and select a phone or tablet.' + detail);
+            cancelled.code = 'cancelled';
+            return cancelled;
         }
         if (error && error.name === 'InvalidStateError') {
             return new Error('This device is already registered.' + detail);
@@ -73,16 +73,35 @@
     // ---------- Fingerprint / device passkey (WebAuthn) ----------
 
     function ensureWebAuthn() {
+        if (!window.isSecureContext) { throw new Error('Open this page over HTTPS to use passkeys.'); }
         if (!window.PublicKeyCredential || !navigator.credentials) {
             throw new Error('This browser does not support fingerprint sign-in.');
         }
     }
 
-    async function passkeyLogin(returnUrl) {
+    function credentialJson(credential) {
+        if (!credential) { throw new Error('The device did not return a credential.'); }
+        if (credential.toJSON) { return JSON.stringify(credential.toJSON()); }
+        var r = credential.response;
+        var response = { clientDataJSON: enc(r.clientDataJSON) };
+        if (r.attestationObject) {
+            response.attestationObject = enc(r.attestationObject);
+            response.transports = r.getTransports ? r.getTransports() : [];
+        } else {
+            response.authenticatorData = enc(r.authenticatorData);
+            response.signature = enc(r.signature);
+            response.userHandle = r.userHandle ? enc(r.userHandle) : null;
+        }
+        return JSON.stringify({ id: credential.id, rawId: enc(credential.rawId), type: credential.type,
+            authenticatorAttachment: credential.authenticatorAttachment, response: response,
+            clientExtensionResults: credential.getClientExtensionResults() });
+    }
+
+    async function passkeyLogin(returnUrl, base) {
         ensureWebAuthn();
-        var start = await post('/Biometrics/PasskeyLoginOptions');
-        var options = start.options;
+        var options = await post(base ? base + '/login-options' : '/Biometrics/PasskeyLoginOptions');
         options.challenge = dec(options.challenge);
+        (options.allowCredentials || []).forEach(function (c) { c.id = dec(c.id); });
 
         var credential;
         try {
@@ -91,22 +110,15 @@
             throw friendly(e);
         }
 
-        var r = credential.response;
-        return post('/Biometrics/PasskeyLogin', {
-            token: start.token,
-            id: enc(credential.rawId),
-            clientDataJson: enc(r.clientDataJSON),
-            authenticatorData: enc(r.authenticatorData),
-            signature: enc(r.signature),
-            userHandle: r.userHandle ? enc(r.userHandle) : null,
+        return post(base ? base + '/verify' : '/Biometrics/PasskeyLogin', {
+            credentialJson: credentialJson(credential),
             returnUrl: returnUrl
         });
     }
 
-    async function passkeyRegister(label, password) {
+    async function passkeyRegister(label, password, base) {
         ensureWebAuthn();
-        var start = await post('/Biometrics/PasskeyRegisterOptions', { password: password });
-        var options = start.options;
+        var options = await post(base ? base + '/register-options' : '/Biometrics/PasskeyRegisterOptions', { password: password });
         options.challenge = dec(options.challenge);
         options.user.id = dec(options.user.id);
         (options.excludeCredentials || []).forEach(function (c) { c.id = dec(c.id); });
@@ -118,16 +130,19 @@
             throw friendly(e);
         }
 
-        return post('/Biometrics/PasskeyRegister', {
-            token: start.token,
-            id: enc(credential.rawId),
-            clientDataJson: enc(credential.response.clientDataJSON),
-            attestationObject: enc(credential.response.attestationObject),
+        return post(base ? base + '/register' : '/Biometrics/PasskeyRegister', {
+            credentialJson: credentialJson(credential),
             label: label
         });
     }
 
-    // ---------- Face recognition ----------
+    // ---------- Face recognition (five-second capture) ----------
+    // Detect a face, take a few descriptors from consecutive camera frames, send them. There are no liveness
+    // steps (owner decision for the academic demo), so a photo of the person held up to the camera can pass.
+
+    var CAPTURE_MS = 5000;
+    var NO_FACE_TIMEOUT_MS = 30000; // time to position the face and complete a continuous capture
+    var MIN_FACE_WIDTH = 80;       // pixels in the analysed frame; smaller faces give unreliable descriptors
 
     function loadScript(src) {
         return new Promise(function (resolve, reject) {
@@ -135,20 +150,37 @@
             script.src = src;
             script.onload = resolve;
             script.onerror = function () {
-                reject(new Error('Could not load the face recognition library. Check your internet connection.'));
+                reject(new Error('Could not load the face recognition library.'));
             };
             document.head.appendChild(script);
         });
     }
 
-    async function loadFaceApi() {
-        if (!window.faceapi) {
-            await loadScript(FACE_CDN + '/dist/face-api.js');
+    // face-api.js and its three models are loaded once per page and shared by every attempt. A dummy inference
+    // then compiles the WebGL programs, so the first real capture is not slowed down by that one-time cost.
+    var faceApiReady = null;
+    function loadFaceApi() {
+        if (!faceApiReady) {
+            faceApiReady = (async function () {
+                if (!window.faceapi) { await loadScript(FACE_BASE + '/face-api.js'); }
+                var nets = window.faceapi.nets;
+                var model = FACE_BASE + '/model';
+                await Promise.all([
+                    nets.tinyFaceDetector.isLoaded || nets.tinyFaceDetector.loadFromUri(model),
+                    nets.faceLandmark68Net.isLoaded || nets.faceLandmark68Net.loadFromUri(model),
+                    nets.faceRecognitionNet.isLoaded || nets.faceRecognitionNet.loadFromUri(model)
+                ]);
+                try {
+                    var blank = document.createElement('canvas');
+                    blank.width = blank.height = 160;
+                    await window.faceapi.detectSingleFace(blank, new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160 }));
+                    await window.faceapi.detectFaceLandmarks(blank);
+                    await window.faceapi.computeFaceDescriptor(blank);
+                } catch (e) { console.info('Face model warm-up skipped:', e); }
+            })();
+            faceApiReady.catch(function () { faceApiReady = null; }); // a failed load can be retried
         }
-        var nets = window.faceapi.nets;
-        if (!nets.tinyFaceDetector.isLoaded) { await nets.tinyFaceDetector.loadFromUri(FACE_CDN + '/model'); }
-        if (!nets.faceLandmark68Net.isLoaded) { await nets.faceLandmark68Net.loadFromUri(FACE_CDN + '/model'); }
-        if (!nets.faceRecognitionNet.isLoaded) { await nets.faceRecognitionNet.loadFromUri(FACE_CDN + '/model'); }
+        return faceApiReady;
     }
 
     async function startCamera(video) {
@@ -165,7 +197,8 @@
             throw new Error('The camera is not available. Allow camera access and try again.');
         }
         video.srcObject = stream;
-        await video.play();
+        try { await video.play(); }
+        catch (e) { stopCamera(stream, video); throw new Error('The camera preview could not start. Try again.'); }
 
         // Wait until the camera is really delivering frames (some cameras need a moment after play()).
         for (var i = 0; i < 50 && (!video.videoWidth || video.readyState < 2); i++) { await sleep(60); }
@@ -177,222 +210,107 @@
         if (video) { video.srcObject = null; }
     }
 
-    // The measurements come from the 68 face landmarks.
-    function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    function nextFrame() { return new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); }); }
 
-    function eyeRatio(p) {
-        return (distance(p[1], p[5]) + distance(p[2], p[4])) / (2 * distance(p[0], p[3]));
-    }
-
-    function measure(landmarks) {
-        var p = landmarks.positions;
-        return {
-            ear: (eyeRatio(p.slice(36, 42)) + eyeRatio(p.slice(42, 48))) / 2,
-            yaw: (p[30].x - (p[0].x + p[16].x) / 2) / (p[16].x - p[0].x),
-            mar: distance(p[62], p[66]) / distance(p[60], p[64])
-        };
-    }
-
-    // Untrusted local preview rules only; these measurements are never authentication proof.
-    function stepMatcher(action, t) {
-        var states = {
-            blink: [
-                function (f) { return f.ear >= t.earOpen; },
-                function (f) { return f.ear <= t.earClosed; },
-                function (f) { return f.ear >= t.earOpen; }
-            ],
-            openMouth: [
-                function (f) { return f.mar <= t.marClosed; },
-                function (f) { return f.mar >= t.marOpen; }
-            ],
-            turnHead: [
-                function (f) { return Math.abs(f.yaw) <= t.yawCenter; },
-                function (f) { return Math.abs(f.yaw) >= t.yawTurn; }
-            ]
-        }[action];
-        var span = { blink: 2500, openMouth: 4000, turnHead: 4000 }[action];
-        var state = 0;
-        var first = 0;
-
-        return function (frame) {
-            if (state > 0 && frame.t - first > span) { state = 0; }
-            if (states[state](frame)) {
-                if (state === 0) { first = frame.t; }
-                state++;
-                if (state === states.length) { return true; }
-            }
-            return false;
-        };
-    }
-
-    var INSTRUCTIONS = {
-        blink: 'Blink once, slowly',
-        openMouth: 'Open your mouth wide, then close it',
-        turnHead: 'Turn your head to one side, then look back at the camera'
-    };
-
-    // Faces are hard to find in dim, grainy or back-lit camera pictures, so the detector adapts:
-    // it starts fast and strict, and if no face is found for a few seconds it switches to a more
-    // sensitive setting and then to a more accurate (slower) detector. The detector only decides
-    // where the face is; the face descriptor itself always comes from the same recognition network.
-    var DETECTORS = [
-        function (f) { return new f.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }); },
-        function (f) { return new f.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }); },
-        function (f) { return new f.SsdMobilenetv1Options({ minConfidence: 0.4 }); }
-    ];
-
-    async function ensureSsdModel() {
-        var nets = window.faceapi.nets;
-        if (!nets.ssdMobilenetv1.isLoaded) { await nets.ssdMobilenetv1.loadFromUri(FACE_CDN + '/model'); }
-    }
-
-    async function capture(challenge, video, setHint) {
+    // onDetect (optional, used by /face-demo): called for every analysed frame with true/false (face found).
+    async function capture(video, setHint, onDetect) {
         var faceapi = window.faceapi;
-        var thresholds = challenge.thresholds;
-        var detectorLevel = 0;
-        var detector = DETECTORS[0](faceapi);
-        var missingSince = null;
-        var ssdFailed = false;
+        // Fast detector first; after 1.5 s without a face a more sensitive one (dim light, face further away).
+        var fast = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+        var sensitive = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 });
         var cpuTried = false;
-        var LEVEL_NAMES = ['fast', 'sensitive', 'SSD'];
 
-        // The detector reads each frame from a plain 2D canvas instead of straight from the <video>
-        // element. On some graphics drivers a video cannot be uploaded to WebGL correctly and the
-        // detector then sees black frames, so it never finds a face even though the picture is fine.
-        var frameCanvas = document.createElement('canvas');
-        var frameContext = frameCanvas.getContext('2d', { willReadFrequently: true });
+        // Each frame is read from a plain 2D canvas instead of straight from the <video>: on some graphics drivers
+        // a video uploaded to WebGL arrives black and the detector never finds a face.
+        var canvas = document.createElement('canvas');
+        var context = canvas.getContext('2d', { willReadFrequently: true });
         function grab() {
-            var sourceWidth = video.videoWidth || 640;
-            var sourceHeight = video.videoHeight || 480;
-            var w = Math.min(sourceWidth, 640);
-            var h = Math.round(w * sourceHeight / sourceWidth);
-            if (frameCanvas.width !== w || frameCanvas.height !== h) { frameCanvas.width = w; frameCanvas.height = h; }
-            frameContext.drawImage(video, 0, 0, w, h);
-            return frameCanvas;
+            var w = Math.min(video.videoWidth || 640, 640);
+            var h = Math.round(w * (video.videoHeight || 480) / (video.videoWidth || 640));
+            if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+            context.drawImage(video, 0, 0, w, h);
+            return canvas;
         }
 
-        // A short description of what the detector is running on, shown when no face is found so a
-        // screenshot is enough to diagnose the problem.
-        function diagnostics() {
-            var backend = 'unknown';
-            try { backend = faceapi.tf.getBackend(); } catch (e) { /* diagnostics only */ }
-            return '[' + backend + ', ' + LEVEL_NAMES[detectorLevel] + ', camera ' + (video.videoWidth || 0) + 'x' + (video.videoHeight || 0) + ']';
-        }
-
-        console.info('Face detection', diagnostics());
-        var frames = [];
         var descriptors = [];
-        var step = 0;
-        var matcher = stepMatcher(challenge.actions[0], thresholds);
         var started = performance.now();
-        var deadline = challenge.expiresInSeconds * 1000 - 4000;
-        var lastDescriptor = -1000;
+        var lastSeen = started;
+        var lastFrameTime = -1;
+        var captureStarted = null;
+        var lastSample = -Infinity;
+        setHint('Look at the camera for 5 seconds.');
 
-        setHint(INSTRUCTIONS[challenge.actions[0]]);
+        while (performance.now() - started < NO_FACE_TIMEOUT_MS) {
+            // Only analyse a new camera frame, so every sample comes from a different picture.
+            if (video.currentTime === lastFrameTime) { await nextFrame(); continue; }
+            lastFrameTime = video.currentTime;
 
-        while (performance.now() - started < deadline) {
-            var now = performance.now() - started;
-            var detection = await faceapi.detectSingleFace(grab(), detector).withFaceLandmarks();
-            if (!detection) {
-                if (missingSince === null) { missingSince = now; }
-                var missing = now - missingSince;
+            var missing = performance.now() - lastSeen;
+            if (missing > 5000 && !cpuTried) {
+                // Last resort: some graphics drivers give wrong results in WebGL, so compute on the CPU.
+                cpuTried = true;
+                try { if (faceapi.tf.getBackend() !== 'cpu') { await faceapi.tf.setBackend('cpu'); await faceapi.tf.ready(); } }
+                catch (e) { console.error('Could not switch to the CPU backend:', e); }
+            }
 
-                if (detectorLevel === 0 && missing > 3000) {
-                    detectorLevel = 1;
-                    detector = DETECTORS[1](faceapi);
-                    console.info('No face found for 3 s: using a more sensitive face detector.');
-                } else if (detectorLevel === 1 && !ssdFailed && missing > 6000) {
-                    try {
-                        setHint('Still looking for your face...');
-                        await ensureSsdModel();
-                        detectorLevel = 2;
-                        detector = DETECTORS[2](faceapi);
-                        console.info('No face found for 6 s: using the more accurate SSD face detector.');
-                    } catch (e) {
-                        console.error('Could not load the SSD face detector:', e);
-                        ssdFailed = true; // stay on the sensitive tiny detector
-                    }
-                } else if (missing > 10000 && !cpuTried) {
-                    // Last resort: some graphics drivers give wrong results in WebGL, so compute on the CPU.
-                    cpuTried = true;
-                    try {
-                        if (faceapi.tf.getBackend() !== 'cpu') {
-                            setHint('Still looking for your face (switching to a compatible mode)...');
-                            await faceapi.tf.setBackend('cpu');
-                            await faceapi.tf.ready();
-                            console.info('No face found for 10 s: switched the computation to the CPU.');
-                        }
-                    } catch (e) {
-                        console.error('Could not switch to the CPU backend:', e);
-                    }
+            var detected = await faceapi.detectAllFaces(grab(), missing > 1500 ? sensitive : fast)
+                .withFaceLandmarks().withFaceDescriptors();
+            var found = detected.length === 1 ? detected[0] : null;
+            if (onDetect) { onDetect(!!found); }
+
+            if (found && found.detection.box.width >= MIN_FACE_WIDTH) {
+                lastSeen = performance.now();
+                if (captureStarted === null) { captureStarted = lastSeen; }
+                var elapsed = lastSeen - captureStarted;
+                if (lastSeen - lastSample >= 1000 || elapsed >= CAPTURE_MS) {
+                    descriptors.push({ t: Math.round(elapsed), v: Array.from(found.descriptor) });
+                    lastSample = lastSeen;
                 }
-
-                setHint(missing > 6000
-                    ? 'No face found. Face a light (not a window behind you), move a little back, and look straight at the camera. ' + diagnostics()
-                    : 'No face found. Look straight at the camera.');
-                await sleep(60);
-                continue;
+                setHint('Keep looking at the camera: ' + Math.max(0, Math.ceil((CAPTURE_MS - elapsed) / 1000)) + ' seconds remaining.');
+                if (elapsed >= CAPTURE_MS && descriptors.length >= 3) { return { descriptors: descriptors }; }
+            } else {
+                captureStarted = null;
+                descriptors = [];
+                lastSample = -Infinity;
+                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 5-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 5-second capture will restart.');
             }
-            missingSince = null;
-
-            var m = measure(detection.landmarks);
-            var frame = { t: Math.round(now), ear: round3(m.ear), yaw: round3(m.yaw), mar: round3(m.mar) };
-            frames.push(frame);
-
-            // A face sample is taken whenever the face is neutral: looking ahead, eyes open, mouth closed.
-            var neutral = m.ear >= thresholds.earOpen && Math.abs(m.yaw) <= thresholds.yawCenter && m.mar <= thresholds.marClosed;
-            if (neutral && descriptors.length < 6 && now - lastDescriptor >= 500) {
-                var full = await faceapi.detectSingleFace(grab(), detector).withFaceLandmarks().withFaceDescriptor();
-                if (full) {
-                    descriptors.push({ t: Math.round(now), v: Array.from(full.descriptor) });
-                    lastDescriptor = now;
-                }
-            }
-
-            if (step < challenge.actions.length && matcher(frame)) {
-                step++;
-                if (step < challenge.actions.length) {
-                    matcher = stepMatcher(challenge.actions[step], thresholds);
-                    setHint(INSTRUCTIONS[challenge.actions[step]]);
-                } else {
-                    setHint('Now look straight at the camera and hold still.');
-                }
-            }
-
-            var span = descriptors.length ? descriptors[descriptors.length - 1].t - descriptors[0].t : 0;
-            if (step >= challenge.actions.length && descriptors.length >= 4 && span >= 1600) {
-                return { frames: frames, descriptors: descriptors };
-            }
-
-            await sleep(20);
         }
 
-        throw new Error(frames.length === 0
-            ? 'No face was detected by the camera. Check the lighting, try another browser, and send this to the developer: ' + diagnostics()
-            : 'Time ran out before the steps were completed. Try again.');
+        var failure = new Error('No face detected. Make sure your face is well lit and fully in view, then try again.');
+        failure.code = 'noFace';
+        throw failure;
     }
 
     async function runFace(options, challengeUrl, submitUrl, extra, challengeBody) {
-        options.setStatus('Loading face recognition...');
-        await loadFaceApi();
-        var stream = await startCamera(options.video);
+        options.setStatus('Starting the camera...');
+        // The token first: a wrong enrollment password fails before the camera opens.
+        var challenge = await post(challengeUrl, challengeBody);
+        var cameraStarting = startCamera(options.video);
         try {
-            options.setStatus('Follow the instructions under the camera.');
-            var challenge = await post(challengeUrl, challengeBody);
-            var evidence = await capture(challenge, options.video, options.setHint);
+            await loadFaceApi(); // usually already loaded in the background when the page opened
+        } catch (e) {
+            cameraStarting.then(function (s) { stopCamera(s, options.video); }, function () { });
+            throw e;
+        }
+        var stream = await cameraStarting;
+        if (options.onCamera) { options.onCamera(true); }
+        try {
+            options.setStatus('Looking for your face...');
+            var evidence = await capture(options.video, options.setHint, options.onDetect);
             options.setStatus('Checking...');
             return await post(submitUrl, Object.assign({ token: challenge.token }, evidence, extra));
         } finally {
             stopCamera(stream, options.video);
+            if (options.onCamera) { options.onCamera(false); }
         }
     }
 
-    function faceLogin(options, email, password, returnUrl) {
-        return Promise.reject(new Error('Face Login is disabled: secure server-verifiable identity proof is not implemented.'));
+    function faceLogin(options, email, returnUrl) {
+        return runFace(options, '/Biometrics/FaceChallenge', '/Biometrics/FaceLogin', { email: email, returnUrl: returnUrl });
     }
 
     function faceEnroll(options, replace, password) {
-        return Promise.reject(new Error('Face enrollment is disabled. Camera capture code is retained for future reviewed use only.'));
+        return runFace(options, '/Biometrics/FaceEnrollChallenge', '/Biometrics/FaceEnroll', { replace: !!replace }, { password: password });
     }
 
     // ---------- Page wiring ----------
@@ -451,8 +369,13 @@
 
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) {
-            faceLoginButton.disabled = true;
-            faceLoginButton.addEventListener('click', function () { setStatus('Face Login is disabled pending secure server-verifiable identity proof.', 'danger'); });
+            faceLoginButton.addEventListener('click', function () {
+                var emailBox = $('Input_Email');
+                var email = ((emailBox && emailBox.value) || '').trim();
+                if (!email) { setStatus('Enter your email above first.', 'danger'); return; }
+                if (panel) { panel.classList.remove('bio-hidden'); }
+                guarded(function () { return faceLogin(faceOptions, email, returnUrl); }, 'Signed in.');
+            });
         }
 
         var passkeyRegisterButton = $('btnPasskeyRegister');
@@ -462,16 +385,34 @@
                 var password = ($('bioPassword') || {}).value || '';
                 if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
                 setStatus('Use your fingerprint, face or PIN when your device asks.');
-                guarded(function () { return passkeyRegister(label, password); }, 'Device registered.').then(function (ok) {
+                guarded(function () { return passkeyRegister(label, password); }, 'Fingerprint / Passkey Registered Successfully').then(function (ok) {
                     if (ok) { window.location.reload(); }
                 });
             });
         }
 
+        root.querySelectorAll('[data-remove-passkey]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                if (!window.confirm('Remove this passkey from your account?')) { return; }
+                guarded(function () { return post('/Biometrics/PasskeyRemove?id=' + encodeURIComponent(button.dataset.removePasskey)); }, 'Passkey removed.').then(function (ok) {
+                    if (ok) { window.location.reload(); }
+                });
+            });
+        });
+
         var faceEnrollButton = $('btnFaceEnroll');
         if (faceEnrollButton) {
-            faceEnrollButton.disabled = true;
-            faceEnrollButton.addEventListener('click', function () { setStatus('Face enrollment is disabled. Browser liveness measurements cannot authorize enrollment.', 'danger'); });
+            faceEnrollButton.addEventListener('click', function () {
+                var password = ($('bioPassword') || {}).value || '';
+                if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
+                var replaceBox = $('faceReplace');
+                if (panel) { panel.classList.remove('bio-hidden'); }
+                guarded(function () { return faceEnroll(faceOptions, replaceBox ? replaceBox.checked : true, password); }, 'Face registered successfully.').then(function (ok) {
+                    // The registration step moves on to its confirmation; the settings page just reloads.
+                    var next = root.getAttribute('data-enrolled-url');
+                    if (ok) { if (next) { window.location.href = next; } else { window.location.reload(); } }
+                });
+            });
         }
 
         var faceRemoveButton = $('btnFaceRemove');
@@ -485,9 +426,152 @@
         }
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
+    // ---------- Development-only face demo (/face-demo, Controllers/FaceDemoController.cs) ----------
+    // Same capture and server-side matching as sign-in; it only shows the numbers and signs nobody in.
+
+    function initFaceDemo() {
+        var root = $('face-demo-root');
+        if (!root) { return; }
+
+        var video = $('faceVideo');
+        var hint = $('faceHint');
+        var result = $('demoResult');
+        var buttons = Array.prototype.slice.call(root.querySelectorAll('button'));
+        var detectedFrames = 0;
+        var missedFrames = 0;
+        var started = 0;
+
+        function show(id, text) { var el = $(id); if (el) { el.textContent = text; } }
+        function setResult(text, kind) {
+            result.className = 'bio-status bio-status--' + (kind || 'info');
+            result.textContent = text;
+        }
+        function elapsed() { return ((performance.now() - started) / 1000).toFixed(1) + ' s'; }
+
+        var options = {
+            video: video,
+            setStatus: function (text) { show('dbgStatus', text); },
+            setHint: function (text) { if (hint) { hint.textContent = text; } },
+            onCamera: function (on) { show('dbgCamera', on ? 'On' : 'Off'); },
+            onDetect: function (found) {
+                if (found) { detectedFrames++; } else { missedFrames++; }
+                show('dbgDetection', (found ? 'Face detected' : 'No face in frame') + ' (' + detectedFrames + ' frames with a face, ' + missedFrames + ' without)');
+            }
+        };
+
+        function clearDebug() {
+            detectedFrames = 0;
+            missedFrames = 0;
+            ['dbgDetection', 'dbgMatch', 'dbgDistance', 'dbgSamples', 'dbgTime'].forEach(function (id) { show(id, '—'); });
+        }
+
+        async function run(submitUrl, onResult) {
+            buttons.forEach(function (b) { b.disabled = true; });
+            clearDebug();
+            video.parentElement.classList.remove('bio-hidden');
+            setResult('Look at the camera.');
+            started = performance.now();
+            try {
+                onResult(await runFace(options, '/face-demo/challenge', submitUrl, {}));
+            } catch (e) {
+                if (e && e.code === 'noFace') {
+                    show('dbgDetection', 'No face detected');
+                    setResult('No Face Detected — ' + e.message, 'danger');
+                } else {
+                    if (e && /camera/i.test(e.message)) { show('dbgCamera', 'Not available'); }
+                    setResult((e && e.message) || String(e), 'danger');
+                }
+            } finally {
+                show('dbgTime', elapsed() + ' (camera start + capture + check)');
+                buttons.forEach(function (b) { b.disabled = false; });
+                options.setStatus('Idle');
+            }
+        }
+
+        $('btnDemoRegister').addEventListener('click', function () {
+            run('/face-demo/register', function (r) {
+                if (!r.registered) { setResult('Capture rejected — ' + r.problem, 'danger'); return; }
+                show('dbgSamples', r.samples + ' samples stored in memory for this browser');
+                show('demoTestFace', 'Registered (' + r.samples + ' samples)');
+                setResult('Test Face Registered Successfully', 'success');
+            });
+        });
+
+        $('btnDemoVerify').addEventListener('click', function () {
+            run('/face-demo/verify', function (r) {
+                if (r.stage === 'noTestFace') { setResult('Register a test face first.', 'danger'); return; }
+                if (r.stage === 'rejected') { setResult('Capture rejected — ' + r.problem, 'danger'); return; }
+                show('dbgThreshold', String(r.threshold));
+                show('dbgDistance', 'average ' + r.averageDistance + ' (per sample: ' + r.bestDistances.join(', ') + ')');
+                show('dbgMatch', r.matchingSamples + ' of ' + r.bestDistances.length + ' samples within threshold (' + r.requiredSamples + ' required, average must be ≤ threshold)');
+                setResult(r.matched ? 'Face Matched — Success' : 'Face Not Matched — Failed', r.matched ? 'success' : 'danger');
+            });
+        });
+
+        $('btnDemoReset').addEventListener('click', async function () {
+            try {
+                await post('/face-demo/reset');
+                clearDebug();
+                show('demoTestFace', 'None registered');
+                setResult('Test face cleared. Register a new one.');
+            } catch (e) {
+                setResult(e.message, 'danger');
+            }
+        });
+    }
+
+    function initPasskeyDemo() {
+        var root = $('passkey-demo-root');
+        if (!root) { return; }
+        $('passkeyDemoSupport').textContent = window.isSecureContext && window.PublicKeyCredential ? 'Supported (HTTPS)' : 'Unavailable — use HTTPS and a compatible browser';
+        async function run(action, success, verification) {
+            var started = performance.now();
+            root.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+            var resultBox = $('passkeyDemoResult');
+            resultBox.className = 'bio-status';
+            resultBox.textContent = 'Follow the browser and phone instructions…';
+            try {
+                var result = await action();
+                resultBox.textContent = success;
+                resultBox.className = 'bio-status bio-status--success';
+                if (verification) { $('passkeyDemoAuth').textContent = success; }
+                if (result.count !== undefined) { $('passkeyDemoCount').textContent = result.count + ' registered'; }
+            } catch (e) {
+                resultBox.textContent = e.message;
+                resultBox.className = 'bio-status bio-status--danger';
+                if (verification) { $('passkeyDemoAuth').textContent = e.code === 'cancelled' ? 'Authentication Cancelled' : e.message === 'No Passkey Registered' ? e.message : 'Authentication Failed'; }
+            } finally {
+                $('passkeyDemoTime').textContent = ((performance.now() - started) / 1000).toFixed(1) + ' seconds';
+                root.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+            }
+        }
+        $('btnPasskeyDemoRegister').onclick = function () { run(function () { return passkeyRegister('Demo phone', null, '/fingerprint-demo'); }, 'Fingerprint / Passkey Registered Successfully', false); };
+        $('btnPasskeyDemoVerify').onclick = function () { run(function () { return passkeyLogin(null, '/fingerprint-demo'); }, 'Authentication Successful', true); };
+        $('btnPasskeyDemoReset').onclick = function () { run(async function () {
+            await post('/fingerprint-demo/reset');
+            $('passkeyDemoAuth').textContent = 'Not attempted';
+            return { count: 0 };
+        }, 'Demo reset. Delete the saved passkey on your phone separately if needed.', false); };
+    }
+
+    // Load the face models in the background as soon as a page can use them, so the first click is fast.
+    // On the Login page (also used by employees) only once the supplier starts using the face sign-in.
+    function preloadFace() { loadFaceApi().catch(function (e) { console.error('Face models could not be preloaded:', e); }); }
+
+    function start() {
         init();
+        initFaceDemo();
+        initPasskeyDemo();
+        if ($('btnFaceEnroll') || $('face-demo-root')) { preloadFace(); }
+        var supplierEmail = $('Input_Email');
+        if (supplierEmail) { supplierEmail.addEventListener('focus', preloadFace, { once: true }); }
+        var faceLoginButton = $('btnFaceLogin');
+        if (faceLoginButton) { faceLoginButton.addEventListener('pointerenter', preloadFace, { once: true }); }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
     }
 })();

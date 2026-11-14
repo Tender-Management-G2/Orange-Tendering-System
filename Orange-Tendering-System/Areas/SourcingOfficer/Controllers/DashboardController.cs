@@ -18,9 +18,24 @@ public class DashboardController(ApplicationDbContext db) : Controller
         var officerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var request = await db.PurchaseRequests.AsNoTracking().Include(r => r.Department)
             .Where(r => r.Status == PurchaseRequestStatus.Submitted).OrderBy(r => r.SubmittedAt).FirstOrDefaultAsync();
-        var tender = await db.Tenders.AsNoTracking().Include(t => t.Rounds)
-            .Where(t => t.Status == TenderStatus.Bidding && t.Rounds.Any(r => r.Status == TenderRoundStatus.Open && r.Invitations.SelectMany(i => i.Bids).Count(b => b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.Compliant) >= 3))
-            .OrderBy(t => t.CreatedAt).FirstOrDefaultAsync();
+        Tender? tender = null;
+        var openRounds = await db.TenderRounds.AsNoTracking().Include(r => r.Tender)
+            .Include(r => r.Invitations).ThenInclude(i => i.Bids)
+            .Where(r => r.Status == TenderRoundStatus.Open && r.Tender.Status == TenderStatus.Bidding)
+            .OrderBy(r => r.CreatedAt).ToListAsync();
+        foreach (var round in openRounds)
+        {
+            var compliantSuppliers = round.Invitations
+                .Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.Compliant))
+                .Select(i => i.SupplierId).Distinct().Count();
+            var priorFailures = await db.TenderRounds.AsNoTracking()
+                .Where(r => r.TenderId == round.TenderId && r.RoundNumber < round.RoundNumber && r.Status == TenderRoundStatus.Failed)
+                .Include(r => r.Invitations).ThenInclude(i => i.Bids).ToListAsync();
+            var failedCount = priorFailures.Count(r => r.Invitations.Count > 0 && r.Invitations
+                .Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted))
+                .Select(i => i.SupplierId).Distinct().Count() < 3);
+            if (compliantSuppliers >= (failedCount >= 2 ? 2 : 3)) { tender = round.Tender; break; }
+        }
         var model = new SourcingOfficerDashboardViewModel
         {
             DisplayName = User.Identity?.Name,

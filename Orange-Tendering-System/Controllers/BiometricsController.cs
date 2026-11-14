@@ -4,8 +4,9 @@
 // Purpose: Fingerprint (WebAuthn passkey) and face-recognition sign-in on top of ASP.NET Core Identity.
 //   - GET Fingerprint / Face: enrollment pages for the signed-in user.
 //   - JSON endpoints called by wwwroot/js/biometric.js. Every POST is protected by the anti-forgery token.
-// Security: face authentication/enrollment is disabled server-side. Browser face evidence is untrusted.
-// Passkeys require real WebAuthn proof and Identity account restrictions; only public keys are stored.
+// Security: face sign-in compares freshly captured descriptors with encrypted enrolled templates (one-time token
+//   per attempt; NO liveness/spoof protection by owner decision). Passkeys require real WebAuthn proof.
+//   Enrollment is allowed for verified pending suppliers; sign-in requires an Approved supplier company.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -25,23 +26,20 @@ namespace Orange_Tendering_System.Controllers
         PasskeyService passkeys,
         FaceService faces,
         BiometricSignInService signIn,
-        BiometricThrottle throttle,
-        IOptions<BiometricOptions> options) : Controller
+        BiometricThrottle throttle) : Controller
     {
-        private const string GenericFailure = "Sign-in failed. Check your details and try again, or use your password.";
+        private const string GenericFailure = "Sign-in failed. Check your details and account approval, then try again.";
 
         // ---------- Pages ----------
 
         // GET /Biometrics/Fingerprint
         public async Task<IActionResult> Fingerprint()
         {
-            var userId = users.GetUserId(User)!;
+            var user = (await users.GetUserAsync(User))!;
             return View(new BiometricManageViewModel
             {
-                Passkeys = await db.UserPasskeyCredentials.AsNoTracking()
-                    .Where(c => c.UserId == userId).OrderBy(c => c.AddedAt)
-                    .Select(c => new PasskeyRow { Id = c.Id, Label = c.DeviceLabel ?? "Device", AddedAt = c.AddedAt, LastUsedAt = c.LastUsedAt })
-                    .ToListAsync()
+                Passkeys = (await passkeys.ListAsync(user)).Select(c => new PasskeyRow
+                { Id = Base64Url.Encode(c.CredentialId), Label = c.Name ?? "Device", AddedAt = c.CreatedAt.UtcDateTime }).ToList()
             });
         }
 
@@ -60,27 +58,24 @@ namespace Orange_Tendering_System.Controllers
             var user = (await users.GetUserAsync(User))!;
             if (!await ConfirmPasswordAsync(user, request.Password)) return Unauthorized(new { error = "The password is not correct." });
 
-            var existing = await db.UserPasskeyCredentials.Where(c => c.UserId == user.Id).Select(c => c.CredentialId).ToListAsync();
-            var (token, publicKey) = passkeys.CreateRegistrationOptions(user, existing, Rp());
-            return Json(new { token, options = publicKey });
+            return Content(await passkeys.CreateRegistrationOptionsAsync(user), "application/json");
         }
 
         [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(100_000)]
         public async Task<IActionResult> PasskeyRegister([FromBody] PasskeyRegisterRequest request)
         {
             var user = (await users.GetUserAsync(User))!;
-            if (!await signIn.AccountAllowedAsync(user)) return Unauthorized(new { error = GenericFailure });
-            var result = await passkeys.RegisterAsync(user, request, Rp());
+            if (!await signIn.EnrollmentAllowedAsync(user)) return Unauthorized(new { error = GenericFailure });
+            var result = await passkeys.RegisterAsync(user, request.CredentialJson, request.Label);
             await signIn.AuditAsync(user.Id, result.Succeeded ? "BiometricEnroll" : "BiometricEnrollFailed", "passkey", Ip(), result.Error);
             return result.Succeeded ? Json(new { succeeded = true }) : BadRequest(new { error = result.Error });
         }
 
         [AllowAnonymous, HttpPost, ValidateAntiForgeryToken]
-        public IActionResult PasskeyLoginOptions()
+        public async Task<IActionResult> PasskeyLoginOptions()
         {
             if (throttle.IsBlocked(BiometricThrottle.IpKey(Ip()))) return TooManyAttempts();
-            var (token, publicKey) = passkeys.CreateLoginOptions(Rp());
-            return Json(new { token, options = publicKey });
+            return Content(await passkeys.CreateLoginOptionsAsync(), "application/json");
         }
 
         [AllowAnonymous, HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(100_000)]
@@ -89,7 +84,7 @@ namespace Orange_Tendering_System.Controllers
             var ipKey = BiometricThrottle.IpKey(Ip());
             if (throttle.IsBlocked(ipKey)) return TooManyAttempts();
 
-            var result = await passkeys.VerifyLoginAsync(request, Rp());
+            var result = await passkeys.VerifyLoginAsync(request.CredentialJson);
             if (!result.Succeeded || result.User is null)
             {
                 throttle.Failure(ipKey);
@@ -108,36 +103,71 @@ namespace Orange_Tendering_System.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> PasskeyRemove(long id)
+        public async Task<IActionResult> PasskeyRemove(string id)
         {
-            var userId = users.GetUserId(User)!;
-            var credential = await db.UserPasskeyCredentials.FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
-            if (credential is null) return NotFound(new { error = "Device not found." });
-
-            db.UserPasskeyCredentials.Remove(credential);
-            await db.SaveChangesAsync();
-            await signIn.AuditAsync(userId, "BiometricRemove", "passkey", Ip(), null);
+            var user = (await users.GetUserAsync(User))!;
+            if (!await passkeys.RemoveAsync(user, id)) return NotFound(new { error = "Device not found." });
+            await signIn.AuditAsync(user.Id, "BiometricRemove", "passkey", Ip(), null);
             return Json(new { succeeded = true });
         }
 
         // ---------- Face recognition ----------
 
-        // Fail closed even if a caller removes the disabled UI or submits forged descriptors,
-        // liveness flags, passwords or provider decisions. No client face evidence is trusted.
-        private ObjectResult FaceDisabled() => StatusCode(StatusCodes.Status501NotImplemented,
-            new { error = FaceService.DisabledReason });
-
         [HttpPost, ValidateAntiForgeryToken]
-        public IActionResult FaceEnrollChallenge([FromBody] EnrollStartRequest request) => FaceDisabled();
+        public async Task<IActionResult> FaceEnrollChallenge([FromBody] EnrollStartRequest request)
+        {
+            var user = (await users.GetUserAsync(User))!;
+            if (!await ConfirmPasswordAsync(user, request.Password)) return Unauthorized(new { error = "The password is not correct." });
+            return Json(faces.CreateChallenge(FaceService.EnrollPurpose, user.Id));
+        }
 
         [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
-        public IActionResult FaceEnroll([FromBody] FaceSubmission submission) => FaceDisabled();
+        public async Task<IActionResult> FaceEnroll([FromBody] FaceSubmission submission)
+        {
+            var user = (await users.GetUserAsync(User))!;
+            if (!await signIn.EnrollmentAllowedAsync(user)) return Unauthorized(new { error = GenericFailure });
+            var result = await faces.EnrollAsync(user, submission);
+            await signIn.AuditAsync(user.Id, result.Succeeded ? "BiometricEnroll" : "BiometricEnrollFailed", "face", Ip(), result.Error);
+            return result.Succeeded ? Json(new { succeeded = true }) : BadRequest(new { error = result.Error });
+        }
 
         [AllowAnonymous, HttpPost, ValidateAntiForgeryToken]
-        public IActionResult FaceChallenge() => FaceDisabled();
+        public IActionResult FaceChallenge()
+        {
+            if (throttle.IsBlocked(BiometricThrottle.IpKey(Ip()))) return TooManyAttempts();
+            return Json(faces.CreateChallenge(FaceService.LoginPurpose, null));
+        }
 
         [AllowAnonymous, HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
-        public IActionResult FaceLogin([FromBody] FaceSubmission submission) => FaceDisabled();
+        public async Task<IActionResult> FaceLogin([FromBody] FaceSubmission submission)
+        {
+            var ipKey = BiometricThrottle.IpKey(Ip());
+            var accountKey = BiometricThrottle.AccountKey(submission.Email);
+            if (throttle.IsBlocked(ipKey, accountKey)) return TooManyAttempts();
+
+            var user = string.IsNullOrWhiteSpace(submission.Email) ? null : await users.FindByEmailAsync(submission.Email.Trim());
+            var result = await faces.VerifyLoginAsync(user, submission);
+            if (!result.Succeeded || result.User is null)
+            {
+                throttle.Failure(ipKey, accountKey);
+                await signIn.RegisterFailureAsync(user, BiometricSignInService.FaceMethod, result.Error ?? "failed", Ip());
+                // Capture problems are checked before the account is looked at, so they are safe to show; a mismatch is generic.
+                return Unauthorized(new { error = result.Error ?? GenericFailure });
+            }
+
+            if (!await signIn.SignInAsync(result.User, BiometricSignInService.FaceMethod, Ip()))
+            {
+                // The face matched, so the person has proven who they are: tell a pending supplier why.
+                var pending = result.User.SupplierId != null && await db.Suppliers.AsNoTracking()
+                    .AnyAsync(s => s.Id == result.User.SupplierId && s.Status == SupplierStatus.Pending);
+                return Unauthorized(new { error = pending
+                    ? "Face recognised, but your company is still awaiting administrator approval."
+                    : GenericFailure });
+            }
+
+            throttle.Reset(ipKey, accountKey);
+            return Json(new { succeeded = true, redirect = await signIn.DestinationAsync(result.User, submission.ReturnUrl, Url.IsLocalUrl) });
+        }
 
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> FaceRemove()
@@ -152,13 +182,7 @@ namespace Orange_Tendering_System.Controllers
 
         private async Task<bool> ConfirmPasswordAsync(ApplicationUser user, string? password)
         {
-            return await signIn.AccountAllowedAsync(user) && await signIn.CheckPasswordAsync(user, password);
-        }
-
-        private RpInfo Rp()
-        {
-            var o = options.Value;
-            return new RpInfo(o.RpId ?? Request.Host.Host, o.Origins ?? [$"{Request.Scheme}://{Request.Host}"], o.RpName);
+            return await signIn.EnrollmentAllowedAsync(user) && await signIn.CheckPasswordAsync(user, password);
         }
 
         private string? Ip() => HttpContext.Connection.RemoteIpAddress?.ToString();

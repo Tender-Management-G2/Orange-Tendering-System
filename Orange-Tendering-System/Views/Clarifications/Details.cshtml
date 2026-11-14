@@ -1,71 +1,34 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Clarification Thread
-
-DEVELOPER OWNER: ALL TEAM
-MODULE: Clarifications, Notifications & Audit Trail
-TRELLO TASK: Clarifications, Notifications & Audit Trail
-TRELLO URL: https://trello.com/c/N1OFBdNM
-
-PURPOSE:
-Read and reply to one clarification thread, with
-attachments.
-
-BUSINESS ACCESS:
-The two participants of the thread
-
-ROUTE: /Clarifications/Details/{id?}
-
-FUTURE IMPLEMENTATION:
-- Load the thread only if the user is FromUser or ToUser.
-- POST reply: ClarificationMessage (+ Documents with
-  ClarificationMessageId); update Status; notify the other
-  participant.
-
-DEPENDENCIES:
-Clarifications, ClarificationMessages, Documents,
-Notifications.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
+@model Orange_Tendering_System.Models.Entities.Clarification
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Clarification Thread";
     ViewData["WorkspaceSection"] = "Clarifications";
-    ViewData["Description"] = "Messages of one clarification thread.";
+    var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    var other = Model.FromUserId == userId ? Model.ToUser?.UserName : Model.FromUser?.UserName;
+    var linked = Model.Bid?.TenderInvitation?.TenderRound?.Tender?.Title ?? Model.Tender?.Title ?? Model.PurchaseRequest?.Title ?? "General";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
+@if (TempData["ClarificationError"] is string error) { <p class="pg-note" role="alert">@error</p> }
+@if (TempData["ClarificationMessage"] is string notice) { <p class="pg-note" role="status">@notice</p> }
 <section class="ws-panel pg-panel">
-    <h2>Thread</h2>
-    <dl class="pg-dl">
-        <div><dt>Subject</dt><dd>—</dd></div>
-        <div><dt>Linked to</dt><dd>—</dd></div>
-        <div><dt>From</dt><dd>—</dd></div>
-        <div><dt>To</dt><dd>—</dd></div>
-        <div><dt>Status</dt><dd>—</dd></div>
-        <div><dt>Opened</dt><dd>—</dd></div>
-    </dl>
+    <div class="pg-panel-head"><div><h2>@Model.Subject</h2><span class="pg-hint">With @other · @linked · <span class="ui-pill ui-pill--@(Model.Status == Orange_Tendering_System.Models.Entities.ClarificationStatus.Closed ? "good" : Model.Status == Orange_Tendering_System.Models.Entities.ClarificationStatus.Open ? "warn" : "info")">@Orange_Tendering_System.Services.ClarificationPolicy.Label(Model.Status)</span></span></div><a asp-action="Index" class="pg-btn">Back to clarifications</a></div>
+    <div class="so-chat">
+    @foreach (var item in Model.Messages.OrderBy(m => m.SentAt))
+    {
+        var own = item.SenderUserId == userId;
+        <article class="so-message @(own ? "is-own" : "")"><small><strong>@(own ? "You" : item.SenderUser?.UserName)</strong> · @item.SentAt.ToLocalTime().ToString("d MMM yyyy h:mm tt")</small><p style="white-space:pre-wrap">@item.Message</p>
+            @if (item.Documents.Count > 0) { <ul>@foreach (var document in item.Documents) { <li>@document.FileName</li> }</ul> }
+        </article>
+    }
+    @if (Model.Messages.Count == 0) { <p>No messages yet.</p> }
+    </div>
 </section>
-
-<section class="ws-panel pg-panel">
-    <h2>Messages</h2>
-    <partial name="_EmptyState" model='"No messages are loaded yet."' />
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Reply</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field pg-field-wide"><label for="f-message-1">Message</label><textarea id="f-message-1" rows="4"></textarea></div>
-                <div class="pg-field"><label for="f-attachment-2">Attachment</label><input id="f-attachment-2" type="file" /></div>
-            </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send reply</button><button type="button" class="pg-btn">Mark as resolved</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
+@if (Model.Status != Orange_Tendering_System.Models.Entities.ClarificationStatus.Closed)
+{
+    <section class="ws-panel pg-panel"><h2>Reply</h2><form asp-action="Reply" method="post" class="pg-form">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <div class="pg-field"><label for="message">Message</label><textarea id="message" name="message" rows="4" maxlength="10000" required></textarea></div>
+        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send reply</button></div>
     </form>
-</section>
+    <form asp-action="Resolve" asp-route-id="@Model.Id" method="post" class="pg-form"><div class="pg-actions"><button type="submit" class="pg-btn">Mark as resolved</button></div></form></section>
+}

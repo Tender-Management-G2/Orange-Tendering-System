@@ -2,23 +2,5 @@
 @{
     ViewData["Title"] = "Weighted Tender Evaluation"; ViewData["WorkspaceSection"] = "Weighted Evaluation";
     ViewData["Description"] = "Requirements, four proposals, formal weight approval, bidding, compliance, evaluation, recommendation, final approval and award.";
-    var area = ViewContext.RouteData.Values["area"]?.ToString(); var controller = ViewContext.RouteData.Values["controller"]?.ToString();
 }
-<partial name="_PageHeader" />
-<section class="ws-panel pg-panel" aria-labelledby="wf-title">
-    <div class="pg-panel-head"><h2 id="wf-title">Tenders</h2>
-        @if (area == "SourcingOfficer") { <a class="pg-btn pg-btn-primary" data-no-modal asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create">+ Prepare tender from an accepted request</a> }
-    </div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
-            <tbody>
-            @foreach (var row in Model)
-            {
-                <tr><td>T-@row.TenderId.ToString("0000")</td><td><strong>@row.Title</strong></td><td>@row.Status</td><td><a class="pg-btn" data-no-modal asp-area="@area" asp-controller="@controller" asp-action="Details" asp-route-id="@row.TenderId">Open workflow</a></td></tr>
-            }
-            @if (Model.Count == 0) { <tr><td colspan="4"><partial name="_EmptyState" model='"No authorized tenders are assigned to this account."' /></td></tr> }
-            </tbody>
-        </table>
-    </div>
-</section>
+<partial name="_WorkflowList" model="Model" />

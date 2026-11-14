@@ -1,0 +1,30 @@
+@model Orange_Tendering_System.ViewModels.WorkflowDetails
+@using Orange_Tendering_System.Models.Entities
+@{
+    // The four phases of the weighted tender cycle, derived only from the stored tender / evaluation state.
+    var status = Model.Tender.Status;
+    var state = Model.Session?.State;
+    var phase = status switch
+    {
+        TenderStatus.Draft or TenderStatus.Bidding => 1,
+        TenderStatus.Evaluation => state == SessionState.ReportDraft ? 3 : 2,
+        TenderStatus.OfficerReview => 3,
+        _ => 4
+    };
+    var done = status is TenderStatus.Awarded or TenderStatus.Rejected or TenderStatus.Cancelled;
+    var steps = new[]
+    {
+        ("1", "Setup", "Weights, bidding, meeting, AI analysis"),
+        ("2", "Committee evaluation", "Four members, one submission each"),
+        ("3", "Weighted results", "Ranking and unified report"),
+        ("4", "Approval & award", "Manager, Top Committee, award")
+    };
+}
+<ol class="wf-steps" aria-label="Tender cycle progress">
+    @for (var i = 0; i < steps.Length; i++)
+    {
+        var n = i + 1;
+        var cls = done || n < phase ? "is-done" : n == phase ? "is-current" : "";
+        <li class="wf-step @cls" data-phase="@n" tabindex="0" role="button" @(n == phase && !done ? "aria-current=step" : null)><b>@(done || n < phase ? "\u2713" : steps[i].Item1)</b><strong>@steps[i].Item2</strong><small>@steps[i].Item3</small></li>
+    }
+</ol>

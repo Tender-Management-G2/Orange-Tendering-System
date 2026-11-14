@@ -1,0 +1,29 @@
+@*
+  Floating AI Chat Assistant (all signed-in roles). Backend: AiChatController -> AiChatService -> shared OllamaChatClient (gemma3:4b).
+  History is stored in SQL Server per user. Separate from AI Bid Analysis and from the Clarification threads.
+*@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery AiAntiforgery
+<div class="ai-chat" data-ai-chat data-csrf="@AiAntiforgery.GetAndStoreTokens(Context).RequestToken">
+    <button type="button" class="ai-fab" aria-haspopup="dialog" aria-expanded="false" aria-label="Open AI assistant" title="AI assistant">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4zM18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9zM6 15l.7 1.6L8.3 17l-1.6.7L6 19.3l-.7-1.6L3.7 17l1.6-.7z" /></svg>
+    </button>
+    <section class="ai-panel" role="dialog" aria-label="AI assistant" hidden>
+        <header class="ai-head">
+            <div><strong>AI Assistant</strong><small>Help with the tender workflow. It cannot see tenders, offers or other users.</small></div>
+            <div class="ai-head-actions">
+                <button type="button" class="ai-icon" data-ai-history aria-label="Conversation history" title="History"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v5l3 2" /></svg></button>
+                <button type="button" class="ai-icon" data-ai-new aria-label="New chat" title="New chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+                <button type="button" class="ai-icon" data-ai-close aria-label="Close assistant" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
+            </div>
+        </header>
+        <div class="ai-history" hidden><ul></ul><p class="ai-history-empty" hidden>No saved conversations yet.</p></div>
+        <div class="ai-messages" aria-live="polite">
+            <div class="ai-welcome"><strong>Hi, how can I help?</strong><span>Ask how a step works, what a status means, or where to find something.</span>
+                <div class="ai-suggest"><button type="button">How does the final decision reach suppliers?</button><button type="button">What can my role do?</button><button type="button">What does Under Evaluation mean?</button></div></div>
+        </div>
+        <form class="ai-form" autocomplete="off">
+            <textarea rows="1" maxlength="2000" placeholder="Ask the assistant..." aria-label="Message to the AI assistant"></textarea>
+            <button type="submit" class="ai-send" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button>
+        </form>
+    </section>
+</div>

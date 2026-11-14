@@ -27,14 +27,25 @@ public sealed class SupplierCommunicationService(ApplicationDbContext context)
                 i.SupplierId == u.SupplierId && i.TenderRound.TenderId == c.TenderId
                 && i.InvitedByUserId == (c.FromUserId == userId ? c.ToUserId : c.FromUserId)))));
 
-    public async Task<List<SupplierClarificationViewModel>> GetThreadsAsync(string userId) =>
-        await Threads(userId).AsNoTracking().OrderByDescending(c => c.CreatedAt)
+    public async Task<List<SupplierClarificationViewModel>> GetThreadsAsync(string userId, string? search = null, string? status = null)
+    {
+        var query = Threads(userId).AsNoTracking();
+        search = search?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(c => c.Subject.Contains(search) || c.Messages.Any(m => m.Message.Contains(search)));
+        if (string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase)) query = query.Where(c => c.Status == ClarificationStatus.Open);
+        else if (string.Equals(status, "Answered", StringComparison.OrdinalIgnoreCase)) query = query.Where(c => c.Status == ClarificationStatus.Answered);
+        else if (string.Equals(status, "Resolved", StringComparison.OrdinalIgnoreCase)) query = query.Where(c => c.Status == ClarificationStatus.Closed);
+
+        return await query.OrderByDescending(c => c.CreatedAt)
             .Select(c => new SupplierClarificationViewModel
             {
                 Id = c.Id, Subject = c.Subject,
                 Status = c.Status == ClarificationStatus.Open ? "Pending" : c.Status == ClarificationStatus.Closed ? "Resolved" : "Answered",
-                CanReply = c.Status != ClarificationStatus.Closed
+                CanReply = c.Status != ClarificationStatus.Closed,
+                LastMessageAt = c.Messages.Max(m => (DateTime?)m.SentAt) ?? c.CreatedAt
             }).ToListAsync();
+    }
 
     public async Task<SupplierClarificationViewModel?> GetThreadAsync(string userId, int id)
     {
@@ -45,6 +56,7 @@ public sealed class SupplierCommunicationService(ApplicationDbContext context)
         {
             Id = id, Subject = thread.Subject, CanReply = thread.Status != ClarificationStatus.Closed,
             Status = thread.Status == ClarificationStatus.Open ? "Pending" : thread.Status == ClarificationStatus.Closed ? "Resolved" : "Answered",
+            LastMessageAt = thread.Messages.OrderByDescending(m => m.SentAt).Select(m => m.SentAt).FirstOrDefault(),
             Messages = thread.Messages.OrderBy(m => m.SentAt).ThenBy(m => m.Id).Select(m => new SupplierMessageViewModel(
                 m.Id, m.SenderUserId == userId ? "You" : "Sourcing Officer", m.Message, m.SentAt,
                 m.Documents.Select(d => new SupplierDocumentViewModel
@@ -111,16 +123,24 @@ public sealed class SupplierCommunicationService(ApplicationDbContext context)
         context.Notifications.Add(new Notification
         {
             UserId = officerId, Title = "Supplier clarification", Message = $"Supplier sent a message in clarification #{id}.",
-            Link = $"/SourcingOfficer/Clarifications?id={id}", CreatedAt = DateTime.UtcNow
+            Link = $"/Clarifications/Details/{id}", CreatedAt = DateTime.UtcNow
         });
         context.AuditLogs.Add(new AuditLog
         { UserId = userId, EntityName = nameof(Clarification), EntityId = id.ToString(), Action = action, CreatedAt = DateTime.UtcNow });
     }
 
-    public async Task<List<SupplierNotificationViewModel>> GetNotificationsAsync(string userId) => await context.Notifications
-        .AsNoTracking().Where(n => n.UserId == userId && Accounts(userId).Any())
-        .OrderByDescending(n => n.CreatedAt).ThenByDescending(n => n.Id)
-        .Select(n => new SupplierNotificationViewModel(n.Id, n.Title, n.Message, n.CreatedAt, n.IsRead, n.Link)).ToListAsync();
+    public async Task<List<SupplierNotificationViewModel>> GetNotificationsAsync(string userId, string? search = null, string? status = null)
+    {
+        var query = context.Notifications.AsNoTracking().Where(n => n.UserId == userId && Accounts(userId).Any());
+        search = search?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(n => n.Title.Contains(search) || n.Message.Contains(search));
+        if (string.Equals(status, "Unread", StringComparison.OrdinalIgnoreCase)) query = query.Where(n => !n.IsRead);
+        else if (string.Equals(status, "Read", StringComparison.OrdinalIgnoreCase)) query = query.Where(n => n.IsRead);
+
+        return await query.OrderByDescending(n => n.CreatedAt).ThenByDescending(n => n.Id)
+            .Select(n => new SupplierNotificationViewModel(n.Id, n.Title, n.Message, n.CreatedAt, n.IsRead, n.Link)).ToListAsync();
+    }
 
     public async Task<bool> MarkReadAsync(string userId, int id)
     {
@@ -132,5 +152,26 @@ public sealed class SupplierCommunicationService(ApplicationDbContext context)
         { UserId = userId, EntityName = nameof(Notification), EntityId = id.ToString(), Action = "ReadNotification", CreatedAt = DateTime.UtcNow });
         await context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<int> MarkAllReadAsync(string userId)
+    {
+        var notifications = await context.Notifications
+            .Where(n => n.UserId == userId && !n.IsRead && Accounts(userId).Any())
+            .ToListAsync();
+        if (notifications.Count == 0) return 0;
+
+        var now = DateTime.UtcNow;
+        foreach (var notification in notifications)
+        {
+            notification.IsRead = true;
+            context.AuditLogs.Add(new AuditLog
+            {
+                UserId = userId, EntityName = nameof(Notification), EntityId = notification.Id.ToString(),
+                Action = "ReadNotification", CreatedAt = now
+            });
+        }
+        await context.SaveChangesAsync();
+        return notifications.Count;
     }
 }

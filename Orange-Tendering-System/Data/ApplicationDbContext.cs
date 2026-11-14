@@ -38,9 +38,17 @@ namespace Orange_Tendering_System.Data
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
-        // Biometric sign-in (fingerprint passkeys and face templates)
-        public DbSet<UserPasskeyCredential> UserPasskeyCredentials => Set<UserPasskeyCredential>();
+        // Biometric sign-in: face templates. Fingerprint / passkey credentials live in Identity's own AspNetUserPasskeys
+        // table (DbSet UserPasskeys, inherited from IdentityDbContext; enabled by Stores.SchemaVersion in Program.cs).
         public DbSet<FaceTemplate> FaceTemplates => Set<FaceTemplate>();
+
+        // Final decision relay (Top Committee -> Manager -> Officer -> Suppliers)
+        public DbSet<FinalDecisionNotice> FinalDecisionNotices => Set<FinalDecisionNotice>();
+        public DbSet<SupplierResultDelivery> SupplierResultDeliveries => Set<SupplierResultDelivery>();
+
+        // AI Chat Assistant (per-user history)
+        public DbSet<AiChatConversation> AiChatConversations => Set<AiChatConversation>();
+        public DbSet<AiChatMessage> AiChatMessages => Set<AiChatMessage>();
 
         private void ProtectReportHistory()
         {
@@ -82,6 +90,8 @@ namespace Orange_Tendering_System.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            // Keep the existing phone column; schema v3 is enabled only for passkey storage.
+            builder.Entity<ApplicationUser>().Property(u => u.PhoneNumber).Metadata.SetMaxLength(null);
 
             builder.Entity<WeightRound>();
             builder.Entity<WeightProposal>().ToTable(t => t.HasCheckConstraint("CK_WeightProposal_Valid",

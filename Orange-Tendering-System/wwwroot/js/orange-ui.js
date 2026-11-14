@@ -86,9 +86,9 @@
   }
 
   /* ---------- Popup-first modals and drawers ---------- */
-  const ACTION = /\/(Create|Edit|Details|Review|Approve|Reject|Return|Forward|Upload|Sign|Confirm|Respond|Submit|Decide|Delete|Remove|Add|New|Compliance|Compare)(\/|\?|$)/i;
+  const ACTION = /\/(Create|Edit|Details|Review|Approve|Reject|Return|Forward|Upload|Sign|Confirm|Respond|Submit|Decide|Delete|Remove|Add|New|Compliance|Compare|Acknowledge)(\/|\?|$)/i;
   const DRAWER = /\/(Details|Review|Compare|Compliance)(\/|\?|$)/i;
-  const COMPLEX = /\/(Workflow|Identity|Biometrics|Notifications|Tasks)(\/|\?|$)/i;
+  const COMPLEX = /\/(Workflow|Identity|Biometrics|Notifications|Tasks|Offers)(\/|\?|$)/i;
   const dialog = el('dialog', 'ui-dialog');
   dialog.setAttribute('aria-labelledby', 'ui-dialog-title');
   dialog.innerHTML = '<div class="ui-dialog-head"><h2 id="ui-dialog-title"></h2><button type="button" class="ui-dialog-close" aria-label="Close" data-dialog-close>×</button></div><div class="ui-dialog-body" tabindex="-1"></div>';
@@ -169,6 +169,17 @@
     open(url.href, a.dataset.modalTitle || a.textContent.trim(), explicit ? a.dataset.modal === 'drawer' : DRAWER.test(url.pathname));
   });
 
+  /* ---------- Confirm before irreversible actions (button[data-confirm]) ---------- */
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-confirm]');
+    if (!b || b.dataset.confirmed) return;
+    ev.preventDefault();
+    const d = el('dialog', 'ui-dialog'); d.innerHTML = '<div class="ui-dialog-head"><h2>Please confirm</h2></div><div class="ui-dialog-body"><p class="ui-confirm-text"></p><div class="pg-actions"><button type="button" class="pg-btn pg-btn-primary" data-ok>Confirm</button><button type="button" class="pg-btn" data-no>Cancel</button></div></div>';
+    $('.ui-confirm-text', d).textContent = b.dataset.confirm; body.append(d); d.showModal();
+    $('[data-no]', d).addEventListener('click', () => { d.close(); d.remove(); });
+    $('[data-ok]', d).addEventListener('click', () => { d.close(); d.remove(); b.dataset.confirmed = '1'; b.click(); });
+  });
+
   /* ---------- Table kit ---------- */
   const TONES = [
     [/approved|accepted|compliant|awarded|active|verified|submitted|open|answered|completed|signed|yes|live data/i, 'good'],
@@ -185,6 +196,8 @@
     if (!table.closest('.pg-table-wrap') && !table.classList.contains('pg-table')) { const w = el('div', 'pg-table-wrap'); table.before(w); w.append(table); table.classList.add('pg-table'); }
     const tbody = table.tBodies[0]; const head = table.tHead && table.tHead.rows[0];
     if (!tbody || !head) return;
+    // Editable tables (rows with form fields, e.g. the purchase-request item grid) keep their own scripts: never re-order or paginate them.
+    if (tbody.querySelector('input, textarea, select, [data-remove-item]')) return;
     let rows = [...tbody.rows];
     if (!rows.length || (rows.length === 1 && rows[0].cells.length === 1 && rows[0].cells[0].colSpan > 1)) return;
     table.dataset.enhanced = '1';

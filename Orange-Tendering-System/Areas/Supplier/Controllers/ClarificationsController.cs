@@ -18,9 +18,11 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
     {
         // Supplier Clarifications — Owner: Saja · No Trello card
         // GET /Supplier/Clarifications. Ownership is checked in the supplier service.
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? search, string? status)
         {
-            return View(await communication.GetThreadsAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+            ViewData["Search"] = search?.Trim();
+            ViewData["Status"] = status;
+            return View(await communication.GetThreadsAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, search, status));
         }
 
         public async Task<IActionResult> Details(int id)

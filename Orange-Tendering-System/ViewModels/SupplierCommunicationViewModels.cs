@@ -18,6 +18,7 @@ public sealed class SupplierClarificationViewModel
     public string Subject { get; set; } = "";
     public string Status { get; set; } = "";
     public bool CanReply { get; set; }
+    public DateTime LastMessageAt { get; set; }
     public List<SupplierMessageViewModel> Messages { get; set; } = new();
 }
 

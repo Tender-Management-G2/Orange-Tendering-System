@@ -1,0 +1,28 @@
+@model IReadOnlyList<Orange_Tendering_System.Services.ClarificationOption>
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "New clarification"; ViewData["WorkspaceSection"] = "Clarifications";
+    ViewData["Description"] = "Ask a question to someone in your approved role chain, linked to a request or tender.";
+}
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    @if (Model.Count == 0)
+    {
+        <p class="pg-hint">There is nobody you can start a clarification with right now. Chats are available only with the roles next to yours in the workflow, for records you are part of.</p>
+        <div class="pg-actions"><a class="pg-btn" asp-action="Index">Back</a></div>
+    }
+    else
+    {
+        <form method="post" asp-action="New" class="pg-form">
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label for="option">Who and about what</label>
+                    <select id="option" name="option" required>
+                        @foreach (var o in Model) { <option value="@o.Value">@o.Recipient (@o.Role) · @o.Context</option> }
+                    </select></div>
+                <div class="pg-field pg-field-wide"><label for="subject">Subject</label><input id="subject" name="subject" maxlength="200" required /></div>
+                <div class="pg-field pg-field-wide"><label for="message">Message</label><textarea id="message" name="message" rows="4" maxlength="10000" required></textarea></div>
+            </div>
+            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send clarification</button><a class="pg-btn" asp-action="Index">Cancel</a></div>
+        </form>
+    }
+</section>

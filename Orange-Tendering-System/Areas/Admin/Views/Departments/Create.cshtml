@@ -1,56 +1,202 @@
+
 @*
-===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Rjoub
 PAGE: Create Department
-
-DEVELOPER OWNER: Rjoub
-MODULE: Administration
-TRELLO TASK: Department Management
-TRELLO URL: https://trello.com/c/KHRsEmzE
-
-PURPOSE:
-Form to add a department.
-
-BUSINESS ACCESS:
-Admin
-
-ROUTE: /Admin/Departments/Create
-
-FUTURE IMPLEMENTATION:
-- POST Create with [ValidateAntiForgeryToken]; handle the
-  unique Name index violation with a friendly message.
-- Audit the creation.
-
-DEPENDENCIES:
-Departments, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
 *@
+
+@model CreateDepartmentViewModel
+
 @{
     ViewData["Title"] = "Create Department";
     ViewData["WorkspaceSection"] = "Departments";
+    ViewData["Description"] =
+        "Add a department and assign existing employees.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
 <section class="ws-panel pg-panel">
-    <h2>Department</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-name-1">Name</label><input id="f-name-1" type="text" /><small class="pg-hint">Must be unique.</small></div>
-                <div class="pg-field pg-field-wide"><label for="f-description-2">Description</label><textarea id="f-description-2" rows="4"></textarea></div>
-                <label class="pg-check"><input type="checkbox" id="f-active-3" /> Active</label>
-            </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Create department</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
 
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="Admin" asp-controller="Departments" asp-action="Index">Back to departments</a></li>
-    </ul>
-</nav>
+    <h2>Create Department</h2>
+
+    <form asp-area="Admin"
+          asp-controller="Departments"
+          asp-action="Create"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="ModelOnly"
+             class="text-danger"></div>
+
+        <div class="pg-form-grid">
+
+            <!-- Department Name -->
+            <div class="pg-field">
+                <label asp-for="Name"></label>
+
+                <input asp-for="Name"
+                       class="form-control"
+                       maxlength="100"
+                       placeholder="Enter department name" />
+
+                <span asp-validation-for="Name"
+                      class="text-danger"></span>
+
+                <small class="pg-hint">
+                    Department name must be unique.
+                </small>
+            </div>
+
+            <!-- Description -->
+            <div class="pg-field pg-field-wide">
+                <label asp-for="Description"></label>
+
+                <textarea asp-for="Description"
+                          class="form-control"
+                          rows="4"
+                          maxlength="500"
+                          placeholder="Enter department description"></textarea>
+
+                <span asp-validation-for="Description"
+                      class="text-danger"></span>
+            </div>
+
+            <!-- Department Status -->
+            <div class="pg-field pg-field-wide">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Department
+                </label>
+            </div>
+
+        </div>
+
+        <!-- ==================================
+             EMPLOYEE ASSIGNMENT
+        =================================== -->
+
+       
+<div class="pg-field pg-field-wide">
+
+    <h3>Assign Employees</h3>
+
+    <p class="pg-hint">
+        Select existing users who are not
+        assigned to another department.
+    </p>
+
+    @if (Model.AvailableEmployees.Any())
+    {
+        <details class="department-employee-dropdown">
+
+            <summary>
+                Select Available Employees
+            </summary>
+
+            <div class="department-employee-options">
+
+                @foreach (var employee in Model.AvailableEmployees)
+                {
+                    <label class="department-employee-option">
+
+                        <input type="checkbox"
+                               name="SelectedEmployeeIds"
+                               value="@employee.Value"
+                               checked="@(Model.SelectedEmployeeIds.Contains(employee.Value))" />
+
+                        <span>@employee.Text</span>
+
+                    </label>
+                }
+
+            </div>
+
+        </details>
+
+        <small class="pg-hint">
+            You can select multiple employees.
+        </small>
+    }
+    else
+    {
+        <p class="pg-hint">
+            No unassigned employees are currently available.
+        </p>
+    }
+
+    <span asp-validation-for="SelectedEmployeeIds"
+          class="text-danger"></span>
+
+</div>
+
+
+        <!-- ACTIONS -->
+        <div class="pg-actions">
+
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Create Department
+            </button>
+
+            <a asp-area="Admin"
+               asp-controller="Departments"
+               asp-action="Index"
+               class="pg-btn">
+                Cancel
+            </a>
+
+        </div>
+
+    </form>
+
+</section>
+<style>
+    
+.department-employee-dropdown {
+    width: 100%;
+    margin-top: 12px;
+    border: 1px solid #454545;
+    border-radius: 12px;
+    background: #1b1c1e;
+    color: #fff;
+}
+
+.department-employee-dropdown summary {
+    cursor: pointer;
+    padding: 15px 18px;
+    font-weight: 500;
+}
+
+.department-employee-dropdown[open] summary {
+    border-bottom: 1px solid #454545;
+}
+
+.department-employee-options {
+    max-height: 230px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.department-employee-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.department-employee-option:hover {
+    background: rgba(255, 121, 0, 0.12);
+}
+
+.department-employee-option input {
+    accent-color: #ff7900;
+}
+</style>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

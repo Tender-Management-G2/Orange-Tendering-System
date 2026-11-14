@@ -36,6 +36,8 @@ public class SessionInput
     // Required unless CreateZoomMeeting is set, in which case the link comes from the Zoom API.
     [Url, MaxLength(1000)] public string? MeetingUrl { get; set; }
     public bool CreateZoomMeeting { get; set; }
+    // Creates an unguessable Jitsi room (meet.jit.si) so evaluation meetings work without any Zoom account or credentials.
+    public bool CreateJitsiMeeting { get; set; }
 }
 public class BidInput
 {

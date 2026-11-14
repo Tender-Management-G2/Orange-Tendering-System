@@ -1,0 +1,255 @@
+@model List<Orange_Tendering_System.ViewModels.WorkflowListRow>
+@{
+    // Weighted Tender Evaluation list: dashboard hero, statistics tiles, drop-down filters and the tender table.
+    // One partial for every role; the data comes from TenderWorkflowService.List (already scoped to the signed-in user).
+    var area = ViewContext.RouteData.Values["area"]?.ToString();
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    string Stage(string status) => status switch
+    {
+        "Draft" => "Setup",
+        "Bidding" => "Bidding",
+        "Evaluation" => "Committee evaluation",
+        "OfficerReview" => "Weighted results",
+        "ManagerReview" or "TopCommitteeReview" => "Approval",
+        "Awarded" => "Awarded",
+        _ => "Closed"
+    };
+    string Words(string s) => System.Text.RegularExpressions.Regex.Replace(s, "(?<=[a-z])(?=[A-Z])", " ");
+    string Tone(string stage) => stage switch { "Awarded" => "good", "Closed" => "muted", "Approval" => "info", "Committee evaluation" or "Weighted results" => "warn", _ => "orange" };
+    var stages = new[] { "Setup", "Bidding", "Committee evaluation", "Weighted results", "Approval", "Awarded", "Closed" };
+    var statuses = Model.Select(r => r.Status).Distinct().OrderBy(x => x).ToList();
+    int Count(params string[] s) => Model.Count(r => s.Contains(Stage(r.Status)));
+    int.TryParse(Context.Request.Query["created"], out var createdId);
+}
+<link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
+<div class="dash-board dash-internal wfl">
+    <section class="dash-welcome wfl-hero" aria-labelledby="wfl-title">
+        <div class="dash-welcome-photo" aria-hidden="true"></div>
+        <div class="dash-welcome-waves" aria-hidden="true"></div>
+        <div class="dash-welcome-copy">
+            <h1 id="wfl-title">Weighted Tender<strong>Evaluation</strong></h1>
+            <p>Requirements, four weight proposals, bidding, committee scoring, recommendation, final approval and award.</p>
+        </div>
+    </section>
+
+    @if (createdId > 0 && Model.Any(r => r.TenderId == createdId))
+    {
+        <div class="wfl-created" role="status"><b aria-hidden="true">&#10003;</b><div><strong>Tender T-@createdId.ToString("0000") was created.</strong><span>It is the highlighted row below. Open it to request the committee weights and continue the cycle.</span></div></div>
+    }
+
+    <section class="dash-metrics wfl-metrics" aria-label="Tender statistics">
+        <article class="dash-metric dash-orange"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5" /></svg></div><div class="dash-metric-copy"><strong>@Model.Count.ToString("N0")</strong><span>All tenders</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-blue"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2" /><path d="M9 3h6v5H9zM9 13h6M9 17h6" /></svg></div><div class="dash-metric-copy"><strong>@Count("Setup", "Bidding").ToString("N0")</strong><span>Setup &amp; bidding</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-purple"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v19M7 22h10M3 6h18M5 6l-4 9h8zM19 6l-4 9h8z" /></svg></div><div class="dash-metric-copy"><strong>@Count("Committee evaluation", "Weighted results").ToString("N0")</strong><span>Evaluation &amp; results</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-green"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10" /></svg></div><div class="dash-metric-copy"><strong>@Count("Approval", "Awarded").ToString("N0")</strong><span>Approval &amp; award</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+    </section>
+
+    <section class="dash-panel wfl-panel" aria-labelledby="wfl-list-title">
+        <div class="dash-panel-heading wfl-heading"><h2 id="wfl-list-title">Tenders</h2>
+            <div class="wfl-heading-actions">
+                <span class="wfl-count" id="wfl-count" role="status" aria-live="polite">@Model.Count @(Model.Count == 1 ? "tender" : "tenders")</span>
+                @if (area == "SourcingOfficer")
+                {
+                    <button type="button" class="wfl-new" data-open-tender title="Prepare a tender from an accepted purchase request" aria-label="Prepare tender from an accepted request"><span aria-hidden="true">+</span> Prepare tender</button>
+                }
+            </div>
+        </div>
+        <div class="wfl-filters" role="search" aria-label="Filter tenders">
+            <label class="wfl-field wfl-search"><span>Search</span><input id="wfl-q" type="search" placeholder="Tender number or title" autocomplete="off" /></label>
+            <label class="wfl-field"><span>Stage</span><select id="wfl-stage"><option value="">All stages</option>@foreach (var s in stages) { <option>@s</option> }</select></label>
+            <label class="wfl-field"><span>Status</span><select id="wfl-status"><option value="">All statuses</option>@foreach (var s in statuses) { <option value="@s">@Words(s)</option> }</select></label>
+            <button type="button" class="wfl-reset" id="wfl-reset">Reset</button>
+        </div>
+        <div class="wfl-table-wrap">
+            <table class="wfl-table">
+                <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">Stage</th><th scope="col">Status</th><th scope="col" class="wfl-actions-col">Actions</th></tr></thead>
+                <tbody id="wfl-body">
+                @foreach (var row in Model)
+                {
+                    var stage = Stage(row.Status);
+                    <tr class="@(row.TenderId == createdId ? "is-new" : null)" data-stage="@stage" data-status="@row.Status" data-text="@($"t-{row.TenderId:0000} {row.Title}".ToLowerInvariant())">
+                        <td><span class="wfl-ref">T-@row.TenderId.ToString("0000")</span></td>
+                        <td><strong>@row.Title</strong></td>
+                        <td><span class="wfl-pill wfl-@Tone(stage)">@stage</span></td>
+                        <td>@Words(row.Status)</td>
+                        <td class="wfl-actions-col"><button type="button" class="wfl-open" data-open-workflow data-id="@row.TenderId" data-url="@Url.Action("Details", controller, new { area, id = row.TenderId })">Open workflow <span aria-hidden="true">&rarr;</span></button></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            <div class="wfl-empty" id="wfl-empty" @(Model.Count == 0 ? null : "hidden")>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM3 7l3-4h12l3 4M9 12h6" /></svg>
+                <p id="wfl-empty-text">@(Model.Count == 0 ? "No authorized tenders are assigned to this account." : "No tenders match these filters.")</p>
+            </div>
+        </div>
+    </section>
+</div>
+<script>
+(function () {
+    var q = document.getElementById('wfl-q'), st = document.getElementById('wfl-stage'), ss = document.getElementById('wfl-status');
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#wfl-body tr')), empty = document.getElementById('wfl-empty'), count = document.getElementById('wfl-count');
+    var total = rows.length;
+    function apply() {
+        var text = q.value.trim().toLowerCase(), shown = 0;
+        rows.forEach(function (r) {
+            var ok = (!text || r.dataset.text.indexOf(text) > -1) && (!st.value || r.dataset.stage === st.value) && (!ss.value || r.dataset.status === ss.value);
+            r.hidden = !ok; if (ok) shown++;
+        });
+        if (total) { empty.hidden = shown > 0; document.getElementById('wfl-empty-text').textContent = 'No tenders match these filters.'; }
+        count.textContent = shown + (shown === 1 ? ' tender' : ' tenders') + (shown !== total ? ' of ' + total : '');
+    }
+    [q, st, ss].forEach(function (el) { el.addEventListener('input', apply); el.addEventListener('change', apply); });
+    document.getElementById('wfl-reset').addEventListener('click', function () { q.value = ''; st.value = ''; ss.value = ''; apply(); q.focus(); });
+})();
+</script>
+@if (area == "SourcingOfficer")
+{
+    <partial name="_TenderCreateDialog" model="new Orange_Tendering_System.ViewModels.RequirementsInput()" />
+}
+
+<dialog id="wf-dialog" class="wf-dialog" aria-labelledby="wf-dialog-title">
+    <button type="button" class="wf-dialog-x" data-wf-close aria-label="Close">&times;</button>
+    <div id="wf-dialog-body" class="wf-dialog-body"></div>
+</dialog>
+<script>
+(function () {
+    var dlg = document.getElementById('wf-dialog'), body = document.getElementById('wf-dialog-body'), dirty = false;
+    function ajax(url, opt) { opt = opt || {}; opt.credentials = 'same-origin'; opt.headers = Object.assign({ 'X-Requested-With': 'XMLHttpRequest' }, opt.headers || {}); return fetch(url, opt); }
+    function showError(msg) { var box = body.querySelector('.wf-error'); if (!box) return; box.textContent = msg; box.hidden = false; box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    function openTitles() { return Array.prototype.map.call(body.querySelectorAll('details.wf-acc[open] > summary span'), function (s) { return s.textContent; }); }
+    function render(html, keep) {
+        body.innerHTML = html;
+        if (keep) body.querySelectorAll('details.wf-acc').forEach(function (d) { d.open = keep.indexOf(d.querySelector('summary span').textContent) > -1; });
+        wire();
+        var firstOpen = body.querySelector('details.wf-acc[open]'); if (firstOpen && !keep) setTimeout(function () { firstOpen.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 120);
+    }
+    function load(url) {
+        body.innerHTML = '<div class="wf-loading"><i></i>Loading tender workflow…</div>';
+        ajax(url).then(function (r) { return r.text().then(function (t) { return { ok: r.ok, t: t }; }); }).then(function (x) {
+            if (x.ok && x.t.indexOf('wf-pop') > -1) render(x.t); else body.innerHTML = '<div class="wf-loading wf-loading-error">This tender could not be opened. You may not have access to it.</div>';
+        }).catch(function () { body.innerHTML = '<div class="wf-loading wf-loading-error">The server could not be reached.</div>'; });
+    }
+    function wire() {
+        var sl = body.querySelector('#wp-fin');
+        if (sl) { var tl = body.querySelector('#wp-tech'), fl = body.querySelector('#wp-fin-label'), tt = body.querySelector('#wp-tech-label'); var sync = function () { var v = Number(sl.value); tl.value = 100 - v; fl.textContent = v + '%'; tt.textContent = (100 - v) + '%'; sl.style.setProperty('--p', v + '%'); }; sl.addEventListener('input', sync); sync(); }
+        var f = body.querySelector('#financial-weight'), t = body.querySelector('#technical-weight');
+        if (f && t) { f.addEventListener('input', function () { t.value = (100 - Number(f.value)).toFixed(4); }); t.addEventListener('input', function () { f.value = (100 - Number(t.value)).toFixed(4); }); }
+        body.querySelectorAll('time[data-local]').forEach(function (el) { var d = new Date(el.dataset.local); if (!isNaN(d)) el.textContent = d.toLocaleString(); });
+        body.querySelectorAll('form').forEach(function (form) { form.addEventListener('submit', submit); });
+        body.querySelectorAll('form[data-picker]').forEach(function (f) {
+            var all = f.querySelector('[data-select-all]'), btn = f.querySelector('[data-pick-btn]'), cnt = f.querySelector('[data-count]');
+            var boxes = function () { return Array.prototype.slice.call(f.querySelectorAll('input[name=supplierIds]:not(:disabled)')); };
+            var sync = function () { var b = boxes(), n = b.filter(function (x) { return x.checked; }).length; cnt.textContent = n + ' selected'; btn.disabled = n === 0; btn.textContent = n ? 'Invite ' + n + ' supplier' + (n > 1 ? 's' : '') : 'Invite selected'; all.checked = b.length > 0 && n === b.length; all.indeterminate = n > 0 && n < b.length; };
+            all.addEventListener('change', function () { boxes().forEach(function (x) { x.checked = all.checked; }); sync(); });
+            f.addEventListener('change', function (e) { if (e.target !== all) sync(); }); sync();
+        });
+        body.querySelectorAll('.wf-step[data-phase]').forEach(function (st) {
+            var go = function () { var main = body.querySelector('.wp-main'); if (!main) return; var n = Number(st.dataset.phase); main.dataset.view = n === 4 ? 'approval' : 'journey'; if (n === 4) { delete main.dataset.ph; } else { main.dataset.ph = n; } main.querySelectorAll('details.wp-prev').forEach(function (d) { var has = !!d.querySelector('.wp-stage[data-ph="' + n + '"]'); d.hidden = n === 4 ? false : !has; if (has) d.open = true; }); body.querySelectorAll('.wf-step').forEach(function (x) { x.classList.toggle('is-view', x === st); }); };
+            st.addEventListener('click', go); st.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+        });
+        body.querySelectorAll('[data-pad]').forEach(function (pad) {
+            var cv = pad.querySelector('canvas'), ctx = cv.getContext('2d'), down = false, last = null;
+            ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+            var pos = function (e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; };
+            cv.addEventListener('pointerdown', function (e) { down = true; last = pos(e); cv.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(last.x + .01, last.y + .01); ctx.stroke(); pad._drawn = true; pad.classList.add('is-signed'); e.preventDefault(); });
+            cv.addEventListener('pointermove', function (e) { if (!down) return; var p = pos(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; e.preventDefault(); });
+            var up = function () { down = false; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('pointerleave', up);
+            pad.querySelector('[data-pad-clear]').addEventListener('click', function () { ctx.clearRect(0, 0, cv.width, cv.height); pad._drawn = false; pad.classList.remove('is-signed'); });
+        });
+        body.querySelectorAll('[data-countdown]').forEach(function (el) {
+            var st = Date.parse(el.dataset.start), en = Date.parse(el.dataset.end), clock = el.querySelector('[data-clock]'), label = el.querySelector('[data-clock-label]'), shown = el.dataset.state, lastRefresh = Date.now(), lastPoll = Date.now();
+            var two = function (n) { return ('0' + n).slice(-2); };
+            var fmt = function (ms) { var s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400); s -= d * 86400; return (d ? d + 'd ' : '') + two(Math.floor(s / 3600)) + ':' + two(Math.floor(s % 3600 / 60)) + ':' + two(s % 60); };
+            var tick = function () {
+                if (el.dataset.final) { label.textContent = 'Scoring is closed'; clock.textContent = '00:00:00'; return; }
+                var now = Date.now(), state = now < st ? 'before' : now < en ? 'open' : 'closed';
+                if (state !== shown && now - lastRefresh > 4000) { lastRefresh = now; refreshView(); return; }
+                if (state === 'before') { label.textContent = 'Meeting and scoring start in'; clock.textContent = fmt(st - now); }
+                else if (state === 'open') { label.textContent = 'Scoring is open, it closes in'; clock.textContent = fmt(en - now); }
+                else { label.textContent = 'Scoring is closed'; clock.textContent = '00:00:00'; }
+                if (state === 'open' && !body.querySelector('.wp-scores') && now - lastPoll > 15000) { lastPoll = now; refreshView(); }
+            };
+            tick(); var iv = setInterval(function () { if (!document.body.contains(el)) { clearInterval(iv); return; } tick(); }, 1000);
+        });
+        body.querySelectorAll('[data-preview]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var box = btn.closest('.wp-report').querySelector('.wp-preview');
+                if (!box.hidden) { box.hidden = true; box.textContent = ''; btn.textContent = 'Preview it here'; return; }
+                var fr = document.createElement('iframe'); fr.title = 'Report PDF'; fr.src = btn.dataset.preview; box.appendChild(fr); box.hidden = false; btn.textContent = 'Hide the preview';
+            });
+        });
+        body.querySelectorAll('[data-wizard]').forEach(function (w) {
+            var cur = Number(w.dataset.current), view = cur, panels = Array.prototype.slice.call(w.querySelectorAll('.wp-wpanel')), tabs = Array.prototype.slice.call(w.querySelectorAll('[data-goto]'));
+            var back = w.querySelector('[data-wback]'), next = w.querySelector('[data-wnext]'), note = w.querySelector('[data-wnote]');
+            var show = function (n) {
+                view = Math.max(1, Math.min(panels.length, n));
+                panels.forEach(function (p) { p.hidden = Number(p.dataset.step) !== view; });
+                tabs.forEach(function (t) { t.closest('li').classList.toggle('is-view', Number(t.dataset.goto) === view); });
+                back.hidden = view === 1; next.hidden = view >= cur || view === panels.length; note.textContent = '';
+            };
+            tabs.forEach(function (t) { t.addEventListener('click', function () { if (!t.disabled) show(Number(t.dataset.goto)); }); });
+            back.addEventListener('click', function () { show(view - 1); }); next.addEventListener('click', function () { show(view + 1); });
+            show(cur);
+        });
+        body.querySelectorAll('[data-all-ok]').forEach(function (b) { b.addEventListener('click', function () { b.closest('form').querySelectorAll('tr[data-bid] [data-f=status]').forEach(function (s) { s.value = 'Compliant'; }); b.closest('form').querySelectorAll('tr[data-bid] [data-f=notes]').forEach(function (s) { s.selectedIndex = 0; }); }); });
+        body.querySelectorAll('select.wp-quick').forEach(function (q) { q.addEventListener('change', function () { var t = q.parentElement.querySelector('textarea'); if (t && q.value) { t.value = q.value; q.value = ''; t.focus(); } }); });
+        var pad = function (n) { return ('0' + n).slice(-2); }, local = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+        body.querySelectorAll('select[data-preset="deadline"]').forEach(function (sel) { sel.addEventListener('change', function () { if (!sel.value) return; var d = new Date(); d.setDate(d.getDate() + Number(sel.value)); d.setHours(17, 0, 0, 0); sel.closest('form').querySelector('input[name=deadline]').value = local(d); }); });
+        body.querySelectorAll('select[data-preset="start"], select[data-preset="duration"]').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                var f = sel.closest('form'), st = f.querySelector('input[name=StartsAt]'), en = f.querySelector('input[name=EndsAt]'), p = f.querySelector('[data-preset=start]').value, dur = Number(f.querySelector('[data-preset=duration]').value || 60), d = new Date();
+                if (sel.dataset.preset === 'start') { if (!p) return; if (p === '15m') d.setMinutes(d.getMinutes() + 15); else if (p === '1h') d.setHours(d.getHours() + 1); else { d.setDate(d.getDate() + (p === 'd2' ? 2 : 1)); d.setHours(10, 0, 0, 0); } d.setSeconds(0, 0); st.value = local(d); }
+                if (st.value) { var e = new Date(st.value); e.setMinutes(e.getMinutes() + dur); en.value = local(e); }
+            });
+        });
+        body.querySelectorAll('table.wp-sortable').forEach(function (tb) {
+            tb.querySelectorAll('thead th').forEach(function (th, ci) {
+                th.tabIndex = 0; th.setAttribute('role', 'button'); th.title = 'Click to sort';
+                var go = function () { var asc = th.dataset.dir !== 'asc'; tb.querySelectorAll('thead th').forEach(function (x) { delete x.dataset.dir; }); th.dataset.dir = asc ? 'asc' : 'desc'; var num = th.hasAttribute('data-num'); var rows = Array.prototype.slice.call(tb.tBodies[0].rows).filter(function (r) { return !r.classList.contains('wp-final'); }); var fin = tb.tBodies[0].querySelector('.wp-final');
+                    var val = function (r) { var c = r.cells[ci]; var v = c.dataset.v !== undefined ? c.dataset.v : c.textContent.trim(); return num ? (v === '' ? -Infinity : parseFloat(v)) : v.toLowerCase(); };
+                    rows.sort(function (a, b) { var x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * (asc ? 1 : -1); }); rows.forEach(function (r) { tb.tBodies[0].appendChild(r); }); if (fin) tb.tBodies[0].appendChild(fin); };
+                th.addEventListener('click', go); th.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+            });
+        });
+    }
+    function bulk(form, e) {
+        e.preventDefault(); var rows = Array.prototype.slice.call(form.querySelectorAll('tr[data-bid]')), btn = form.querySelector('button:not([type=button])'), label = btn.textContent, done = 0, errors = [];
+        btn.disabled = true; btn.textContent = 'Saving…';
+        var step = function (i) {
+            if (i >= rows.length) { return Promise.resolve(); }
+            var r = rows[i], fd = new FormData(); fd.set('bidId', r.dataset.bid); fd.set('status', r.querySelector('[data-f=status]').value); fd.set('notes', r.querySelector('[data-f=notes]').value); fd.set('missing', '');
+            var tok = form.querySelector('input[name=__RequestVerificationToken]'); if (tok) fd.set('__RequestVerificationToken', tok.value);
+            return ajax(form.action, { method: 'POST', body: fd }).then(function (res) { return (res.headers.get('content-type') || '').indexOf('json') > -1 ? res.json().then(function (d) { errors.push(r.cells[0].textContent.trim() + ': ' + (d.error || 'Rejected')); }) : res.text().then(function () { done++; }); }).then(function () { return step(i + 1); });
+        };
+        step(0).then(function () { return ajax(lastUrl).then(function (r) { return r.text(); }); }).then(function (html) { dirty = true; render(html, openTitles()); if (errors.length) showError(errors[0]); else { var f = document.createElement('div'); f.className = 'wf-flash'; f.innerHTML = '<b aria-hidden="true">✓</b>Compliance saved for ' + done + ' offer' + (done === 1 ? '' : 's') + '.'; var head = body.querySelector('.wf-pop-head'); head.parentNode.insertBefore(f, head.nextSibling); } }).catch(function () { btn.disabled = false; btn.textContent = label; showError('The server could not be reached. Try again.'); });
+    }
+    function submit(e) {
+        if (e.currentTarget.hasAttribute('data-bulk-compliance')) { return bulk(e.currentTarget, e); }
+        e.preventDefault(); var form = e.currentTarget, btn = e.submitter, fd = new FormData(form);
+        var pad = form.querySelector('[data-pad]'), decisionSel = form.querySelector('select[name=decision]');
+        if (pad && !(decisionSel && decisionSel.value !== 'Approve')) { if (!pad._drawn) { showError('Draw your signature in the box first.'); return; } fd.set('signatureImage', pad.querySelector('canvas').toDataURL('image/png')); }
+        if (btn && btn.name) fd.set(btn.name, btn.value);
+        form.querySelectorAll('input[data-utc]').forEach(function (i) { if (i.value) { fd.delete(i.name); fd.set(i.name, new Date(i.value).toISOString()); } });
+        var label = btn ? btn.textContent : ''; form.querySelectorAll('button').forEach(function (b) { b.disabled = true; }); if (btn) btn.textContent = /\/Analyze\//.test(form.action) ? 'Analyzing the offers… about a minute' : 'Working…';
+        var keep = openTitles();
+        ajax(form.action, { method: 'POST', body: fd }).then(function (r) {
+            var json = (r.headers.get('content-type') || '').indexOf('json') > -1;
+            return (json ? r.json() : r.text()).then(function (d) {
+                if (json && d.ok) { dirty = true; return ajax(lastUrl).then(function (r2) { return r2.text(); }).then(function (html) { render(html, keep); var f = document.createElement('div'); f.className = 'wf-flash'; f.innerHTML = '<b aria-hidden="true">\u2713</b>Saved.'; var head = body.querySelector('.wf-pop-head'); head.parentNode.insertBefore(f, head.nextSibling); body.scrollTop = 0; }); }
+                if (json) { form.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); if (btn) btn.textContent = label; showError(d.error || 'The action was rejected.'); return; }
+                if (d.indexOf('wf-pop') > -1) { dirty = true; render(d, keep); var m = body.querySelector('.wf-flash'); if (m) m.scrollIntoView({ block: 'nearest' }); body.scrollTop = 0; } else { window.location.href = r.url; }
+            });
+        }).catch(function () { form.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); if (btn) btn.textContent = label; showError('The server could not be reached. Try again.'); });
+    }
+    var lastUrl = '';
+    function refreshView() { if (!lastUrl || !dlg.open) return; ajax(lastUrl).then(function (r) { return r.text(); }).then(function (h) { if (h.indexOf('wf-pop') > -1 && dlg.open) render(h, openTitles()); }); }
+    function openWorkflow(url) { lastUrl = url; dirty = false; dlg.showModal(); load(url); }
+    document.querySelectorAll('[data-open-workflow]').forEach(function (b) { b.addEventListener('click', function () { openWorkflow(b.dataset.url); }); });
+    function closeDlg() { if (dlg.open) dlg.close(); }
+    dlg.querySelectorAll('[data-wf-close]').forEach(function (b) { b.addEventListener('click', closeDlg); });
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) closeDlg(); });
+    dlg.addEventListener('close', function () { if (dirty) { window.location.href = window.location.pathname; } else if (/[?&]open=/.test(window.location.search)) { history.replaceState(null, '', window.location.pathname); } });
+    var openId = new URLSearchParams(window.location.search).get('open');
+    if (openId) { var b = document.querySelector('[data-open-workflow][data-id="' + openId + '"]'); if (b) openWorkflow(b.dataset.url); }
+})();
+</script>

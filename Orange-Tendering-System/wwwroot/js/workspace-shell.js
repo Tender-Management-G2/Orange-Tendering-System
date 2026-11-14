@@ -75,36 +75,37 @@
   document.addEventListener('click',event=>{if(account&&!account.contains(event.target))account.open=false;});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&account?.open){account.open=false;account.querySelector('summary').focus();}});
 
-  const voiceButton=body.querySelector('[data-sourcing-manager-voice-search]');
-  const reportSearch=body.querySelector('#sourcing-manager-search');
-  const reportSearchForm=body.querySelector('[data-sourcing-manager-search]');
-  if(voiceButton&&reportSearch&&reportSearchForm){
-    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-    const announce=message=>{const status=document.querySelector('#workspace-theme-status');if(status)status.textContent=message;};
-    if(!SpeechRecognition){
-      voiceButton.disabled=true;
-      voiceButton.title='Voice search is not supported by this browser';
-      announce('Voice search is not supported by this browser.');
-    }else{
-      const recognition=new SpeechRecognition();
-      recognition.lang='en-US';
-      recognition.interimResults=false;
-      recognition.maxAlternatives=1;
-      recognition.addEventListener('start',()=>{voiceButton.setAttribute('aria-pressed','true');voiceButton.title='Listening…';announce('Listening for a report search.');});
-      recognition.addEventListener('result',event=>{
-        const query=event.results[0][0].transcript.trim();
-        if(!query)return;
-        reportSearch.value=query;
-        announce(`Searching reports for ${query}.`);
-        reportSearchForm.requestSubmit();
-      });
-      recognition.addEventListener('error',event=>{
-        const message=event.error==='not-allowed'?'Microphone permission was not granted.':'Voice search could not understand that. Please try again.';
-        announce(message);
-        voiceButton.title=message;
-      });
-      recognition.addEventListener('end',()=>{voiceButton.setAttribute('aria-pressed','false');voiceButton.title='Search reports by voice';});
-      voiceButton.addEventListener('click',()=>{try{recognition.start();}catch{announce('Voice search is already listening.');}});
+  // The shared header search filters records on every workspace page.
+  const searches=[...body.querySelectorAll('input[type="search"]')];
+  const searchStatus=document.querySelector('#workspace-search-status');
+  if(searches.length){
+    const candidates=[...document.querySelectorAll('.pg-table tbody tr, .pg-card, .pg-links li, article.ws-panel, .dash-activity-item, .dash-task-item, [data-search-item]')];
+    function filterPage(){
+      const terms=searches.map(input=>input.value.trim().toLocaleLowerCase()).filter(Boolean);
+      const filters=[...document.querySelectorAll('.pg-toolbar select')].map(select=>select.value.trim().toLocaleLowerCase()).filter(value=>value&&!/^(all|select|status: all|period: this month)$/.test(value));
+      let visible=0;
+      for(const item of candidates){
+        const content=item.innerText.toLocaleLowerCase();
+        const match=terms.every(term=>content.includes(term))&&filters.every(filter=>content.includes(filter.replace(/^[^:]+:\s*/,'')));
+        item.hidden=!match;if(match)visible++;
+      }
+      if(searchStatus)searchStatus.textContent=terms.length||filters.length?`${visible} matching records on this page.`:'Page search cleared.';
+    }
+    searches.forEach(input=>input.addEventListener('input',filterPage));
+    document.querySelectorAll('.pg-toolbar select').forEach(select=>select.addEventListener('change',filterPage));
+    const VoiceRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const voice=body.querySelector('.ws-voice-search');
+    if(voice){
+      if(!VoiceRecognition){voice.title='Voice search is not supported in this browser';voice.setAttribute('aria-label','Voice search is not supported in this browser');}
+      else{
+        const recognition=new VoiceRecognition();recognition.lang='en-US';recognition.interimResults=false;recognition.maxAlternatives=1;
+        let listening=false;
+        recognition.addEventListener('start',()=>{listening=true;voice.classList.add('is-listening');voice.setAttribute('aria-label','Stop voice search');if(searchStatus)searchStatus.textContent='Listening. Say what you want to find.';});
+        recognition.addEventListener('end',()=>{listening=false;voice.classList.remove('is-listening');voice.setAttribute('aria-label','Start voice search');});
+        recognition.addEventListener('result',event=>{const phrase=event.results[0][0].transcript;const search=searches.find(input=>input.hasAttribute('data-workspace-search'))||searches[0];search.value=phrase;search.dispatchEvent(new Event('input',{bubbles:true}));});
+        recognition.addEventListener('error',event=>{if(searchStatus)searchStatus.textContent=event.error==='not-allowed'?'Allow microphone access to use voice search.':'Voice search could not hear that. Try again or type your search.';});
+        voice.addEventListener('click',()=>{if(listening)recognition.stop();else{try{recognition.start();}catch{if(searchStatus)searchStatus.textContent='Voice search is already starting.';}}});
+      }
     }
   }
 })();

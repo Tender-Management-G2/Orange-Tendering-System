@@ -13,6 +13,7 @@
     var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
     var showWeightedEvaluation = canWorkflow && workspace?.Area != "TopCommittee";
     var activeSection = ViewData["WorkspaceSection"] as string;
+    var isAdminWorkspace = string.Equals(workspace?.Area, "Admin", StringComparison.OrdinalIgnoreCase);
 }
 <nav class="ws-primary-nav" aria-label="@(workspace?.Label ?? "Workspace") navigation">
     @if (showWeightedEvaluation) { <a class="ws-nav-item" asp-area="" asp-controller="Workflow" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>Weighted Evaluation</span></a> }
@@ -21,6 +22,10 @@
     {
         foreach (var item in workspace.Items)
         {
+            if (isAdminWorkspace && (item.Label is "Roles" or "Settings" or "Clarifications" or "My Tasks" || item.Controller is "Roles" or "Settings"))
+            {
+                continue;
+            }
             var active = item.Label == activeSection;
             <a class="ws-nav-item @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="@(item.Area ?? workspace.Area)" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
         }
@@ -37,6 +42,10 @@
             continue;
         }
         var item = WorkspaceNavigation.SharedItems[i];
+        if (isAdminWorkspace && item.Label is "Clarifications" or "My Tasks")
+        {
+            continue;
+        }
         if (workspace?.Area == "SourcingManager" && item.Label == "My Tasks")
         {
             continue;

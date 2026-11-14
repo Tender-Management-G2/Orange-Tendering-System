@@ -25,6 +25,37 @@ public sealed partial class SupplierOfferService(ApplicationDbContext context, T
                 && u.Supplier.Status == SupplierStatus.Approved));
     }
 
+    // Explains, in plain words, why an offer cannot be created for this invitation (instead of a bare 404).
+    public async Task<string> GetCreateBlockReasonAsync(string userId, int invitationId)
+    {
+        var now = workflow.Now;
+        var inv = await context.TenderInvitations.AsNoTracking().Where(i => i.Id == invitationId
+                && context.Users.Any(u => u.Id == userId && u.SupplierId == i.SupplierId))
+            .Select(i => new
+            {
+                i.Status,
+                Round = i.TenderRound.Status,
+                Tender = i.TenderRound.Tender.Status,
+                i.TenderRound.Deadline,
+                i.TenderRound.OpensAt,
+                HasBid = i.Bids.Any(),
+                WeightsApproved = context.Set<WeightRound>().Any(w => w.TenderId == i.TenderRound.TenderId && w.State == WeightState.Approved),
+                Active = context.Users.Any(u => u.Id == userId && u.IsActive),
+                Approved = i.Supplier != null && i.Supplier.Status == SupplierStatus.Approved
+            }).SingleOrDefaultAsync();
+
+        if (inv == null) return "This invitation was not found, or it belongs to another supplier account.";
+        if (!inv.Active || !inv.Approved) return "Your supplier account is not approved and active yet, so offers cannot be created.";
+        if (inv.Status != InvitationStatus.Accepted) return "You must accept the invitation before you can create an offer.";
+        if (inv.HasBid) return "An offer already exists for this invitation. Open it from My Offers.";
+        if (inv.Tender != TenderStatus.Bidding) return "This tender is not open for offers right now.";
+        if (inv.Round != TenderRoundStatus.Open) return "This tender round is not open for offers.";
+        if (!inv.WeightsApproved) return "This tender is not open for offers yet: the evaluation weights are still waiting for approval. Please check again later.";
+        if (inv.OpensAt.HasValue && inv.OpensAt > now) return $"Offers open on {inv.OpensAt:dd MMM yyyy HH:mm}.";
+        if (!inv.Deadline.HasValue || inv.Deadline <= now) return "The deadline for this tender round has passed.";
+        return "Offers cannot be created for this invitation right now.";
+    }
+
     public async Task<SupplierDraftOfferViewModel?> GetCreateAsync(string userId, int invitationId)
     {
         return await AvailableInvitations(userId, invitationId).AsNoTracking()
