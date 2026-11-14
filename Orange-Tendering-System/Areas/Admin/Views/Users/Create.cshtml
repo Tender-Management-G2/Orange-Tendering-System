@@ -125,23 +125,8 @@ No hardcoded passwords or demo accounts.
                       class="text-danger"></span>
             </div>
 
-            <div class="pg-field">
-                <label asp-for="Password">
-                    Temporary Password
-                </label>
-
-                <input asp-for="Password"
-                       type="password"
-                       class="form-control"
-                       autocomplete="new-password" />
-
-                <span asp-validation-for="Password"
-                      class="text-danger"></span>
-
-                <small class="pg-hint">
-                    Password must follow Identity security requirements.
-                    The account must be confirmed before sign-in.
-                </small>
+            <div class="pg-field pg-field-wide">
+                <p class="pg-hint">The user will receive a welcome email with a secure link to set their password and a link to sign in. The password link expires in one hour.</p>
             </div>
 
             <div class="pg-field">

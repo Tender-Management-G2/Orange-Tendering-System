@@ -81,7 +81,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             var result = await _adminService.CreateUserAsync(
-                model, adminId);
+                model, adminId, HttpContext);
 
             if (!result.Succeeded)
             {
@@ -97,7 +97,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             TempData["SuccessMessage"] =
-                "User created successfully. The active account can now sign in.";
+                "User created successfully. A welcome email with a password setup link has been sent.";
 
             if (Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl!);
 

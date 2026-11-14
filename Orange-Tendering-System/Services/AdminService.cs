@@ -4,9 +4,13 @@ using Orange_Tendering_System.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Orange_Tendering_System.Models;
 using System.Text.Json;
+using System.Text;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Orange_Tendering_System.Services
 {
@@ -15,15 +19,21 @@ namespace Orange_Tendering_System.Services
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IEmailSender _emailSender;
+        private readonly LinkGenerator _links;
 
         public AdminService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            RoleManager<IdentityRole> roleManager)
+            RoleManager<IdentityRole> roleManager,
+            IEmailSender emailSender,
+            LinkGenerator links)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
+            _emailSender = emailSender;
+            _links = links;
         }
 
         // A supplier application enters Admin review only after its contact verifies the OTP.
@@ -975,7 +985,8 @@ namespace Orange_Tendering_System.Services
 
         public async Task<IdentityResult> CreateUserAsync(
             CreateUserViewModel model,
-            string adminId)
+            string adminId,
+            HttpContext httpContext)
         {
             var committeeSeat = CommitteeAccountSeats.Find(model.CommitteeSeat);
             if (model.CommitteeSeat != null && (committeeSeat == null || committeeSeat.Role != model.Role))
@@ -1039,18 +1050,16 @@ namespace Orange_Tendering_System.Services
                 DepartmentId = model.DepartmentId,
                 SupplierId = null,
                 IsActive = model.IsActive,
-
-                // Admin-created employees receive a password here, with no email
-                // confirmation flow. Identity requires a confirmed account to sign in.
-                EmailConfirmed = true
+                // The employee sets a private password through the emailed link.
+                EmailConfirmed = false,
+                MustChangePassword = true
             };
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
             // Create the account using Identity
-            var result = await _userManager.CreateAsync(
-                user, model.Password);
+            var result = await _userManager.CreateAsync(user);
 
             if (!result.Succeeded)
             {
@@ -1099,8 +1108,35 @@ namespace Orange_Tendering_System.Services
                 CreatedAt = DateTime.UtcNow
             });
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            try
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+                var passwordUrl = _links.GetUriByPage(httpContext, "/Account/ActivateEmployee",
+                    values: new { area = "Identity", email = user.Email, code });
+                var loginUrl = _links.GetUriByPage(httpContext, "/Account/Login",
+                    values: new { area = "Identity" });
+                if (passwordUrl == null || loginUrl == null)
+                    throw new InvalidOperationException("Could not generate account links.");
+
+                await _emailSender.SendEmailAsync(email, "Welcome to Orange Tendering",
+                    $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
+                    "<p>Welcome to Orange Tendering. An administrator has created an account for you.</p>" +
+                    $"<p><a href=\"{HtmlEncoder.Default.Encode(passwordUrl)}\">Set your password</a> to activate your account. This secure link expires in one hour.</p>" +
+                    $"<p>After setting your password, <a href=\"{HtmlEncoder.Default.Encode(loginUrl)}\">sign in to Orange Tendering</a> using this email address.</p>" +
+                    "<p>If you were not expecting this invitation, please contact your administrator.</p>" +
+                    "<p>Kind regards,<br>Orange Tendering Team</p>");
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception exception) when (exception is System.Net.Mail.SmtpException or InvalidOperationException)
+            {
+                await transaction.RollbackAsync();
+                return IdentityResult.Failed(new IdentityError
+                {
+                    Description = "The welcome email could not be delivered. The account was not created. Please try again."
+                });
+            }
 
             return IdentityResult.Success;
         }

@@ -305,6 +305,48 @@ var resentVerified = await supplier.PostAsync("/Identity/Account/VerifyEmail", F
 Check(resentVerified.StatusCode == HttpStatusCode.Redirect &&
     resentVerified.Headers.Location?.ToString().Contains("PendingApproval") == true,
     "new OTP signs in after resend");
+int rejectedSupplierId;
+using (var scope = factory.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    rejectedSupplierId = (await db.Users.SingleAsync(u => u.Email == expiredEmail)).SupplierId!.Value;
+}
+var reviewAdminToken = await Token(admin, "/Identity/Account/Login");
+var reviewAdminLogin = await admin.PostAsync("/Identity/Account/Login", Form(new()
+{
+    ["Input.Email"] = adminEmail, ["Input.Password"] = newAdminPassword,
+    ["__RequestVerificationToken"] = reviewAdminToken
+}));
+Check(reviewAdminLogin.Headers.Location?.ToString() == "/Admin", "Admin signs in for supplier review");
+var supplierIndex = await (await admin.GetAsync("/Admin/Suppliers?statusFilter=Pending")).Content.ReadAsStringAsync();
+Check(supplierIndex.Contains("CR-" + expiredSuffix), "verified registration appears on Admin Suppliers page");
+var supplierReviewToken = await Token(admin, "/Admin/Suppliers/Review/" + rejectedSupplierId);
+var rejected = await admin.PostAsync("/Admin/Suppliers/SubmitReview", Form(new()
+{
+    ["SupplierId"] = rejectedSupplierId.ToString(), ["Decision"] = "Rejected",
+    ["ReviewNotes"] = "Legal documentation does not meet registration requirements.",
+    ["__RequestVerificationToken"] = supplierReviewToken
+}));
+Check(rejected.StatusCode == HttpStatusCode.Redirect, "Admin rejects supplier from the Suppliers review page");
+using (var scope = factory.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var account = await db.Users.SingleAsync(u => u.Email == expiredEmail);
+    Check((await db.Suppliers.SingleAsync(s => s.Id == rejectedSupplierId)).Status == SupplierStatus.Rejected && !account.IsActive,
+        "rejection disables the supplier account");
+}
+using (var rejectedClient = Client(factory))
+{
+    var rejectedLoginToken = await Token(rejectedClient, "/Identity/Account/Login");
+    var denied = await rejectedClient.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = expiredEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = rejectedLoginToken
+    }));
+    Check(denied.StatusCode == HttpStatusCode.OK &&
+        (await rejectedClient.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+        "rejected supplier cannot sign in or enter the workspace");
+}
 var failedEmail = $"delivery-fail-{suffix}@example.test";
 mail.FailNext = true;
 var failedRegisterToken = await Token(supplier, "/Identity/Account/Register");
@@ -325,15 +367,24 @@ var pendingLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new(
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
     ["__RequestVerificationToken"] = supplierLoginToken
 }));
-Check(pendingLogin.StatusCode == HttpStatusCode.Redirect &&
-    pendingLogin.Headers.Location?.ToString().Contains("PendingApproval") == true,
-    "verified pending supplier can sign in again without OTP");
+Check(pendingLogin.StatusCode == HttpStatusCode.OK &&
+    (await pendingLogin.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"),
+    "verified pending supplier cannot sign in before Admin approval");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var company = await db.Suppliers.SingleAsync(s => s.RegistrationNumber == "CR-" + suffix);
-    company.Status = SupplierStatus.Approved;
-    await db.SaveChangesAsync();
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check((await review.GetSuppliersAsync(null, "Pending")).Suppliers.Any(s => s.Id == company.Id),
+        "verified registration appears on Admin Suppliers page");
+    foreach (var documentId in await db.Documents.Where(d => d.SupplierId == company.Id).Select(d => d.Id).ToListAsync())
+        Check(await review.ReviewSupplierDocumentAsync(new SupplierDocumentReviewViewModel
+        { SupplierId = company.Id, DocumentId = documentId, Status = DocumentVerificationStatus.Verified }, adminId) == "Success",
+            "Admin verifies supplier document");
+    Check(await review.ReviewSupplierAsync(new SupplierReviewDecisionViewModel
+    { SupplierId = company.Id, Decision = SupplierStatus.Approved }, adminId) == "Success",
+        "Admin approves supplier registration");
 }
 var approvedLoginToken = await Token(supplier, "/Identity/Account/Login");
 var approvedLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new()
@@ -422,8 +473,7 @@ using (var employee = Client(factory))
     Check(employeeLogin.Headers.Location?.ToString() == "/Department", "activated employee enters assigned workspace");
 }
 
-// The Admin Create User screen supplies the password directly. Its accounts must
-// already be confirmed because that screen has no email confirmation step.
+// The Admin Create User screen emails a private password setup link.
 var adminCreatedEmail = $"admin-created-{suffix}@example.test";
 using (var scope = factory.Services.CreateScope())
 {
@@ -431,29 +481,64 @@ using (var scope = factory.Services.CreateScope())
     var departmentId = await db.Departments.Where(d => d.Name == "Auth Test Department " + suffix)
         .Select(d => d.Id).SingleAsync();
     var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+    context.Request.Scheme = "https";
+    context.Request.Host = new HostString("localhost");
     var created = await scope.ServiceProvider.GetRequiredService<AdminService>().CreateUserAsync(
         new CreateUserViewModel
         {
             FullName = "Admin Created Employee", Email = adminCreatedEmail,
-            Password = supplierPassword, Role = SystemRoles.RequestingDepartment,
+            Role = SystemRoles.RequestingDepartment,
             DepartmentId = departmentId, IsActive = true
-        }, adminId);
-    Check(created.Succeeded, "Admin Create User saves the employee");
+        }, adminId, context);
+    Check(created.Succeeded, "Admin Create User saves the employee and sends welcome email");
     var account = await db.Users.SingleAsync(u => u.Email == adminCreatedEmail);
-    Check(account.EmailConfirmed, "Admin-created employee is confirmed for password sign-in");
+    Check(!account.EmailConfirmed && account.MustChangePassword && account.PasswordHash == null,
+        "Admin-created employee waits for password setup before sign-in");
 }
+var welcomeEmail = mail.Messages.Last(m => m.To == adminCreatedEmail);
+Check(welcomeEmail.Subject.Contains("Welcome") && welcomeEmail.Body.Contains("sign in") &&
+      welcomeEmail.Body.Contains("ActivateEmployee"), "welcome email includes password and login links");
+var welcomeUrl = WebUtility.HtmlDecode(Regex.Match(welcomeEmail.Body, "href=\\\"([^\\\"]+)\\\"").Groups[1].Value);
+var welcomeUri = new Uri(welcomeUrl);
+var welcomePassword = "W!w7" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 using (var adminCreated = Client(factory))
 {
+    var activationToken = await Token(adminCreated, welcomeUri.PathAndQuery);
+    var activationQuery = QueryHelpers.ParseQuery(welcomeUri.Query);
+    var activated = await adminCreated.PostAsync("/Identity/Account/ActivateEmployee", Form(new()
+    {
+        ["Input.Email"] = adminCreatedEmail, ["Input.Code"] = activationQuery["code"].ToString(),
+        ["Input.Password"] = welcomePassword, ["Input.ConfirmPassword"] = welcomePassword,
+        ["__RequestVerificationToken"] = activationToken
+    }));
+    Check((await activated.Content.ReadAsStringAsync()).Contains("Your password is set"),
+        "welcome link sets the password and confirms the account");
     var token = await Token(adminCreated, "/Identity/Account/Login");
     var response = await adminCreated.PostAsync("/Identity/Account/Login", Form(new()
     {
-        ["Input.Email"] = adminCreatedEmail, ["Input.Password"] = supplierPassword,
+        ["Input.Email"] = adminCreatedEmail, ["Input.Password"] = welcomePassword,
         ["__RequestVerificationToken"] = token
     }));
     Check(response.StatusCode == HttpStatusCode.Redirect && response.Headers.Location?.ToString() == "/Department",
         "Admin-created employee signs in with the assigned role");
     Check((await adminCreated.GetAsync("/Department")).StatusCode == HttpStatusCode.OK,
         "Admin-created employee keeps an authenticated session");
+}
+var failedWelcomeEmail = $"welcome-fail-{suffix}@example.test";
+using (var scope = factory.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+    context.Request.Scheme = "https";
+    context.Request.Host = new HostString("localhost");
+    mail.FailNext = true;
+    var failed = await scope.ServiceProvider.GetRequiredService<AdminService>().CreateUserAsync(
+        new CreateUserViewModel { FullName = "Failed Welcome", Email = failedWelcomeEmail,
+            Role = SystemRoles.SourcingOfficer, IsActive = true }, adminId, context);
+    Check(!failed.Succeeded && !await db.Users.AnyAsync(u => u.Email == failedWelcomeEmail),
+        "undelivered welcome email rolls back account creation");
 }
 
 var forgotToken = await Token(admin, "/Identity/Account/ForgotPassword");

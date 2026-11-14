@@ -60,11 +60,14 @@ public class LoginModel(
             .Select(s => (SupplierStatus?)s.Status)
             .SingleOrDefaultAsync();
         var supplierAllowed = (!isSupplier && user.SupplierId == null) ||
-            (isSupplier && (supplierStatus is SupplierStatus.Pending or SupplierStatus.Approved));
+            (isSupplier && supplierStatus == SupplierStatus.Approved);
         if (!user.IsActive || !user.EmailConfirmed || !supplierAllowed)
         {
             logger.LogWarning("Identity sign-in denied by account state for user {UserId}.", user.Id);
-            ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");
+            ModelState.AddModelError(string.Empty,
+                isSupplier && supplierStatus == SupplierStatus.Pending && user.EmailConfirmed
+                    ? "Your supplier registration is awaiting administrator approval."
+                    : "Invalid sign-in attempt.");
             return Page();
         }
 
@@ -88,8 +91,6 @@ public class LoginModel(
 
         if (user.MustChangePassword)
             return RedirectToPage("./FirstLoginPasswordChange");
-        if (isSupplier && supplierStatus == SupplierStatus.Pending)
-            return RedirectToPage("./PendingApproval");
         if (ReturnUrl != null)
             return LocalRedirect(ReturnUrl);
 

@@ -233,6 +233,7 @@ static class BiometricChecks
         var password = "F!f6" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         int companyId;
         string userId;
+        string emailCode;
         using (var scope = services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -241,10 +242,12 @@ static class BiometricChecks
             db.Suppliers.Add(company);
             await db.SaveChangesAsync();
             companyId = company.Id;
-            var account = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true, IsActive = true, FullName = "Face supplier", SupplierId = company.Id };
+            var account = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = false, IsActive = false,
+                EmailOtpSentAt = DateTime.UtcNow, FullName = "Face supplier", SupplierId = company.Id };
             check((await users.CreateAsync(account, password)).Succeeded && (await users.AddToRoleAsync(account, SystemRoles.Supplier)).Succeeded,
-                "verified pending supplier fixture created");
+                "pending supplier fixture created");
             userId = account.Id;
+            emailCode = await users.GenerateUserTokenAsync(account, TokenOptions.DefaultEmailProvider, "SupplierEmailOtp");
         }
 
         async Task<HttpResponseMessage> PasswordLogin(HttpClient client) =>
@@ -255,7 +258,14 @@ static class BiometricChecks
 
         using var pending = newClient();
         var pendingLogin = await PasswordLogin(pending);
-        check(pendingLogin.Headers.Location?.ToString().Contains("PendingApproval") == true, "pending supplier password sign-in lands on Pending Approval");
+        check(pendingLogin.StatusCode == HttpStatusCode.OK, "pending supplier password sign-in is denied");
+        var verifyToken = await token(pending, "/Identity/Account/VerifyEmail?email=" + Uri.EscapeDataString(email));
+        var verified = await pending.PostAsync("/Identity/Account/VerifyEmail", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Input.Email"] = email, ["Input.Code"] = emailCode, ["__RequestVerificationToken"] = verifyToken
+        }));
+        check(verified.Headers.Location?.ToString().Contains("PendingApproval") == true,
+            "OTP opens the registration session for biometric enrollment");
         var pendingPage = await (await pending.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
         check(pendingPage.Contains("id=\"btnFaceEnroll\"") && pendingPage.Contains("<h1>Face Registration</h1>") &&
               pendingPage.Contains("aria-current=\"step\">Face registration"), "after email verification the registration shows the Face Registration step");
@@ -271,11 +281,8 @@ static class BiometricChecks
         check((await pending.GetAsync("/Supplier")).Headers.Location?.ToString().Contains("PendingApproval") == true,
             "face enrollment does not open the Supplier workspace before approval");
 
-        // Resume in a new browser session: same account, same face, remaining passkey step.
-        using var resumed = newClient();
-        await PasswordLogin(resumed);
-        var resumedPage = await (await resumed.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
-        check(resumedPage.Contains("<h1>Fingerprint / Passkey Registration</h1>"), "interrupted enrollment resumes at passkey step without replacing the face");
+        var nextPage = await (await pending.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
+        check(nextPage.Contains("<h1>Fingerprint / Passkey Registration</h1>"), "supplier advances to passkey registration");
         using var phoneKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var phoneId = RandomNumberGenerator.GetBytes(32);
         var creation = await (await Post(pending, csrf, "/Biometrics/PasskeyRegisterOptions", new { password })).Content.ReadFromJsonAsync<JsonElement>();
@@ -287,7 +294,7 @@ static class BiometricChecks
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             check(await db.Users.CountAsync(u => u.Email == email) == 1 && await db.FaceTemplates.AnyAsync(f => f.UserId == userId) &&
-                await db.UserPasskeys.AnyAsync(p => p.UserId == userId), "resumed supplier has one account containing both face and passkey");
+                await db.UserPasskeys.AnyAsync(p => p.UserId == userId), "supplier has one account containing both face and passkey");
         }
         uint phoneCounter = 1;
         async Task<HttpResponseMessage> PhoneLogin(HttpClient client)
@@ -323,7 +330,7 @@ static class BiometricChecks
 
         using var passwordOnly = newClient();
         var refused = await PasswordLogin(passwordOnly);
-        check(refused.StatusCode == HttpStatusCode.OK && (await refused.Content.ReadAsStringAsync()).Contains("Supplier accounts sign in with face recognition") &&
+        check(refused.StatusCode == HttpStatusCode.OK && (await refused.Content.ReadAsStringAsync()).Contains("This supplier account signs in with face recognition") &&
               (await passwordOnly.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK, "approved supplier with face enrolled cannot bypass it with the password");
         foreach (var status in new[] { SupplierStatus.Rejected, SupplierStatus.Suspended })
         {
