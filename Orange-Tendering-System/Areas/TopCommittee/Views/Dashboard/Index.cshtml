@@ -36,7 +36,7 @@
     var voteClass = item.MyVote?.Decision switch { VoteDecision.Approve => "is-ok", VoteDecision.Reject => "is-bad", _ => "is-warn" };
     var progressClass = item.ValidVotes.Count >= 4 ? "is-ok" : "is-warn";
     <tr><td>T-@item.Tender.Id<br />@item.Tender.Title</td><td>@item.Round.RoundNumber</td><td>@item.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</td><td>@item.ValidVotes.Count(v => v.Decision == VoteDecision.Approve) / 4</td><td><span class="pg-badge @progressClass">@item.ValidVotes.Count / 4 Voted</span></td><td><span class="pg-badge @voteClass">@(item.MyVote?.Decision.ToString() ?? "Pending")</span></td><td><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@item.Round.Id">Review</a>
-    @if (item.CanVote) { <a class="pg-btn pg-btn-primary" asp-controller="Decisions" asp-action="Decision" asp-route-id="@item.Round.Id">Vote</a> }
+    @if (item.CanVote || (ViewData["SignedReportRounds"] as HashSet<int>)?.Contains(item.Round.Id) == true) { <a class="pg-btn pg-btn-primary" asp-controller="Decisions" asp-action="Decision" asp-route-id="@item.Round.Id">Vote</a> }
     else { <span class="pg-hint">@(item.MyVote is not null ? "Vote recorded" : "Review eligibility notes")</span> }</td></tr>
 }
 @if (Model.Pending.Count == 0) { <tr><td colspan="7">No tenders awaiting committee action.</td></tr> }

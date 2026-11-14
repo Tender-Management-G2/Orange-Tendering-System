@@ -28,7 +28,7 @@ public sealed class NotificationsController(ApplicationDbContext db, UserManager
         var items = new List<object>(recent.Count);
         foreach (var item in recent)
         {
-            var destination = await AuthorizedDestination(user.Id, item.Link, cancellationToken);
+            var destination = await AuthorizedDestination(user.Id, item.Link, item.Title, item.CreatedAt, cancellationToken);
             items.Add(new
             {
                 item.Id,
@@ -51,7 +51,7 @@ public sealed class NotificationsController(ApplicationDbContext db, UserManager
         var notification = await Db.Notifications.SingleOrDefaultAsync(n => n.Id == id && n.UserId == user.Id, cancellationToken);
         if (notification is null) return NotFound();
 
-        var destination = await AuthorizedDestination(user.Id, notification.Link, cancellationToken);
+        var destination = await AuthorizedDestination(user.Id, notification.Link, notification.Title, notification.CreatedAt, cancellationToken);
         if (destination is null)
             return Forbid();
 
@@ -66,8 +66,44 @@ public sealed class NotificationsController(ApplicationDbContext db, UserManager
         return Json(new { url = destination, unreadCount });
     }
 
-    private async Task<string?> AuthorizedDestination(string userId, string? link, CancellationToken cancellationToken)
+    private async Task<string?> AuthorizedDestination(string userId, string? link, string? title, DateTime createdAt, CancellationToken cancellationToken)
     {
+        // Older Manager notifications have no deep link. Resolve only a nearby,
+        // submitted Executive Summary from a round assigned to this member.
+        if (string.IsNullOrWhiteSpace(link) && title == "New Executive Summary")
+        {
+            var candidates = await Committee.AssignedRounds(userId)
+                .Where(r => r.Status == CommitteeRoundStatus.InProgress &&
+                    r.TenderReport != null && r.TenderReport.ReportType == ReportType.ExecutiveSummary &&
+                    r.TenderReport.Status == ReportStatus.Submitted && r.TenderReport.SubmittedAt != null)
+                .Select(r => new { r.Id, SubmittedAt = r.TenderReport!.SubmittedAt })
+                .ToListAsync(cancellationToken);
+            var matches = candidates
+                .Select(candidate => new
+                {
+                    candidate.Id,
+                    Difference = Math.Abs((candidate.SubmittedAt!.Value - createdAt).TotalSeconds)
+                })
+                .Where(candidate => candidate.Difference <= 120)
+                .OrderBy(candidate => candidate.Difference)
+                .ToArray();
+            if (matches.Length > 0 && (matches.Length == 1 || matches[0].Difference < matches[1].Difference))
+                return Url.Action("Decision", "Decisions", new { area = "TopCommittee", id = matches[0].Id });
+        }
+
+        // Shared workflow notifications identify the tender, while Top pages
+        // identify the committee round. Resolve only within this user's assignments.
+        const string workflowPrefix = "/Workflow/Details/";
+        if (link?.StartsWith(workflowPrefix, StringComparison.Ordinal) == true &&
+            int.TryParse(link.AsSpan(workflowPrefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var tenderId) && tenderId > 0)
+        {
+            var assignedRound = await Committee.AssignedRounds(userId)
+                .Where(r => r.TenderRound.TenderId == tenderId)
+                .OrderByDescending(r => r.TenderRound.RoundNumber).ThenByDescending(r => r.RoundNumber)
+                .Select(r => (int?)r.Id).FirstOrDefaultAsync(cancellationToken);
+            if (assignedRound.HasValue)
+                return Url.Action("Decision", "Decisions", new { area = "TopCommittee", id = assignedRound.Value });
+        }
         var threadId = ThreadIdFor(link);
         if (threadId.HasValue && await new PrivateClarificationService(Db, Users).Read(userId, threadId.Value) is not null)
             return Url.Action("Details", "Conversations", new { area = "TopCommittee", id = threadId.Value });
