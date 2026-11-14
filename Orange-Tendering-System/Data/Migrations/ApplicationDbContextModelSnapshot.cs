@@ -1564,6 +1564,9 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<byte[]>("SignatureImage")
+                        .HasColumnType("varbinary(max)");
+
                     b.Property<DateTime>("SignedAt")
                         .HasColumnType("datetime2");
 

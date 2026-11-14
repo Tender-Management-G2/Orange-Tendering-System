@@ -201,6 +201,7 @@ Departments, Suppliers, AuditLogs.
                                 @user.FullName
                             </td>
 
+
                             <!-- Email -->
                             <td>
                                 @user.Email
@@ -216,14 +217,14 @@ Departments, Suppliers, AuditLogs.
                                 @user.DepartmentOrCompany
                             </td>
 
+                           
                             <!-- Account Status -->
                             <td>
                                 <span class="pg-status">
-                                    @(user.IsActive
-                                        ? "Active"
-                                        : "Inactive")
+                                    @user.StatusLabel
                                 </span>
                             </td>
+
 
                             <!-- Actions -->
                             <td>

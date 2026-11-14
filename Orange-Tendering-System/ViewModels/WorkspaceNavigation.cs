@@ -16,12 +16,10 @@ namespace Orange_Tendering_System.ViewModels
 
     public static class WorkspaceNavigation
     {
-        // Shown under every internal role's menu.
+        // Shown under every internal role's menu. My Tasks and Notifications are not listed here: notifications live in the top-bar bell.
         public static readonly IReadOnlyList<NavItem> SharedItems =
         [
-            new("My Tasks", "Tasks", "Index", "check", ""),
-            new("Clarifications", "Clarifications", "Index", "chat", ""),
-            new("Notifications", "Notifications", "Index", "bell", "")
+            new("Clarifications", "Clarifications", "Index", "chat", "")
         ];
 
         public static readonly IReadOnlyList<Workspace> Workspaces =
@@ -51,7 +49,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Received Bids", "Bids", "Index", "layers"),
                 new("Reports", "Reports", "Index", "report"),
                 new("Final Decisions", "FinalDecisions", "Index", "check"),
-                  new("Supplier Clarifications", "Clarifications", "Index", "chat")
+                  new("Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
             [
@@ -67,21 +65,14 @@ namespace Orange_Tendering_System.ViewModels
             new("EvaluationCommittee", "Evaluation Committee", SystemRoles.EvaluationCommittee,
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
-                new("Assigned Evaluations", "Evaluations", "Index", "request"),
-                new("Criteria & Weights", "Criteria", "Index", "scale"),
-                new("Technical Evaluation", "Evaluations", "Technical", "settings"),
-                new("Financial Evaluation", "Evaluations", "Financial", "chart"),
-                new("Scores", "Evaluations", "Scores", "vote"),
-                new("AI Analysis", "Evaluations", "AiAnalysis", "ai"),
-                new("Unified Report", "Reports", "Unified", "report"),
-                new("History", "Evaluations", "History", "history")
+                // Criteria, Technical/Financial, Scores, AI Analysis, Unified Report and History were scaffold pages that all redirected
+                // to the weighted workflow, so they are not listed separately: every step is on the tender workflow page.
+                new("Assigned Evaluations", "Workflow", "Index", "request")
             ]),
             new("SourcingManager", "Sourcing Manager", SystemRoles.SourcingManager,
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Pending Reports", "Reports", "Index", "request"),
-                new("Report Review", "Reports", "Index", "check"),
-                new("Forwarding", "Reports", "Forward", "send"),
                 new("Final Decisions", "FinalDecisions", "Index", "check"),
                 new("Decision History", "Reports", "History", "history"),
                 new("Analytics & Exports", "Analytics", "Index", "chart", "")
@@ -106,8 +97,11 @@ namespace Orange_Tendering_System.ViewModels
 
         public static Workspace? Current(string? area, ClaimsPrincipal user) => ForArea(area) ?? ForUser(user);
 
+        // Every role has its own layout (Views/Shared/_<Role>Layout.cshtml) with that role's fixed sidebar.
+        // Shared pages outside an area use the layout of the user's first workspace role (same order as ForUser).
         public static string LayoutFor(ClaimsPrincipal user) =>
-            user.IsInRole(SystemRoles.Supplier) ? "_SupplierLayout" : "_WorkspaceLayout";
+            user.IsInRole(SystemRoles.Supplier) ? "_SupplierLayout"
+            : ForUser(user)?.Area is { } area ? $"_{area}Layout" : "_WorkspaceLayout";
 
         // Inline SVG content (24x24, stroke icons) taken from the supplied layout.
         public static readonly IReadOnlyDictionary<string, string> Icons = new Dictionary<string, string>

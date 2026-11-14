@@ -73,7 +73,16 @@ public partial class TenderWorkflowService
     {
         await Officer(t, a); var r = await Round(id);
         Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 2000, "Record the re-tender reason (up to 2000 characters).");
-        Require(r.Status == TenderRoundStatus.Closed && !await db.Set<EvaluationSession>().AnyAsync(x => x.TenderRoundId == r.Id), "Only a closed bidding round without a scheduled evaluation can be re-tendered.");
+        // A closed round can be re-tendered before an evaluation is scheduled, or while a scheduled evaluation cannot work because fewer
+        // than the required number of compliant offers are eligible. In that case the scheduled evaluation is cancelled and kept as history.
+        var session = await db.Set<EvaluationSession>().Include(x => x.EligibleBids).FirstOrDefaultAsync(x => x.TenderRoundId == r.Id);
+        Require(r.Status == TenderRoundStatus.Closed, "Only a closed bidding round can be re-tendered.");
+        if (session != null)
+        {
+            Require(session.State is SessionState.Scheduled or SessionState.Incomplete or SessionState.Closed, "The evaluation already produced a report, so this round cannot be re-tendered.");
+            Require(session.EligibleBids.Count < MinimumOffers(await FailedRoundsBefore(id, r.RoundNumber)), "Re-tender is allowed after scheduling only when fewer compliant offers than the required minimum are eligible.");
+            session.State = SessionState.Closed; session.ClosedAt = Now; session.ClosureReason = "Cancelled: the round was re-tendered because too few compliant offers were eligible.";
+        }
         Require(r.RoundNumber < MaxRounds, $"Round {MaxRounds} was the final permitted round. Round {MaxRounds + 1} cannot be created; proceed with the received offers instead.");
         var offers = DistinctSuppliers(await Submitted(r.Id));
         // Re-tendering is the officer's decision: an undecided proceed request for this round is closed, not awaited.

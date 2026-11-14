@@ -106,7 +106,7 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
         return ReportCryptography.Hash(ReportCanonicalJson.Serialize(invariant));
     }
     public async Task<bool> Sign(TenderReport report, EvaluationSession session, ApplicationUser actor, ReportSigningStage stage,
-        string role, string slot, string decision, string? expectedHash, bool confirmed, DateTime now)
+        string role, string slot, string decision, string? expectedHash, bool confirmed, DateTime now, byte[]? signatureImage = null)
     {
         TenderWorkflowService.Require(confirmed && !string.IsNullOrWhiteSpace(expectedHash) && expectedHash == report.PdfSha256 && report.SupersededAt == null && report.Status is not (ReportStatus.Returned or ReportStatus.Rejected), "Open and review the current generated PDF, confirm signing, and submit its exact hash. Obsolete versions cannot be signed.");
         await AssertIntegrity(report, session);
@@ -118,7 +118,7 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
         }
         TenderWorkflowService.Require(await db.AuditLogs.AnyAsync(x => x.EntityName == "TenderReport" && x.EntityId == report.Id.ToString() && x.UserId == actor.Id && x.Action == "ProtectedReportViewed" && x.NewValues != null && x.NewValues.Contains(expectedHash)), "Review the generated PDF before signing your assigned section.");
         var signature = new ReportSignature { TenderReportId = report.Id, UserId = actor.Id, SignerName = Name(actor), Role = role, Stage = stage, Slot = slot,
-            Decision = decision, SignedAt = now, DocumentHash = report.PdfSha256!, SnapshotHash = report.SnapshotSha256! };
+            Decision = decision, SignedAt = now, DocumentHash = report.PdfSha256!, SnapshotHash = report.SnapshotSha256!, SignatureImage = signatureImage };
         crypto.Sign(signature, report.VersionNumber); db.Add(signature);
         db.AuditLogs.Add(new AuditLog { UserId = actor.Id, EntityName = "TenderReport", EntityId = report.Id.ToString(), Action = "ReportVersionSigned", CreatedAt = now,
             NewValues = JsonSerializer.Serialize(new { report.Id, report.VersionNumber, signature.DocumentHash, signature.SnapshotHash, stage, role, slot, decision, signature.Method, signature.CertificateThumbprint }) });

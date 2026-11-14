@@ -2,6 +2,7 @@
 @using Orange_Tendering_System.Models.Entities
 @using System.Text.Json
 @{
+    Layout = User.IsInRole(Orange_Tendering_System.Models.SystemRoles.SourcingManager) ? "_SourcingManagerLayout" : "_EvaluationCommitteeLayout";
     ViewData["Title"] = Model.Tender.Title;
     ViewData["WorkspaceSection"] = "Weighted Evaluation";
     var area = ViewContext.RouteData.Values["area"]?.ToString();

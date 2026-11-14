@@ -21,35 +21,35 @@ namespace Orange_Tendering_System.Areas.EvaluationCommittee.Controllers
         // GET /EvaluationCommittee/Evaluations/Technical/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Technical(int? id)
         {
-            return RedirectToAction("Index", "Workflow");
+            return id is > 0 ? RedirectToAction("Details", "Workflow", new { id }) : RedirectToAction("Index", "Workflow");
         }
 
         // Financial Evaluation — Owner: Tariq · Trello: Financial Evaluation (https://trello.com/c/oqDGzKzR)
         // GET /EvaluationCommittee/Evaluations/Financial/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Financial(int? id)
         {
-            return RedirectToAction("Index", "Workflow");
+            return id is > 0 ? RedirectToAction("Details", "Workflow", new { id }) : RedirectToAction("Index", "Workflow");
         }
 
         // Committee Scoring & Consolidation — Owner: Tariq · Trello: Committee Scoring & Consolidation (https://trello.com/c/zzYbN4wd)
         // GET /EvaluationCommittee/Evaluations/Scores/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult Scores(int? id)
         {
-            return RedirectToAction("Index", "Workflow");
+            return id is > 0 ? RedirectToAction("Details", "Workflow", new { id }) : RedirectToAction("Index", "Workflow");
         }
 
         // Ollama AI Bid Analysis — Owner: Tariq · Trello: Ollama AI Bid Analysis (https://trello.com/c/oWr6Ezhy)
         // GET /EvaluationCommittee/Evaluations/AiAnalysis/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult AiAnalysis(int? id)
         {
-            return RedirectToAction("Index", "Workflow");
+            return id is > 0 ? RedirectToAction("Details", "Workflow", new { id }) : RedirectToAction("Index", "Workflow");
         }
 
         // Evaluation History — Owner: Tariq · Trello: Evaluation History (https://trello.com/c/gmOCr3ie)
         // GET /EvaluationCommittee/Evaluations/History/{id?}. TODO: load the record by id (NotFound when missing) and check access.
         public IActionResult History(int? id)
         {
-            return RedirectToAction("Index", "Workflow");
+            return id is > 0 ? RedirectToAction("Details", "Workflow", new { id }) : RedirectToAction("Index", "Workflow");
         }
     }
 }
