@@ -1,4 +1,5 @@
 /* Weighted tender cycle pages (Areas/*/Views/Workflow/Details.cshtml). Design only: no behaviour. */
+.wp-picker .wp-pick li[hidden] { display: none !important; }
 .wf{max-width:1180px;margin:0 auto;padding:6px 6px 40px;color:var(--ws-ink)}
 .wf>a:first-child{display:inline-flex;align-items:center;gap:6px;margin:18px 0 6px;color:var(--ws-accent);text-decoration:none;font-weight:700;font-size:13px}
 .wf>a:first-child::before{content:"\2190"}

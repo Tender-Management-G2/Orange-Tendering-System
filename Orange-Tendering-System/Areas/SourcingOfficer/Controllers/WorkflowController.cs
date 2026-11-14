@@ -41,7 +41,9 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         TenderWorkflowService.Require(round != null, "Tender round not found.");
         var already = await db.TenderInvitations.AsNoTracking().Where(i => i.TenderRoundId == round!.Id).Select(i => i.SupplierId).ToListAsync();
         var wanted = supplierIds is { Length: > 0 } ? supplierIds.ToHashSet() : null;
-        var ids = await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Approved && !already.Contains(s.Id) && (wanted == null || wanted.Contains(s.Id))).OrderBy(s => s.CompanyName).Select(s => s.Id).ToListAsync();
+        var ids = await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Approved
+            && db.Users.Any(u => u.SupplierId == s.Id && u.IsActive && u.EmailConfirmed)
+            && !already.Contains(s.Id) && (wanted == null || wanted.Contains(s.Id))).OrderBy(s => s.CompanyName).Select(s => s.Id).ToListAsync();
         TenderWorkflowService.Require(ids.Count > 0, wanted == null ? "Every approved supplier has already been invited." : "Choose at least one supplier that is not invited yet.");
         foreach (var supplierId in ids) await Workflow.Invite(id, supplierId, User);
     });

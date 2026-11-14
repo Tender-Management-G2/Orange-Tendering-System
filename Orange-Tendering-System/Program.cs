@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
@@ -51,6 +51,7 @@ builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierOfferService
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierCommunicationService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDocumentService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDashboardService>();
+builder.Services.AddScoped<SupplierTenderPortalService>();
 
 builder.Services.Configure<TenderApprovalPolicy>(builder.Configuration.GetSection("TenderApprovalPolicy"));
 builder.Services.AddSingleton(TimeProvider.System);

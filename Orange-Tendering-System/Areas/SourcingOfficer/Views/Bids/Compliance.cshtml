@@ -18,7 +18,7 @@
 
     <section class="ws-panel pg-panel">
         <h2>Your compliance decision</h2>
-        <form asp-action="Compliance" method="post" class="pg-form" id="compliance-form">
+        <form asp-action="Compliance" method="post" class="pg-form" id="compliance-form" data-offer-compliance>
             <input type="hidden" name="id" value="@Model.Id" />
             <div asp-validation-summary="ModelOnly" class="pg-validation" role="alert"></div>
             <div class="pg-field pg-field-wide">
@@ -29,6 +29,7 @@
                     <option value="PendingClarification" selected="@(Model.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.PendingClarification)">Needs clarification — waiting for supplier</option>
                 </select>
             </div>
+            <p class="pg-hint" data-compliance-confirmation hidden>Choosing Compliant confirms that you reviewed the attached documents and resolved the previous missing requirements.</p>
             <div class="pg-field so-conditional-box" id="noncompliant-box" hidden>
                 <label for="notes">Why does this offer not meet the requirements?</label>
                 <textarea name="notes" id="notes" rows="3" maxlength="2000" placeholder="Explain the unmet requirement or failed check">@Model.ComplianceNotes</textarea>
@@ -48,24 +49,3 @@
         </form>
     </section>
 </div>
-@section Scripts {
-    <script>
-        (() => {
-            const status = document.getElementById('status');
-            const reasonBox = document.getElementById('noncompliant-box');
-            const missingBox = document.getElementById('clarification-box');
-            const reason = document.getElementById('notes');
-            const missing = document.getElementById('missingRequirements');
-            function updateFields() {
-                const isNonCompliant = status.value === 'NonCompliant';
-                const needsClarification = status.value === 'PendingClarification';
-                reasonBox.hidden = !isNonCompliant;
-                missingBox.hidden = !needsClarification;
-                reason.required = isNonCompliant;
-                missing.required = needsClarification;
-            }
-            status.addEventListener('change', updateFields);
-            updateFields();
-        })();
-    </script>
-}
