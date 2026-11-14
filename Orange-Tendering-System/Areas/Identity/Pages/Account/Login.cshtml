@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model LoginModel
 @*
 ===========================================================
@@ -13,29 +13,23 @@ TRELLO TASK: User Login & Role Redirect
 TRELLO URL: https://trello.com/c/WoTewqHd
 
 PURPOSE:
-Email/password sign-in for every user (employees and approved
-suppliers), using the existing Identity LoginModel unchanged.
+One Identity email/password sign-in for employees and approved suppliers.
 
 BUSINESS ACCESS:
 Anonymous visitors.
 
-FUTURE IMPLEMENTATION:
-- After sign-in, redirect to the user's workspace by role
-  (see WorkspaceController / Workspace/Index) instead of "/".
-- Block suppliers whose Supplier.Status is not Approved, and
-  users with ApplicationUser.IsActive = false.
-- Fingerprint and face sign-in: replace the disabled buttons
-  below with a real, demonstrable verification flow. Never
-  accept a static photo as live face verification.
-- Audit failed and successful sign-ins (without secrets).
+BIOMETRIC SIGN-IN:
+- Fingerprint (WebAuthn passkey) and face recognition (live camera
+  challenge, password required) are wired to BiometricsController and
+  wwwroot/js/biometric.js. They issue the same Identity cookie.
 
 DEPENDENCIES:
 AspNetUsers, ApplicationUser, Supplier, SignInManager,
 Biometrics pages, AuditLogs.
 
 STATUS:
-PASSWORD SIGN-IN WORKS (existing Identity). Role redirect and
-biometric sign-in are NOT IMPLEMENTED.
+Identity sign-in, role redirect, account-state checks, and lockout are implemented.
+Biometric sign-in is implemented (see Controllers/BiometricsController.cs).
 
 IMPORTANT:
 Do not add a second authentication system next to Identity.
@@ -61,29 +55,29 @@ Do not add a second authentication system next to Identity.
             <button id="login-submit" type="submit" class="primary">Sign In →</button>
         </form>
 
-        @* Biometric entry points — Ahmad. Disabled until a real verification flow exists. *@
-        <div class="auth-biometric" aria-label="Biometric sign-in">
-            <small>Biometric sign-in (not implemented yet)</small>
-            <button type="button" class="overview" disabled title="Fingerprint sign-in is not implemented yet">Sign in with fingerprint</button>
-            <button type="button" class="overview" disabled title="Face recognition sign-in is not implemented yet">Sign in with face recognition</button>
+        @* Biometric sign-in (Ahmad): Identity cookie issued by BiometricsController after a verified fingerprint passkey
+           (WebAuthn) only. Camera face recognition is not an authentication factor. *@
+        <div class="auth-biometric" id="bio-root" data-return-url="@Model.ReturnUrl" aria-label="Biometric sign-in">
+            <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
+            <button type="button" id="btnPasskeyLogin" class="overview">Sign in with fingerprint</button>
+            <button type="button" id="btnFaceLogin" data-bio-disabled="true" class="overview" disabled title="Face Login is disabled pending secure server-verifiable identity proof">Sign in with face recognition</button>
+            <small>Passkeys use your device's authenticator (fingerprint, PIN or device face unlock). This application does not receive physical fingerprint data. Camera-based Face Login is disabled until secure server-verifiable proof is implemented and verified.</small>
+            <div id="facePanel" class="bio-face-panel bio-hidden">
+                <video id="faceVideo" playsinline muted autoplay></video>
+                <div id="faceHint" class="bio-face-hint"></div>
+            </div>
         </div>
 
-        @if ((Model.ExternalLogins?.Count ?? 0) > 0)
-        {
-            <form id="external-account" asp-page="./ExternalLogin" asp-route-returnUrl="@Model.ReturnUrl" method="post">
-                @foreach (var provider in Model.ExternalLogins!)
-                {
-                    <button type="submit" class="overview" name="provider" value="@provider.Name" title="Log in using your @provider.DisplayName account">@provider.DisplayName</button>
-                }
-            </form>
-        }
-
         <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
-        <a class="auth-link" asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl">Register as a supplier ↗</a>
-        <a class="auth-link" id="resend-confirmation" asp-page="./ResendEmailConfirmation">Resend email confirmation</a>
+        <a class="auth-link" asp-page="./Register">Register as a supplier ↗</a>
+        <a class="auth-link" id="resend-confirmation" asp-page="./VerifyEmail">Verify supplier email</a>
     </div>
 </section>
 
+@section Styles {
+    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+}
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
 }

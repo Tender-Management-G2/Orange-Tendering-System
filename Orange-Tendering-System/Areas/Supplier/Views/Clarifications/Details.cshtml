@@ -1,0 +1,18 @@
+@model SupplierClarificationViewModel
+@{ ViewData["Title"] = "Clarification Details"; ViewData["WorkspaceSection"] = "Clarifications"; }
+<partial name="_PageHeader" />
+@if (TempData["ClarificationMessage"] is string notice) { <p class="pg-note" role="status">@notice</p> }
+<section class="ws-panel pg-panel"><h2>@Model.Subject</h2><p>Status: @Model.Status</p></section>
+@foreach (var message in Model.Messages) {
+<section class="ws-panel pg-panel"><h3>@message.Sender</h3><p>@message.At.ToString("yyyy-MM-dd HH:mm") UTC</p><p style="white-space:pre-wrap">@message.Message</p>
+<ul>@foreach (var doc in message.Documents) { <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a></li> }</ul>
+@if (Model.CanReply && message.Sender == "You") {
+<form asp-controller="Documents" asp-action="UploadClarification" method="post" enctype="multipart/form-data">
+<input name="messageId" value="@message.Id" type="hidden" /><label for="message-file-@message.Id">Attach PDF, PNG or JPEG (up to 10 MB)</label><input id="message-file-@message.Id" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" required /><button type="submit" class="pg-btn">Attach document</button></form>
+}
+</section>
+}
+@if (Model.CanReply) {
+<section class="ws-panel pg-panel"><form asp-action="Reply" asp-route-id="@Model.Id" method="post" class="pg-form"><label for="reply-message">Reply to Sourcing Officer</label><textarea id="reply-message" name="message" rows="5" maxlength="10000" required></textarea><button type="submit" class="pg-btn pg-btn-primary">Send reply</button></form></section>
+}
+<a asp-action="Index">Back to clarifications</a>

@@ -1,48 +1,40 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Accept / Decline Invitation
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Supplier Portal
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Accept or decline an invitation.
-
-BUSINESS ACCESS:
-Supplier (own company only, Admin-approved)
-
-ROUTE: /Supplier/Invitations/Respond/{id?}
-
-FUTURE IMPLEMENTATION:
-- POST Accept / Decline for an own, Pending invitation
-  before the deadline; notify the Officer; audit.
-
-DEPENDENCIES:
-TenderInvitations, Notifications, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Every query must be filtered by the signed-in user’s
-SupplierId. Never show other suppliers’ invitations, offers,
-prices or evaluations.
-===========================================================
-*@
+@model SupplierInvitationDetailsViewModel
+@* Owner: Saja. Accepting an invitation does not create or submit a bid. *@
 @{
     ViewData["Title"] = "Accept / Decline Invitation";
     ViewData["WorkspaceSection"] = "Invitations";
-    ViewData["Description"] = "Tell the Sourcing Officer whether your company will submit an offer.";
+    ViewData["Description"] = "Respond to your company's invitation.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<div class="pg-grid">
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Accept invitation", "Confirm that your company intends to submit an offer.", "Sets the invitation to Accepted and RespondedAt (UTC).", false, false)' />
-<partial name="_ConfirmAction" model='new ConfirmActionModel("Decline invitation", "Decline this invitation.", "Sets the invitation to Declined. Your company cannot submit an offer in this round.", true, true)' />
-</div>
+<section class="ws-panel pg-panel">
+    <h2>@Model.TenderTitle</h2>
+    <dl class="pg-dl">
+        <div><dt>Round</dt><dd>@Model.RoundNumber</dd></div>
+        <div><dt>Deadline</dt><dd>@(Model.Deadline?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Status</dt><dd>@Model.DisplayStatus</dd></div>
+    </dl>
 
-<aside class="pg-note"><strong>Ignoring an invitation</strong><p>If you do nothing, the invitation stays Pending and no offer is created.</p></aside>
+    @if (Model.CanRespond)
+    {
+        <p>Accept if your company intends to participate. Acceptance does not create or submit an offer.</p>
+        <p>Declining means your company will not participate in this round. Your response cannot be changed here.</p>
+        <form asp-area="Supplier" asp-controller="Invitations" asp-action="Respond"
+              asp-route-id="@Model.Id" method="post" class="pg-form">
+            <div class="pg-actions">
+                <button type="submit" name="decision" value="Accepted" class="pg-btn pg-btn-primary">Accept invitation</button>
+                <button type="submit" name="decision" value="Declined" class="pg-btn">Decline invitation</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <p role="status">This invitation was already answered or the bidding period is not open. No response can be saved.</p>
+    }
+</section>
+<nav class="pg-links" aria-label="Related pages">
+    <ul>
+        <li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Details" asp-route-id="@Model.Id">Back to details</a></li>
+        <li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Index">Back to invitations</a></li>
+    </ul>
+</nav>

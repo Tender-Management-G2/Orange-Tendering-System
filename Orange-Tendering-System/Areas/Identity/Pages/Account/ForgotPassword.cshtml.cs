@@ -1,93 +1,57 @@
-// ORANGE TENDER MANAGEMENT SYSTEM — Owner: Ahmad (Authentication). Scaffolded from ASP.NET Core Identity UI 10; logic unchanged.
-// Status: existing Identity behavior. See the TODO list in ForgotPassword.cshtml.
-// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-#nullable disable
-
-using System;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
-namespace Orange_Tendering_System.Areas.Identity.Pages.Account
+namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
+
+public class ForgotPasswordModel(
+    UserManager<ApplicationUser> users,
+    IEmailSender emailSender,
+    IConfiguration configuration,
+    ILogger<ForgotPasswordModel> logger) : PageModel
 {
-    public class ForgotPasswordModel : PageModel
+    [BindProperty] public InputModel Input { get; set; } = new();
+    public class InputModel
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IEmailSender _emailSender;
+        [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+    }
 
-        public ForgotPasswordModel(UserManager<ApplicationUser> userManager, IEmailSender emailSender)
+    public async Task<IActionResult> OnPostAsync()
+    {
+        if (!ModelState.IsValid) return Page();
+        if (!SmtpEmailSender.IsConfigured(configuration))
         {
-            _userManager = userManager;
-            _emailSender = emailSender;
-        }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [BindProperty]
-        public InputModel Input { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public class InputModel
-        {
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            [EmailAddress]
-            public string Email { get; set; }
-        }
-
-        public async Task<IActionResult> OnPostAsync()
-        {
-            if (ModelState.IsValid)
-            {
-                var user = await _userManager.FindByEmailAsync(Input.Email);
-                if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
-                {
-                    // Don't reveal that the user does not exist or is not confirmed
-                    return RedirectToPage("./ForgotPasswordConfirmation");
-                }
-
-                // For more information on how to enable account confirmation and password reset please
-                // visit https://go.microsoft.com/fwlink/?LinkID=532713
-                var code = await _userManager.GeneratePasswordResetTokenAsync(user);
-                code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-                var callbackUrl = Url.Page(
-                    "/Account/ResetPassword",
-                    pageHandler: null,
-                    values: new { area = "Identity", code },
-                    protocol: Request.Scheme);
-
-                var storedEmail = await _userManager.GetEmailAsync(user);
-                if (string.IsNullOrEmpty(storedEmail))
-                {
-                    throw new InvalidOperationException("Users must have an email.");
-                }
-
-                await _emailSender.SendEmailAsync(
-                    storedEmail,
-                    "Reset Password",
-                    $"Please reset your password by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.");
-
-                return RedirectToPage("./ForgotPasswordConfirmation");
-            }
-
+            logger.LogError("Password recovery email delivery is not configured.");
+            ModelState.AddModelError(string.Empty, "Email delivery is unavailable. Please contact the administrator.");
             return Page();
         }
+
+        var user = await users.FindByEmailAsync(Input.Email.Trim());
+        if (user == null || !await users.IsEmailConfirmedAsync(user) || !user.IsActive)
+            return RedirectToPage("./ForgotPasswordConfirmation");
+
+        var code = await users.GeneratePasswordResetTokenAsync(user);
+        var encoded = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var url = Url.Page("/Account/ResetPassword", pageHandler: null, values: new { area = "Identity", code = encoded }, protocol: Request.Scheme);
+        if (url == null) throw new InvalidOperationException("Could not generate password-reset URL.");
+        try
+        {
+            await emailSender.SendEmailAsync(user.Email!, "Reset your password",
+                $"<p>Reset your password using <a href=\"{HtmlEncoder.Default.Encode(url)}\">this one-hour link</a>.</p><p>If you did not request this, ignore the message.</p>");
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Password recovery email delivery failed for user {UserId}.", user.Id);
+            ModelState.AddModelError(string.Empty, "Email delivery is unavailable. Please contact the administrator.");
+            return Page();
+        }
+        return RedirectToPage("./ForgotPasswordConfirmation");
     }
 }

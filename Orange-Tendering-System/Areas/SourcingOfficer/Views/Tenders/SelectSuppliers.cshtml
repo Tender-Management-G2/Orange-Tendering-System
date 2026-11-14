@@ -1,70 +1,18 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Supplier Selection
+@model Orange_Tendering_System.ViewModels.SelectOfficerSuppliersModel
+@{ ViewData["Title"] = "Find suppliers"; ViewData["WorkspaceSection"] = "Tenders"; ViewData["Description"] = "Choose a supply category, review companies in it, then invite suppliers one at a time."; }
+<div class="so-page"><partial name="_PageHeader" />
+<section class="ws-panel pg-panel so-supplier-context"><div class="pg-panel-head"><div><span class="so-eyebrow">INVITATIONS FOR THIS TENDER</span><h2>@Model.TenderTitle</h2></div><a class="pg-btn" asp-controller="Tenders" asp-action="Details" asp-route-id="@Model.TenderId">← Tender details</a></div>
+@if(TempData["SupplierInviteMessage"] is string inviteMessage){<div class="so-alert" role="status">@inviteMessage</div>}
+@if(TempData["SupplierInviteError"] is string inviteError){<div class="so-alert so-alert-error" role="alert">@inviteError</div>}
+<p>Start by choosing a category. “Suppliers available” shows how many approved suppliers in that category have not been invited to this round.</p></section>
 
-DEVELOPER OWNER: Amal
-MODULE: Sourcing Officer / Tender Management
-TRELLO TASK: Supplier Selection
-TRELLO URL: https://trello.com/c/CDiXqUwu
+@if(Model.SelectedCategory is null){
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>Supplier categories</h2><span class="pg-hint">All categories in the supplier directory, not just IT suppliers.</span></div></div><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Category</th><th>Approved suppliers</th><th></th></tr></thead><tbody>@foreach(var category in Model.Categories){<tr><td><strong>@category.Name</strong></td><td><span class="pg-badge @(category.SupplierCount>0?"is-ok":"")">@category.SupplierCount</span></td><td><a class="pg-btn @(category.SupplierCount>0?"pg-btn-primary":"")" asp-action="SelectSuppliers" asp-route-id="@Model.RoundId" asp-route-category="@category.Name">Show category</a></td></tr>}</tbody></table></div></section>
+}else{
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><span class="so-eyebrow">SELECTED CATEGORY</span><h2>@Model.SelectedCategory</h2><span class="pg-hint">@Model.Suppliers.Count approved supplier(s) in this category.</span></div><a class="pg-btn" asp-action="SelectSuppliers" asp-route-id="@Model.RoundId">← All categories</a></div>
+@if(!Model.CanInvite){<div class="so-alert so-alert-error" role="status">@Model.InviteUnavailableReason</div>}
+@if(Model.Suppliers.Count==0){<div class="so-empty">There are no approved suppliers in this category yet. Choose another category or return after a supplier is approved.</div>}else{
+<div class="pg-table-wrap"><table class="pg-table so-supplier-table"><thead><tr><th>Company</th><th>Registration number</th><th>Contact</th><th>Details</th><th>Invitation</th></tr></thead><tbody>@foreach(var supplier in Model.Suppliers){var existing=Model.Invitations.FirstOrDefault(i=>i.SupplierId==supplier.Id);<tr><td><strong>@supplier.CompanyName</strong><br/><small class="pg-hint">@supplier.Category</small></td><td>@supplier.RegistrationNumber</td><td><a href="mailto:@supplier.Email">@supplier.Email</a><br/><small>@supplier.Phone</small></td><td><details class="so-supplier-details"><summary>View details</summary><dl class="so-supplier-detail-list"><div><dt>Company</dt><dd>@supplier.CompanyName</dd></div><div><dt>Category</dt><dd>@supplier.Category</dd></div><div><dt>Registration no.</dt><dd>@supplier.RegistrationNumber</dd></div><div><dt>Tax no.</dt><dd>@(supplier.TaxNumber??"Not provided")</dd></div><div><dt>Address</dt><dd>@(supplier.Address??"Not provided")</dd></div><div><dt>Status</dt><dd>@supplier.Status</dd></div></dl></details></td><td>@if(existing!=null){<span class="pg-badge @(existing.Status==Orange_Tendering_System.Models.Entities.InvitationStatus.Accepted?"is-ok":existing.Status==Orange_Tendering_System.Models.Entities.InvitationStatus.Declined?"is-bad":"is-warn")">@existing.Status</span>}else if(Model.CanInvite){<form asp-action="InviteSupplier" method="post"><input type="hidden" name="roundId" value="@Model.RoundId"/><input type="hidden" name="supplierId" value="@supplier.Id"/><input type="hidden" name="category" value="@Model.SelectedCategory"/><button type="submit" class="pg-btn pg-btn-primary">Send invitation</button></form>}else{<span class="pg-hint">Not accepting invitations</span>}</td></tr>}</tbody></table></div>}
+</section>}
 
-PURPOSE:
-Select approved suppliers to invite to a specific tendering
-round.
-
-BUSINESS ACCESS:
-Sourcing Officer
-
-ROUTE: /SourcingOfficer/Tenders/SelectSuppliers/{id?}
-
-FUTURE IMPLEMENTATION:
-- Query Suppliers with Status = Approved.
-- POST: create one TenderInvitation per selected supplier
-  for this TenderRound (unique TenderRoundId + SupplierId).
-- Notify invited supplier accounts; audit.
-
-DEPENDENCIES:
-Suppliers, TenderRounds, TenderInvitations, Notifications,
-AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Inviting three suppliers does not satisfy the three-offer
-rule; only submitted offers count.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "Supplier Selection";
-    ViewData["WorkspaceSection"] = "Tenders";
-    ViewData["Description"] = "Choose which approved suppliers to invite to the current tendering round.";
-}
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<aside class="pg-note"><strong>Who can be invited</strong><p>Only Admin-approved, active suppliers. Each round has its own invitation list: a new round starts the selection from scratch, and a supplier can be invited once per round.</p></aside>
-
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search approved suppliers" aria-label="Search approved suppliers" disabled />
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-approved-suppliers">
-    <div class="pg-panel-head"><h2 id="tbl-approved-suppliers">Approved suppliers</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Select</th><th scope="col">Company</th><th scope="col">Registration no.</th><th scope="col">Previous invitations</th><th scope="col">Previous offers</th></tr></thead>
-            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"Approved suppliers are not loaded yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Send invitations</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Invite selected suppliers</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>Already invited to this round</h2><span class="pg-hint">Invitation status updates when a supplier accepts or declines.</span></div><span class="pg-badge">@Model.Invitations.Count invitations</span></div>@if(Model.Invitations.Count==0){<p class="so-empty">No invitations sent yet.</p>}else{<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Supplier</th><th>Category</th><th>Sent</th><th>Response</th></tr></thead><tbody>@foreach(var invitation in Model.Invitations){<tr><td>@invitation.Supplier.CompanyName</td><td>@invitation.Supplier.Category</td><td>@invitation.InvitedAt.ToLocalTime().ToString("d MMM yyyy")</td><td><span class="pg-badge @(invitation.Status==Orange_Tendering_System.Models.Entities.InvitationStatus.Accepted?"is-ok":invitation.Status==Orange_Tendering_System.Models.Entities.InvitationStatus.Declined?"is-bad":"is-warn")">@invitation.Status</span></td></tr>}</tbody></table></div>}</section></div>

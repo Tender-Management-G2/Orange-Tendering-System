@@ -23,12 +23,21 @@ namespace Orange_Tendering_System.Models.Entities
         public string CreatedByUserId { get; set; } = string.Empty;
         public ApplicationUser CreatedByUser { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
+        [Microsoft.EntityFrameworkCore.Precision(18, 2)]
+        public decimal EstimatedValue { get; set; }
+        [MaxLength(3)] public string Currency { get; set; } = "JOD";
+        public bool IsCritical { get; set; }
+        public DateTime? ClosedAt { get; set; }
+        [Timestamp] public byte[] RowVersion { get; set; } = [];
 
-        // Final award: set only after 4/4 Top Committee approval.
+        // Final award: set only after all approvals required by the frozen configured policy.
         // The committee's recommended bid is kept separately on TenderReport.RecommendedBidId.
         public int? AwardedBidId { get; set; }
         public Bid? AwardedBid { get; set; }
         public DateTime? AwardedAt { get; set; }
+        public string? AwardedByUserId { get; set; }
+        public ApplicationUser? AwardedByUser { get; set; }
+        public string? AwardApprovalEvidenceJson { get; set; }
 
         public ICollection<TenderRound> Rounds { get; set; } = new List<TenderRound>();
         public ICollection<TenderItem> Items { get; set; } = new List<TenderItem>();

@@ -1,0 +1,12 @@
+/* Biometric sign-in and enrollment (fingerprint passkey + face recognition). Used by the Login page and Views/Biometrics. */
+.bio-hidden{display:none!important}
+.bio-status{margin:12px 0;padding:10px 14px;border-radius:10px;border:1px solid var(--rule,var(--ws-rule,#8884));font-size:13px;line-height:1.6}
+.bio-status:empty{display:none}
+.bio-status--success{border-color:#2f9e6a;color:#2f9e6a}
+.bio-status--danger{border-color:#d85742;color:#d8574a}
+.bio-face-panel{text-align:center;margin-top:14px}
+.bio-face-panel video{width:100%;max-width:360px;border-radius:12px;transform:scaleX(-1);background:#000}
+.bio-face-hint{font-weight:600;margin-top:8px;font-size:13px}
+.bio-list{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}
+.bio-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--ws-rule);border-radius:10px}
+.bio-list small{display:block;color:var(--ws-muted)}

@@ -1,30 +1,35 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Shared — Amal (Index); Doulat (Review)
-// Module: Sourcing Officer / Tender Management / Department / Purchase Requests (Sourcing Officer review step)
-// Purpose: MVC endpoints for the PurchaseRequests pages of the Sourcing Officer workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Models.Entities;
 
-namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
+namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
+
+[Area("SourcingOfficer")]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
+public class PurchaseRequestsController(ApplicationDbContext db) : Controller
 {
-    [Area("SourcingOfficer")]
-    [Authorize(Roles = SystemRoles.SourcingOfficer)]
-    public class PurchaseRequestsController : Controller
-    {
-        // Approved Purchase Requests — Owner: Amal · Trello: Approved Purchase Requests (https://trello.com/c/bsQzN4ih)
-        // GET /SourcingOfficer/PurchaseRequests. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
-        {
-            return View();
-        }
+    public async Task<IActionResult> Index() => View(await db.PurchaseRequests.AsNoTracking()
+        .Include(r => r.Department).Include(r => r.Tenders).OrderByDescending(r => r.SubmittedAt ?? r.CreatedAt).ToListAsync());
 
-        // Purchase Request Review / Approval — Owner: Doulat · Trello: Purchase Request Review / Approval (https://trello.com/c/cOYVH9co)
-        // GET /SourcingOfficer/PurchaseRequests/Review/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Review(int? id)
-        {
-            return View();
-        }
+    public async Task<IActionResult> Review(int id)
+    {
+        var request = await db.PurchaseRequests.AsNoTracking().Include(r => r.Department).Include(r => r.Items).SingleOrDefaultAsync(r => r.Id == id);
+        return request == null ? NotFound() : View(request);
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Review(int id, ReviewDecision decision, string? comment)
+    {
+        var request = await db.PurchaseRequests.Include(r => r.Reviews).SingleOrDefaultAsync(r => r.Id == id);
+        if (request == null) return NotFound();
+        if (request.Status != PurchaseRequestStatus.Submitted || decision == ReviewDecision.Pending) return BadRequest();
+        request.Status = decision switch { ReviewDecision.Accepted => PurchaseRequestStatus.Accepted, ReviewDecision.Returned => PurchaseRequestStatus.Returned, _ => PurchaseRequestStatus.Rejected };
+        var submittedSnapshot = System.Text.Json.JsonSerializer.Serialize(new { request.Title, request.Justification, request.Priority, request.NeededBy, Items = request.Items.Select(i => new { i.Name, i.Specifications, i.Quantity, i.Unit }) });
+        request.Reviews.Add(new PurchaseRequestReview { PurchaseRequestId = id, SubmissionNumber = request.Reviews.Select(x => x.SubmissionNumber).DefaultIfEmpty(0).Max() + 1, SubmittedAt = DateTime.UtcNow, SubmittedSnapshotJson = submittedSnapshot, Decision = decision, Comment = comment?.Trim(), ReviewedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value, ReviewedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
     }
 }

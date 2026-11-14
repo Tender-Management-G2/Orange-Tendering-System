@@ -2,7 +2,7 @@
 // Owner: Tariq
 // Module: Technical & Financial Evaluation Committee
 // Purpose: MVC endpoints for the Dashboard pages of the Evaluation Committee workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+// Status: Dashboard data comes from InternalDashboardService (real, role-scoped SQL Server counts).
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
@@ -16,9 +16,6 @@ namespace Orange_Tendering_System.Areas.EvaluationCommittee.Controllers
     {
         // Committee Dashboard — Owner: Tariq · Trello: Committee Dashboard (https://trello.com/c/Z1VGmfZ7)
         // GET /EvaluationCommittee. TODO: build the view model from real data in a service.
-        public IActionResult Index()
-        {
-            return View(new WorkspaceDashboardViewModel());
-        }
+        public async Task<IActionResult> Index([FromServices] Orange_Tendering_System.Services.InternalDashboardService dashboard) => View(await dashboard.GetAsync(SystemRoles.EvaluationCommittee, User));
     }
 }

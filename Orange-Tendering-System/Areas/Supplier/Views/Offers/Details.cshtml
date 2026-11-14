@@ -1,75 +1,50 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Offer Details
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Supplier Portal
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Read-only view of one of the supplier’s own offers.
-
-BUSINESS ACCESS:
-Supplier (own company only, Admin-approved)
-
-ROUTE: /Supplier/Offers/Details/{id?}
-
-FUTURE IMPLEMENTATION:
-- Load an own bid only. Never show compliance notes or
-  evaluation scores to the supplier.
-
-DEPENDENCIES:
-Bids, BidItems, Documents.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Every query must be filtered by the signed-in user’s
-SupplierId. Never show other suppliers’ invitations, offers,
-prices or evaluations.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "Offer Details";
-    ViewData["WorkspaceSection"] = "My Offers";
-    ViewData["Description"] = "One of your offers as submitted.";
-}
+@model SupplierOfferDetailsViewModel
+@{ ViewData["Title"] = "Offer Details"; ViewData["WorkspaceSection"] = "My Offers"; }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
+@if (TempData["OfferSuccess"] is string success) { <p class="pg-note" role="status">@success</p> }
+@if (TempData["OfferError"] is string error) { <p class="pg-note" role="alert">@error</p> }
 <section class="ws-panel pg-panel">
-    <h2>Offer</h2>
-    <dl class="pg-dl">
-        <div><dt>Tender</dt><dd>—</dd></div>
-        <div><dt>Round</dt><dd>—</dd></div>
-        <div><dt>Revision</dt><dd>—</dd></div>
-        <div><dt>Status</dt><dd>—</dd></div>
-        <div><dt>Submitted</dt><dd>—</dd></div>
-        <div><dt>Currency</dt><dd>—</dd></div>
-        <div><dt>Delivery (days)</dt><dd>—</dd></div>
-        <div><dt>Valid until</dt><dd>—</dd></div>
-    </dl>
+<h2>@Model.TenderTitle — Offer #@Model.Id</h2>
+<dl class="pg-dl">
+<div><dt>Status / revision</dt><dd>@Model.Status / @Model.Revision</dd></div>
+<div><dt>Deadline (UTC)</dt><dd>@Model.Deadline?.ToString("yyyy-MM-dd HH:mm")</dd></div>
+<div><dt>Submitted (UTC)</dt><dd>@(Model.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not submitted")</dd></div>
+<div><dt>Delivery</dt><dd>@Model.Terms.DeliveryDays days</dd></div>
+<div><dt>Payment terms</dt><dd>@Model.Terms.PaymentTerms</dd></div>
+<div><dt>Technical proposal</dt><dd style="white-space:pre-wrap">@Model.Terms.TechnicalProposal</dd></div>
+<div><dt>Valid until</dt><dd>@Model.Terms.ValidUntil?.ToString("yyyy-MM-dd")</dd></div>
+<div><dt>Compliance</dt><dd>@Model.ComplianceStatus</dd></div>
+<div><dt>Missing requirements</dt><dd>@(Model.MissingRequirements ?? "None recorded")</dd></div>
+</dl>
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th>Specifications</th><th>Line total</th></tr></thead><tbody>
+@foreach (var item in Model.Terms.Items) { <tr><td>@item.Name</td><td>@item.Quantity</td><td>@item.UnitPrice.ToString("N2")</td><td>@item.OfferedSpecifications</td><td>@((item.Quantity * item.UnitPrice).ToString("N2"))</td></tr> }
+</tbody></table></div>
+<p>Shipping: @Model.Terms.ShippingCost | Installation: @Model.Terms.InstallationCost | Maintenance: @Model.Terms.MaintenanceCost | Tax: @Model.Terms.TaxAmount | Other: @Model.Terms.OtherCost</p>
+<p><strong>Total: @Model.Total.ToString("N2") @Model.Terms.CurrencyCode</strong></p>
 </section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-item-prices">
-    <div class="pg-panel-head"><h2 id="tbl-item-prices">Item prices</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Tender item</th><th scope="col">Quantity</th><th scope="col">Unit price</th><th scope="col">Line total</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Offer not loaded."' /></td></tr></tbody>
-        </table>
-    </div>
+<section class="ws-panel pg-panel"><h2>Attachments</h2>
+<ul>@foreach (var doc in Model.Documents) { <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a></li> }</ul>
+@if (Model.Documents.Count == 0) { <p>No attachments uploaded.</p> }
+@if (Model.CanEdit) {
+<form asp-controller="Documents" asp-action="UploadOffer" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form">
+<label for="offer-file">Attach PDF, PNG or JPEG (maximum 10 MB)</label><input id="offer-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" required />
+<button class="pg-btn" type="submit">Upload attachment</button></form>
+}
 </section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-documents">
-    <div class="pg-panel-head"><h2 id="tbl-documents">Documents</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th></tr></thead>
-            <tbody><tr><td colspan="2"><partial name="_EmptyState" model='"No documents attached."' /></td></tr></tbody>
-        </table>
-    </div>
+@if (Model.CanEdit) {
+<section class="ws-panel pg-panel"><h2>Submit offer</h2>
+<p>Check your prices, quantities, specifications and all tender requirements and attachments. After submission, editing is locked.</p>
+<a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn">Edit draft</a>
+<form asp-action="Submit" asp-route-id="@Model.Id" method="post"><button type="submit" class="pg-btn pg-btn-primary">Submit final offer</button></form>
 </section>
+}
+@if (Model.Outcome != null) {
+<section class="ws-panel pg-panel"><h2>Approved result: @Model.Outcome</h2><p style="white-space:pre-wrap">@Model.ResultMessage</p><p>Notified: @Model.NotifiedAt?.ToString("yyyy-MM-dd HH:mm") UTC</p></section>
+} else {
+<p class="pg-note">Awaiting the approved result notification from the Sourcing Officer.</p>
+}
+<nav class="pg-links"><a asp-action="Index">My offers</a> | <a asp-action="History" asp-route-id="@Model.Id">History</a> |
+@if (Model.CanContactOfficer) {
+<a asp-controller="Clarifications" asp-action="Create" asp-route-bidId="@Model.Id">Contact Sourcing Officer</a><span> | </span>
+}
+<a asp-controller="Notifications" asp-action="Index">Notifications and results</a></nav>

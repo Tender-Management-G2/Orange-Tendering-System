@@ -1,0 +1,22 @@
+@model Orange_Tendering_System.ViewModels.RequirementsInput
+@{ ViewData["Title"] = "Tender requirements"; }
+<h1>Prepare tender requirements</h1>
+<p>Use an accepted Purchase Request. Its items, quantities and specifications are copied into the tender. Assign four distinct active committee accounts.</p>
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create" method="post" class="ws-panel pg-panel">
+    <div asp-validation-summary="All" role="alert"></div>
+    <p><label asp-for="PurchaseRequestId">Approved Purchase Request ID</label><input asp-for="PurchaseRequestId" type="number" min="1" required /></p>
+    <p><label asp-for="Title"></label><input asp-for="Title" required /></p>
+    <p><label asp-for="Description"></label><textarea asp-for="Description" required></textarea></p>
+    <p><label asp-for="TechnicalRequirements">Technical requirements</label><textarea asp-for="TechnicalRequirements" required></textarea></p>
+    <p><label asp-for="CommercialConditions">Financial and commercial conditions</label><textarea asp-for="CommercialConditions" required></textarea></p>
+    <p><label asp-for="DeliveryExpectations">Delivery expectations</label><textarea asp-for="DeliveryExpectations" required></textarea></p>
+    <p><label asp-for="MandatoryCompliance">Mandatory compliance requirements and documents</label><textarea asp-for="MandatoryCompliance" required></textarea></p>
+    <p><label asp-for="EstimatedValue">Estimated procurement value</label><input asp-for="EstimatedValue" type="number" min="0.01" step="0.01" required /></p>
+    <p><label asp-for="Currency"></label><input asp-for="Currency" maxlength="3" pattern="[A-Z]{3}" required /></p>
+    <p><label><input asp-for="IsCritical" /> Critical procurement (used only by an explicitly configured final-approval policy)</label></p>
+    <p><label asp-for="SourcingManagerId">Sourcing Manager user ID</label><input asp-for="SourcingManagerId" required /></p>
+    <p><label asp-for="DepartmentRepresentativeId">Requesting Department Representative user ID</label><input asp-for="DepartmentRepresentativeId" required /></p>
+    <p><label asp-for="FinancialRepresentativeId">Financial Representative user ID</label><input asp-for="FinancialRepresentativeId" required /></p>
+    <p><label asp-for="TechnicalRepresentativeId">Technical Representative user ID</label><input asp-for="TechnicalRepresentativeId" required /></p>
+    <button type="submit">Save tender requirements</button>
+</form>

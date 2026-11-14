@@ -9,61 +9,76 @@ TRELLO TASK: Fingerprint Registration & Login
 TRELLO URL: https://trello.com/c/mQphpvOG
 
 PURPOSE:
-Enrollment page for fingerprint sign-in; the sign-in entry
-point is on the Login page.
+Signed-in users register or remove the fingerprint-capable
+authenticator (Windows Hello, Touch ID, phone through QR code,
+security key) used by the Login page "Sign in with fingerprint".
 
 BUSINESS ACCESS:
 Any signed-in user (enrolls their own account)
 
 ROUTE: /Biometrics/Fingerprint
 
-FUTURE IMPLEMENTATION:
-- Decide and document the fingerprint verification approach.
-- Store only credential metadata (would need a migration).
-- Enable the Login page button when the flow works; audit
-  enrollments.
+HOW IT WORKS:
+WebAuthn passkey with user verification required. The device
+checks the fingerprint locally; this system stores only the
+public key (UserPasskeyCredentials). Registration needs the
+current password. Everything is audited without biometric data.
 
 DEPENDENCIES:
-AspNetUsers, future biometric credential table, Login page,
-AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Do not fake fingerprint verification, store fingerprints, or
-add login bypasses.
+AspNetUsers, UserPasskeyCredentials, AuditLogs,
+wwwroot/js/biometric.js, BiometricsController.
 ===========================================================
 *@
+@model BiometricManageViewModel
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Fingerprint Registration & Login";
     ViewData["WorkspaceSection"] = "My Workspace";
     ViewData["Description"] = "Register a fingerprint-capable authenticator for this account.";
 }
+@section Styles { <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" /> }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<aside class="pg-note"><strong>Not implemented</strong><p>No fingerprint data is captured or stored. A real verification approach (device, provider or WebAuthn with a documented way to prove the fingerprint modality) must be chosen and demonstrated first.</p></aside>
+<div id="bio-root" data-return-url="">
+    @Html.AntiForgeryToken()
+    <div id="bio-status" class="bio-status bio-status--info" role="status">Your fingerprint never leaves your device; only a public key is stored. Your password keeps working.</div>
 
-<section class="ws-panel pg-panel">
-    <h2>Planned enrollment</h2>
-    <ol class="pg-steps">
-        <li><div><strong>Choose method</strong><small>Team decision on the biometric provider / device</small></div></li>
-        <li><div><strong>Verify identity</strong><small>Password re-check before enrollment</small></div></li>
-        <li><div><strong>Register authenticator</strong><small>Store only a credential reference, never raw fingerprint data</small></div></li>
-        <li><div><strong>Use at sign-in</strong><small>Login page fingerprint button</small></div></li>
-    </ol>
-</section>
+    <section class="ws-panel pg-panel">
+        <h2>Registered devices</h2>
+        @if (Model.Passkeys.Count == 0)
+        {
+            <p class="pg-hint">No device registered yet.</p>
+        }
+        else
+        {
+            <ul class="bio-list">
+                @foreach (var p in Model.Passkeys)
+                {
+                    <li>
+                        <div>
+                            <strong>@p.Label</strong>
+                            <small>Added @p.AddedAt.ToString("yyyy-MM-dd") · @(p.LastUsedAt is { } used ? "last used " + used.ToString("yyyy-MM-dd") : "never used")</small>
+                        </div>
+                        <button type="button" class="pg-btn pg-btn-danger" data-remove-passkey="@p.Id">Remove</button>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
 
-<section class="ws-panel pg-panel">
-    <h2>Register fingerprint</h2>
-    <form class="pg-form">
-        <fieldset disabled>
+    <section class="ws-panel pg-panel">
+        <h2>Register fingerprint</h2>
+        <div class="pg-form">
             <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-authenticator-name-1">Authenticator name</label><input id="f-authenticator-name-1" type="text" /><small class="pg-hint">e.g. Office laptop</small></div>
+                <div class="pg-field"><label for="passkeyLabel">Authenticator name</label><input id="passkeyLabel" type="text" maxlength="150" placeholder="e.g. Office laptop" /></div>
+                <div class="pg-field"><label for="bioPassword">Current password</label><input id="bioPassword" type="password" autocomplete="current-password" /><small class="pg-hint">Re-checked before a new authenticator is added.</small></div>
             </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Register fingerprint</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
+            <div class="pg-actions">
+                <button id="btnPasskeyRegister" type="button" class="pg-btn pg-btn-primary">Register fingerprint</button>
+                <span class="pg-hint">If this computer has no fingerprint reader or Windows Hello, choose "Use a phone or tablet" in the browser window and scan the QR code with your phone.</span>
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts { <script src="~/js/biometric.js" asp-append-version="true"></script> }
