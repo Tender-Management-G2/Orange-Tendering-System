@@ -9,9 +9,12 @@
    =========================================================== *@
 
 @{
-    ViewData["Title"] = "Evaluation Reports List";
-    ViewData["WorkspaceSection"] = "Pending Reports";
-    ViewData["Description"] = "Detailed evaluation reports submitted for managerial review.";
+    var isForwarding = Model.IsForwarding;
+    ViewData["Title"] = isForwarding ? "Forwarding" : "Evaluation Reports List";
+    ViewData["WorkspaceSection"] = isForwarding ? "Forwarding" : "Pending Reports";
+    ViewData["Description"] = isForwarding
+        ? "Accepted evaluation reports ready for forwarding or already with the Top Committee."
+        : "Detailed evaluation reports submitted for managerial review.";
 
     var search = Model.Search ?? string.Empty;
     var status = Model.Status ?? string.Empty;
@@ -40,6 +43,11 @@
       class="pg-toolbar"
       aria-label="Search and filters">
 
+    @if (isForwarding)
+    {
+        <input type="hidden" name="forwarding" value="true" />
+    }
+
     <input type="search"
            name="search"
            value="@search"
@@ -66,15 +74,25 @@
         Search
     </button>
 
-    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
-        Reset
-    </a>
+    @if (isForwarding)
+    {
+        <a asp-action="Index"
+           asp-route-status="Accepted"
+           asp-route-forwarding="true"
+           class="btn btn-outline-secondary btn-sm">Reset</a>
+    }
+    else
+    {
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Reset</a>
+    }
 </form>
 
 <section class="ws-panel pg-panel" aria-labelledby="tbl-officer-reports">
 
     <div class="pg-panel-head">
-        <h2 id="tbl-officer-reports">Reports from Sourcing Officer</h2>
+        <h2 id="tbl-officer-reports">
+            @(isForwarding ? "Forwarding status" : "Reports from Sourcing Officer")
+        </h2>
     </div>
 
     <div class="pg-table-wrap">
@@ -106,6 +124,14 @@
                 {
                     @foreach (var report in Model.OfficerReports)
                     {
+                        var statusClass = report.Status switch
+                        {
+                            ReportStatus.Submitted => "is-submitted",
+                            ReportStatus.Accepted => "is-accepted",
+                            ReportStatus.Returned => "is-returned",
+                            ReportStatus.Rejected => "is-rejected",
+                            _ => ""
+                        };
                         <tr>
                             <td>
                                 @report.TenderRound.Tender.Title
@@ -116,7 +142,7 @@
                             </td>
 
                             <td>
-                                v@report.VersionNumber
+                                v@(report.VersionNumber)
                             </td>
 
                             <td>
@@ -130,7 +156,7 @@
                             </td>
 
                             <td>
-                                @report.Status
+                                <span class="sm-status @statusClass">@report.Status</span>
                             </td>
 
                             <td>
@@ -141,7 +167,8 @@
                                    class="btn btn-primary btn-sm">
                                     Review
                                 </a>
-                                @if (report.Status == ReportStatus.Accepted)
+                                @if (report.Status == ReportStatus.Accepted &&
+                                     !Model.ForwardedReportIds.Contains(report.Id))
                                 {
                                     <a asp-area="SourcingManager"
                                        asp-controller="Reports"
@@ -150,6 +177,10 @@
                                        class="btn btn-outline-secondary btn-sm">
                                         Forward
                                     </a>
+                                }
+                                else if (report.Status == ReportStatus.Accepted)
+                                {
+                                    <span class="pg-badge is-warn">With Top Committee</span>
                                 }
                             </td>
                         </tr>

@@ -113,6 +113,10 @@ Check(await db.Notifications.CountAsync(notification => notification.Title == "N
     "all four Top Committee members are notified");
 Check(await db.AuditLogs.AnyAsync(log => log.EntityId == summary.Id.ToString() && log.Action == "Forward"), "forwarding is audit logged");
 
+var duplicateForward = await controller.Forward(approvedReport.Id);
+Check(duplicateForward is RedirectToActionResult { ActionName: "Forwarding" },
+    "an evaluation already with the Top Committee cannot be opened for a second forwarding");
+
 Console.WriteLine("Sourcing Manager smoke checks passed.");
 
 TenderReport Report(int version, string content) => new()

@@ -13,6 +13,15 @@
         : JsonSerializer.Deserialize<List<RankingSnapshotRow>>(
             Model.RankingSnapshotJson,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+    var statusClass = Model.Status switch
+    {
+        ReportStatus.Submitted => "is-submitted",
+        ReportStatus.Accepted => "is-accepted",
+        ReportStatus.Returned => "is-returned",
+        ReportStatus.Rejected => "is-rejected",
+        _ => ""
+    };
+    var isWithTopCommittee = ViewBag.IsWithTopCommittee == true;
 }
 
 <partial name="_PageHeader" />
@@ -55,9 +64,9 @@
         </div>
 
         <div>
-            <dt>Recommended offer</dt>
+            <dt>Recommended supplier</dt>
             <dd>
-                @(Model.RecommendedBidId?.ToString()
+                @(Model.RecommendedBid?.TenderInvitation?.Supplier?.CompanyName
                     ?? "No recommendation")
             </dd>
         </div>
@@ -69,13 +78,13 @@
 
         <div>
             <dt>Status</dt>
-            <dd>@Model.Status</dd>
+            <dd><span class="sm-status @statusClass">@Model.Status</span></dd>
         </div>
     </dl>
 </section>
 
 <section class="ws-panel pg-panel">
-    <h2>Report content (read-only)</h2>
+    <h2>Report content</h2>
 
     @if (string.IsNullOrWhiteSpace(Model.Content))
     {
@@ -84,9 +93,7 @@
     }
     else
     {
-        <p style="white-space: pre-wrap;">
-            @Model.Content
-        </p>
+        <div class="sm-report-content">@Model.Content</div>
     }
 </section>
 
@@ -95,7 +102,7 @@
 
     <div class="pg-panel-head">
         <h2 id="tbl-committee-result-frozen">
-            Committee result (frozen)
+            Submitted evaluation results
         </h2>
     </div>
 
@@ -184,17 +191,15 @@ else
     <section class="ws-panel pg-panel">
         <h2>Manager Decision</h2>
 
-        <p>Status: @Model.Status</p>
-        <p>Comment: @(Model.ReviewComment ?? "No comment")</p>
-        <p>
-            Reviewed:
-            @(Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")
-                ?? "Not reviewed")
-        </p>
+        <div class="sm-decision-card">
+            <div><span>Status</span><strong class="sm-status @statusClass">@Model.Status</strong></div>
+            <div><span>Comment</span><strong>@(Model.ReviewComment ?? "No comment")</strong></div>
+            <div><span>Reviewed</span><strong>@(Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not reviewed")</strong></div>
+        </div>
     </section>
 }
 
-@if (Model.Status == ReportStatus.Accepted)
+@if (Model.Status == ReportStatus.Accepted && !isWithTopCommittee)
 {
     <nav class="pg-links" aria-label="Next steps">
         <ul>
@@ -208,6 +213,13 @@ else
             </li>
         </ul>
     </nav>
+}
+else if (Model.Status == ReportStatus.Accepted && isWithTopCommittee)
+{
+    <aside class="pg-note">
+        <strong>With Top Committee</strong>
+        <p>This evaluation has already been forwarded and is awaiting the committee response.</p>
+    </aside>
 }
 
 <a asp-area="SourcingManager"

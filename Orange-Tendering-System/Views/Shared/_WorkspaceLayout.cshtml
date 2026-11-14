@@ -54,6 +54,10 @@ until implemented. Notifications link to the shared page shell.
     <script src="~/js/theme-init.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/workspace-shell.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
+    @if (isSourcingManager)
+    {
+        <link rel="stylesheet" href="~/css/sourcing-manager.css" asp-append-version="true" />
+    }
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="ws-shell ws-internal" data-workspace-role="@(workspace?.Role ?? "Signed-in user")">

@@ -40,12 +40,19 @@
                 {
                     @foreach (var report in Model)
                     {
+                        var statusClass = report.Status switch
+                        {
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Accepted => "is-accepted",
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Returned => "is-returned",
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Rejected => "is-rejected",
+                            _ => "is-submitted"
+                        };
                         <tr>
                             <td>@report.TenderRound?.Tender?.Title</td>
 
                             <td>Version @report.VersionNumber</td>
 
-                            <td>@report.Status</td>
+                            <td><span class="sm-status @statusClass">@report.Status</span></td>
 
                             <td>@(report.ReviewComment ?? "-")</td>
 

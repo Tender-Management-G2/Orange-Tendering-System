@@ -2,7 +2,7 @@
 // Owner: Haya
 // Module: Sourcing Manager Review
 // Purpose: MVC endpoints for the Reports pages of the Sourcing Manager workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
+// Status: Implemented. Provides report review, manager decisions, executive summaries and Top Committee forwarding.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
@@ -26,13 +26,14 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
         }
         // Evaluation Reports List — Owner: Haya · Trello: Evaluation Reports List (https://trello.com/c/CWgcYFbk)
         // GET /SourcingManager/Reports. TODO: query the data in a service and pass a view model.
-        public async Task<IActionResult> Index(string? search, string? status)
+        public async Task<IActionResult> Index(string? search, string? status, bool forwarding = false)
         {
             var officerReportsQuery = _context.TenderReports
                 .Include(r => r.TenderRound)
                     .ThenInclude(tr => tr.Tender)
                 .Include(r => r.CreatedByUser)
-                .Where(r => r.ReportType == ReportType.FullEvaluation);
+                .Where(r => r.ReportType == ReportType.FullEvaluation &&
+                            r.Status != ReportStatus.Draft);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -69,12 +70,25 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 .AsNoTracking()
                 .ToListAsync();
 
+            var forwardedReportIds = await _context.CommitteeRounds
+                .Where(round =>
+                    round.CommitteeType == CommitteeType.Top &&
+                    round.TenderReport != null &&
+                    round.TenderReport.PreviousReportId != null &&
+                    (round.Status == CommitteeRoundStatus.InProgress ||
+                     round.Status == CommitteeRoundStatus.Approved))
+                .Select(round => round.TenderReport!.PreviousReportId!.Value)
+                .Distinct()
+                .ToListAsync();
+
             return View(new SourcingManagerReportsIndexViewModel
             {
                 OfficerReports = officerReports,
                 TopCommitteeResponses = topCommitteeResponses,
+                ForwardedReportIds = new HashSet<int>(forwardedReportIds),
                 Search = search,
-                Status = status
+                Status = status,
+                IsForwarding = forwarding
             });
         }
 
@@ -89,7 +103,11 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
         [HttpGet]
         public IActionResult Forwarding()
         {
-            return RedirectToAction(nameof(Index), new { status = ReportStatus.Accepted.ToString() });
+            return RedirectToAction(nameof(Index), new
+            {
+                status = ReportStatus.Accepted.ToString(),
+                forwarding = true
+            });
         }
 
         // Review Unified Evaluation Report — Owner: Haya · Trello: Review Unified Evaluation Report (https://trello.com/c/IKQ7sZwo)
@@ -120,6 +138,14 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
             {
                 return NotFound();
             }
+
+            ViewBag.IsWithTopCommittee = await _context.CommitteeRounds
+                .AnyAsync(round =>
+                    round.CommitteeType == CommitteeType.Top &&
+                    round.TenderReport != null &&
+                    round.TenderReport.PreviousReportId == report.Id &&
+                    (round.Status == CommitteeRoundStatus.InProgress ||
+                     round.Status == CommitteeRoundStatus.Approved));
 
             return View(report);
         }
@@ -416,6 +442,22 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 return RedirectToAction(nameof(Review), new { id });
             }
 
+            var isWithTopCommittee = await _context.CommitteeRounds
+                .AnyAsync(round =>
+                    round.CommitteeType == CommitteeType.Top &&
+                    round.TenderReport != null &&
+                    round.TenderReport.PreviousReportId == report.Id &&
+                    (round.Status == CommitteeRoundStatus.InProgress ||
+                     round.Status == CommitteeRoundStatus.Approved));
+
+            if (isWithTopCommittee)
+            {
+                TempData["Error"] =
+                    "This evaluation is already with the Top Committee.";
+
+                return RedirectToAction(nameof(Forwarding));
+            }
+
             // Add Total Cost calculation here
             if (report.RecommendedBid != null)
             {
@@ -513,6 +555,22 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 return RedirectToAction(nameof(Review), new { id });
             }
 
+            var isWithTopCommittee = await _context.CommitteeRounds
+                .AnyAsync(round =>
+                    round.CommitteeType == CommitteeType.Top &&
+                    round.TenderReport != null &&
+                    round.TenderReport.PreviousReportId == report.Id &&
+                    (round.Status == CommitteeRoundStatus.InProgress ||
+                     round.Status == CommitteeRoundStatus.Approved));
+
+            if (isWithTopCommittee)
+            {
+                TempData["Error"] =
+                    "This evaluation has already been forwarded to the Top Committee.";
+
+                return RedirectToAction(nameof(Index));
+            }
+
      
             var draft = await _context.TenderReports
                 .FirstOrDefaultAsync(r =>
@@ -595,6 +653,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
             // 1. Find the accepted Full Evaluation report
             var report = await _context.TenderReports
                 .Include(r => r.TenderRound)
+                    .ThenInclude(tr => tr.Tender)
                 .FirstOrDefaultAsync(r =>
                     r.Id == id &&
                     r.ReportType == ReportType.FullEvaluation);
@@ -610,6 +669,22 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                     "Only accepted evaluation reports can be forwarded.";
 
                 return RedirectToAction(nameof(Review), new { id });
+            }
+
+            var isWithTopCommittee = await _context.CommitteeRounds
+                .AnyAsync(round =>
+                    round.CommitteeType == CommitteeType.Top &&
+                    round.TenderReport != null &&
+                    round.TenderReport.PreviousReportId == report.Id &&
+                    (round.Status == CommitteeRoundStatus.InProgress ||
+                     round.Status == CommitteeRoundStatus.Approved));
+
+            if (isWithTopCommittee)
+            {
+                TempData["Error"] =
+                    "This evaluation has already been forwarded to the Top Committee.";
+
+                return RedirectToAction(nameof(Index));
             }
 
             // 2. Find the saved Executive Summary draft
@@ -651,8 +726,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
             var alreadyForwarded = await _context.CommitteeRounds
                 .AnyAsync(r =>
                     r.CommitteeType == CommitteeType.Top &&
-                    r.TenderReport != null &&
-                    r.TenderReport.PreviousReportId == report.Id);
+                    r.TenderReportId == draft.Id);
 
 
             if (alreadyForwarded)
@@ -672,6 +746,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 // Submit the Executive Summary
                 draft.Status = ReportStatus.Submitted;
                 draft.SubmittedAt = DateTime.UtcNow;
+                report.TenderRound.Tender.Status = TenderStatus.TopCommitteeReview;
 
                 // Find the next Top Committee round number
                 var latestRound = await _context.CommitteeRounds
