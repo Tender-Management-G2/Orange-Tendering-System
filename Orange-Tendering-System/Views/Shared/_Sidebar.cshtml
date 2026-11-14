@@ -25,7 +25,14 @@
     @for (var i = 0; i < WorkspaceNavigation.SharedItems.Count; i++)
     {
         var item = WorkspaceNavigation.SharedItems[i];
+        if (workspace?.Area == "SourcingManager" && item.Label == "My Tasks")
+        {
+            continue;
+        }
         var active = item.Label == activeSection;
-        <a class="ws-nav-item @(i == 0 ? "ws-nav-support" : null) @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
+        var itemArea = workspace?.Area == "SourcingManager" && item.Label == "Clarifications"
+            ? "SourcingManager"
+            : item.Area ?? workspace?.Area;
+        <a class="ws-nav-item @(i == 0 ? "ws-nav-support" : null) @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="@itemArea" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
     }
 </nav>

@@ -387,69 +387,6 @@ members, but this managerial review is a separate stage.
     <!-- Bottom Row -->
     <section class="dash-bottom-row">
 
-        <!-- My Tasks -->
-        <article class="dash-panel dash-tasks">
-
-            <div class="dash-panel-heading">
-                <h2>My Tasks</h2>
-
-                <a asp-area="SourcingManager"
-                   asp-controller="Reports"
-                   asp-action="Index"
-                   class="dash-text-action">
-                    View All <span aria-hidden="true">→</span>
-                </a>
-            </div>
-
-            <div class="dash-task-list">
-
-                @if (data.Tasks.Count > 0)
-                {
-                    foreach (var task in data.Tasks)
-                    {
-                        <div class="dash-task-item">
-
-                            <span class="dash-task-icon">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <rect x="5" y="5" width="14" height="17" rx="2" />
-                                    <path d="M9 3h6v5H9zM9 13h6M9 17h6" />
-                                </svg>
-                            </span>
-
-                            <div>
-                                <strong>@task.Title</strong>
-                                <small>@task.Context</small>
-                            </div>
-
-                            <span class="dash-status-pill">
-                                @task.Status
-                            </span>
-
-                        </div>
-                    }
-                }
-                else
-                {
-                    <div class="dash-empty-rows" aria-hidden="true"></div>
-
-                    <div class="dash-empty-state">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <rect x="5" y="5" width="14" height="17" rx="2" />
-                            <path d="M9 3h6v5H9zM9 13h6M9 17h6" />
-                        </svg>
-
-                        <span>
-                            @(data.DataConnected
-                                ? "No reports waiting for review."
-                                : "Review tasks are not connected.")
-                        </span>
-                    </div>
-                }
-
-            </div>
-
-        </article>
-
         <!-- Evaluation Reports Distribution -->
         <article class="dash-panel dash-distribution">
 

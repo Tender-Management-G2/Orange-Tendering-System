@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using System.Security.Claims;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
 {
@@ -25,11 +26,56 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
         }
         // Evaluation Reports List — Owner: Haya · Trello: Evaluation Reports List (https://trello.com/c/CWgcYFbk)
         // GET /SourcingManager/Reports. TODO: query the data in a service and pass a view model.
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? search, string? status)
         {
-            var report=await _context.TenderReports.Include(r=>r.TenderRound).ThenInclude(tr=>tr.Tender).Include(r => r.CreatedByUser)
-                .Where(r=>r.ReportType==ReportType.FullEvaluation).OrderByDescending(r=>r.SubmittedAt).AsNoTracking().ToListAsync();
-            return View(report);
+            var officerReportsQuery = _context.TenderReports
+                .Include(r => r.TenderRound)
+                    .ThenInclude(tr => tr.Tender)
+                .Include(r => r.CreatedByUser)
+                .Where(r => r.ReportType == ReportType.FullEvaluation);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                officerReportsQuery = officerReportsQuery.Where(r =>
+                    r.TenderRound.Tender.Title.Contains(term));
+            }
+
+            if (Enum.TryParse<ReportStatus>(status, true, out var selectedStatus))
+            {
+                officerReportsQuery = officerReportsQuery.Where(r => r.Status == selectedStatus);
+            }
+
+            var officerReports = await officerReportsQuery
+                .OrderByDescending(r => r.SubmittedAt)
+                .AsNoTracking()
+                .ToListAsync();
+
+            var topCommitteeResponses = await _context.CommitteeRounds
+                .Include(round => round.TenderRound)
+                    .ThenInclude(tenderRound => tenderRound.Tender)
+                .Include(round => round.TenderReport)
+                .Where(round =>
+                    round.CommitteeType == CommitteeType.Top &&
+                    round.Status != CommitteeRoundStatus.InProgress &&
+                    round.TenderReport != null)
+                .OrderByDescending(round => round.CompletedAt)
+                .Select(round => new TopCommitteeResponseRow(
+                    round.Id,
+                    round.TenderRound.Tender.Title,
+                    round.TenderReport!.VersionNumber,
+                    round.Status,
+                    round.CompletedAt))
+                .AsNoTracking()
+                .ToListAsync();
+
+            return View(new SourcingManagerReportsIndexViewModel
+            {
+                OfficerReports = officerReports,
+                TopCommitteeResponses = topCommitteeResponses,
+                Search = search,
+                Status = status
+            });
         }
 
         // Sidebar destination for reports that have arrived for managerial review.

@@ -21,7 +21,6 @@ namespace Orange_Tendering_System.ViewModels
         [
             new("My Tasks", "Tasks", "Index", "check", ""),
             new("Clarifications", "Clarifications", "Index", "chat", ""),
-            new("Notifications", "Notifications", "Index", "bell", "")
         ];
 
         public static readonly IReadOnlyList<Workspace> Workspaces =
@@ -82,10 +81,9 @@ namespace Orange_Tendering_System.ViewModels
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
                 new("Pending Reports", "Reports", "Pending", "request"),
-                new("Report Review", "Reports", "Pending", "check"),
                 new("Forwarding", "Reports", "Forwarding", "send"),
                 new("Decision History", "Reports", "History", "history"),
-                new("Analytics & Exports", "Analytics", "Index", "chart", "")
+                new("Analytics & Exports", "Analytics", "Index", "chart")
             ]),
             new("TopCommittee", "Top Committee", SystemRoles.TopCommittee,
             [

@@ -83,7 +83,6 @@ app.MapRazorPages()
    .WithStaticAssets();
 
 await IdentityBootstrap.SeedAsync(app.Services, app.Configuration);
-
 app.Run();
 
 namespace Orange_Tendering_System { public sealed class WebAppMarker { } }

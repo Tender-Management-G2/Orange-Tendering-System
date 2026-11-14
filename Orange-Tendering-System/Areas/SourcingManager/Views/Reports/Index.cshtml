@@ -1,4 +1,4 @@
-@model List<Orange_Tendering_System.Models.Entities.TenderReport>
+@model Orange_Tendering_System.ViewModels.SourcingManagerReportsIndexViewModel
 @using Orange_Tendering_System.Models.Entities
 
 @* ===========================================================
@@ -13,24 +13,8 @@
     ViewData["WorkspaceSection"] = "Pending Reports";
     ViewData["Description"] = "Detailed evaluation reports submitted for managerial review.";
 
-    var search = Context.Request.Query["search"].ToString();
-    var status = Context.Request.Query["status"].ToString();
-
-    var reports = Model.AsEnumerable();
-
-    if (!string.IsNullOrWhiteSpace(search))
-    {
-        reports = reports.Where(r =>
-            r.TenderRound.Tender.Title.Contains(
-                search, StringComparison.OrdinalIgnoreCase));
-    }
-
-    if (Enum.TryParse<ReportStatus>(status, true, out var selectedStatus))
-    {
-        reports = reports.Where(r => r.Status == selectedStatus);
-    }
-
-    var filteredReports = reports.ToList();
+    var search = Model.Search ?? string.Empty;
+    var status = Model.Status ?? string.Empty;
 }
 
 <partial name="_PageHeader" />
@@ -87,10 +71,10 @@
     </a>
 </form>
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-reports">
+<section class="ws-panel pg-panel" aria-labelledby="tbl-officer-reports">
 
     <div class="pg-panel-head">
-        <h2 id="tbl-reports">Reports</h2>
+        <h2 id="tbl-officer-reports">Reports from Sourcing Officer</h2>
     </div>
 
     <div class="pg-table-wrap">
@@ -109,7 +93,7 @@
             </thead>
 
             <tbody>
-                @if (!filteredReports.Any())
+                @if (!Model.OfficerReports.Any())
                 {
                     <tr>
                         <td colspan="7">
@@ -120,7 +104,7 @@
                 }
                 else
                 {
-                    @foreach (var report in filteredReports)
+                    @foreach (var report in Model.OfficerReports)
                     {
                         <tr>
                             <td>
@@ -173,6 +157,55 @@
                 }
             </tbody>
 
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-top-committee-responses">
+    <div class="pg-panel-head">
+        <h2 id="tbl-top-committee-responses">Top Committee Responses</h2>
+    </div>
+
+    <p class="pg-hint">These are final committee responses for follow-up. The Sourcing Manager cannot approve or reject them.</p>
+
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th scope="col">Tender</th>
+                    <th scope="col">Executive summary</th>
+                    <th scope="col">Committee response</th>
+                    <th scope="col">Decided at</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.TopCommitteeResponses.Any())
+                {
+                    <tr>
+                        <td colspan="4">
+                            <partial name="_EmptyState" model='"No Top Committee responses received yet."' />
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var response in Model.TopCommitteeResponses)
+                    {
+                        <tr>
+                            <td>@response.TenderTitle</td>
+                            <td>Version @response.ExecutiveSummaryVersion</td>
+                            <td>
+                                @(response.Decision == CommitteeRoundStatus.Approved
+                                    ? "Award approved"
+                                    : response.Decision == CommitteeRoundStatus.Rejected
+                                        ? "Further details requested"
+                                        : "Under review")
+                            </td>
+                            <td>@(response.DecidedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not available")</td>
+                        </tr>
+                    }
+                }
+            </tbody>
         </table>
     </div>
 </section>
