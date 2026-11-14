@@ -2,6 +2,8 @@
 
 
 
+using Orange_Tendering_System.Models.Entities;
+
 namespace Orange_Tendering_System.ViewModels
 {
     public class UserDetailsViewModel
@@ -17,6 +19,10 @@ namespace Orange_Tendering_System.ViewModels
         public string DepartmentName { get; set; } = "";
 
         public string SupplierName { get; set; } = "";
+
+        public SupplierStatus? SupplierStatus { get; set; }
+
+        public string StatusLabel => AccountStatusText.For(IsActive, SupplierStatus);
 
         public bool IsActive { get; set; }
 

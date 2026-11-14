@@ -9,7 +9,9 @@ public sealed class SupplierInvitationDetailsViewModel
     public bool IsBiddingOpen => RoundStatus == TenderRoundStatus.Open && TenderStatus == TenderStatus.Bidding
         && Deadline.HasValue && Deadline.Value > DateTime.UtcNow
         && (!OpensAt.HasValue || OpensAt.Value <= DateTime.UtcNow);
-    public bool CanCreateDraft => Status == InvitationStatus.Accepted && !HasOffer && IsBiddingOpen;
+    public bool WeightsApproved { get; set; }
+    public bool CanCreateDraft => Status == InvitationStatus.Accepted && !HasOffer && IsBiddingOpen && WeightsApproved;
+    public bool WaitingForWeights => Status == InvitationStatus.Accepted && !HasOffer && IsBiddingOpen && !WeightsApproved;
     public TenderRoundStatus RoundStatus { get; set; }
     public TenderStatus TenderStatus { get; set; }
     public bool CanRespond => Status == InvitationStatus.Pending && IsBiddingOpen;

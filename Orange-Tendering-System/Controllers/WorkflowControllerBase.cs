@@ -12,7 +12,16 @@ public abstract class WorkflowControllerBase(TenderWorkflowService workflow, Pro
     protected TenderWorkflowService Workflow => workflow;
     protected ProtectedDocumentStore Documents => documents;
     public virtual async Task<IActionResult> Index() => View(await workflow.List(User));
-    public virtual async Task<IActionResult> Details(int id) => View(await workflow.Details(id, User));
+    // The tender workflow is a popup over the list (Views/Shared/_WorkflowPopup.cshtml). The popup loads this action by AJAX;
+    // opening the address directly shows the list with the popup already open for this tender.
+    protected bool IsAjax => string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+    public virtual async Task<IActionResult> Details(int id)
+    {
+        var model = await workflow.Details(id, User);
+        if (!IsAjax) return RedirectToAction("Index", new { open = id });
+        Response.Headers.CacheControl = "no-store";
+        return PartialView("~/Views/Shared/_WorkflowPopup.cshtml", model);
+    }
     public async Task<IActionResult> Download(int id)
     {
         var (document, _) = await workflow.AuthorizedDocument(id, User);
@@ -34,6 +43,7 @@ public abstract class WorkflowControllerBase(TenderWorkflowService workflow, Pro
         {
             var message = context.Exception is WorkflowException error ? error.Message : "The record changed or a duplicate operation was rejected. Reload and check its current state.";
             context.ExceptionHandled = true;
+            if (IsAjax) { context.Result = new JsonResult(new { error = message }) { StatusCode = 400 }; base.OnActionExecuted(context); return; }
             ViewData.Model = message;
             context.Result = new ViewResult { ViewName = "WorkflowError", ViewData = ViewData, TempData = TempData, StatusCode = 400 };
         }

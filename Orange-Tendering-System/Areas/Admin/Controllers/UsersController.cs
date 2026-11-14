@@ -24,12 +24,23 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             _userManager = userManager;
         }
 
-        // GET: /Admin/Users
+
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            string? search,
+            string? roleFilter,
+            string? departmentFilter,
+            string? statusFilter,
+            int page = 1)
         {
-            var users = await _adminService.GetUsersAsync();
-            return View(users);
+            var model = await _adminService.GetUsersAsync(
+                search,
+                roleFilter,
+                departmentFilter,
+                statusFilter,
+                page);
+
+            return View(model);
         }
 
         // GET: /Admin/Users/Create
@@ -85,14 +96,19 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
         }
 
 
+
+        // ==========================================
         // GET: /Admin/Users/Edit/{id}
+        // ==========================================
+
         [HttpGet]
         public async Task<IActionResult> Edit(string? id)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return NotFound();
 
-            var model = await _adminService.GetUserForEditAsync(id);
+            var model = await _adminService
+                .GetUserForEditAsync(id);
 
             if (model == null)
                 return NotFound();
@@ -100,7 +116,11 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             return View(model);
         }
 
+
+        // ==========================================
         // POST: /Admin/Users/Edit/{id}
+        // ==========================================
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(
@@ -110,6 +130,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             if (id != model.Id)
                 return BadRequest();
 
+            // Validate submitted form
             if (!ModelState.IsValid)
             {
                 var original = await _adminService
@@ -119,23 +140,28 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     return NotFound();
 
                 model.Departments = original.Departments;
+                model.AvailableRoles = original.AvailableRoles;
                 model.CurrentRoles = original.CurrentRoles;
                 model.Email = original.Email;
 
                 return View(model);
             }
 
+            // Get current Admin ID
             var adminId = _userManager.GetUserId(User);
 
-            if (string.IsNullOrEmpty(adminId))
+            if (string.IsNullOrWhiteSpace(adminId))
                 return Challenge();
+        
 
+            // Update account and single role
             var result = await _adminService.UpdateUserAsync(
                 model, adminId);
 
             if (result == "NotFound")
                 return NotFound();
 
+            // Handle service validation and save errors
             if (result != "Success")
             {
                 var messages = new Dictionary<string, string>
@@ -147,27 +173,48 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                         "Full name must contain 2 to 150 characters.",
 
                     ["InvalidDepartment"] =
-                        "Please select an active department.",
+                        "Please select a valid active department.",
 
                     ["DepartmentRequired"] =
-                        "A department is required for this role.",
+                        "A department is required for Requesting Department users.",
+
+                    ["InvalidRole"] =
+                        "Please select a valid user role.",
 
                     ["SelfDeactivate"] =
                         "You cannot deactivate your own account.",
 
+                    ["SelfRoleChange"] =
+                        "You cannot remove your own Admin role.",
+
                     ["LastAdmin"] =
-                        "You cannot deactivate the last active Admin.",
+                        "You cannot remove or deactivate the last active Admin.",
+
+                    ["RoleUpdateFailed"] =
+                        "Unable to update the user's role.",
 
                     ["UpdateFailed"] =
                         "Unable to update the account."
                 };
 
-                ModelState.AddModelError(
-                    "",
-                    messages.TryGetValue(result, out var message)
-                        ? message
-                        : "Unable to update the account.");
+                var message = messages.TryGetValue(
+                    result, out var errorMessage)
+                        ? errorMessage
+                        : "Unable to update the account.";
 
+                // Display role errors next to Role dropdown
+                if (result == "InvalidRole")
+                {
+                    ModelState.AddModelError(
+                        nameof(model.SelectedRole),
+                        message);
+                }
+                else
+                {
+                    ModelState.AddModelError("", message);
+                }
+
+                // Reload dropdown data
                 var original = await _adminService
                     .GetUserForEditAsync(id);
 
@@ -175,6 +222,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     return NotFound();
 
                 model.Departments = original.Departments;
+                model.AvailableRoles = original.AvailableRoles;
                 model.CurrentRoles = original.CurrentRoles;
                 model.Email = original.Email;
 
@@ -182,10 +230,11 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             TempData["SuccessMessage"] =
-                "User updated successfully.";
+                "User information and role updated successfully.";
 
             return RedirectToAction(nameof(Index));
         }
+
 
 
 

@@ -47,7 +47,9 @@ SupplierId on the server (UI hiding is not authorization).
                 <a class="ws-topnav-item @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="Supplier" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
             }
         </nav>
+        <div class="ws-search ws-supplier-search" data-global-search data-search-url="/Search/Query"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search invitations and offers..." aria-label="Search my invitations and offers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
         <div class="ws-topbar-actions">
+            <button type="button" class="ws-icon-button" data-voice-search aria-label="Voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
             <partial name="_NotificationBell" />
             <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
             <partial name="_WorkspaceAccountMenu" />

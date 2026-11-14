@@ -1,47 +1,21 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Sourcing Manager Decision History
-
-DEVELOPER OWNER: Haya
-MODULE: Sourcing Manager Review
-TRELLO TASK: Sourcing Manager Decision History
-TRELLO URL: https://trello.com/c/CSb7lOgK
-
-PURPOSE:
-History of manager decisions, each attached to the report
-version it applied to.
-
-BUSINESS ACCESS:
-Sourcing Manager
-
-ROUTE: /SourcingManager/Reports/History
-
-FUTURE IMPLEMENTATION:
-- Query TenderReports where ReviewedByUserId = current user,
-  newest first.
-
-DEPENDENCIES:
-TenderReports.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
+@model List<Orange_Tendering_System.ViewModels.WorkflowListRow>
 @{
-    ViewData["Title"] = "Sourcing Manager Decision History";
-    ViewData["WorkspaceSection"] = "Decision History";
-    ViewData["Description"] = "Every decision you made on report versions.";
+    ViewData["Title"] = "Decision History"; ViewData["WorkspaceSection"] = "Decision History";
+    ViewData["Description"] = "Tenders whose report has already been decided.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-decisions">
-    <div class="pg-panel-head"><h2 id="tbl-decisions">Decisions</h2></div>
+<section class="ws-panel pg-panel" aria-labelledby="mr-title">
+    <div class="pg-panel-head"><h2 id="mr-title">Decision History</h2></div>
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Report version</th><th scope="col">Decision</th><th scope="col">Comment</th><th scope="col">Decided at</th></tr></thead>
-            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No decisions recorded yet."' /></td></tr></tbody>
+            <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model)
+            {
+                <tr><td>T-@row.TenderId.ToString("0000")</td><td><strong>@row.Title</strong></td><td>@row.Status</td><td><a class="pg-btn" data-no-modal asp-area="SourcingManager" asp-controller="Workflow" asp-action="Details" asp-route-id="@row.TenderId">Open</a></td></tr>
+            }
+            @if (Model.Count == 0) { <tr><td colspan="4"><partial name="_EmptyState" model='"No decided reports yet."' /></td></tr> }
+            </tbody>
         </table>
     </div>
 </section>

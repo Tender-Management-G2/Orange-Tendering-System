@@ -87,14 +87,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
         <div>
             <dt>Account Status</dt>
             <dd>
-                @if (Model.IsActive)
-                {
-                    <span class="pg-status">Active</span>
-                }
-                else
-                {
-                    <span class="pg-status">Inactive</span>
-                }
+                <span class="pg-status">@Model.StatusLabel</span>
             </dd>
         </div>
 

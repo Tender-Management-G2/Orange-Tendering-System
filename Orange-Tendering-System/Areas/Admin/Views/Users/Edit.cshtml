@@ -1,33 +1,32 @@
+
 @*
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
 PAGE: Edit User
-
 DEVELOPER OWNER: Rjoub
 MODULE: Administration
 TRELLO TASK: User Management
 TRELLO URL: https://trello.com/c/UYxdWeUv
 
 PURPOSE:
-Edit an existing account’s name, department, roles and
-active status.
+Edit an existing user's information, department,
+single assigned role, and active status.
 
-BUSINESS ACCESS:
-Admin
-
+BUSINESS ACCESS: Admin
 ROUTE: /Admin/Users/Edit/{id?}
 
-FUTURE IMPLEMENTATION:
-- Load the user by id; return NotFound when missing.
-- POST Edit: update fields, add/remove roles, keep at least
-  one active Admin.
-- Audit role and status changes.
+FEATURES:
+- Edit Full Name
+- Display Email (Read Only)
+- Change Department
+- Change User Role using Dropdown
+- One Role per User
+- Activate / Deactivate User
+- Validation and Audit Logging through Backend
 
 DEPENDENCIES:
-AspNetUsers, AspNetUserRoles, Departments, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+AspNetUsers, AspNetUserRoles, AspNetRoles,
+Departments, AuditLogs.
 ===========================================================
 *@
 
@@ -37,7 +36,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
     ViewData["Title"] = "Edit User";
     ViewData["WorkspaceSection"] = "Users";
     ViewData["Description"] =
-        "Update account information and active status.";
+        "Update user information, role, department and account status.";
 }
 
 <partial name="_PageHeader" />
@@ -60,84 +59,155 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
         <input type="hidden" asp-for="Id" />
 
         <div asp-validation-summary="All"
-             class="text-danger"></div>
+             class="text-danger">
+        </div>
 
         <div class="pg-form-grid">
 
-            <!-- Full Name -->
+            <!-- ================================
+                 FULL NAME
+            ================================= -->
+
             <div class="pg-field">
-                <label asp-for="FullName">Full Name</label>
+
+                <label asp-for="FullName">
+                    Full Name
+                </label>
 
                 <input asp-for="FullName"
                        class="form-control"
-                       maxlength="150" />
+                       maxlength="150"
+                       placeholder="Enter full name" />
 
                 <span asp-validation-for="FullName"
-                      class="text-danger"></span>
+                      class="text-danger">
+                </span>
+
             </div>
 
-            <!-- Email: Display only -->
-            <div class="pg-field">
-                <label>Email</label>
 
-                <input type="email"
-                       value="@Model.Email"
+            <!-- ================================
+                 EMAIL - READ ONLY
+            ================================= -->
+
+            <div class="pg-field">
+
+                <label asp-for="Email">
+                    Email
+                </label>
+
+                <input asp-for="Email"
+                       type="email"
                        class="form-control"
                        readonly />
+
+                <span asp-validation-for="Email"
+                      class="text-danger">
+                </span>
 
                 <small class="pg-hint">
                     Email changes are handled through
                     the account verification process.
                 </small>
+
             </div>
 
-            <!-- Department -->
+
+            <!-- ================================
+                 DEPARTMENT
+            ================================= -->
+
             <div class="pg-field">
-                <label asp-for="DepartmentId">Department</label>
+
+                <label asp-for="DepartmentId">
+                    Department
+                </label>
 
                 <select asp-for="DepartmentId"
                         asp-items="Model.Departments"
                         class="form-control">
 
-                    <option value="">Select Department</option>
+                    <option value="">
+                        Select Department
+                    </option>
 
                 </select>
 
                 <span asp-validation-for="DepartmentId"
-                      class="text-danger"></span>
-            </div>
-
-            <!-- Current Roles -->
-            <div class="pg-field">
-                <label>Current Role(s)</label>
-
-                <input type="text"
-                       value="@Model.CurrentRoles"
-                       class="form-control"
-                       readonly />
+                      class="text-danger">
+                </span>
 
                 <small class="pg-hint">
-                    Roles are managed separately in
-                    the Roles Management page.
+                    A department is required for
+                    Requesting Department users.
                 </small>
+
             </div>
 
-            <!-- Account Status -->
+
+            <!-- ================================
+                 SINGLE USER ROLE
+            ================================= -->
+
             <div class="pg-field">
+
+                <label asp-for="SelectedRole">
+                    User Role
+                </label>
+
+                <select asp-for="SelectedRole"
+                        asp-items="Model.AvailableRoles"
+                        class="form-control"
+                        required>
+
+                    <option value="">
+                        Select User Role
+                    </option>
+
+                </select>
+
+                <span asp-validation-for="SelectedRole"
+                      class="text-danger">
+                </span>
+
+                <small class="pg-hint">
+                    Each user can have only one role.
+                    Selecting another role will replace
+                    the currently assigned role.
+                </small>
+
+            </div>
+
+
+            <!-- ================================
+                 ACCOUNT STATUS
+            ================================= -->
+
+            <div class="pg-field">
+
                 <label class="pg-check">
+
                     <input asp-for="IsActive" />
+
                     Active Account
+
                 </label>
 
                 <small class="pg-hint">
-                    Deactivating an account should
-                    prevent further access to the system.
+                    Deactivating an account prevents
+                    access when the authentication
+                    access checks are enforced.
                 </small>
+
             </div>
 
         </div>
 
-        <!-- Actions -->
+
+        <!-- ================================
+             FORM ACTIONS
+        ================================= -->
+
         <div class="pg-actions">
 
             <button type="submit"
@@ -158,20 +228,38 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
 </section>
 
-<!-- Information -->
+
+<!-- =====================================
+     ACCOUNT MANAGEMENT INFORMATION
+===================================== -->
+
 <aside class="pg-note">
-    <strong>Deactivate, do not delete</strong>
+
+    <strong>
+        Deactivate, do not delete
+    </strong>
 
     <p>
         Accounts linked to purchase requests,
         tenders, bids, evaluations or decisions
         should remain in the database.
-        Deactivate them to preserve history.
+
+        Deactivate accounts to preserve history
+        and maintain audit records.
     </p>
+
 </aside>
 
-<nav class="pg-links" aria-label="Related pages">
+
+<!-- =====================================
+     RELATED PAGES
+===================================== -->
+
+<nav class="pg-links"
+     aria-label="Related pages">
+
     <ul>
+
         <li>
             <a asp-area="Admin"
                asp-controller="Users"
@@ -188,10 +276,18 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                 Back to Users
             </a>
         </li>
+
     </ul>
+
 </nav>
 
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
 
+<!-- =====================================
+     VALIDATION SCRIPTS
+===================================== -->
+
+@section Scripts {
+
+    <partial name="_ValidationScriptsPartial" />
+
+}

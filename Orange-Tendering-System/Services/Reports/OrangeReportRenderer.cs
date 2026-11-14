@@ -14,7 +14,9 @@ namespace Orange_Tendering_System.Services.Reports;
 
 public class OrangeReportRenderer
 {
-    public const string TemplateVersion = "Orange-report-1";
+    public const string TemplateVersion = "Orange-report-2";
+    // Signature ledger geometry. Older reports (template 1) keep their original row height so their stored pages still line up.
+    public static int RowHeight(string? templateVersion) => templateVersion == "Orange-report-1" ? 52 : 56;
     private static readonly object FontLock = new();
     private static readonly XColor Orange = XColor.FromArgb(255, 121, 0);
     private static readonly string[] Slots = ["Evaluation:SourcingManager", "Evaluation:DepartmentRepresentative", "Evaluation:FinancialRepresentative", "Evaluation:TechnicalRepresentative", "Manager:Manager", "Top:1", "Top:2", "Top:3", "Top:4"];
@@ -34,13 +36,32 @@ public class OrangeReportRenderer
         section.PageSetup.PageFormat = PageFormat.A4;
         section.PageSetup.LeftMargin = Unit.FromPoint(48); section.PageSetup.RightMargin = Unit.FromPoint(48);
         section.PageSetup.TopMargin = Unit.FromPoint(66); section.PageSetup.BottomMargin = Unit.FromPoint(52);
-        var brand = section.Headers.Primary.AddParagraph("orange   |   Sourcing & Tender Management");
-        brand.Format.Font.Color = MColor.FromRgb(210, 89, 0); brand.Format.Font.Bold = true; brand.Format.Font.Size = 11;
-        Heading(section, "TENDER EVALUATION REPORT", 19);
-        Heading(section, data.Title, 14);
+        var headerTable = section.Headers.Primary.AddTable();
+        headerTable.AddColumn(Unit.FromPoint(78)); headerTable.AddColumn(Unit.FromPoint(421));
+        var headerRow = headerTable.AddRow(); headerRow.VerticalAlignment = VerticalAlignment.Center; headerRow.Height = Unit.FromPoint(26);
+        headerRow.Cells[0].Shading.Color = MColor.FromRgb(255, 121, 0); headerRow.Cells[0].VerticalAlignment = VerticalAlignment.Center; headerRow.Cells[0].Format.Alignment = ParagraphAlignment.Center;
+        var logo = headerRow.Cells[0].AddParagraph("orange"); logo.Format.Font.Bold = true; logo.Format.Font.Size = 15; logo.Format.Font.Color = MColor.FromRgb(255, 255, 255);
+        headerRow.Cells[1].VerticalAlignment = VerticalAlignment.Center; headerRow.Cells[1].Format.LeftIndent = Unit.FromPoint(10);
+        var brand = headerRow.Cells[1].AddParagraph("Sourcing & Tender Management System"); brand.Format.Font.Color = MColor.FromRgb(90, 96, 104); brand.Format.Font.Bold = true; brand.Format.Font.Size = 10;
+        headerRow.Cells[1].Borders.Bottom.Color = MColor.FromRgb(255, 121, 0); headerRow.Cells[1].Borders.Bottom.Width = 1.5;
+        var banner = section.AddTable(); banner.AddColumn(Unit.FromPoint(499));
+        var bannerRow = banner.AddRow(); bannerRow.Shading.Color = MColor.FromRgb(255, 121, 0); banner.TopPadding = 16; banner.BottomPadding = 16; banner.LeftPadding = 16; banner.RightPadding = 16;
+        var bannerKicker = bannerRow.Cells[0].AddParagraph("OFFICIAL EVALUATION REPORT"); bannerKicker.Format.Font.Size = 9; bannerKicker.Format.Font.Bold = true; bannerKicker.Format.Font.Color = MColor.FromRgb(255, 233, 214);
+        var bannerTitle = bannerRow.Cells[0].AddParagraph("TENDER EVALUATION REPORT"); bannerTitle.Format.Font.Size = 21; bannerTitle.Format.Font.Bold = true; bannerTitle.Format.Font.Color = MColor.FromRgb(255, 255, 255); bannerTitle.Format.SpaceBefore = 3;
+        var bannerName = bannerRow.Cells[0].AddParagraph(SafeText(data.Title, 40)); bannerName.Format.Font.Size = 13; bannerName.Format.Font.Color = MColor.FromRgb(255, 255, 255); bannerName.Format.SpaceBefore = 4;
+        section.AddParagraph().Format.SpaceAfter = 4;
         Body(section, $"Tender #{data.TenderId}  |  Purchase Request #{data.PurchaseRequestId}  |  Report #{data.ReportId}  |  Version {data.Version}");
         Body(section, $"Generated from verified SQL Server records - {DisplayUtc(data.CreatedUtc)}");
         Body(section, data.Description);
+        var winner = data.Ranking.OrderBy(x => x.Rank).FirstOrDefault();
+        var winnerBid = winner == null ? null : data.Bids.FirstOrDefault(b => b.Id == winner.BidId);
+        Heading(section, "Summary");
+        Table(section, ["At a glance", "Result"], [
+            ["Offers evaluated", data.Ranking.Count.ToString()],
+            ["Recommended winner", winnerBid == null ? "None" : $"{winnerBid.Supplier} (bid #{winnerBid.Id})"],
+            ["Final weighted score", winner == null ? "-" : Number(Math.Round(winner.Score, 4))],
+            ["Approved weights", $"{Number(data.FinancialWeight)}% financial / {Number(data.TechnicalWeight)}% technical"],
+            ["Committee", $"{data.Committee.Count} independent members"]]);
         Heading(section, "1. Requirements and approved evaluation criteria");
         Table(section, ["Approved criteria", "Value"], [
             ["Financial weight", Number(data.FinancialWeight) + "%"], ["Technical weight", Number(data.TechnicalWeight) + "%"],
@@ -89,14 +110,20 @@ public class OrangeReportRenderer
         var pageIndex = pdf.PageCount - 1;
         using (var graphics = XGraphics.FromPdfPage(signaturesPage))
         {
-            graphics.DrawString("orange", new XFont("Orange Sans", 23, XFontStyleEx.Bold), new XSolidBrush(Orange), 48, 46);
-            graphics.DrawString("7. Signatures and approval ledger", new XFont("Orange Sans", 15, XFontStyleEx.Bold), XBrushes.Black, 48, 82);
-            graphics.DrawString($"Report #{data.ReportId} - Version {data.Version}", new XFont("Orange Sans", 9), XBrushes.Black, 48, 101);
+            graphics.DrawRectangle(new XSolidBrush(Orange), 48, 36, 86, 34);
+            graphics.DrawString("orange", new XFont("Orange Sans", 17, XFontStyleEx.Bold), XBrushes.White, new XRect(48, 36, 86, 34), XStringFormats.Center);
+            graphics.DrawString("7. Signatures and approval ledger", new XFont("Orange Sans", 15, XFontStyleEx.Bold), XBrushes.Black, 48, 90);
+            graphics.DrawString($"Report #{data.ReportId} - Version {data.Version}", new XFont("Orange Sans", 9), XBrushes.DimGray, 48, 108);
+            var rowH = RowHeight(TemplateVersion);
             for (var i = 0; i < Slots.Length; i++)
             {
-                var y = 122 + i * 52;
-                graphics.DrawRectangle(new XPen(XColors.LightGray), 48, y, 499, 52);
-                graphics.DrawLine(new XPen(XColors.LightGray), 214, y, 214, y + 52);
+                var y = 122 + i * rowH;
+                graphics.DrawRectangle(new XSolidBrush(XColor.FromArgb(255, 246, 238)), 48, y, 166, rowH);
+                graphics.DrawRectangle(new XPen(XColors.LightGray), 48, y, 499, rowH);
+                graphics.DrawLine(new XPen(XColors.LightGray), 214, y, 214, y + rowH);
+                graphics.DrawRectangle(new XSolidBrush(Orange), 48, y, 4, rowH);
+                graphics.DrawLine(new XPen(XColors.Silver, 0.6) { DashStyle = XDashStyle.Dash }, 440, y + rowH - 14, 538, y + rowH - 14);
+                graphics.DrawString("Signature", new XFont("Orange Sans", 6), XBrushes.Gray, 440, y + rowH - 6);
                 var label = Slots[i];
                 if (i < 4)
                 {
@@ -107,9 +134,9 @@ public class OrangeReportRenderer
                 }
                 if (i == 4) label = "Sourcing Manager\nManagement review";
                 if (i > 4) label = "Top Committee\nAssigned seat " + (i - 4);
-                new XTextFormatter(graphics).DrawString(label, new XFont("Orange Sans", 8), XBrushes.Black, new XRect(54, y + 7, 152, 40));
+                new XTextFormatter(graphics).DrawString(label, new XFont("Orange Sans", 8), XBrushes.Black, new XRect(58, y + 9, 150, rowH - 14));
             }
-            new XTextFormatter(graphics).DrawString("Signatures are recorded only after explicit authenticated review. An electronic acknowledgment is a database-backed approval record. Where a trusted personal certificate is configured, a detached CMS signature signs the version-and-document-hash manifest; this is not an embedded PAdES signature. Viewing watermarks never modify the canonical signed bytes.", new XFont("Orange Sans", 8), XBrushes.DimGray, new XRect(48, 610, 499, 85));
+            new XTextFormatter(graphics).DrawString("Signatures are recorded only after explicit authenticated review. An electronic acknowledgment is a database-backed approval record. Where a trusted personal certificate is configured, a detached CMS signature signs the version-and-document-hash manifest; this is not an embedded PAdES signature. Viewing watermarks never modify the canonical signed bytes.", new XFont("Orange Sans", 8), XBrushes.DimGray, new XRect(48, 636, 499, 60));
         }
         for (var i = 0; i < pdf.PageCount; i++)
         {
@@ -137,13 +164,26 @@ public class OrangeReportRenderer
         }
         using (var g = XGraphics.FromPdfPage(pdf.Pages[report.SignaturePageIndex!.Value]))
         {
+            var rowH = RowHeight(report.TemplateVersion);
             for (var i = 0; i < Slots.Length; i++)
             {
                 var signature = signatures.SingleOrDefault(x => x.Stage + ":" + x.Slot == Slots[i]);
                 var waiting = i > 4 && topRequired != true ? topRequired == false ? "Not required by the approved final-approval policy." : "Conditional seat: awaiting an explicit final-approval policy." : "Awaiting assigned user's explicit review and signing.";
                 var text = signature == null ? waiting :
                     $"{Clip(signature.SignerName, 35)} ({Clip(signature.UserId, 25)})\n{signature.Decision} - {signature.SignedAt:yyyy-MM-dd HH:mm:ss} UTC\n{signature.Method} | Receipt #{signature.Id}" + (signature.InvalidatedAt != null ? " | OBSOLETE VERSION" : "");
-                new XTextFormatter(g).DrawString(text, new XFont("Orange Sans", 7), XBrushes.Black, new XRect(220, 129 + i * 52, 321, 42));
+                var hasPicture = signature?.SignatureImage is { Length: > 0 };
+                new XTextFormatter(g).DrawString(text, new XFont("Orange Sans", 7), XBrushes.Black, new XRect(220, 129 + i * rowH, hasPicture ? 212 : 321, rowH - 10));
+                if (hasPicture)
+                {
+                    try
+                    {
+                        using var pictureStream = new MemoryStream(signature!.SignatureImage!); using var picture = XImage.FromStream(pictureStream);
+                        var boxW = 104.0; var boxH = rowH - 22.0; var ratio = (double)picture.PixelWidth / Math.Max(1, picture.PixelHeight);
+                        var w = Math.Min(boxW, boxH * ratio); var h = w / ratio;
+                        g.DrawImage(picture, 438 + (boxW - w) / 2, 124 + i * rowH + (boxH - h) / 2 + 3, w, h);
+                    }
+                    catch (Exception) { /* a damaged picture never blocks the report; the text record stays */ }
+                }
             }
             new XTextFormatter(g).DrawString("Personalized viewing copy. Canonical SHA-256: " + report.PdfSha256, new XFont("Orange Sans", 7), XBrushes.DimGray, new XRect(48, 711, 499, 40));
         }
@@ -152,7 +192,8 @@ public class OrangeReportRenderer
     private static void Heading(Section section, string text, int size = 13)
     {
         var p = section.AddParagraph(SafeText(text, size >= 18 ? 24 : size >= 14 ? 32 : 40)); p.Format.Font.Size = size; p.Format.Font.Bold = true;
-        p.Format.Font.Color = MColor.FromRgb(166, 70, 0); p.Format.SpaceBefore = 12; p.Format.SpaceAfter = 7; p.Format.KeepWithNext = true;
+        p.Format.Font.Color = MColor.FromRgb(200, 85, 0); p.Format.SpaceBefore = 14; p.Format.SpaceAfter = 7; p.Format.KeepWithNext = true;
+        if (size >= 13) { p.Format.Borders.Bottom.Color = MColor.FromRgb(255, 121, 0); p.Format.Borders.Bottom.Width = 1.1; p.Format.Borders.DistanceFromBottom = 3; }
     }
     private static void Table(Section section, string[] headings, string[][] rows)
     {
@@ -160,7 +201,7 @@ public class OrangeReportRenderer
         var table = section.AddTable(); table.Borders.Width = .4; table.Borders.Color = MColor.FromRgb(210, 215, 220);
         table.Format.Font.Size = 8; table.Format.SpaceAfter = 3; table.TopPadding = 5; table.BottomPadding = 5;
         foreach (var _ in headings) table.AddColumn(Unit.FromPoint(499d / headings.Length));
-        var header = table.AddRow(); header.HeadingFormat = true; header.Shading.Color = MColor.FromRgb(255, 232, 211); header.Format.Font.Bold = true;
+        var header = table.AddRow(); header.HeadingFormat = true; header.Shading.Color = MColor.FromRgb(255, 121, 0); header.Format.Font.Bold = true; header.Format.Font.Color = MColor.FromRgb(255, 255, 255);
         for (var i = 0; i < headings.Length; i++) header.Cells[i].AddParagraph(headings[i]);
         foreach (var values in rows)
         {
@@ -171,7 +212,7 @@ public class OrangeReportRenderer
                     .Select(chunk => string.Concat(chunk.Select(rune => rune.ToString()))).DefaultIfEmpty("").ToArray()).ToArray();
             for (var part = 0; part < cells.Max(x => x.Length); part++)
             {
-                var row = table.AddRow();
+                var row = table.AddRow(); if (table.Rows.Count % 2 == 1) row.Shading.Color = MColor.FromRgb(255, 246, 238);
                 for (var i = 0; i < headings.Length; i++)
                 {
                     var text = cells[i].ElementAtOrDefault(part) ?? (i == 0 && part > 0 ? "(continued)" : "");

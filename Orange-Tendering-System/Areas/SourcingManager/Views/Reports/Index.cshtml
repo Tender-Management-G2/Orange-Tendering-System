@@ -1,54 +1,21 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Evaluation Reports List
-
-DEVELOPER OWNER: Haya
-MODULE: Sourcing Manager Review
-TRELLO TASK: Evaluation Reports List
-TRELLO URL: https://trello.com/c/CWgcYFbk
-
-PURPOSE:
-List detailed evaluation reports submitted by the Officer
-for managerial review.
-
-BUSINESS ACCESS:
-Sourcing Manager
-
-ROUTE: /SourcingManager/Reports
-
-FUTURE IMPLEMENTATION:
-- Query TenderReports (ReportType = FullEvaluation) by
-  status.
-- Row action: Review.
-
-DEPENDENCIES:
-TenderReports, Tenders, AspNetUsers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
+@model List<Orange_Tendering_System.ViewModels.WorkflowListRow>
 @{
-    ViewData["Title"] = "Evaluation Reports List";
-    ViewData["WorkspaceSection"] = "Pending Reports";
-    ViewData["Description"] = "Detailed evaluation reports submitted to you by the Sourcing Officer.";
+    ViewData["Title"] = "Pending Reports"; ViewData["WorkspaceSection"] = "Pending Reports";
+    ViewData["Description"] = "Evaluation reports waiting for your review and decision.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search tender" aria-label="Search tender" />
-    <select aria-label="Status"><option>Status: Submitted</option><option>Status: Returned</option><option>Status: Rejected</option><option>Status: Accepted</option></select>
-    <span class="pg-hint">Search and filters update the records shown on this page.</span>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-reports">
-    <div class="pg-panel-head"><h2 id="tbl-reports">Reports</h2></div>
+<section class="ws-panel pg-panel" aria-labelledby="mr-title">
+    <div class="pg-panel-head"><h2 id="mr-title">Pending Reports</h2></div>
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Report</th><th scope="col">Version</th><th scope="col">Submitted by</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No reports are waiting for review."' /></td></tr></tbody>
+            <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model)
+            {
+                <tr><td>T-@row.TenderId.ToString("0000")</td><td><strong>@row.Title</strong></td><td>@row.Status</td><td><a class="pg-btn" data-no-modal asp-area="SourcingManager" asp-controller="Workflow" asp-action="Details" asp-route-id="@row.TenderId">Review report</a></td></tr>
+            }
+            @if (Model.Count == 0) { <tr><td colspan="4"><partial name="_EmptyState" model='"No reports are waiting for your review."' /></td></tr> }
+            </tbody>
         </table>
     </div>
 </section>

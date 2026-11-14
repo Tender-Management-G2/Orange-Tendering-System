@@ -9,10 +9,11 @@ namespace Orange_Tendering_System.Areas.EvaluationCommittee.Controllers;
 public class ReportsController(TenderWorkflowService workflow) : ReportControllerBase(workflow)
 {
     public IActionResult Unified(int? id)=>RedirectToAction("Index", "Workflow");
-    [HttpPost] public Task<IActionResult> Sign(int id,string documentHash,bool confirmed,string comment="") => Execute(id,async()=>
+    [HttpPost] public Task<IActionResult> Sign(int id,string documentHash,bool confirmed,string comment="",string? signatureImage=null) => Execute(id,async()=>
     {
+        var png=ReadSignature(signatureImage);
         var report=await Workflow.ReviewReport(id,User);
         TenderWorkflowService.Require(report.IsCurrent,"An obsolete report cannot be signed.");
-        await Workflow.FinalizeReport(report.Tender.Id,comment,User,documentHash,confirmed);
+        await Workflow.FinalizeReport(report.Tender.Id,comment,User,documentHash,confirmed,png);
     });
 }

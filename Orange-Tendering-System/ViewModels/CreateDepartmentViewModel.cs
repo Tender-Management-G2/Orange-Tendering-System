@@ -1,7 +1,6 @@
 ﻿
-// sara rjoub 
-
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace Orange_Tendering_System.ViewModels
 {
@@ -16,5 +15,11 @@ namespace Orange_Tendering_System.ViewModels
         public string? Description { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        // Employees selected while creating a department
+        public List<string> SelectedEmployeeIds { get; set; } = new();
+
+        // Available employees for selection
+        public List<SelectListItem> AvailableEmployees { get; set; } = new();
     }
 }

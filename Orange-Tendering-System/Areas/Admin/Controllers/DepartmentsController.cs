@@ -1,8 +1,3 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Rjoub
-// Module: Administration
-// Purpose: MVC endpoints for the Departments pages of the Admin workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -31,19 +26,25 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
 
         // GET: /Admin/Departments
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            string? search,
+            string? statusFilter)
         {
-            var departments =
-                await _adminService.GetDepartmentsAsync();
+            var model = await _adminService
+                .GetDepartmentsAsync(search, statusFilter);
 
-            return View(departments);
+            return View(model);
         }
 
         // GET: /Admin/Departments/Create
         [HttpGet]
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            return View(new CreateDepartmentViewModel());
+            var model = new CreateDepartmentViewModel();
+
+            await LoadCreateOptionsAsync(model);
+
+            return View(model);
         }
 
         // POST: /Admin/Departments/Create
@@ -54,24 +55,23 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
         {
             if (!ModelState.IsValid)
             {
+                await LoadCreateOptionsAsync(model);
                 return View(model);
             }
 
             var adminId = _userManager.GetUserId(User);
 
             if (string.IsNullOrEmpty(adminId))
-            {
                 return Challenge();
-            }
 
-            var created = await _adminService
+            var result = await _adminService
                 .CreateDepartmentAsync(model, adminId);
 
-            if (!created)
+            if (result != "Success")
             {
-                ModelState.AddModelError(
-                    nameof(model.Name),
-                    "A department with this name already exists.");
+                AddDepartmentError(result, nameof(model.Name));
+
+                await LoadCreateOptionsAsync(model);
 
                 return View(model);
             }
@@ -82,22 +82,18 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-
         // GET: /Admin/Departments/Edit/5
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
         {
-            var department =
-                await _adminService.GetDepartmentForEditAsync(id);
+            var model = await _adminService
+                .GetDepartmentForEditAsync(id);
 
-            if (department == null)
-            {
+            if (model == null)
                 return NotFound();
-            }
 
-            return View(department);
+            return View(model);
         }
-
 
         // POST: /Admin/Departments/Edit/5
         [HttpPost]
@@ -107,44 +103,30 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             EditDepartmentViewModel model)
         {
             if (id != model.Id)
-            {
                 return BadRequest();
-            }
 
             if (!ModelState.IsValid)
             {
+                await LoadEditOptionsAsync(model);
                 return View(model);
             }
 
             var adminId = _userManager.GetUserId(User);
 
             if (string.IsNullOrEmpty(adminId))
-            {
                 return Challenge();
-            }
 
             var result = await _adminService
                 .UpdateDepartmentAsync(model, adminId);
 
             if (result == "NotFound")
-            {
                 return NotFound();
-            }
 
-            if (result == "Duplicate")
+            if (result != "Success")
             {
-                ModelState.AddModelError(
-                    nameof(model.Name),
-                    "A department with this name already exists.");
+                AddDepartmentError(result, nameof(model.Name));
 
-                return View(model);
-            }
-
-            if (result == "InvalidName")
-            {
-                ModelState.AddModelError(
-                    nameof(model.Name),
-                    "Department name must contain 2 to 100 characters.");
+                await LoadEditOptionsAsync(model);
 
                 return View(model);
             }
@@ -155,5 +137,80 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // GET: /Admin/Departments/Details/5
+        [HttpGet]
+        public async Task<IActionResult> Details(int id)
+        {
+            var model = await _adminService
+                .GetDepartmentDetailsAsync(id);
+
+            if (model == null)
+                return NotFound();
+
+            return View(model);
+        }
+
+        // Load eligible employees for Create
+        private async Task LoadCreateOptionsAsync(
+            CreateDepartmentViewModel model)
+        {
+            model.AvailableEmployees =
+                await _adminService
+                    .GetAvailableDepartmentEmployeesAsync();
+        }
+
+        // Load eligible employees for Edit
+        private async Task LoadEditOptionsAsync(
+            EditDepartmentViewModel model)
+        {
+            model.AvailableEmployees =
+                await _adminService
+                    .GetAvailableDepartmentEmployeesAsync(model.Id);
+        }
+
+        // Department validation messages
+        private void AddDepartmentError(
+            string result,
+            string nameField)
+        {
+            switch (result)
+            {
+                case "Duplicate":
+                    ModelState.AddModelError(
+                        nameField,
+                        "A department with this name already exists.");
+                    break;
+
+                case "InvalidName":
+                    ModelState.AddModelError(
+                        nameField,
+                        "Department name must contain 2 to 100 characters.");
+                    break;
+
+                case "InvalidDescription":
+                    ModelState.AddModelError(
+                        nameof(CreateDepartmentViewModel.Description),
+                        "Department description cannot exceed 500 characters.");
+                    break;
+
+                case "InvalidEmployees":
+                    ModelState.AddModelError(
+                        nameof(CreateDepartmentViewModel.SelectedEmployeeIds),
+                        "One or more selected employees are unavailable or belong to another department.");
+                    break;
+
+                case "EmployeeRequiresDepartment":
+                    ModelState.AddModelError(
+                        nameof(CreateDepartmentViewModel.SelectedEmployeeIds),
+                        "An employee with the Requesting Department role must stay assigned to a department. Change their role or department in Users first.");
+                    break;
+
+                default:
+                    ModelState.AddModelError(
+                        string.Empty,
+                        "Unable to save department. Please try again.");
+                    break;
+            }
+        }
     }
 }

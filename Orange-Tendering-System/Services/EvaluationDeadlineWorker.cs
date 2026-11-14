@@ -8,13 +8,17 @@ public class EvaluationDeadlineWorker(IServiceScopeFactory scopes, ILogger<Evalu
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        try
         {
-            await Step("Evaluation deadline processing", s => s.GetRequiredService<TenderWorkflowService>().CloseDueSessions(stoppingToken), stoppingToken);
-            await Step("Evaluation opening processing", s => s.GetRequiredService<TenderWorkflowService>().OpenDueSessions(stoppingToken), stoppingToken);
-            await Step("External invitation delivery", s => s.GetRequiredService<ExternalInvitationDispatcher>().DispatchPending(stoppingToken), stoppingToken);
-            await Step("Approved registration invitations", s => s.GetRequiredService<TenderWorkflowService>().LinkRegisteredContacts(stoppingToken), stoppingToken);
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                await Step("Evaluation deadline processing", s => s.GetRequiredService<TenderWorkflowService>().CloseDueSessions(stoppingToken), stoppingToken);
+                await Step("Evaluation opening processing", s => s.GetRequiredService<TenderWorkflowService>().OpenDueSessions(stoppingToken), stoppingToken);
+                await Step("External invitation delivery", s => s.GetRequiredService<ExternalInvitationDispatcher>().DispatchPending(stoppingToken), stoppingToken);
+                await Step("Approved registration invitations", s => s.GetRequiredService<TenderWorkflowService>().LinkRegisteredContacts(stoppingToken), stoppingToken);
+            }
         }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
     private async Task Step(string name, Func<IServiceProvider, Task> work, CancellationToken stoppingToken)
     {
