@@ -43,9 +43,9 @@ tokens or biometric data.
           asp-controller="AuditLogs"
           asp-action="Index"
           method="get"
-          class="pg-form">
+          class="pg-form" data-audit-filters>
 
-        <div class="pg-form-grid">
+        <div class="pg-form-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
 
             <!-- Search -->
             <div class="pg-field">
@@ -60,18 +60,6 @@ tokens or biometric data.
                        placeholder="User, action or entity" />
             </div>
 
-            <!-- Action Filter -->
-            <div class="pg-field">
-                <label for="actionFilter">Action</label>
-
-                <input type="text"
-                       id="actionFilter"
-                       name="actionFilter"
-                       value="@Model.Action"
-                       class="form-control"
-                       maxlength="100"
-                       placeholder="e.g. Created, Updated" />
-            </div>
 
             <!-- From Date -->
             <div class="pg-field">
@@ -102,11 +90,6 @@ tokens or biometric data.
 
         <div class="pg-actions">
 
-            <button type="submit"
-                    class="pg-btn pg-btn-primary">
-                Apply Filters
-            </button>
-
             <a asp-area="Admin"
                asp-controller="AuditLogs"
                asp-action="Index"
@@ -118,6 +101,8 @@ tokens or biometric data.
 
     </form>
 
+    <p data-audit-status role="status" aria-live="polite" class="pg-hint"></p>
+    <div data-audit-results>
     <!-- Results -->
     <div class="pg-panel-head">
         <div>
@@ -132,7 +117,7 @@ tokens or biometric data.
     <!-- Audit Logs Table -->
     <div class="pg-table-wrap">
 
-        <table class="pg-table">
+        <table class="pg-table" data-no-enhance>
 
             <thead>
                 <tr>
@@ -244,7 +229,6 @@ tokens or biometric data.
                    asp-controller="AuditLogs"
                    asp-action="Index"
                    asp-route-search="@Model.Search"
-                   asp-route-actionFilter="@Model.Action"
                    asp-route-fromDate="@(Model.FromDate?.ToString("yyyy-MM-dd"))"
                    asp-route-toDate="@(Model.ToDate?.ToString("yyyy-MM-dd"))"
                    asp-route-page="@(Model.CurrentPage - 1)">
@@ -265,7 +249,6 @@ tokens or biometric data.
                    asp-controller="AuditLogs"
                    asp-action="Index"
                    asp-route-search="@Model.Search"
-                   asp-route-actionFilter="@Model.Action"
                    asp-route-fromDate="@(Model.FromDate?.ToString("yyyy-MM-dd"))"
                    asp-route-toDate="@(Model.ToDate?.ToString("yyyy-MM-dd"))"
                    asp-route-page="@(Model.CurrentPage + 1)">
@@ -276,4 +259,9 @@ tokens or biometric data.
         </nav>
     }
 
+    </div>
 </section>
+
+@section Scripts {
+    <script src="~/js/admin-audit-live.js" asp-append-version="true"></script>
+}

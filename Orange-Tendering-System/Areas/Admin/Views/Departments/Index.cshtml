@@ -197,7 +197,7 @@ PAGE: Department Management
      DEPARTMENTS TABLE
 =================================== -->
 
-<section class="ws-panel pg-panel">
+<section class="ws-panel pg-panel admin-department-records">
 
     <div class="pg-panel-head">
 
@@ -259,7 +259,9 @@ PAGE: Department Management
                                 @(string.IsNullOrWhiteSpace(
                                     department.Description)
                                     ? "—"
-                                    : department.Description)
+                                    : department.Description.Length > 90
+                                        ? department.Description[..90] + "…"
+                                        : department.Description)
                             </td>
 
                             <td>
@@ -284,7 +286,7 @@ PAGE: Department Management
                                     <a class="pg-btn"
                                        asp-area="Admin"
                                        asp-controller="Departments"
-                                       asp-action="Details"
+                                       asp-action="Details" data-modal="center"
                                        asp-route-id="@department.Id">
                                         Details
                                     </a>

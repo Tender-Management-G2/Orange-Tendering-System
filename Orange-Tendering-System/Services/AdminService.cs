@@ -155,7 +155,7 @@ namespace Orange_Tendering_System.Services
             }
 
             var departments = await query
-                .OrderBy(d => d.Name)
+                .OrderByDescending(d => d.Id)
                 .Select(d => new DepartmentListViewModel
                 {
                     Id = d.Id,
@@ -187,7 +187,7 @@ namespace Orange_Tendering_System.Services
         public async Task<List<SelectListItem>>
             GetAvailableDepartmentEmployeesAsync(int? departmentId = null)
         {
-            // Current department employees + active unassigned employees.
+            // Current department employees and unassigned employee accounts.
             // Supplier and Admin accounts are excluded from new assignments.
 
             var users = await _context.Users
@@ -196,7 +196,7 @@ namespace Orange_Tendering_System.Services
                     (departmentId.HasValue &&
                      u.DepartmentId == departmentId.Value)
                     ||
-                    (u.DepartmentId == null && u.IsActive))
+                    (u.DepartmentId == null))
                 .Where(u =>
                     !_context.UserRoles.Any(ur =>
                         ur.UserId == u.Id &&
@@ -231,6 +231,9 @@ namespace Orange_Tendering_System.Services
         {
             var name = model.Name?.Trim() ?? "";
 
+
+            if (model.Description?.Trim().Length > 160) return "InvalidDescription";
+
             if (name.Length < 2 || name.Length > 100)
             {
                 return "InvalidName";
@@ -241,6 +244,8 @@ namespace Orange_Tendering_System.Services
                 .Where(id => !string.IsNullOrWhiteSpace(id))
                 .Distinct()
                 .ToList();
+
+            if (!model.IsActive && selectedIds.Count > 0) return "InactiveDepartmentEmployees";
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync(
@@ -277,9 +282,7 @@ namespace Orange_Tendering_System.Services
                 ).Distinct().ToListAsync();
 
                 if (restrictedIds.Count > 0 ||
-                    employees.Any(u =>
-                        !u.IsActive ||
-                        u.DepartmentId != null))
+                    employees.Any(u => u.DepartmentId != null))
                 {
                     return "InvalidEmployees";
                 }
@@ -426,6 +429,9 @@ namespace Orange_Tendering_System.Services
         {
             var newName = model.Name?.Trim() ?? "";
 
+
+            if (model.Description?.Trim().Length > 160) return "InvalidDescription";
+
             if (newName.Length < 2 || newName.Length > 100)
             {
                 return "InvalidName";
@@ -436,6 +442,8 @@ namespace Orange_Tendering_System.Services
                 .Where(id => !string.IsNullOrWhiteSpace(id))
                 .Distinct()
                 .ToList();
+
+            if (!model.IsActive) selectedIds.Clear();
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync(
@@ -503,10 +511,7 @@ namespace Orange_Tendering_System.Services
                     select ur.UserId
                 ).Distinct().ToListAsync();
 
-                if (restrictedIds.Count > 0 ||
-                    selectedEmployees.Any(u =>
-                        newEmployeeIds.Contains(u.Id) &&
-                        !u.IsActive))
+                if (restrictedIds.Count > 0)
                 {
                     return "InvalidEmployees";
                 }
@@ -835,7 +840,13 @@ namespace Orange_Tendering_System.Services
             // =========================================
 
             var users = await query
-                .OrderBy(u => u.FullName)
+                // Creation audit IDs are chronological; keep updates from changing this order.
+                // Legacy accounts without a creation entry follow in a stable alphabetical order.
+                .OrderByDescending(u => _context.AuditLogs
+                    .Where(a => a.EntityName == "ApplicationUser" && a.EntityId == u.Id
+                        && (a.Action == "Created" || a.Action == "EmployeeProvisioned"))
+                    .Select(a => (long?)a.Id).Min())
+                .ThenBy(u => u.FullName)
                 .ThenBy(u => u.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -966,6 +977,10 @@ namespace Orange_Tendering_System.Services
             CreateUserViewModel model,
             string adminId)
         {
+            var committeeSeat = CommitteeAccountSeats.Find(model.CommitteeSeat);
+            if (model.CommitteeSeat != null && (committeeSeat == null || committeeSeat.Role != model.Role))
+                return IdentityResult.Failed(new IdentityError { Description = "The selected committee category does not match the account role." });
+
             var allowedRoles = SystemRoles.All
                 .Where(r => r != SystemRoles.Supplier);
 
@@ -1053,6 +1068,17 @@ namespace Orange_Tendering_System.Services
                 return roleResult;
             }
 
+            if (committeeSeat != null)
+            {
+                var claimResult = await _userManager.AddClaimAsync(user,
+                    new System.Security.Claims.Claim(CommitteeAccountSeats.ClaimType, committeeSeat.Key));
+                if (!claimResult.Succeeded)
+                {
+                    await transaction.RollbackAsync();
+                    return claimResult;
+                }
+            }
+
             // Record non-sensitive information in AuditLogs
             _context.AuditLogs.Add(new AuditLog
             {
@@ -1067,7 +1093,8 @@ namespace Orange_Tendering_System.Services
                         user.Email,
                         user.DepartmentId,
                         user.IsActive,
-                        Role = model.Role
+                        Role = model.Role,
+                        CommitteeSeat = committeeSeat?.Key
                     }),
                 CreatedAt = DateTime.UtcNow
             });

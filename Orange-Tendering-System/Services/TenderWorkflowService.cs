@@ -461,16 +461,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                 var assignedTop = await Members(id, CommitteeType.Top);
                 if (assignedTop.Count == 0)
                 {
-                    // The Top Committee is a standing body: when the Manager approves, the first four eligible active members are seated automatically (no officer step).
-                    var evaluators = await db.CommitteeMembers.Where(x => x.TenderId == id).Select(x => x.UserId).ToListAsync();
-                    var pool = new List<ApplicationUser>();
-                    foreach (var person in (await users.GetUsersInRoleAsync(SystemRoles.TopCommittee)).Where(x => x.IsActive && !evaluators.Contains(x.Id)).OrderBy(x => x.FullName))
-                        if (!await Role(person, SystemRoles.SourcingOfficer) && !await Role(person, SystemRoles.SourcingManager)) pool.Add(person);
-                    if (pool.Count >= 4)
-                    {
-                        foreach (var person in pool.Take(4)) db.CommitteeMembers.Add(new CommitteeMember { TenderId = id, UserId = person.Id, CommitteeType = CommitteeType.Top, AssignedAt = Now });
-                        await db.SaveChangesAsync(); assignedTop = await Members(id, CommitteeType.Top);
-                    }
+                    // Tender-specific membership is explicitly selected by Admin.
+                    foreach (var admin in (await users.GetUsersInRoleAsync(SystemRoles.Admin)).Where(x => x.IsActive))
+                        db.Notifications.Add(new Notification { UserId = admin.Id, Title = "Top Committee assignment required", Message = $"Assign the CEO and three members for tender #{id}.", Link = $"/Admin/Committees/Manage/{id}", CreatedAt = Now });
                 }
                 if (assignedTop.Count == 4 && !await db.CommitteeRounds.AnyAsync(x => x.TenderRoundId == s.TenderRoundId && x.CommitteeType == CommitteeType.Top && x.TenderReportId == s.ReportId))
                 {
