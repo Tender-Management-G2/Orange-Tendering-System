@@ -77,12 +77,15 @@ namespace Orange_Tendering_System.ViewModels
             ]),
             new("SourcingManager", "Sourcing Manager", SystemRoles.SourcingManager,
             [
-                new("Dashboard", "Dashboard", "Index", "home"),
-                new("Pending Reports", "Reports", "Index", "request"),
-                new("Report Review", "Reports", "Index", "check"),
-                new("Forwarding", "Reports", "Forward", "send"),
-                new("Decision History", "Reports", "History", "history"),
-                new("Analytics & Exports", "Analytics", "Index", "chart", "")
+                new("Dashboard", "ManagerDashboard", "Index", "home"),
+                new("Workflow Overview", "Dashboard", "Index", "chart"),
+                new("Pending Reports", "ManagerReports", "Pending", "request"),
+                new("Report Review", "ManagerReports", "Index", "check"),
+                new("Forwarding", "ManagerReports", "Forwarding", "send"),
+                new("Decision History", "ManagerReports", "History", "history"),
+                new("Weighted Workflow", "Workflow", "Index", "tender"),
+                new("Analytics & Exports", "Analytics", "Index", "chart"),
+                new("Manager Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("TopCommittee", "Top Committee", SystemRoles.TopCommittee,
             [
