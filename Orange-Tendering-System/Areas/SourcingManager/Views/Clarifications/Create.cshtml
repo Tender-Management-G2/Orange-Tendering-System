@@ -1,0 +1,57 @@
+@model SourcingManagerClarificationCreateViewModel
+
+@{
+    ViewData["Title"] = "Open clarification";
+    ViewData["WorkspaceSection"] = "Clarifications";
+    ViewData["Description"] = "Ask an Evaluation Committee or Top Committee member about a tender under review.";
+}
+
+<partial name="_PageHeader" />
+
+<section class="ws-panel pg-panel">
+    <form method="get" class="pg-toolbar">
+        <label for="tenderId">Tender context</label>
+        <select id="tenderId" name="tenderId">
+            @foreach (var tender in Model.Tenders)
+            {
+                <option value="@tender.Id" selected="@(Model.TenderId == tender.Id)">@tender.Title</option>
+            }
+        </select>
+        <button class="pg-btn" type="submit">Load members</button>
+    </form>
+
+    @if (!Model.Recipients.Any())
+    {
+        <partial name="_EmptyState" model='"No Evaluation Committee or Top Committee members are assigned to this tender yet."' />
+    }
+    else
+    {
+        <form method="post" class="pg-form">
+            <input type="hidden" name="tenderId" value="@Model.TenderId" />
+            <div asp-validation-summary="ModelOnly" class="pg-error"></div>
+            <div class="pg-form-grid">
+                <div class="pg-field">
+                    <label for="toUserId">Send to</label>
+                    <select id="toUserId" name="toUserId" required>
+                        @foreach (var recipient in Model.Recipients)
+                        {
+                            <option value="@recipient.UserId">@recipient.DisplayName — @recipient.Role</option>
+                        }
+                    </select>
+                </div>
+                <div class="pg-field">
+                    <label for="subject">Subject</label>
+                    <input id="subject" name="subject" maxlength="200" required />
+                </div>
+                <div class="pg-field pg-field-wide">
+                    <label for="message">Message</label>
+                    <textarea id="message" name="message" maxlength="2000" required></textarea>
+                </div>
+            </div>
+            <div class="pg-actions">
+                <button class="pg-btn pg-btn-primary" type="submit">Send clarification</button>
+                <a class="pg-btn pg-btn-secondary" asp-action="Index">Cancel</a>
+            </div>
+        </form>
+    }
+</section>
