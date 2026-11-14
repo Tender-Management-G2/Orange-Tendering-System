@@ -1,54 +1,242 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Evaluation Reports List
+@model Orange_Tendering_System.ViewModels.SourcingManagerReportsIndexViewModel
+@using Orange_Tendering_System.Models.Entities
 
-DEVELOPER OWNER: Haya
-MODULE: Sourcing Manager Review
-TRELLO TASK: Evaluation Reports List
-TRELLO URL: https://trello.com/c/CWgcYFbk
+@* ===========================================================
+   ORANGE TENDER MANAGEMENT SYSTEM
+   PAGE: Evaluation Reports List
+   DEVELOPER OWNER: Haya
+   MODULE: Sourcing Manager Review
+   =========================================================== *@
 
-PURPOSE:
-List detailed evaluation reports submitted by the Officer
-for managerial review.
-
-BUSINESS ACCESS:
-Sourcing Manager
-
-ROUTE: /SourcingManager/Reports
-
-FUTURE IMPLEMENTATION:
-- Query TenderReports (ReportType = FullEvaluation) by
-  status.
-- Row action: Review.
-
-DEPENDENCIES:
-TenderReports, Tenders, AspNetUsers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
 @{
-    ViewData["Title"] = "Evaluation Reports List";
-    ViewData["WorkspaceSection"] = "Pending Reports";
-    ViewData["Description"] = "Detailed evaluation reports submitted to you by the Sourcing Officer.";
+    var isForwarding = Model.IsForwarding;
+    ViewData["Title"] = isForwarding ? "Forwarding" : "Evaluation Reports List";
+    ViewData["WorkspaceSection"] = isForwarding ? "Forwarding" : "Pending Reports";
+    ViewData["Description"] = isForwarding
+        ? "Accepted evaluation reports ready for forwarding or already with the Top Committee."
+        : "Detailed evaluation reports submitted for managerial review.";
+
+    var search = Model.Search ?? string.Empty;
+    var status = Model.Status ?? string.Empty;
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search tender" aria-label="Search tender" disabled />
-    <select aria-label="Status" disabled><option>Status: Submitted</option><option>Status: Returned</option><option>Status: Rejected</option><option>Status: Accepted</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["Success"]
+    </div>
+}
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-reports">
-    <div class="pg-panel-head"><h2 id="tbl-reports">Reports</h2></div>
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
+
+<form method="get"
+      asp-area="SourcingManager"
+      asp-controller="Reports"
+      asp-action="Index"
+      class="pg-toolbar"
+      aria-label="Search and filters">
+
+    @if (isForwarding)
+    {
+        <input type="hidden" name="forwarding" value="true" />
+    }
+
+    <input type="search"
+           name="search"
+           value="@search"
+           placeholder="Search tender"
+           aria-label="Search tender" />
+
+    <select name="status" aria-label="Status">
+        <option value="">All Statuses</option>
+
+        @foreach (var item in Enum.GetValues<ReportStatus>())
+        {
+            if (status == item.ToString())
+            {
+                <option value="@item" selected>@item</option>
+            }
+            else
+            {
+                <option value="@item">@item</option>
+            }
+        }
+    </select>
+
+    <button type="submit" class="btn btn-primary btn-sm">
+        Search
+    </button>
+
+    @if (isForwarding)
+    {
+        <a asp-action="Index"
+           asp-route-status="Accepted"
+           asp-route-forwarding="true"
+           class="btn btn-outline-secondary btn-sm">Reset</a>
+    }
+    else
+    {
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Reset</a>
+    }
+</form>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-officer-reports">
+
+    <div class="pg-panel-head">
+        <h2 id="tbl-officer-reports">
+            @(isForwarding ? "Forwarding status" : "Reports from Sourcing Officer")
+        </h2>
+    </div>
+
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Report</th><th scope="col">Version</th><th scope="col">Submitted by</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No reports are waiting for review."' /></td></tr></tbody>
+
+            <thead>
+                <tr>
+                    <th scope="col">Tender</th>
+                    <th scope="col">Report</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Submitted by</th>
+                    <th scope="col">Submitted</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (!Model.OfficerReports.Any())
+                {
+                    <tr>
+                        <td colspan="7">
+                            <partial name="_EmptyState"
+                                     model='"No evaluation reports found."' />
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var report in Model.OfficerReports)
+                    {
+                        var statusClass = report.Status switch
+                        {
+                            ReportStatus.Submitted => "is-submitted",
+                            ReportStatus.Accepted => "is-accepted",
+                            ReportStatus.Returned => "is-returned",
+                            ReportStatus.Rejected => "is-rejected",
+                            _ => ""
+                        };
+                        <tr>
+                            <td>
+                                @report.TenderRound.Tender.Title
+                            </td>
+
+                            <td>
+                                Full Evaluation
+                            </td>
+
+                            <td>
+                                v@(report.VersionNumber)
+                            </td>
+
+                            <td>
+                                @(report.CreatedByUser?.UserName
+                                    ?? report.CreatedByUserId)
+                            </td>
+
+                            <td>
+                                @(report.SubmittedAt?.ToString("yyyy-MM-dd")
+                                    ?? "Not submitted")
+                            </td>
+
+                            <td>
+                                <span class="sm-status @statusClass">@report.Status</span>
+                            </td>
+
+                            <td>
+                                <a asp-area="SourcingManager"
+                                   asp-controller="Reports"
+                                   asp-action="Review"
+                                   asp-route-id="@report.Id"
+                                   class="btn btn-primary btn-sm">
+                                    Review
+                                </a>
+                                @if (report.Status == ReportStatus.Accepted &&
+                                     !Model.ForwardedReportIds.Contains(report.Id))
+                                {
+                                    <a asp-area="SourcingManager"
+                                       asp-controller="Reports"
+                                       asp-action="Forward"
+                                       asp-route-id="@report.Id"
+                                       class="btn btn-outline-secondary btn-sm">
+                                        Forward
+                                    </a>
+                                }
+                                else if (report.Status == ReportStatus.Accepted)
+                                {
+                                    <span class="pg-badge is-warn">With Top Committee</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-top-committee-responses">
+    <div class="pg-panel-head">
+        <h2 id="tbl-top-committee-responses">Top Committee Responses</h2>
+    </div>
+
+    <p class="pg-hint">These are final committee responses for follow-up. The Sourcing Manager cannot approve or reject them.</p>
+
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th scope="col">Tender</th>
+                    <th scope="col">Executive summary</th>
+                    <th scope="col">Committee response</th>
+                    <th scope="col">Decided at</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.TopCommitteeResponses.Any())
+                {
+                    <tr>
+                        <td colspan="4">
+                            <partial name="_EmptyState" model='"No Top Committee responses received yet."' />
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var response in Model.TopCommitteeResponses)
+                    {
+                        <tr>
+                            <td>@response.TenderTitle</td>
+                            <td>Version @response.ExecutiveSummaryVersion</td>
+                            <td>
+                                @(response.Decision == CommitteeRoundStatus.Approved
+                                    ? "Award approved"
+                                    : response.Decision == CommitteeRoundStatus.Rejected
+                                        ? "Further details requested"
+                                        : "Under review")
+                            </td>
+                            <td>@(response.DecidedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not available")</td>
+                        </tr>
+                    }
+                }
+            </tbody>
         </table>
     </div>
 </section>

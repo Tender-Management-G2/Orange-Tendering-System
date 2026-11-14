@@ -1,0 +1,177 @@
+@model SourcingManagerAnalyticsViewModel
+@using Orange_Tendering_System.Models.Entities
+
+@{
+    ViewData["Title"] = "Reports & Analytics";
+    ViewData["WorkspaceSection"] = "Analytics & Exports";
+    ViewData["Description"] = "Live report-review and Top Committee forwarding data for your Sourcing Manager work.";
+}
+
+<partial name="_PageHeader" />
+
+@{
+    var statusRows = new[]
+    {
+        new { Label = "Submitted", Value = Model.SubmittedCount, CssClass = "is-submitted" },
+        new { Label = "Accepted", Value = Model.AcceptedCount, CssClass = "is-accepted" },
+        new { Label = "Returned", Value = Model.ReturnedCount, CssClass = "is-returned" },
+        new { Label = "Rejected", Value = Model.RejectedCount, CssClass = "is-rejected" }
+    };
+    var highestValue = Math.Max(1, statusRows.Max(row => row.Value));
+}
+
+<section class="ws-panel pg-panel sm-chart-panel" aria-labelledby="decision-chart-title">
+    <div class="pg-panel-head">
+        <div>
+            <h2 id="decision-chart-title">Manager decision statistics</h2>
+            <p>Live distribution of unified evaluation report statuses.</p>
+        </div>
+        <div class="sm-chart-legend" aria-label="Chart legend">
+            @foreach (var row in statusRows)
+            {
+                <span class="@row.CssClass"><i></i>@row.Label</span>
+            }
+        </div>
+    </div>
+
+    <div class="sm-bar-chart" role="img" aria-label="Bar chart showing @Model.SubmittedCount submitted, @Model.AcceptedCount accepted, @Model.ReturnedCount returned, and @Model.RejectedCount rejected reports.">
+        @foreach (var row in statusRows)
+        {
+            var height = Math.Max(row.Value == 0 ? 0 : 8, (int)Math.Round(row.Value * 100m / highestValue));
+            <div class="sm-bar-column">
+                <strong>@row.Value</strong>
+                <div class="sm-bar-track"><i class="@row.CssClass" style="height:@height%"></i></div>
+                <span>@row.Label</span>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="pg-grid pg-grid-3" aria-label="Report summary">
+    <article class="ws-panel pg-panel">
+        <p class="pg-kicker">Awaiting your decision</p>
+        <strong class="pg-stat">@Model.SubmittedCount</strong>
+        <p>Submitted evaluation reports</p>
+    </article>
+    <article class="ws-panel pg-panel">
+        <p class="pg-kicker">Your decisions</p>
+        <strong class="pg-stat">@Model.AcceptedCount</strong>
+        <p>Accepted reports</p>
+        <p class="pg-muted">@Model.ReturnedCount returned · @Model.RejectedCount rejected</p>
+    </article>
+    <article class="ws-panel pg-panel">
+        <p class="pg-kicker">Top Committee</p>
+        <strong class="pg-stat">@Model.AwaitingTopCommitteeCount</strong>
+        <p>Awaiting committee decision</p>
+        <p class="pg-muted">@Model.CompletedTopCommitteeCount completed decisions</p>
+    </article>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="statistics-table">
+    <div class="pg-panel-head">
+        <div>
+            <h2 id="statistics-table">Statistics table</h2>
+            <p>The table matches the values in the chart above.</p>
+        </div>
+    </div>
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th scope="col">Report status</th>
+                    <th scope="col">Number of reports</th>
+                    <th scope="col">Meaning</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Submitted</td><td>@Model.SubmittedCount</td><td>Waiting for your review.</td></tr>
+                <tr><td>Accepted</td><td>@Model.AcceptedCount</td><td>Accepted by the Sourcing Manager.</td></tr>
+                <tr><td>Returned</td><td>@Model.ReturnedCount</td><td>Returned to the Sourcing Officer for review.</td></tr>
+                <tr><td>Rejected</td><td>@Model.RejectedCount</td><td>Rejected by the Sourcing Manager.</td></tr>
+                <tr><td>Awaiting Top Committee</td><td>@Model.AwaitingTopCommitteeCount</td><td>Forwarded and awaiting the committee decision.</td></tr>
+                <tr><td>Completed Top Committee</td><td>@Model.CompletedTopCommitteeCount</td><td>Final committee response received.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel" aria-labelledby="analytics-reports">
+    <div class="pg-panel-head">
+        <div>
+            <h2 id="analytics-reports">Evaluation report activity</h2>
+            <p>Only unified evaluation reports and their related Top Committee progress are shown.</p>
+        </div>
+    </div>
+
+    <form method="get" class="pg-toolbar">
+        <label class="sr-only" for="search">Search tender or submitter</label>
+        <input id="search" name="search" value="@Model.Search" placeholder="Search tender or submitter" />
+        <label class="sr-only" for="status">Manager decision</label>
+        <select id="status" name="status">
+            <option value="">All statuses</option>
+            @foreach (var item in Enum.GetValues<ReportStatus>())
+            {
+                <option value="@item" selected="@(Model.Status == item.ToString())">@item</option>
+            }
+        </select>
+        <button class="pg-btn" type="submit">Search</button>
+        <a class="pg-btn pg-btn-secondary" asp-action="Index">Reset</a>
+        <a class="pg-btn pg-btn-secondary" asp-action="Export" asp-route-search="@Model.Search" asp-route-status="@Model.Status">Export CSV</a>
+    </form>
+
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th scope="col">Tender</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Submitted by</th>
+                    <th scope="col">Manager decision</th>
+                    <th scope="col">Top Committee</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (!Model.Rows.Any())
+            {
+                <tr><td colspan="6"><partial name="_EmptyState" model='"No reports match the selected filters."' /></td></tr>
+            }
+            else
+            {
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <td>@row.TenderTitle</td>
+                        <td>v@(row.VersionNumber)</td>
+                        <td>@row.SubmittedBy<br /><span class="pg-muted">@row.SubmittedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@row.Status<br /><span class="pg-muted">@row.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@(row.TopCommitteeStatus?.ToString() ?? "Not forwarded")<br /><span class="pg-muted">@row.TopCommitteeDecidedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
+                        <td><a class="pg-btn" asp-area="SourcingManager" asp-controller="Reports" asp-action="Review" asp-route-id="@row.ReportId">Open report</a></td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<style>
+    .sm-chart-panel { overflow: hidden; }
+    .sm-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ws-muted); }
+    .sm-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .sm-chart-legend i { width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
+    .sm-chart-legend .is-submitted { color: #ff9700; }
+    .sm-chart-legend .is-accepted { color: #4a86c5; }
+    .sm-chart-legend .is-returned { color: #8064a2; }
+    .sm-chart-legend .is-rejected { color: #c7504d; }
+    .sm-bar-chart { min-height: 270px; display: grid; grid-template-columns: repeat(4, minmax(96px, 1fr)); gap: 22px; align-items: end; padding: 25px 18px 0; border-bottom: 1px solid var(--ws-rule); background: repeating-linear-gradient(to bottom, transparent 0, transparent 53px, var(--ws-soft-rule) 54px); }
+    .sm-bar-column { height: 245px; display: grid; grid-template-rows: 24px 1fr 32px; justify-items: center; gap: 8px; font-size: 12px; color: var(--ws-muted); text-align: center; }
+    .sm-bar-column strong { color: var(--ws-ink); font-size: 14px; }
+    .sm-bar-track { height: 100%; width: min(70px, 65%); display: flex; align-items: flex-end; }
+    .sm-bar-track i { width: 100%; min-height: 0; border-radius: 7px 7px 0 0; box-shadow: 0 8px 20px #00000020; }
+    .sm-bar-track i.is-submitted { background: linear-gradient(180deg, #ffb12c, #f17200); }
+    .sm-bar-track i.is-accepted { background: linear-gradient(180deg, #6da7dc, #3f79b7); }
+    .sm-bar-track i.is-returned { background: linear-gradient(180deg, #a182c6, #70528e); }
+    .sm-bar-track i.is-rejected { background: linear-gradient(180deg, #e0736d, #b53f3d); }
+    @@media (max-width: 620px) { .sm-bar-chart { gap: 8px; padding-inline: 8px; } .sm-bar-column { font-size: 10px; } .sm-chart-legend { margin-top: 6px; } }
+</style>

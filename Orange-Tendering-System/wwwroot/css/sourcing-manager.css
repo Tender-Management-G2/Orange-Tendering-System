@@ -1,0 +1,49 @@
+/* Sourcing Manager workspace — role-specific visual layer. */
+[data-workspace-role="Sourcing Manager"] .pg-page{max-width:1380px;gap:18px;padding-top:14px}
+[data-workspace-role="Sourcing Manager"] .pg-header{position:relative;overflow:hidden;padding:22px 24px 20px;border:1px solid #ff790042;border-radius:18px;background:linear-gradient(115deg,#ff790018 0%,var(--ws-raised) 38%,var(--ws-surface) 100%);box-shadow:inset 0 1px 0 #ffffff0d}
+[data-workspace-role="Sourcing Manager"] .pg-header:after{content:"";position:absolute;width:230px;height:230px;right:-80px;top:-115px;border-radius:50%;background:radial-gradient(circle,#ff790044 0%,#ff790000 68%);pointer-events:none}
+[data-workspace-role="Sourcing Manager"] .pg-header>*{position:relative;z-index:1}
+[data-workspace-role="Sourcing Manager"] .pg-title{font-size:clamp(27px,3vw,38px)}
+[data-workspace-role="Sourcing Manager"] .pg-description{max-width:700px;font-size:13px}
+[data-workspace-role="Sourcing Manager"] .ws-panel{border-color:#aeb5bb40;box-shadow:inset 0 1px 0 #ffffff0a,0 13px 32px #00000016;transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+[data-workspace-role="Sourcing Manager"] .ws-panel:hover{border-color:#ff790052;box-shadow:inset 0 1px 0 #ffffff0d,0 16px 38px #00000020}
+[data-workspace-role="Sourcing Manager"] .pg-panel h2{display:flex;align-items:center;gap:9px;font-size:19px}
+[data-workspace-role="Sourcing Manager"] .pg-panel h2:before{content:"";width:4px;height:19px;border-radius:999px;background:linear-gradient(#ffb324,#ff7900)}
+[data-workspace-role="Sourcing Manager"] .pg-panel-head>div>p{margin:5px 0 0;color:var(--ws-muted);font-size:12px;line-height:1.5}
+[data-workspace-role="Sourcing Manager"] .pg-toolbar{padding:12px;border:1px solid var(--ws-soft-rule);border-radius:14px;background:var(--ws-surface)}
+[data-workspace-role="Sourcing Manager"] .pg-toolbar input,[data-workspace-role="Sourcing Manager"] .pg-toolbar select{background:var(--ws-raised)!important}
+[data-workspace-role="Sourcing Manager"] .pg-table-wrap{border-color:#aeb5bb38;background:var(--ws-surface)}
+[data-workspace-role="Sourcing Manager"] .pg-table th{background:linear-gradient(105deg,#ffffff09,#ffffff03);letter-spacing:.01em}
+[data-workspace-role="Sourcing Manager"] .pg-table tbody tr{transition:background .15s ease}
+[data-workspace-role="Sourcing Manager"] .pg-table tbody tr:hover{background:#ff79000b}
+[data-workspace-role="Sourcing Manager"] .pg-table td:first-child{font-weight:600}
+[data-workspace-role="Sourcing Manager"] .pg-dl div{padding:11px 12px;border:1px solid var(--ws-soft-rule);border-radius:10px;background:#00000008}
+[data-workspace-role="Sourcing Manager"] .pg-dl dd{font-size:14px;overflow-wrap:anywhere}
+[data-workspace-role="Sourcing Manager"] .pg-badge{font-weight:700;letter-spacing:.01em}
+[data-workspace-role="Sourcing Manager"] .pg-links ul{gap:12px}
+[data-workspace-role="Sourcing Manager"] .pg-links a{padding:10px 16px;border-radius:10px;border-color:#ff790075;background:#ff790012;font-weight:700}
+[data-workspace-role="Sourcing Manager"] .pg-links a:hover{background:#ff79002b;transform:translateY(-1px)}
+[data-workspace-role="Sourcing Manager"] .pg-note{border-left-width:4px;box-shadow:inset 0 1px #ffffff08}
+[data-workspace-role="Sourcing Manager"] .pg-confirm{border-color:#ff790066;background:linear-gradient(130deg,#ff790010,var(--ws-surface) 42%)}
+[data-workspace-role="Sourcing Manager"] .pg-confirm.is-destructive{border-color:#e5604f6b;background:linear-gradient(130deg,#e5604f0c,var(--ws-surface) 42%)}
+[data-workspace-role="Sourcing Manager"] .pg-actions{padding-top:5px}
+[data-workspace-role="Sourcing Manager"] .pg-btn{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
+[data-workspace-role="Sourcing Manager"] .pg-btn:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.07);box-shadow:0 8px 18px #00000024}
+[data-workspace-role="Sourcing Manager"] .alert{border-radius:12px;border-width:1px}
+
+/* Report review and decision screens */
+[data-workspace-role="Sourcing Manager"] .sm-report-content{padding:17px 18px;border:1px solid var(--ws-soft-rule);border-radius:13px;background:var(--ws-surface);white-space:pre-wrap;line-height:1.85;color:var(--ws-muted)}
+[data-workspace-role="Sourcing Manager"] .sm-decision-card{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+[data-workspace-role="Sourcing Manager"] .sm-decision-card>div{padding:13px 15px;border-radius:12px;background:var(--ws-surface);border:1px solid var(--ws-soft-rule)}
+[data-workspace-role="Sourcing Manager"] .sm-decision-card span{display:block;margin-bottom:5px;color:var(--ws-muted);font-size:11px}[data-workspace-role="Sourcing Manager"] .sm-decision-card strong{font-size:14px}
+[data-workspace-role="Sourcing Manager"] .sm-status{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border:1px solid var(--ws-rule);border-radius:999px;background:var(--ws-raised);font-size:11px;font-weight:700;white-space:nowrap}
+[data-workspace-role="Sourcing Manager"] .sm-status:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}.sm-status.is-submitted{color:#ffae22;border-color:#ff790075}.sm-status.is-accepted{color:#52c889;border-color:#52c88970}.sm-status.is-returned{color:#af8ad9;border-color:#af8ad970}.sm-status.is-rejected{color:#ef7666;border-color:#ef766670}.sm-status.is-forwarded{color:#ffae22;border-color:#ff790075}
+
+/* Analytics cards */
+[data-workspace-role="Sourcing Manager"] .pg-grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+[data-workspace-role="Sourcing Manager"] .pg-grid-3 .pg-panel{min-height:145px;position:relative;overflow:hidden}
+[data-workspace-role="Sourcing Manager"] .pg-grid-3 .pg-panel:after{content:"";position:absolute;right:-20px;bottom:-36px;width:116px;height:116px;border:18px solid #ff790018;border-radius:50%}
+[data-workspace-role="Sourcing Manager"] .pg-kicker{margin:0!important;color:var(--ws-accent)!important;font-size:11px!important;font-weight:700;letter-spacing:.07em;text-transform:uppercase}.pg-stat{display:block;margin:8px 0 2px;font-size:38px;line-height:1;color:var(--ws-ink)}
+
+[data-theme="light"][data-workspace-role="Sourcing Manager"] .pg-dl div,[data-theme="light"][data-workspace-role="Sourcing Manager"] .sm-report-content{background:#f8f9fa}
+@media(max-width:800px){[data-workspace-role="Sourcing Manager"] .pg-grid-3{grid-template-columns:1fr}.sm-decision-card{grid-template-columns:1fr!important}[data-workspace-role="Sourcing Manager"] .pg-header{padding:18px}}

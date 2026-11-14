@@ -1,47 +1,78 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Sourcing Manager Decision History
+@model List<Orange_Tendering_System.Models.Entities.TenderReport>
 
-DEVELOPER OWNER: Haya
-MODULE: Sourcing Manager Review
-TRELLO TASK: Sourcing Manager Decision History
-TRELLO URL: https://trello.com/c/CSb7lOgK
-
-PURPOSE:
-History of manager decisions, each attached to the report
-version it applied to.
-
-BUSINESS ACCESS:
-Sourcing Manager
-
-ROUTE: /SourcingManager/Reports/History
-
-FUTURE IMPLEMENTATION:
-- Query TenderReports where ReviewedByUserId = current user,
-  newest first.
-
-DEPENDENCIES:
-TenderReports.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
 @{
     ViewData["Title"] = "Sourcing Manager Decision History";
     ViewData["WorkspaceSection"] = "Decision History";
     ViewData["Description"] = "Every decision you made on report versions.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
 <section class="ws-panel pg-panel" aria-labelledby="tbl-decisions">
-    <div class="pg-panel-head"><h2 id="tbl-decisions">Decisions</h2></div>
+    <div class="pg-panel-head">
+        <h2 id="tbl-decisions">Decisions</h2>
+    </div>
+
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Report version</th><th scope="col">Decision</th><th scope="col">Comment</th><th scope="col">Decided at</th></tr></thead>
-            <tbody><tr><td colspan="5"><partial name="_EmptyState" model='"No decisions recorded yet."' /></td></tr></tbody>
+            <thead>
+                <tr>
+                    <th scope="col">Tender</th>
+                    <th scope="col">Report version</th>
+                    <th scope="col">Decision</th>
+                    <th scope="col">Comment</th>
+                    <th scope="col">Decided at</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            <partial name="_EmptyState"
+                                     model='"No decisions recorded yet."' />
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var report in Model)
+                    {
+                        var statusClass = report.Status switch
+                        {
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Accepted => "is-accepted",
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Returned => "is-returned",
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Rejected => "is-rejected",
+                            _ => "is-submitted"
+                        };
+                        <tr>
+                            <td>@report.TenderRound?.Tender?.Title</td>
+
+                            <td>Version @report.VersionNumber</td>
+
+                            <td><span class="sm-status @statusClass">@report.Status</span></td>
+
+                            <td>@(report.ReviewComment ?? "-")</td>
+
+                            <td>
+                                @report.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")
+                            </td>
+
+                            <td>
+                                <a asp-area="SourcingManager"
+                                   asp-controller="Reports"
+                                   asp-action="Review"
+                                   asp-route-id="@report.Id"
+                                   class="pg-btn">
+                                    View Report
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
         </table>
     </div>
 </section>

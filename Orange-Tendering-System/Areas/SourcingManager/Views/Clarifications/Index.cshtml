@@ -1,0 +1,60 @@
+@model SourcingManagerClarificationsIndexViewModel
+@using Orange_Tendering_System.Models.Entities
+
+@{
+    ViewData["Title"] = "Clarifications";
+    ViewData["WorkspaceSection"] = "Clarifications";
+    ViewData["Description"] = "Clarifications with Evaluation Committee and Top Committee members on your evaluation reports.";
+}
+
+<partial name="_PageHeader" />
+
+@if (TempData["Success"] is string success)
+{
+    <p class="pg-notice pg-notice-success">@success</p>
+}
+
+<section class="ws-panel pg-panel" aria-labelledby="my-clarifications">
+    <div class="pg-panel-head">
+        <div><h2 id="my-clarifications">My clarifications</h2><p>Each thread is linked to a tender under your review.</p></div>
+        <a class="pg-btn pg-btn-primary" asp-action="Create">Open a clarification</a>
+    </div>
+    <form method="get" class="pg-toolbar">
+        <input name="search" value="@Model.Search" placeholder="Search subject, tender, or member" aria-label="Search clarifications" />
+        <select name="status" aria-label="Clarification status">
+            <option value="">All statuses</option>
+            @foreach (var item in Enum.GetValues<ClarificationStatus>())
+            {
+                <option value="@item" selected="@(Model.Status == item.ToString())">@item</option>
+            }
+        </select>
+        <button class="pg-btn" type="submit">Search</button>
+        <a class="pg-btn pg-btn-secondary" asp-action="Index">Reset</a>
+    </form>
+
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead><tr><th>Subject</th><th>With</th><th>Linked tender</th><th>Status</th><th>Opened</th><th>Last message</th></tr></thead>
+            <tbody>
+            @if (!Model.Threads.Any())
+            {
+                <tr><td colspan="6"><partial name="_EmptyState" model='"You have no clarification threads."' /></td></tr>
+            }
+            else
+            {
+                @foreach (var thread in Model.Threads)
+                {
+                    <tr>
+                        <td><a asp-action="Details" asp-route-id="@thread.Id">@thread.Subject</a></td>
+                        <td>@thread.OtherParticipant</td>
+                        <td>@thread.TenderTitle</td>
+                        <td>@thread.Status</td>
+                        <td>@thread.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@thread.LastMessageAt?.ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</section>

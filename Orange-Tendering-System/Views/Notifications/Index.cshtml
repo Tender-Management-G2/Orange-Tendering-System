@@ -7,6 +7,16 @@
     var unreadCount = ViewData["UnreadCount"] as int? ?? 0;
 }
 <partial name="_PageHeader" />
+<form method="get" asp-area="" asp-controller="Notifications" asp-action="Index" class="pg-toolbar" aria-label="Search and filters">
+    <input type="search" name="search" value="@ViewData["Search"]" placeholder="Search notifications" aria-label="Search notifications" />
+    <select name="status" aria-label="Show">
+        <option value="" selected="@(string.IsNullOrWhiteSpace(ViewData["Status"] as string))">Show: All</option>
+        <option value="Unread" selected="@string.Equals(ViewData["Status"] as string, "Unread", StringComparison.OrdinalIgnoreCase)">Unread</option>
+        <option value="Read" selected="@string.Equals(ViewData["Status"] as string, "Read", StringComparison.OrdinalIgnoreCase)">Read</option>
+    </select>
+    <button type="submit" class="pg-btn pg-btn-primary">Search</button>
+    <a class="pg-btn" asp-area="" asp-controller="Notifications" asp-action="Index">Reset</a>
+</form>
 <section class="ws-panel pg-panel" aria-labelledby="notifications-title">
     <div class="pg-panel-head">
         <h2 id="notifications-title">Notifications</h2>
@@ -32,7 +42,7 @@
                         <td>
                             @if (!string.IsNullOrWhiteSpace(notification.Link) && Url.IsLocalUrl(notification.Link))
                             {
-                                <a class="pg-btn" href="@notification.Link">Open</a>
+                                <a class="pg-btn" asp-area="" asp-controller="Notifications" asp-action="Open" asp-route-id="@notification.Id">Open</a>
                             }
                             @if (!notification.IsRead)
                             {
@@ -47,6 +57,10 @@
                 </tbody>
             </table>
         </div>
+        <form asp-area="" asp-controller="Notifications" asp-action="MarkAllRead" method="post" class="pg-actions">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="pg-btn pg-btn-primary" disabled="@(!Model.Any(n => !n.IsRead))">Mark all as read</button>
+        </form>
         @if (Model.Count == 100)
         {
             <p class="pg-hint">Showing the 100 most recent notifications.</p>

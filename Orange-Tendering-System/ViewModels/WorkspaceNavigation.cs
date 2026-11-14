@@ -35,7 +35,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Suppliers", "Suppliers", "Index", "layers"),
                 new("Settings", "Settings", "Index", "settings"),
                 new("Audit Logs", "AuditLogs", "Index", "list"),
-                new("Analytics & Exports", "Analytics", "Index", "chart", "")
+                new("Analytics & Exports", "Analytics", "Index", "chart")
             ]),
             new("Department", "Department", SystemRoles.RequestingDepartment,
             [
