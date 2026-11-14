@@ -1,0 +1,28 @@
+@model AdminCommitteeSeatInput
+@{
+    var fieldName = Model.Field switch {
+        "TopMemberOne" => "MemberOneId", "TopMemberTwo" => "MemberTwoId",
+        "TopMemberThree" => "MemberThreeId", "TopMemberFour" => "MemberFourId", _ => Model.Field
+    };
+}
+<article class="admin-committee-seat">
+    <div class="pg-panel-head"><h3>@Model.Title</h3><span class="pg-status">@Model.Role</span></div>
+    <p class="pg-hint">@Model.Hint</p>
+    <label for="@Model.Field">Select account</label>
+    <select id="@Model.Field" name="@fieldName" class="form-control" required disabled="@Model.Locked">
+        <option value="">Choose a member</option>
+        @if (!string.IsNullOrEmpty(Model.SelectedId) && !Model.Options.Any(x => x.Value == Model.SelectedId))
+        {
+            <option value="@Model.SelectedId" selected disabled>Current selection is unavailable · review the account</option>
+        }
+        @foreach (var person in Model.Options)
+        {
+            <option value="@person.Value" selected="@(person.Value == Model.SelectedId)">@person.Text</option>
+        }
+    </select>
+    @if (!Model.Locked)
+    {
+        <a class="pg-btn" asp-area="Admin" asp-controller="Users" asp-action="Create"
+           asp-route-role="@Model.Role" asp-route-returnUrl="@Model.ReturnUrl">+ Create User</a>
+    }
+</article>

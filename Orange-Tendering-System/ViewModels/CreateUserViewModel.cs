@@ -22,6 +22,9 @@ namespace Orange_Tendering_System.ViewModels
         [Required(ErrorMessage = "Please select a role.")]
         public string Role { get; set; } = "";
 
+        [StringLength(40)]
+        public string? CommitteeSeat { get; set; }
+
         [Required(ErrorMessage = "Password is required.")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = "";

@@ -1,0 +1,53 @@
+@model AdminAccountOverviewViewModel
+@{
+    Layout = "/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = "Subscriptions & Maintenance";
+    ViewData["WorkspaceSection"] = "Analytics & Exports";
+    ViewData["Description"] = "Read-only overview of subscriptions, revenue and technical maintenance.";
+}
+<partial name="_PageHeader" />
+<aside class="pg-note" role="note">
+    <strong>Demo preview · Read only</strong>
+    <p>All counts, prices, revenue and maintenance dates below are sample data for presentation. They are not actual invoices, payments or confirmed technical appointments.</p>
+</aside>
+<section class="pg-cards" aria-label="Demo account overview">
+    <article class="pg-card" data-search-item>
+        <span>Monthly subscription revenue</span><h2>@Model.MonthlyRevenue.ToString("N0") @Model.Currency</h2>
+        <p>Demo monthly total across the plans below</p>
+    </article>
+    <article class="pg-card" data-search-item>
+        <span>Active subscriptions</span><h2>@Model.ActiveSubscriptions</h2><p>Demo subscribed organization accounts</p>
+    </article>
+    <article class="pg-card" data-search-item>
+        <span>Annual revenue projection</span><h2>@((Model.MonthlyRevenue * 12).ToString("N0")) @Model.Currency</h2>
+        <p>Demo monthly revenue × 12; not collected revenue</p>
+    </article>
+</section>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><div><h2>Subscription overview</h2><p>Sample plans and recurring monthly charges · USD</p></div></div>
+    <div class="pg-table-wrap">
+        <table class="pg-table" data-no-enhance aria-label="Demo subscription plans">
+            <thead><tr><th>Plan</th><th>Accounts</th><th>Price / account</th><th>Billing cycle</th><th>Monthly total</th></tr></thead>
+            <tbody>
+                @foreach (var plan in Model.Subscriptions)
+                {
+                    <tr data-search-item>
+                        <td>@plan.Plan</td><td>@plan.Accounts</td><td>@plan.MonthlyPrice.ToString("N0") @Model.Currency</td>
+                        <td>@plan.BillingCycle</td><td>@((plan.Accounts * plan.MonthlyPrice).ToString("N0")) @Model.Currency</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><div><h2>Technical maintenance</h2><p>Illustrative schedule · not a confirmed appointment</p></div></div>
+    <dl class="pg-dl">
+        <div data-search-item><dt>Next maintenance (demo, UTC)</dt><dd>@Model.NextMaintenanceUtc.ToString("yyyy-MM-dd HH:mm")</dd></div>
+        <div data-search-item><dt>Estimated duration</dt><dd>2 hours</dd></div>
+        <div data-search-item><dt>Responsible team</dt><dd>Technical Operations · Demo</dd></div>
+        <div data-search-item><dt>Planned work</dt><dd>Security updates, database backup verification and platform health checks</dd></div>
+        <div data-search-item><dt>Expected impact</dt><dd>Brief service interruptions during the maintenance window</dd></div>
+        <div data-search-item><dt>Admin coordination</dt><dd>Review the confirmed schedule with the technical team and notify affected users</dd></div>
+    </dl>
+</section>

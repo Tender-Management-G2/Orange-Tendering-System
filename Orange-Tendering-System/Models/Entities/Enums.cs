@@ -25,8 +25,9 @@ namespace Orange_Tendering_System.Models.Entities
 
     public enum CommitteeType { Evaluation, Top }
 
-    // The four Evaluation Committee seats (one person each per tender). Top Committee members have none.
-    public enum CommitteeResponsibility { SourcingManager, DepartmentRepresentative, FinancialRepresentative, TechnicalRepresentative }
+    // Keep DepartmentRepresentative for historical tenders. Admin may assign two distinct technical seats.
+    // ChiefExecutiveOfficer marks the Top Committee CEO seat; other Top members have no responsibility.
+    public enum CommitteeResponsibility { SourcingManager, DepartmentRepresentative, FinancialRepresentative, TechnicalRepresentative, TechnicalRepresentative2, ChiefExecutiveOfficer }
 
     public enum CommitteeRoundStatus { InProgress, Approved, Rejected }
 

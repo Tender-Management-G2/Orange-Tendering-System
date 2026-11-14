@@ -45,9 +45,15 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
 
         // GET: /Admin/Users/Create
         [HttpGet]
-        public async Task<IActionResult> Create()
+        public async Task<IActionResult> Create(string? role, string? returnUrl, string? committeeSeat)
         {
-            var model = new CreateUserViewModel();
+            var seat = CommitteeAccountSeats.Find(committeeSeat);
+            if (committeeSeat != null && seat == null) return BadRequest();
+            var model = new CreateUserViewModel { CommitteeSeat = seat?.Key };
+            if (new[] { SystemRoles.EvaluationCommittee, SystemRoles.TopCommittee, SystemRoles.SourcingManager }.Contains(role))
+                model.Role = role!;
+            if (seat != null) model.Role = seat.Role;
+            ViewData["ReturnUrl"] = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
             await _adminService.FillCreateUserOptionsAsync(model);
 
@@ -58,8 +64,9 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-            CreateUserViewModel model)
+            CreateUserViewModel model, string? returnUrl)
         {
+            ViewData["ReturnUrl"] = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
             if (!ModelState.IsValid)
             {
                 await _adminService.FillCreateUserOptionsAsync(model);
@@ -91,6 +98,8 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
 
             TempData["SuccessMessage"] =
                 "User created successfully. The active account can now sign in.";
+
+            if (Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl!);
 
             return RedirectToAction(nameof(Index));
         }

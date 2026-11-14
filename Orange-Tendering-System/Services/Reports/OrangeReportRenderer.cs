@@ -20,6 +20,19 @@ public class OrangeReportRenderer
     private static readonly object FontLock = new();
     private static readonly XColor Orange = XColor.FromArgb(255, 121, 0);
     private static readonly string[] Slots = ["Evaluation:SourcingManager", "Evaluation:DepartmentRepresentative", "Evaluation:FinancialRepresentative", "Evaluation:TechnicalRepresentative", "Manager:Manager", "Top:1", "Top:2", "Top:3", "Top:4"];
+    internal static string[] LedgerSlots(bool twoTechnical)
+    {
+        var slots = (string[])Slots.Clone();
+        if (twoTechnical) slots[1] = "Evaluation:TechnicalRepresentative2";
+        return slots;
+    }
+    private static bool HasSecondTechnicalSeat(string? snapshot)
+    {
+        if (string.IsNullOrEmpty(snapshot)) return false;
+        using var json = System.Text.Json.JsonDocument.Parse(snapshot);
+        return json.RootElement.GetProperty("Inputs").GetProperty("Committee").EnumerateArray()
+            .Any(x => x.GetProperty("Seat").GetString() == "TechnicalRepresentative2");
+    }
     public OrangeReportRenderer(IOptions<ReportPdfOptions> options)
     {
         lock (FontLock) GlobalFontSettings.FontResolver ??= new ReportFontResolver(options.Value.FontDirectory);
@@ -27,6 +40,7 @@ public class OrangeReportRenderer
     public RenderedReport Render(FrozenReport frozen)
     {
         var data = frozen.Inputs;
+        var slots = LedgerSlots(data.Committee.Any(x => x.Seat == "TechnicalRepresentative2"));
         var document = new MigraDoc.DocumentObjectModel.Document();
         document.Info.Title = $"Orange Tender {data.TenderId} - Evaluation Report v{data.Version}";
         document.Styles[StyleNames.Normal]!.Font.Name = "Orange Sans";
@@ -115,7 +129,7 @@ public class OrangeReportRenderer
             graphics.DrawString("7. Signatures and approval ledger", new XFont("Orange Sans", 15, XFontStyleEx.Bold), XBrushes.Black, 48, 90);
             graphics.DrawString($"Report #{data.ReportId} - Version {data.Version}", new XFont("Orange Sans", 9), XBrushes.DimGray, 48, 108);
             var rowH = RowHeight(TemplateVersion);
-            for (var i = 0; i < Slots.Length; i++)
+            for (var i = 0; i < slots.Length; i++)
             {
                 var y = 122 + i * rowH;
                 graphics.DrawRectangle(new XSolidBrush(XColor.FromArgb(255, 246, 238)), 48, y, 166, rowH);
@@ -124,10 +138,10 @@ public class OrangeReportRenderer
                 graphics.DrawRectangle(new XSolidBrush(Orange), 48, y, 4, rowH);
                 graphics.DrawLine(new XPen(XColors.Silver, 0.6) { DashStyle = XDashStyle.Dash }, 440, y + rowH - 14, 538, y + rowH - 14);
                 graphics.DrawString("Signature", new XFont("Orange Sans", 6), XBrushes.Gray, 440, y + rowH - 6);
-                var label = Slots[i];
+                var label = slots[i];
                 if (i < 4)
                 {
-                    var seat = data.Committee.Single(x => "Evaluation:" + x.Seat == Slots[i]);
+                    var seat = data.Committee.Single(x => "Evaluation:" + x.Seat == slots[i]);
                     var name = Clip(seat.Name, 40);
                     if (graphics.MeasureString(name, new XFont("Orange Sans", 8)).Width > 152) name = SafeText(name, 18);
                     label = SeatLabel(seat.Seat) + "\n" + name;
@@ -150,6 +164,7 @@ public class OrangeReportRenderer
     }
     public byte[] AccessCopy(TenderReport report, IReadOnlyList<ReportSignature> signatures, string identity, DateTime accessedAt, bool? topRequired)
     {
+        var slots = LedgerSlots(HasSecondTechnicalSeat(report.SnapshotJson));
         using var input = new MemoryStream(report.PdfContent!);
         using var pdf = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
         var stamp = $"CONFIDENTIAL - {identity} - {accessedAt:yyyy-MM-dd HH:mm:ss} UTC";
@@ -165,9 +180,9 @@ public class OrangeReportRenderer
         using (var g = XGraphics.FromPdfPage(pdf.Pages[report.SignaturePageIndex!.Value]))
         {
             var rowH = RowHeight(report.TemplateVersion);
-            for (var i = 0; i < Slots.Length; i++)
+            for (var i = 0; i < slots.Length; i++)
             {
-                var signature = signatures.SingleOrDefault(x => x.Stage + ":" + x.Slot == Slots[i]);
+                var signature = signatures.SingleOrDefault(x => x.Stage + ":" + x.Slot == slots[i]);
                 var waiting = i > 4 && topRequired != true ? topRequired == false ? "Not required by the approved final-approval policy." : "Conditional seat: awaiting an explicit final-approval policy." : "Awaiting assigned user's explicit review and signing.";
                 var text = signature == null ? waiting :
                     $"{Clip(signature.SignerName, 35)} ({Clip(signature.UserId, 25)})\n{signature.Decision} - {signature.SignedAt:yyyy-MM-dd HH:mm:ss} UTC\n{signature.Method} | Receipt #{signature.Id}" + (signature.InvalidatedAt != null ? " | OBSOLETE VERSION" : "");
@@ -227,7 +242,7 @@ public class OrangeReportRenderer
     private static string Money(decimal number) => number.ToString("N2", CultureInfo.InvariantCulture);
     private static string DisplayUtc(string value) => DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date) ? date.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture) : value;
     private static string Clip(string value, int length) => value.EnumerateRunes().Count() <= length ? value : string.Concat(value.EnumerateRunes().Take(length).Select(rune => rune.ToString())) + "...";
-    private static string SeatLabel(string seat) => seat switch { "SourcingManager" => "Sourcing Manager", "DepartmentRepresentative" => "Department Representative", "FinancialRepresentative" => "Financial Representative", "TechnicalRepresentative" => "Technical Representative", _ => seat };
+    private static string SeatLabel(string seat) => seat switch { "SourcingManager" => "Sourcing Manager", "DepartmentRepresentative" => "Department Representative", "FinancialRepresentative" => "Financial Representative", "TechnicalRepresentative" => "Technical Representative", "TechnicalRepresentative2" => "Technical Representative 2", _ => seat };
     private static string SafeText(string value, int width) => System.Text.RegularExpressions.Regex.Replace(value, @"\S{" + (width + 1) + @",}", match => string.Join("\n", match.Value.EnumerateRunes().Chunk(width).Select(chunk => string.Concat(chunk.Select(rune => rune.ToString())))));
     private static Paragraph Body(Section section, string text) => section.AddParagraph(SafeText(text, 48));
     private static IEnumerable<string> ReadableJson(string json)

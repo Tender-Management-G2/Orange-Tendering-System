@@ -1,0 +1,37 @@
+@model AdminCommitteeAccountsViewModel
+@{
+    var title = Model.Committee == "Top" ? "Top Committee" : "Evaluation Committee";
+    ViewData["Title"] = title;
+    ViewData["WorkspaceSection"] = "Committees";
+    ViewData["Description"] = "Create accounts from the four member categories below. The committee and role are selected automatically.";
+    var returnUrl = Url.Action("Members", "Committees", new { area = "Admin", committee = Model.Committee });
+}
+<partial name="_PageHeader" />
+@if (TempData["SuccessMessage"] is string success) { <p class="pg-note" role="status">@success</p> }
+<div class="pg-actions"><a class="pg-btn" asp-area="Admin" asp-controller="Committees" asp-action="Index">← Back to Committees</a></div>
+<section class="admin-committee-grid" aria-label="@title member categories">
+    @foreach (var slot in Model.Slots)
+    {
+        <article class="admin-committee-seat">
+            <h2>@slot.Seat.Title</h2>
+            <p>@slot.Seat.Description</p>
+            <p class="pg-hint">Committee: @title<br />Role: @slot.Seat.Role</p>
+            <a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Users" asp-action="Create"
+               asp-route-committeeSeat="@slot.Seat.Key" asp-route-returnUrl="@returnUrl">+ Create User</a>
+            @if (slot.Accounts.Count == 0)
+            {
+                <p class="pg-hint">No accounts created in this category yet.</p>
+            }
+            else
+            {
+                <ul class="admin-committee-accounts">
+                    @foreach (var account in slot.Accounts)
+                    {
+                        <li data-search-item><strong>@account.Name</strong><span>@account.Email</span><small>@(account.Active ? "Active" : "Inactive")</small></li>
+                    }
+                </ul>
+            }
+        </article>
+    }
+</section>
+<p class="pg-hint">These categories organize accounts. Membership and voting access for a specific tender are assigned separately.</p>

@@ -40,17 +40,18 @@ No hardcoded passwords or demo accounts.
 @model CreateUserViewModel
 
 @{
-    ViewData["Title"] = "Create User";
+    var committeeSeat = CommitteeAccountSeats.Find(Model.CommitteeSeat);
+    ViewData["Title"] = committeeSeat == null ? "Create User" : $"Create {committeeSeat.Title}";
     ViewData["WorkspaceSection"] = "Users";
     ViewData["Description"] =
-        "Create an internal employee account.";
+        committeeSeat == null ? "Create an internal employee account." : $"{(committeeSeat.Committee == "Top" ? "Top Committee" : "Evaluation Committee")} · {committeeSeat.Title}";
 }
 
 <partial name="_PageHeader" />
 
 <section class="ws-panel pg-panel">
 
-    <h2>Create Employee Account</h2>
+    <h2>@(committeeSeat == null ? "Create Employee Account" : $"Create {committeeSeat.Title} Account")</h2>
 
     <form asp-area="Admin"
           asp-controller="Users"
@@ -59,6 +60,8 @@ No hardcoded passwords or demo accounts.
           class="pg-form">
 
         @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="CommitteeSeat" />
+        <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
 
         <div asp-validation-summary="All"
              class="text-danger"></div>
@@ -103,11 +106,20 @@ No hardcoded passwords or demo accounts.
             <div class="pg-field">
                 <label asp-for="Role">Role</label>
 
+                @if (committeeSeat != null)
+                {
+                    <input type="hidden" asp-for="Role" />
+                    <input value="@committeeSeat.Role" class="form-control" readonly aria-label="Assigned committee role" />
+                    <small class="pg-hint">Committee and category: @(committeeSeat.Committee == "Top" ? "Top Committee" : "Evaluation Committee") · @committeeSeat.Title</small>
+                }
+                else
+                {
                 <select asp-for="Role"
                         asp-items="Model.Roles"
                         class="form-control">
                     <option value="">Select Role</option>
                 </select>
+                }
 
                 <span asp-validation-for="Role"
                       class="text-danger"></span>

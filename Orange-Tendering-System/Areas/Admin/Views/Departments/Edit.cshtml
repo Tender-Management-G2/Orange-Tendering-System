@@ -60,9 +60,9 @@ PAGE: Edit Department
 
                 <textarea asp-for="Description"
                           class="form-control"
-                          rows="4"
-                          maxlength="500"
-                          placeholder="Enter department description"></textarea>
+                          rows="2"
+                          maxlength="160"
+                          placeholder="Brief description (up to 160 characters)"></textarea>
 
                 <span asp-validation-for="Description"
                       class="text-danger"></span>
@@ -94,19 +94,20 @@ PAGE: Edit Department
 
             @if (Model.AvailableEmployees.Any())
             {
-                <select asp-for="SelectedEmployeeIds"
-                        asp-items="Model.AvailableEmployees"
-                        multiple
-                        size="8"
-                        class="form-control"
-                        aria-label="Manage department employees">
-                </select>
-
-                <small class="pg-hint">
-                    Hold Ctrl to select multiple employees.
-                    Deselecting an employee will not delete
-                    their account.
-                </small>
+                <details class="department-employee-dropdown">
+                    <summary>Select Department Employees</summary>
+                    <div class="department-employee-options">
+                        @foreach (var employee in Model.AvailableEmployees)
+                        {
+                            <label class="department-employee-option">
+                                <input type="checkbox" name="SelectedEmployeeIds" value="@employee.Value"
+                                       checked="@(Model.SelectedEmployeeIds.Contains(employee.Value))" />
+                                <span>@employee.Text</span>
+                            </label>
+                        }
+                    </div>
+                </details>
+                <small class="pg-hint">Select multiple employees. Deactivating this department releases all employees without deleting their accounts.</small>
             }
             else
             {

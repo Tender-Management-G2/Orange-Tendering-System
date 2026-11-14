@@ -11,7 +11,7 @@ namespace Orange_Tendering_System.ViewModels
         [Display(Name = "Department Name")]
         public string Name { get; set; } = "";
 
-        [StringLength(500)]
+        [StringLength(160, ErrorMessage = "Use a short description of up to 160 characters.")]
         public string? Description { get; set; }
 
         public bool IsActive { get; set; } = true;
