@@ -118,6 +118,10 @@ until implemented. Notifications link to the shared page shell.
     </div>
     <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
     <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
+    @if (isSourcingManager)
+    {
+        <script src="~/js/sourcing-manager-filters.js" asp-append-version="true"></script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
