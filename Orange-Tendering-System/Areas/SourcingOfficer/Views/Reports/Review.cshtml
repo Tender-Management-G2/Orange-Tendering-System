@@ -2,8 +2,8 @@
 @using Orange_Tendering_System.Models.Entities
 @{ ViewData["Title"]=$"Evaluation report v{Model.Report.VersionNumber}"; var area=ViewContext.RouteData.Values["area"]?.ToString(); var id=Model.Report.Id; }
 <style>.rl-panel{padding:1.2rem;border:1px solid #8885;border-radius:10px;margin:1rem 0}.rl-panel label{display:block;margin:.7rem 0}.rl-panel textarea,.rl-panel select{display:block;max-width:48rem;width:100%;padding:.6rem;background:transparent;color:inherit;border:1px solid #888;border-radius:4px}.rl-panel button,.rl-button{padding:.6rem 1rem;border:0;border-radius:4px;background:#ff7900;color:#111;font-weight:700}.rl-table{width:100%;border-collapse:collapse}.rl-table td,.rl-table th{text-align:left;padding:.6rem;border-bottom:1px solid #8885}.rl-scroll{overflow:auto}.rl-hash{overflow-wrap:anywhere}.rl-block{border-left:5px solid #ff7900;padding:1rem}.rl-pdf{width:100%;height:75vh;min-height:450px;border:1px solid #8885}</style>
-<p><a asp-area="@area" asp-controller="Workflow" asp-action="Details" asp-route-id="@Model.Tender.Id">Return to tender</a></p>
-<h1>@Model.Tender.Title - Evaluation report v@(Model.Report.VersionNumber)</h1>
+<partial name="_PageHeader" />
+<p><a asp-area="@area" asp-controller="Workflow" asp-action="Details" asp-route-id="@Model.Tender.Id">Return to tender: @Model.Tender.Title</a></p>
 <p>Report #@id | @Model.Report.Status | @(Model.IsCurrent ? "Current version" : "Historical / superseded version")</p>
 @if(TempData["ReportMessage"] is string message) { <p role="status">@message</p> }
 @if(!Model.IsCurrent) { <p class="rl-block">This version is retained for audit. Its endorsements cannot approve a newer version.</p> }

@@ -9,6 +9,12 @@
     var sectionLabel = ViewData["WorkspaceSection"] as string;
     var description = ViewData["Description"] as string;
 }
+@if (workspace?.Area == "SourcingOfficer")
+{
+    <partial name="~/Areas/SourcingOfficer/Views/Shared/_PageHeader.cshtml" />
+}
+else
+{
 <header class="pg-header">
     <nav class="pg-breadcrumb" aria-label="Breadcrumb">
         <ol>
@@ -33,3 +39,4 @@
         <p class="pg-description">@description</p>
     }
 </header>
+}
