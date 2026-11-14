@@ -1,0 +1,68 @@
+/* One presentation layer for every Officer page; no changes to other role shells. */
+.ws-shell[data-workspace-role="Sourcing Officer"] {
+    --officer-page-radius: 18px;
+}
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-main { padding: 22px 24px 36px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-page { padding: 0; max-width: 1440px; gap: 22px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .so-page { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-header {
+    position: relative; overflow: hidden; isolation: isolate; margin: 0; padding: 24px 28px;
+    border: 1px solid var(--ws-rule); border-bottom-color: #ff790078; border-radius: var(--officer-page-radius);
+    background: radial-gradient(ellipse at 100% 100%, #ff790027, transparent 58%), linear-gradient(115deg, var(--ws-surface), var(--ws-bg));
+}
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-header::after {
+    content: ""; position: absolute; right: -40px; bottom: -100px; width: 300px; height: 200px;
+    border: 1px solid #ff790026; border-radius: 50%; box-shadow: 0 0 0 22px #ff790008, 0 0 0 44px #ff790006; pointer-events: none; z-index: -1;
+}
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-title { margin: 8px 0; font-size: clamp(28px, 2.8vw, 38px); line-height: 1.15; letter-spacing: -.035em; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-description { margin: 0; max-width: 850px; line-height: 1.65; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-breadcrumb { margin: 0; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 16px; margin: 0; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-card {
+    --officer-card-rgb: 255, 121, 0; position: relative; overflow: hidden; min-height: 126px; padding: 20px 22px;
+    display: flex; flex-direction: column; gap: 8px; border: 1px solid rgba(var(--officer-card-rgb), .42);
+    border-radius: var(--officer-page-radius); background: linear-gradient(125deg, rgba(var(--officer-card-rgb), .18), rgba(var(--officer-card-rgb), .035) 65%), var(--ws-surface);
+}
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-card:nth-child(4n + 2) { --officer-card-rgb: 0, 148, 255; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-card:nth-child(4n + 3) { --officer-card-rgb: 170, 109, 218; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-card:nth-child(4n + 4) { --officer-card-rgb: 0, 185, 119; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-card > span { color: var(--ws-muted); font-size: 13px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-card strong { font-size: 34px; line-height: 1.15; letter-spacing: -.03em; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-card small { color: var(--ws-muted); }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-panel,
+.ws-shell[data-workspace-role="Sourcing Officer"] .dash-panel { border-radius: var(--officer-page-radius); border-color: var(--ws-rule); background: linear-gradient(130deg, var(--ws-raised), var(--ws-surface) 65%); }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-panel { margin: 0; padding: 24px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-panel-head { gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-panel h2 { font-size: 20px; letter-spacing: -.02em; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-table { width: 100%; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-table th { font-size: 11px; letter-spacing: .045em; text-transform: uppercase; background: var(--ws-raised); }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-table td { font-size: 13px; border-color: var(--ws-soft-rule); }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-btn { border-radius: 11px; font-weight: 600; font-size: 13px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-form input,
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-form select,
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-form textarea { border-radius: 10px; border-color: var(--ws-rule); }
+.ws-shell[data-workspace-role="Sourcing Officer"] .so-help { border-radius: 14px; padding: 16px 20px; border: 1px solid var(--ws-soft-rule); background: var(--ws-surface); }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-sidebar { height: 100dvh; overflow: hidden; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-sidebar-brand { flex: none; padding: 22px 20px 24px; min-height: 116px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-sidebar-brand .ws-brand { gap: 14px; min-width: 0; flex-shrink: 1; font-size: 12px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-sidebar-brand .ws-brand > span:last-child { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-sidebar > .ws-primary-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-sidebar-bottom { flex: none; margin-top: 0; padding: 16px 22px 28px; }
+.ws-officer-search-tools { display: flex; align-items: center; gap: 8px; flex: 1 1 560px; max-width: 720px; min-width: 0; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-officer-search-tools .ws-search { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; order: 0; }
+.ws-officer-search-tools .ws-search-microphone { flex: 0 0 auto; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .ws-topbar-actions { flex: 0 0 auto; margin-left: auto; }
+@media (max-width: 767px) {
+    .ws-shell[data-workspace-role="Sourcing Officer"] .ws-main { padding: 16px 12px 28px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-page,
+    .ws-shell[data-workspace-role="Sourcing Officer"] .so-page { gap: 16px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-header { padding: 20px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-panel { padding: 17px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-card { padding: 16px; min-height: 122px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-card strong { font-size: 30px; }
+    .ws-officer-search-tools { order: 5; flex: 1 0 100%; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-card { transition: none; }
+}

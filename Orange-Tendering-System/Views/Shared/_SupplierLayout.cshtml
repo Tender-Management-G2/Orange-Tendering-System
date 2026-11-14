@@ -4,8 +4,8 @@ ORANGE TENDER MANAGEMENT SYSTEM
 FILE: Supplier portal layout (premium horizontal navbar + footer)
 
 PURPOSE:
-Shell for the Supplier area, matching the supplied supplier-portal design: brand + "Supplier Portal" pill, a horizontal
-navigation bar, the live notification bell, help and the account menu. Menu items are supplier-only and come from
+Shell for the Supplier area: logo, horizontal navigation and account menu, followed by a search and notification row.
+Menu items are supplier-only and come from
 ViewModels/WorkspaceNavigation.cs ("Supplier"). The Notifications item is the bell itself.
 
 SECURITY:
@@ -32,27 +32,31 @@ SupplierId on the server (UI hiding is not authorization).
     <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/supplier-sidebar.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/orange-ui.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/supplier-ui.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="ws-shell ws-supplier ws-topnav" data-workspace-role="Supplier">
     <a class="ws-skip" href="#workspace-main">Skip to main content</a>
     <header class="ws-topnav-bar">
-        <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span><span>Sourcing &amp; Tender<br />Management System</span></a>
-        <span class="ws-portal-pill">Supplier Portal</span>
+        <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span></a>
         <button class="ws-icon-button ws-topnav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="supplier-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
         <nav id="supplier-nav" class="ws-topnav-links" aria-label="Supplier navigation">
             @foreach (var item in workspace.Items.Where(i => i.Label != "Notifications"))
             {
-                var active = item.Label == activeSection;
+                var active = item.Label == activeSection || (item.Controller == "Profile" && activeSection == "Documents");
                 <a class="ws-topnav-item @(active ? "is-active" : null)" aria-current="@(active ? "page" : null)" asp-area="Supplier" asp-controller="@item.Controller" asp-action="@item.Action"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg><span>@item.Label</span></a>
             }
         </nav>
+        <div class="ws-supplier-account"><partial name="_WorkspaceAccountMenu" /></div>
+        <div class="ws-supplier-utilities" aria-label="Search and notifications">
+        <div class="ws-supplier-search-tools">
         <div class="ws-search ws-supplier-search" data-global-search data-search-url="/Search/Query"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search invitations and offers..." aria-label="Search my invitations and offers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
+            <partial name="_VoiceSearchButton" />
+        </div>
         <div class="ws-topbar-actions">
-            <button type="button" class="ws-icon-button" data-voice-search aria-label="Voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
             <partial name="_NotificationBell" />
             <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
-            <partial name="_WorkspaceAccountMenu" />
+        </div>
         </div>
     </header>
     <main id="workspace-main" class="ws-supplier-main" tabindex="-1">

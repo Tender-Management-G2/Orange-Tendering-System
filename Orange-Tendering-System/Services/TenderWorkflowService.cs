@@ -104,8 +104,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var actor = await Actor(principal);
         Require(await IsOfficer(actor), "Exactly one active Sourcing Officer must be configured.");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var pr = await db.PurchaseRequests.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == input.PurchaseRequestId);
+        var pr = await db.PurchaseRequests.FromSqlInterpolated($"SELECT * FROM PurchaseRequests WITH (UPDLOCK,HOLDLOCK) WHERE Id={input.PurchaseRequestId}").Include(x => x.Items).SingleOrDefaultAsync();
         Require(pr?.Status == PurchaseRequestStatus.Accepted && pr.Items.Count > 0, "An accepted Purchase Request with line items is required.");
+        Require(!await db.Tenders.AnyAsync(t => t.PurchaseRequestId == input.PurchaseRequestId), "This request already has a tender. Continue that tender or create a new round instead.");
         var ids = new[] { input.SourcingManagerId, input.DepartmentRepresentativeId, input.FinancialRepresentativeId, input.TechnicalRepresentativeId };
         Require(ids.Distinct().Count() == 4 && !ids.Contains(actor.Id), "Assign four distinct committee members, separate from the officer.");
         for (var i = 0; i < ids.Length; i++)
@@ -175,12 +176,14 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     public Task Invite(int id, int supplierId, ClaimsPrincipal principal) => Change(id, principal, "SupplierInvited", async (t, a) =>
     {
         await Officer(t, a); var r = await Round(id);
-        Require(r.Status == TenderRoundStatus.Open && r.Deadline > Now, "Bidding is not open.");
-        Require(await db.Suppliers.AnyAsync(x => x.Id == supplierId && x.Status == SupplierStatus.Approved), "Only approved suppliers can be invited.");
+        Require(t.Status == TenderStatus.Bidding && r.Status == TenderRoundStatus.Open && r.Deadline > Now
+            && await db.Set<WeightRound>().AnyAsync(w => w.TenderId == id && w.State == WeightState.Approved), "Complete tender setup and approved weights before inviting suppliers.");
+        Require(await db.Suppliers.AnyAsync(x => x.Id == supplierId && x.Status == SupplierStatus.Approved
+            && db.Users.Any(u => u.SupplierId == x.Id && u.IsActive && u.EmailConfirmed)), "Only approved suppliers with an active verified account can be invited.");
         Require(!await db.TenderInvitations.AnyAsync(x => x.TenderRoundId == r.Id && x.SupplierId == supplierId), "Supplier already invited.");
         db.TenderInvitations.Add(new TenderInvitation { TenderRoundId = r.Id, SupplierId = supplierId, InvitedAt = Now, InvitedByUserId = a.Id });
         await QueueSupplierEmail(r, await db.Suppliers.SingleAsync(x => x.Id == supplierId), a);
-        foreach (var u in await db.Users.Where(x => x.SupplierId == supplierId && x.IsActive).ToListAsync()) Notify(u.Id, id, "Tender invitation", "Review the published requirements and approved weights, then accept or decline.");
+        foreach (var u in await db.Users.Where(x => x.SupplierId == supplierId && x.IsActive).ToListAsync()) Notify(u.Id, id, "Tender invitation", "Review the tender requirements and submission dates, then accept or decline.");
     });
     public Task Respond(int id, int invitationId, bool accept, ClaimsPrincipal principal) => Change(id, principal, "InvitationResponded", async (t, a) =>
     {
@@ -239,11 +242,15 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     public Task CloseBidding(int id, ClaimsPrincipal principal) => Change(id, principal, "BiddingClosed", async (t, a) =>
     {
         await Officer(t, a); var r = await Round(id);
-        // Bidding closes after its deadline, or earlier once every invited supplier has either declined or submitted its offer (nothing is left to wait for).
+        // The Officer may close early after three distinct suppliers submit, without waiting for other invitations.
+        // Deadline and all-answered closure remain available for low-response / re-tendering rounds.
         var invitations = await db.TenderInvitations.Where(i => i.TenderRoundId == r.Id).Select(i => new { i.Id, i.Status }).ToListAsync();
         var submitted = (await db.Bids.Where(b => b.Status == BidStatus.Submitted && b.TenderInvitation.TenderRoundId == r.Id).Select(b => b.TenderInvitationId).ToListAsync()).ToHashSet();
         var everyoneAnswered = invitations.Count > 0 && invitations.All(i => i.Status == InvitationStatus.Declined || submitted.Contains(i.Id));
-        Require(r.Status == TenderRoundStatus.Open && (r.Deadline <= Now || everyoneAnswered), "Bidding can close only after its deadline, or once every invited supplier has submitted an offer or declined.");
+        var submittedSuppliers = await db.Bids.Where(b => b.Status == BidStatus.Submitted && b.TenderInvitation.TenderRoundId == r.Id)
+            .Select(b => b.TenderInvitation.SupplierId).Distinct().CountAsync();
+        Require(r.Status == TenderRoundStatus.Open && (submittedSuppliers >= 3 || r.Deadline <= Now || everyoneAnswered),
+            "Bidding can close after three distinct suppliers submit offers, after the deadline, or once every invited supplier submits or declines.");
         r.Status = TenderRoundStatus.Closed; r.ClosedAt = Now;
     });
     public Task Compliance(int id, int bidId, ComplianceStatus status, string notes, string missing, ClaimsPrincipal principal) => Change(id, principal, "ComplianceRecorded", async (t, a) =>
@@ -567,7 +574,19 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var a = await Actor(principal);
         var supplier = await Role(a, SystemRoles.Supplier);
         var query = db.Tenders.AsNoTracking();
-        if (supplier) query = query.Where(x => db.TenderInvitations.Any(i => i.TenderRound.TenderId == x.Id && i.SupplierId == a.SupplierId));
+        if (supplier)
+        {
+            query = query.Where(x => db.TenderInvitations.Any(i => i.TenderRound.TenderId == x.Id && i.SupplierId == a.SupplierId));
+            var now = Now;
+            var rows = await query.OrderByDescending(t => t.Id).Select(t => new
+            {
+                t.Id, t.Title,
+                Open = t.Status == TenderStatus.Bidding && t.Rounds.Any(r => r.RoundNumber == t.Rounds.Max(x => x.RoundNumber)
+                    && r.Status == TenderRoundStatus.Open && r.Deadline > now && (!r.OpensAt.HasValue || r.OpensAt <= now)),
+                Upcoming = t.Rounds.Any(r => r.RoundNumber == t.Rounds.Max(x => x.RoundNumber) && r.Status == TenderRoundStatus.Open && r.OpensAt > now)
+            }).ToListAsync();
+            return rows.Select(t => new WorkflowListRow(t.Id, t.Title, t.Open ? "Open" : t.Upcoming ? "Upcoming" : "Closed")).ToList();
+        }
         else if (!await IsOfficer(a)) query = query.Where(x => x.CommitteeMembers.Any(m => m.UserId == a.Id));
         return await query.OrderByDescending(x => x.Id).Select(x => new WorkflowListRow(x.Id, x.Title, x.Status.ToString())).ToListAsync();
     }

@@ -1,0 +1,45 @@
+@model SupplierTenderPortalViewModel
+@using System.Text.Json
+<section class="ws-panel pg-panel">
+    <h3>Submission information</h3>
+    <dl class="pg-dl">
+        <div><dt>Availability</dt><dd>@Model.Availability</dd></div>
+        <div><dt>Your invitation</dt><dd>@Model.InvitationStatus</dd></div>
+        <div><dt>Round</dt><dd>@Model.RoundNumber</dd></div>
+        <div><dt>Opens</dt><dd>@(Model.OpensAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Submission deadline</dt><dd>@(Model.Deadline?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+    </dl>
+</section>
+<section class="ws-panel pg-panel">
+    <h3>Requirements and conditions</h3>
+    @{
+        var requirements = new List<KeyValuePair<string, string>>();
+        if (!string.IsNullOrWhiteSpace(Model.Requirements))
+        {
+            try
+            {
+                using var json = JsonDocument.Parse(Model.Requirements);
+                if (json.RootElement.ValueKind == JsonValueKind.Object)
+                    foreach (var field in json.RootElement.EnumerateObject())
+                        requirements.Add(new(System.Text.RegularExpressions.Regex.Replace(field.Name, "(?<=[a-z])(?=[A-Z])", " "), field.Value.ToString()));
+                else requirements.Add(new("Requirements", Model.Requirements));
+            }
+            catch (JsonException) { requirements.Add(new("Requirements", Model.Requirements)); }
+        }
+    }
+    @if (requirements.Count == 0) { <p>No additional requirements listed.</p> }
+    @foreach (var requirement in requirements) { <h4>@requirement.Key</h4><p class="supplier-tender-text">@requirement.Value</p> }
+</section>
+<section class="ws-panel pg-panel">
+    <h3>Specifications and quantities</h3>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th>Item</th><th>Specifications</th><th>Quantity</th><th>Unit</th></tr></thead>
+        <tbody>@foreach (var item in Model.Items) { <tr><td>@item.Name</td><td class="supplier-tender-text">@item.Specifications</td><td>@item.Quantity.ToString("0.###")</td><td>@item.Unit</td></tr> }</tbody>
+    </table></div>
+</section>
+@if (Model.Documents.Count > 0)
+{
+    <section class="ws-panel pg-panel"><h3>Tender documents</h3><ul>
+        @foreach (var doc in Model.Documents) { <li><a asp-area="Supplier" asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a></li> }
+    </ul></section>
+}

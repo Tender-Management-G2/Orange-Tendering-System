@@ -34,6 +34,33 @@ else
         </dl>
     </section>
 
+    @if (TempData["DocumentMessage"] is string documentMessage)
+    {
+        <p class="pg-note" role="status">@documentMessage</p>
+    }
+    <section class="ws-panel pg-panel">
+        <h2>Company documents</h2>
+        @if (Model.Documents.Count == 0)
+        {
+            <p>No company documents uploaded.</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var doc in Model.Documents)
+                {
+                    <li><a asp-area="Supplier" asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a> — @doc.UploadedAt.ToString("yyyy-MM-dd")</li>
+                }
+            </ul>
+        }
+        <form asp-area="Supplier" asp-controller="Documents" asp-action="UploadCompany" method="post" enctype="multipart/form-data" class="pg-form">
+            <input type="hidden" name="returnToProfile" value="true" />
+            <label for="profile-company-file">PDF, PNG or JPEG (maximum 10 MB)</label>
+            <input id="profile-company-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" required />
+            <button type="submit" class="pg-btn pg-btn-primary">Upload for review</button>
+        </form>
+    </section>
+
     <section class="ws-panel pg-panel">
         <h2>Update contact details</h2>
         <form asp-area="Supplier" asp-controller="Profile" asp-action="UpdateContact" method="post" class="pg-form">
@@ -56,11 +83,6 @@ else
         </form>
     </section>
 
-    <nav class="pg-links" aria-label="Related pages">
-        <ul>
-            <li><a asp-area="Supplier" asp-controller="Documents" asp-action="Index">My documents</a></li>
-        </ul>
-    </nav>
 }
 
 @section Scripts {

@@ -38,11 +38,11 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(12 * 1024 * 1024)]
-        public async Task<IActionResult> UploadCompany(IFormFile file)
+        public async Task<IActionResult> UploadCompany(IFormFile file, bool returnToProfile = false)
         {
             var error = await documents.UploadAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, file);
             TempData["DocumentMessage"] = error ?? "Document uploaded for administrator review.";
-            return RedirectToAction("Index");
+            return returnToProfile ? RedirectToAction("Index", "Profile") : RedirectToAction("Index");
         }
 
         [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(12 * 1024 * 1024)]

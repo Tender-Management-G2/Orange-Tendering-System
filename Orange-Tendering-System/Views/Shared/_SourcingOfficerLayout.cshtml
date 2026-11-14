@@ -33,6 +33,7 @@ through WorkspaceNavigation.LayoutFor.
     <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/orange-ui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/sourcing-officer.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/officer-ui.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="ws-shell ws-internal" data-workspace-role="Sourcing Officer">
@@ -44,9 +45,8 @@ through WorkspaceNavigation.LayoutFor.
         </div>
         <nav class="ws-primary-nav" aria-label="Sourcing Officer navigation">
             <a class="ws-nav-item @Active("SourcingOfficer", new[] { "Dashboard" })" asp-area="SourcingOfficer" asp-controller="Dashboard" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("home"))</svg><span>Dashboard</span></a>
-            <a class="ws-nav-item @Active("SourcingOfficer", new[] { "Workflow" })" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>Weighted Evaluation</span></a>
-            <a class="ws-nav-item @Active("SourcingOfficer", new[] { "PurchaseRequests" })" asp-area="SourcingOfficer" asp-controller="PurchaseRequests" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("request"))</svg><span>Requests</span></a>
-            <a class="ws-nav-item @Active("SourcingOfficer", new[] { "Tenders", "Invitations" })" asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>Tenders</span></a>
+            <a class="ws-nav-item @Active("SourcingOfficer", new[] { "PurchaseRequests" })" asp-area="SourcingOfficer" asp-controller="PurchaseRequests" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("request"))</svg><span>Request</span></a>
+            <a class="ws-nav-item @Active("SourcingOfficer", new[] { "Workflow", "Tenders", "Invitations" })" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>Tender</span></a>
             <a class="ws-nav-item @Active("SourcingOfficer", new[] { "Bids" })" asp-area="SourcingOfficer" asp-controller="Bids" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("layers"))</svg><span>Received Bids</span></a>
             <a class="ws-nav-item @Active("SourcingOfficer", new[] { "Reports" })" asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("report"))</svg><span>Reports</span></a>
             <a class="ws-nav-item @Active("SourcingOfficer", new[] { "FinalDecisions" })" asp-area="SourcingOfficer" asp-controller="FinalDecisions" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg><span>Final Decisions</span></a>
@@ -59,9 +59,11 @@ through WorkspaceNavigation.LayoutFor.
     <div class="ws-stage">
         <header class="ws-topbar">
             <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+            <div class="ws-officer-search-tools">
             <div class="ws-search" data-global-search data-search-url="/Search/Query"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Search tenders, purchase requests and suppliers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
+                <partial name="_VoiceSearchButton" />
+            </div>
             <div class="ws-topbar-actions">
-                <button type="button" class="ws-icon-button" data-voice-search aria-label="Voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
                 <partial name="_NotificationBell" />
                 <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
                 <partial name="_WorkspaceAccountMenu" />
@@ -80,7 +82,9 @@ through WorkspaceNavigation.LayoutFor.
     <script src="~/js/vendor/signalr.min.js" asp-append-version="true"></script>
     <script src="~/js/notification-bell.js" asp-append-version="true"></script>
     <partial name="_JQueryScripts" />
+    <script src="~/js/report-signature.js" asp-append-version="true"></script>
     <script src="~/js/orange-ui.js" asp-append-version="true"></script>
+    <script src="~/js/offer-compliance.js" asp-append-version="true"></script>
     <script src="~/js/ai-chat.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

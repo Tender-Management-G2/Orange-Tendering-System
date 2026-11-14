@@ -44,8 +44,8 @@ namespace Orange_Tendering_System.ViewModels
             new("SourcingOfficer", "Sourcing Officer", SystemRoles.SourcingOfficer,
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
-                new("Requests", "PurchaseRequests", "Index", "request"),
-                new("Tenders", "Tenders", "Index", "tender"),
+                new("Request", "PurchaseRequests", "Index", "request"),
+                new("Tender", "Workflow", "Index", "tender"),
                 new("Received Bids", "Bids", "Index", "layers"),
                 new("Reports", "Reports", "Index", "report"),
                 new("Final Decisions", "FinalDecisions", "Index", "check"),
@@ -54,10 +54,8 @@ namespace Orange_Tendering_System.ViewModels
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
             [
                 new("Dashboard", "Dashboard", "Index", "home"),
-                new("Invitations", "Invitations", "Index", "mail"),
-                new("Weighted Tenders", "Workflow", "Index", "tender"),
+                new("Invitations", "Workflow", "Index", "mail"),
                 new("My Offers", "Offers", "Index", "layers"),
-                new("Documents", "Documents", "Index", "folder"),
                 new("Profile", "Profile", "Index", "user"),
                 new("Notifications", "Notifications", "Index", "bell"),
                 new("Clarifications", "Clarifications", "Index", "chat")

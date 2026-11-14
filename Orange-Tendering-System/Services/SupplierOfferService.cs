@@ -50,7 +50,7 @@ public sealed partial class SupplierOfferService(ApplicationDbContext context, T
         if (inv.HasBid) return "An offer already exists for this invitation. Open it from My Offers.";
         if (inv.Tender != TenderStatus.Bidding) return "This tender is not open for offers right now.";
         if (inv.Round != TenderRoundStatus.Open) return "This tender round is not open for offers.";
-        if (!inv.WeightsApproved) return "This tender is not open for offers yet: the evaluation weights are still waiting for approval. Please check again later.";
+        if (!inv.WeightsApproved) return "Offers are not available for this tender yet. Please check again later or contact the Sourcing Officer.";
         if (inv.OpensAt.HasValue && inv.OpensAt > now) return $"Offers open on {inv.OpensAt:dd MMM yyyy HH:mm}.";
         if (!inv.Deadline.HasValue || inv.Deadline <= now) return "The deadline for this tender round has passed.";
         return "Offers cannot be created for this invitation right now.";

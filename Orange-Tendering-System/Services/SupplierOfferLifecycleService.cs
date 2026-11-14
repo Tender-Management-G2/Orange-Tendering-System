@@ -92,7 +92,11 @@ public sealed partial class SupplierOfferService
                 [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId)], "SupplierPortal")));
             return null;
         }
-        catch (WorkflowException e) { return e.Message; }
+        catch (WorkflowException e)
+        {
+            return new[] { "weight", "evaluation", "committee", "approval" }.Any(word => e.Message.Contains(word, StringComparison.OrdinalIgnoreCase))
+                ? "This offer cannot be submitted right now. Check the tender dates or contact the Sourcing Officer." : e.Message;
+        }
     }
 
     public async Task<List<SupplierHistoryRow>?> GetHistoryAsync(string userId, int id)
@@ -133,7 +137,8 @@ public sealed partial class SupplierOfferService
             CanEdit = bid.Status == BidStatus.Draft && bid.TenderInvitation.Status == InvitationStatus.Accepted
                 && round.Status == TenderRoundStatus.Open && round.Tender.Status == TenderStatus.Bidding
                 && round.Deadline.HasValue && round.Deadline > now && (!round.OpensAt.HasValue || round.OpensAt <= now),
-            MissingRequirements = bid.MissingRequirements, ComplianceStatus = bid.ComplianceStatus.ToString(),
+            // Internal screening is communicated through explicit clarification requests, not an inferred outcome.
+            MissingRequirements = null, ComplianceStatus = string.Empty,
             Terms = new SupplierDraftOfferInputModel
             {
                 CurrencyCode = bid.CurrencyCode, TechnicalProposal = bid.TechnicalProposal, PaymentTerms = bid.PaymentTerms,

@@ -4,7 +4,7 @@
     // One partial for every role; the data comes from TenderWorkflowService.List (already scoped to the signed-in user).
     var area = ViewContext.RouteData.Values["area"]?.ToString();
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
-    string Stage(string status) => status switch
+    string Stage(string status) => area == "Supplier" ? status : status switch
     {
         "Draft" => "Setup",
         "Bidding" => "Bidding",
@@ -16,19 +16,26 @@
     };
     string Words(string s) => System.Text.RegularExpressions.Regex.Replace(s, "(?<=[a-z])(?=[A-Z])", " ");
     string Tone(string stage) => stage switch { "Awarded" => "good", "Closed" => "muted", "Approval" => "info", "Committee evaluation" or "Weighted results" => "warn", _ => "orange" };
-    var stages = new[] { "Setup", "Bidding", "Committee evaluation", "Weighted results", "Approval", "Awarded", "Closed" };
+    var stages = area == "Supplier" ? new[] { "Open", "Upcoming", "Closed" } : new[] { "Setup", "Bidding", "Committee evaluation", "Weighted results", "Approval", "Awarded", "Closed" };
     var statuses = Model.Select(r => r.Status).Distinct().OrderBy(x => x).ToList();
     int Count(params string[] s) => Model.Count(r => s.Contains(Stage(r.Status)));
     int.TryParse(Context.Request.Query["created"], out var createdId);
 }
 <link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
-<div class="dash-board dash-internal wfl">
+<div class="dash-board @(area == "Supplier" ? "dash-supplier" : "dash-internal") wfl">
     <section class="dash-welcome wfl-hero" aria-labelledby="wfl-title">
         <div class="dash-welcome-photo" aria-hidden="true"></div>
         <div class="dash-welcome-waves" aria-hidden="true"></div>
         <div class="dash-welcome-copy">
-            <h1 id="wfl-title">Weighted Tender<strong>Evaluation</strong></h1>
-            <p>Requirements, four weight proposals, bidding, committee scoring, recommendation, final approval and award.</p>
+            @if (area == "Supplier")
+            {
+                <h1 id="wfl-title">Tender <strong>Invitations</strong></h1>
+            }
+            else
+            {
+                @if (area == "SourcingOfficer") { <h1 id="wfl-title">Tender<strong>Management</strong></h1> } else { <h1 id="wfl-title">Weighted Tender<strong>Evaluation</strong></h1> }
+            }
+            <p>@(area == "Supplier" ? "Review your invitations, read the tender requirements and manage your own offers." : "Requirements, four weight proposals, bidding, committee scoring, recommendation, final approval and award.")</p>
         </div>
     </section>
 
@@ -39,9 +46,9 @@
 
     <section class="dash-metrics wfl-metrics" aria-label="Tender statistics">
         <article class="dash-metric dash-orange"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5" /></svg></div><div class="dash-metric-copy"><strong>@Model.Count.ToString("N0")</strong><span>All tenders</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
-        <article class="dash-metric dash-blue"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2" /><path d="M9 3h6v5H9zM9 13h6M9 17h6" /></svg></div><div class="dash-metric-copy"><strong>@Count("Setup", "Bidding").ToString("N0")</strong><span>Setup &amp; bidding</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
-        <article class="dash-metric dash-purple"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v19M7 22h10M3 6h18M5 6l-4 9h8zM19 6l-4 9h8z" /></svg></div><div class="dash-metric-copy"><strong>@Count("Committee evaluation", "Weighted results").ToString("N0")</strong><span>Evaluation &amp; results</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
-        <article class="dash-metric dash-green"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10" /></svg></div><div class="dash-metric-copy"><strong>@Count("Approval", "Awarded").ToString("N0")</strong><span>Approval &amp; award</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-blue"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2" /><path d="M9 3h6v5H9zM9 13h6M9 17h6" /></svg></div><div class="dash-metric-copy"><strong>@(area == "Supplier" ? Count("Open").ToString("N0") : Count("Setup", "Bidding").ToString("N0"))</strong><span>@(area == "Supplier" ? "Open for offers" : "Setup & bidding")</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-purple"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v19M7 22h10M3 6h18M5 6l-4 9h8zM19 6l-4 9h8z" /></svg></div><div class="dash-metric-copy"><strong>@(area == "Supplier" ? Count("Upcoming").ToString("N0") : Count("Committee evaluation", "Weighted results").ToString("N0"))</strong><span>@(area == "Supplier" ? "Upcoming" : "Evaluation & results")</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-green"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10" /></svg></div><div class="dash-metric-copy"><strong>@(area == "Supplier" ? Count("Closed").ToString("N0") : Count("Approval", "Awarded").ToString("N0"))</strong><span>@(area == "Supplier" ? "Closed for offers" : "Approval & award")</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
     </section>
 
     <section class="dash-panel wfl-panel" aria-labelledby="wfl-list-title">
@@ -56,13 +63,13 @@
         </div>
         <div class="wfl-filters" role="search" aria-label="Filter tenders">
             <label class="wfl-field wfl-search"><span>Search</span><input id="wfl-q" type="search" placeholder="Tender number or title" autocomplete="off" /></label>
-            <label class="wfl-field"><span>Stage</span><select id="wfl-stage"><option value="">All stages</option>@foreach (var s in stages) { <option>@s</option> }</select></label>
+            <label class="wfl-field"><span>@(area == "Supplier" ? "Availability" : "Stage")</span><select id="wfl-stage"><option value="">All stages</option>@foreach (var s in stages) { <option>@s</option> }</select></label>
             <label class="wfl-field"><span>Status</span><select id="wfl-status"><option value="">All statuses</option>@foreach (var s in statuses) { <option value="@s">@Words(s)</option> }</select></label>
             <button type="button" class="wfl-reset" id="wfl-reset">Reset</button>
         </div>
         <div class="wfl-table-wrap">
             <table class="wfl-table">
-                <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">Stage</th><th scope="col">Status</th><th scope="col" class="wfl-actions-col">Actions</th></tr></thead>
+                <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">@(area == "Supplier" ? "Availability" : "Stage")</th><th scope="col">Status</th><th scope="col" class="wfl-actions-col">Actions</th></tr></thead>
                 <tbody id="wfl-body">
                 @foreach (var row in Model)
                 {
@@ -72,7 +79,13 @@
                         <td><strong>@row.Title</strong></td>
                         <td><span class="wfl-pill wfl-@Tone(stage)">@stage</span></td>
                         <td>@Words(row.Status)</td>
-                        <td class="wfl-actions-col"><button type="button" class="wfl-open" data-open-workflow data-id="@row.TenderId" data-url="@Url.Action("Details", controller, new { area, id = row.TenderId })">Open workflow <span aria-hidden="true">&rarr;</span></button></td>
+                        <td class="wfl-actions-col">
+                            @if (area == "Supplier")
+                            {
+                                <button type="button" class="pg-btn supplier-tender-details-button" data-tender-details data-id="@row.TenderId" data-url="@Url.Action("TenderDetails", "Workflow", new { area = "Supplier", id = row.TenderId })">Details</button>
+                            }
+                            <button type="button" class="wfl-open" data-open-workflow data-id="@row.TenderId" data-url="@Url.Action("Details", controller, new { area, id = row.TenderId })">Open workflow <span aria-hidden="true">&rarr;</span></button>
+                        </td>
                     </tr>
                 }
                 </tbody>
@@ -111,6 +124,14 @@
     <button type="button" class="wf-dialog-x" data-wf-close aria-label="Close">&times;</button>
     <div id="wf-dialog-body" class="wf-dialog-body"></div>
 </dialog>
+@if (area == "Supplier")
+{
+    <dialog id="supplier-tender-dialog" class="wf-dialog supplier-tender-dialog" aria-labelledby="supplier-tender-title">
+        <button type="button" class="wf-dialog-x" data-tender-close aria-label="Close tender details">&times;</button>
+        <div class="wf-dialog-body" data-tender-details-body></div>
+    </dialog>
+    <script src="~/js/supplier-tender-details.js" asp-append-version="true"></script>
+}
 <script>
 (function () {
     var dlg = document.getElementById('wf-dialog'), body = document.getElementById('wf-dialog-body'), dirty = false;
@@ -139,9 +160,20 @@
         body.querySelectorAll('form[data-picker]').forEach(function (f) {
             var all = f.querySelector('[data-select-all]'), btn = f.querySelector('[data-pick-btn]'), cnt = f.querySelector('[data-count]');
             var boxes = function () { return Array.prototype.slice.call(f.querySelectorAll('input[name=supplierIds]:not(:disabled)')); };
-            var sync = function () { var b = boxes(), n = b.filter(function (x) { return x.checked; }).length; cnt.textContent = n + ' selected'; btn.disabled = n === 0; btn.textContent = n ? 'Invite ' + n + ' supplier' + (n > 1 ? 's' : '') : 'Invite selected'; all.checked = b.length > 0 && n === b.length; all.indeterminate = n > 0 && n < b.length; };
-            all.addEventListener('change', function () { boxes().forEach(function (x) { x.checked = all.checked; }); sync(); });
+            var sync = function () { var b = boxes(), n = b.filter(function (x) { return x.checked; }).length, visible = b.filter(function (x) { return !x.closest('li').hidden; }), picked = visible.filter(function (x) { return x.checked; }).length; cnt.textContent = n + ' selected'; btn.disabled = n === 0; btn.textContent = n ? 'Invite ' + n + ' supplier' + (n > 1 ? 's' : '') : 'Invite selected'; all.checked = visible.length > 0 && picked === visible.length; all.indeterminate = picked > 0 && picked < visible.length; };
+            all.addEventListener('change', function () { boxes().filter(function (x) { return !x.closest('li').hidden; }).forEach(function (x) { x.checked = all.checked; }); sync(); });
             f.addEventListener('change', function (e) { if (e.target !== all) sync(); }); sync();
+            var search = f.querySelector('[data-supplier-search]'), category = f.querySelector('select[data-supplier-category]');
+            if (search && category) {
+                var filterSuppliers = function () {
+                    var term = search.value.trim().toLowerCase();
+                    f.querySelectorAll('li[data-supplier-name]').forEach(function (row) {
+                        row.hidden = (term && row.dataset.supplierName.indexOf(term) < 0) || (category.value && row.dataset.supplierCategory !== category.value);
+                    });
+                    sync();
+                };
+                search.addEventListener('input', filterSuppliers); category.addEventListener('change', filterSuppliers);
+            }
         });
         body.querySelectorAll('.wf-step[data-phase]').forEach(function (st) {
             var go = function () { var main = body.querySelector('.wp-main'); if (!main) return; var n = Number(st.dataset.phase); main.dataset.view = n === 4 ? 'approval' : 'journey'; if (n === 4) { delete main.dataset.ph; } else { main.dataset.ph = n; } main.querySelectorAll('details.wp-prev').forEach(function (d) { var has = !!d.querySelector('.wp-stage[data-ph="' + n + '"]'); d.hidden = n === 4 ? false : !has; if (has) d.open = true; }); body.querySelectorAll('.wf-step').forEach(function (x) { x.classList.toggle('is-view', x === st); }); };
@@ -227,7 +259,8 @@
         if (e.currentTarget.hasAttribute('data-bulk-compliance')) { return bulk(e.currentTarget, e); }
         e.preventDefault(); var form = e.currentTarget, btn = e.submitter, fd = new FormData(form);
         var pad = form.querySelector('[data-pad]'), decisionSel = form.querySelector('select[name=decision]');
-        if (pad && !(decisionSel && decisionSel.value !== 'Approve')) { if (!pad._drawn) { showError('Draw your signature in the box first.'); return; } fd.set('signatureImage', pad.querySelector('canvas').toDataURL('image/png')); }
+        var signatureRequired = !decisionSel || decisionSel.value === 'Approve' || form.action.indexOf('/TopCommittee/') >= 0;
+        if (pad && signatureRequired) { if (!pad._drawn) { showError('Draw your signature in the box first.'); return; } fd.set('signatureImage', pad.querySelector('canvas').toDataURL('image/png')); }
         if (btn && btn.name) fd.set(btn.name, btn.value);
         form.querySelectorAll('input[data-utc]').forEach(function (i) { if (i.value) { fd.delete(i.name); fd.set(i.name, new Date(i.value).toISOString()); } });
         var label = btn ? btn.textContent : ''; form.querySelectorAll('button').forEach(function (b) { b.disabled = true; }); if (btn) btn.textContent = /\/Analyze\//.test(form.action) ? 'Analyzing the offers… about a minute' : 'Working…';

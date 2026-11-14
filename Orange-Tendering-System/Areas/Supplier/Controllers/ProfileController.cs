@@ -14,7 +14,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
 { //بقرا  بيانات من الداتابيس المرتبطة بالاي دي الي دخل فيه المستخدم وبشوف شو الشركة الي مرتبطة فيه
     [Area("Supplier")]
     [Authorize(Roles = SystemRoles.Supplier)]
-    public class ProfileController(SupplierProfileService profileService) : Controller
+    public class ProfileController(SupplierProfileService profileService, SupplierDocumentService documents) : Controller
     {
         public async Task<IActionResult> Index()
         {
@@ -22,7 +22,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             if (string.IsNullOrEmpty(userId))
                 return Challenge();
 
-            var model = await profileService.GetProfileAsync(userId);
+            var model = await LoadProfileAsync(userId);
             if (model.AccessMessage is not null)
                 Response.StatusCode = StatusCodes.Status403Forbidden;
 
@@ -44,7 +44,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             // 2. إذا البيانات غير صحيحة، نعرض الصفحة مع الأخطاء.
             if (!ModelState.IsValid)
             {
-                var model = await profileService.GetProfileAsync(userId);
+                var model = await LoadProfileAsync(userId);
                 if (model.AccessMessage is not null)
                     Response.StatusCode = StatusCodes.Status403Forbidden;
                 return View("Index", model);
@@ -60,6 +60,14 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             // 4. بعد نجاح الحفظ نرجع للبروفايل مع رسالة نجاح.
             TempData["ProfileSuccess"] = "Contact details saved successfully.";
             return RedirectToAction("Index");
+        }
+
+        private async Task<SupplierProfileViewModel> LoadProfileAsync(string userId)
+        {
+            var model = await profileService.GetProfileAsync(userId);
+            if (model.AccessMessage is null)
+                model.Documents = await documents.GetCompanyDocumentsAsync(userId);
+            return model;
         }
     }
 }

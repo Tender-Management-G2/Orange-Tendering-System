@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -22,6 +22,9 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
+if (args.Contains("--seed-saja-demo")) { await SajaDemoFixture.Run(); return; }
+if (args.Contains("--unified-tender-checks")) { await UnifiedTenderChecks.Run(); return; }
+if (args.Contains("--verify-saja-demo")) { await SajaDemoFixture.Run(verifyExisting: true); return; }
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
 if (args.Contains("--seed-lifecycle")) { await LifecycleFixture.Run(); return; }

@@ -8,7 +8,7 @@
         .Select(u => (u.Id, (string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName + " (" + u.Email + ")")!, u.DepartmentId)).OrderBy(u => u.Item2).ToList();
     var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager);
     var evaluators = await Pool(Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee);
-    var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted).OrderByDescending(r => r.Id)
+    var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted && !r.Tenders.Any()).OrderByDescending(r => r.Id)
         .Select(r => new
         {
             id = r.Id, deptId = r.DepartmentId, title = r.Title, dept = r.Department.Name, why = r.Justification, priority = r.Priority.ToString(),

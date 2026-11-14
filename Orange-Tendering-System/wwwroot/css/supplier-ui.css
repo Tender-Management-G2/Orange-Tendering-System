@@ -1,0 +1,43 @@
+/* Supplier presentation only; shared role layouts and workflow rules stay unchanged. */
+.ws-supplier .ws-topnav-bar { flex-wrap: wrap; gap: 12px; }
+.ws-supplier .ws-topnav-bar .ws-brand .ws-logo { display: flex; }
+.ws-supplier .ws-topnav-links { flex: 1 1 auto; min-width: 0; }
+.ws-supplier-account { flex: 0 0 auto; margin-left: auto; }
+.ws-supplier-account .ws-account-label { max-width: 135px; }
+.ws-supplier-account .ws-account-menu { max-width: calc(100vw - 24px); }
+.ws-supplier-utilities { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex: 1 0 100%; min-width: 0; order: 10; border-top: 1px solid var(--ws-soft-rule); padding-top: 10px; }
+.ws-supplier-search-tools { display: flex; align-items: center; gap: 8px; flex: 0 1 468px; min-width: 0; }
+.ws-supplier-utilities .ws-supplier-search { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; }
+.ws-supplier-search-tools .ws-search-microphone { flex: 0 0 auto; }
+.ws-supplier .ws-supplier-utilities .ws-topbar-actions { margin-left: auto; gap: 8px; }
+.supplier-tender-details-button { margin-right: 8px; }
+.ws-supplier .wf-dialog-x { z-index: 20; }
+.supplier-tender-summary { padding: 30px; }
+.supplier-tender-summary > header { padding-right: 40px; margin-bottom: 24px; }
+.supplier-tender-summary h2 { margin: 8px 0 12px; font-size: clamp(21px, 3vw, 30px); }
+.supplier-tender-summary h3 { margin-top: 0; }
+.supplier-tender-summary .pg-panel { margin-bottom: 18px; }
+.supplier-tender-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.supplier-tender-summary > footer { justify-content: flex-end; }
+@media (max-width: 1180px) {
+    .ws-supplier .ws-topnav-toggle { order: 2; }
+    .ws-supplier-account { order: 3; }
+    .ws-supplier .ws-topnav-links { flex-basis: 100%; }
+}
+@media (max-width: 640px) {
+    .ws-supplier .wfl-hero { padding: 0; min-height: 220px; }
+    .ws-supplier .wfl-hero .dash-welcome-copy { padding: 22px; }
+    .ws-supplier .wfl-hero .dash-welcome-copy h1 { font-size: 24px; }
+    .ws-supplier .wfl-hero .dash-welcome-copy p { font-size: 12px; max-width: 100%; }
+    .ws-supplier .wfl-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .ws-supplier .wfl-metrics .dash-metric { padding: 14px 13px 25px; }
+    .ws-supplier .wfl-metrics .dash-metric-copy > strong { font-size: 28px; }
+    .ws-supplier .ws-topnav-bar { padding: 10px 12px; gap: 8px; }
+    .ws-supplier .ws-supplier-utilities { gap: 8px; }
+    .ws-supplier-search-tools { flex: 1 1 auto; min-width: 0; }
+    .ws-supplier .ws-supplier-utilities .ws-supplier-search { flex: 1 1 auto; width: auto; min-width: 0; order: 0; }
+    .ws-supplier .ws-supplier-utilities .ws-topbar-actions { gap: 2px; }
+    .ws-supplier-account .ws-account { padding-left: 8px; }
+    .supplier-tender-summary { padding: 22px 14px; }
+    .supplier-tender-details-button { margin: 0 0 6px; }
+}
