@@ -1,0 +1,48 @@
+<script>
+(()=>{
+ document.querySelectorAll('[data-live-root]').forEach(root=>{
+  if(root.dataset.liveInitialized)return;root.dataset.liveInitialized='true';
+  const form=root.querySelector('[data-live-form]'),results=root.querySelector('[data-live-results]'),status=root.querySelector('[data-live-status]');
+  const search=form.elements.namedItem('search'),select=form.elements.namedItem('status');
+  const base=new URL(form.action,location.href);base.search='';base.hash='';
+  let timer,controller,sequence=0;
+  const urlFor=page=>{const url=new URL(base);if(search.value.trim())url.searchParams.set('search',search.value.trim());if(select.value)url.searchParams.set('status',select.value);if(page>1)url.searchParams.set('page',page);return url;};
+  let appliedUrl=urlFor(Number(results.firstElementChild?.dataset.resultPage)||1).href;
+  const announce=()=>{const n=Number(results.firstElementChild?.dataset.resultCount)||0;status.textContent=n===0?'No matching results found.':`${n} matching committee round${n===1?'':'s'}.`;delete status.dataset.error;};
+  const invalidate=()=>{clearTimeout(timer);++sequence;controller?.abort();};
+  const busy=value=>{results.setAttribute('aria-busy',String(value));};
+  async function load(page,historyMode='replace'){
+   invalidate();const requestId=sequence,url=urlFor(page);
+   if(url.href===appliedUrl){busy(false);announce();return;}
+   controller=new AbortController();busy(true);status.textContent='Updating results…';delete status.dataset.error;
+   try{
+    const response=await fetch(url,{headers:{'X-TopCommittee-Live':'1','Accept':'text/html'},credentials:'same-origin',cache:'no-store',signal:controller.signal});
+    if(requestId!==sequence)return;
+    if(response.redirected){location.assign(response.url);return;}
+    if(!response.ok)throw new Error('Request failed');
+    const markup=await response.text();if(requestId!==sequence)return;
+    const documentResult=new DOMParser().parseFromString(markup,'text/html');
+    const panel=documentResult.querySelector('section[data-result-count]');if(!panel)throw new Error('Unexpected response');
+    results.replaceChildren(panel);const actualPage=Number(panel.dataset.resultPage)||1;const actualUrl=urlFor(actualPage);
+    appliedUrl=actualUrl.href;
+    if(historyMode==='push')history.pushState({tcLive:true},'',actualUrl);
+    else if(historyMode==='replace')history.replaceState({tcLive:true},'',actualUrl);
+    announce();
+   }catch(error){if(requestId===sequence&&error.name!=='AbortError'){status.textContent='Could not update results. Press Enter to try again.';status.dataset.error='true';}}
+   finally{if(requestId===sequence)busy(false);}
+  }
+  search.addEventListener('input',()=>{invalidate();busy(true);status.textContent='Updating results…';timer=setTimeout(()=>load(1),300);});
+  select.addEventListener('change',()=>load(1));
+  form.addEventListener('submit',event=>{event.preventDefault();load(1);});
+  results.addEventListener('click',event=>{
+   const link=event.target.closest('a');if(!link||!link.closest('[data-live-pagination]')||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+   event.preventDefault();let page=Number(new URL(link.href).searchParams.get('page'))||1;
+   const lastCriteria=new URL(appliedUrl);lastCriteria.searchParams.delete('page');
+   if(lastCriteria.href!==urlFor(1).href)page=1;
+   load(page,'push');
+  });
+  addEventListener('popstate',()=>{const query=new URL(location.href).searchParams;search.value=query.get('search')||'';select.value=query.get('status')||'';load(Math.max(1,Number(query.get('page'))||1),'none');});
+  announce();
+ });
+})();
+</script>

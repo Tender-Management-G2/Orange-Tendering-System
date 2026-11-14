@@ -1,0 +1,15 @@
+@model PrivateConversation
+@{ ViewData["Title"]=Model.Thread.Subject; }
+<div class="tc-review"><header class="rv-page-head"><div><div class="rv-breadcrumb">Private conversation · T-@Model.Details.Tender.Id · Committee round @Model.Details.Round.RoundNumber</div><h1>@Model.Thread.Subject</h1><p>@Model.Details.Tender.Title</p></div><a class="rv-secondary" asp-action="Index">← Private inbox</a></header><partial name="_Messages" />
+<section class="rv-card rv-clarifications"><h2>Private conversation</h2><p class="rv-muted">Status: @CommitteeDisplay.Clarification(Model.Thread.Status)</p><p class="rv-private-note">Only the sending Top Committee member and the responsible Sourcing Manager can read this thread and its attachments.</p>
+@if(ViewData["ClarificationError"] is string error){<p class="rv-error" role="alert">@error</p>}
+@foreach(var message in Model.Thread.Messages.OrderBy(m=>m.SentAt).ThenBy(m=>m.Id))
+{<article class="rv-message"><header><strong>@message.SenderUser.FullName</strong><time>@CommitteeDisplay.Date(message.SentAt)</time></header><p class="rv-preserve" dir="auto">@message.Message</p>@foreach(var doc in message.Documents.Where(d=>d.DocumentType=="TopClarificationAttachment")){<a class="rv-file-link" asp-action="Download" asp-route-id="@doc.Id">▤ @doc.FileName (@((doc.SizeBytes/1024d).ToString("0.#")) KB)</a>}</article>}
+@if(Model.CanReply)
+{<form asp-action="Reply" method="post" enctype="multipart/form-data" class="rv-message-form" data-private-message><input type="hidden" name="ThreadId" value="@Model.Thread.Id" /><input type="hidden" name="SubmissionId" value="@Guid.NewGuid().ToString("N")" /><div class="rv-field"><label for="private-reply">Your reply <span>*</span></label><textarea id="private-reply" name="Message" maxlength="10000" rows="4" required>@ViewData["ClarificationMessage"]</textarea></div><partial name="_ClarificationUpload" model='"reply-attachment"' /><button class="rv-primary" type="submit">Send private reply</button><span class="rv-send-status" role="status" aria-live="polite"></span></form>}
+else {<p class="rv-muted">This conversation is read-only.</p>}
+@if(!Model.IsManager && Model.CanReply && Model.Thread.Status==ClarificationStatus.Answered)
+{<form asp-controller="Clarifications" asp-action="Resolve" method="post"><input type="hidden" name="roundId" value="@Model.Details.Round.Id" /><input type="hidden" name="threadId" value="@Model.Thread.Id" /><button type="submit" class="rv-secondary">Mark resolved</button></form>}
+</section></div>
+@section Styles {<partial name="_ReviewStyles" />}
+@section Scripts {<partial name="_ClarificationScripts" />}

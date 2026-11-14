@@ -4,23 +4,138 @@
     ViewData["WorkspaceSection"] = "My Requests";
     ViewData["Description"] = "Requests belonging to your department. Only the creator can edit a Draft or Returned request.";
 }
+<div class="dept-live" data-live-root>
 <partial name="_PageHeader" />
-<form method="get" asp-action="Index" class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" name="search" value="@Model.Search" placeholder="Title or PR reference" aria-label="Title or PR reference" maxlength="200" />
-    <select name="status" aria-label="Status"><option value="">All statuses</option>
-    @foreach (var status in RequestDisplay.Statuses) { <option value="@status" selected="@(Model.Status == status)">@status</option> }
-    </select>
-    <select name="priority" aria-label="Priority"><option value="">All priorities</option>
-    @foreach (var priority in Enum.GetValues<RequestPriority>()) { <option value="@priority" selected="@(Model.Priority == priority)">@priority</option> }
-    </select>
-    <button type="submit" class="pg-btn pg-btn-primary">Search</button><a asp-action="Index" class="pg-btn">Clear</a>
+<form method="get" asp-action="Index" class="pg-toolbar dept-request-toolbar" id="department-request-filters" aria-label="Search and filter purchase requests" data-live-form>
+    <div class="dept-live-field"><label for="department-request-search">Request Search</label><input id="department-request-search" type="search" name="search" value="@Model.Search" placeholder="Title or PR reference (e.g. PR-19)" aria-controls="department-request-results" maxlength="200" autocomplete="off" /></div>
+    <div class="dept-live-field"><label for="department-request-status">Request Status</label><select id="department-request-status" name="status" aria-controls="department-request-results">
+        <option value="">All statuses</option>
+        @foreach (var status in RequestDisplay.Statuses) { <option value="@status" selected="@(Model.Status == status)">@status</option> }
+    </select></div>
+    <div class="dept-live-field"><label for="department-request-priority">Priority</label><select id="department-request-priority" name="priority" aria-controls="department-request-results">
+        <option value="">All priorities</option>
+        @foreach (var priority in Enum.GetValues<RequestPriority>()) { <option value="@priority" selected="@(Model.Priority == priority)">@priority</option> }
+    </select></div>
 </form>
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>Purchase requests (@Model.Total)</h2><a class="pg-btn pg-btn-primary" asp-action="Create">New request</a></div>
-    <partial name="_RequestTable" model='new RequestTable(Model.Requests, Model.UserId)' />
-    <nav class="pg-actions" aria-label="Request pages">
-    @if (Model.Page > 1) { <a class="pg-btn" asp-route-page="@(Model.Page - 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-priority="@Model.Priority">Previous</a> }
-    <span>Page @Model.Page of @Model.Pages</span>
-    @if (Model.Page < Model.Pages) { <a class="pg-btn" asp-route-page="@(Model.Page + 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-priority="@Model.Priority">Next</a> }
-    </nav>
-</section>
+<p class="dept-live-status" role="status" aria-live="polite" aria-atomic="true" data-live-status></p>
+<div id="department-request-results" data-live-results aria-busy="false">
+    <partial name="_MyRequestResults" model="Model" />
+</div>
+</div>
+
+@section Styles {
+<style>
+.dept-live{display:flex;flex-direction:column;gap:18px;min-width:0}.dept-live>*{min-width:0}
+.dept-live .dept-request-toolbar{display:grid;grid-template-columns:minmax(220px,2fr) minmax(170px,1fr) minmax(150px,1fr);gap:16px;align-items:end;max-width:900px}
+.dept-live-field{display:grid;gap:7px;min-width:0}.dept-live-field label{font-size:12px;font-weight:600;color:var(--ws-muted,#596071)}
+.dept-request-toolbar input,.dept-request-toolbar select{width:100%;max-width:none;min-width:0;height:42px;padding:9px 12px;border:1px solid var(--ws-rule,#cbd1dc);border-radius:10px;background:var(--ws-surface,#fff);color:var(--ws-ink,#17212e);font:inherit;font-size:13px}
+.dept-request-toolbar input::placeholder{color:var(--ws-muted)}
+.dept-request-toolbar input:focus-visible,.dept-request-toolbar select:focus-visible{outline:2px solid #ff7900;outline-offset:2px;border-color:#ff7900}
+.dept-live-status{margin:0;min-height:18px;font-size:12px;line-height:1.5;color:var(--ws-muted,#596071)}.dept-live-status[data-error]{color:var(--ws-accent,#ad4900)}
+.dept-request-results-panel{min-width:0}
+.dept-request-toolbar [disabled]{opacity:.65}
+.dept-request-results-panel .pg-panel-head{flex-wrap:wrap;gap:12px}
+.dept-status-badge{display:inline-flex;align-items:center;justify-content:center;min-height:25px;padding:4px 10px;border:1px solid transparent;border-radius:999px;font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap}
+.dept-status-draft{color:#4b5563;background:#f0f2f4;border-color:#dfe3e7}
+.dept-status-submitted{color:#1454a0;background:#e8f2ff;border-color:#c9defb}
+.dept-status-under-review{color:#7135a8;background:#f3eaff;border-color:#e1cef7}
+.dept-status-returned{color:#a34a00;background:#fff0df;border-color:#ffd2a5}
+.dept-status-rejected{color:#a12432;background:#ffebed;border-color:#f5c8cd}
+.dept-status-accepted{color:#166b3b;background:#e6f6eb;border-color:#c3e7ce}
+.dept-status-converted-to-tender{color:#087078;background:#e1f6f5;border-color:#b6e5e3}
+.dept-status-other{color:#4b5563;background:#f0f2f4;border-color:#dfe3e7}
+.dept-row-actions{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.dept-row-actions .dept-edit-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:6px 10px;border:1px solid #f4bd8d;border-radius:8px;background:#fff0e0;color:#c65d00;text-decoration:none;font-size:12px;font-weight:700;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.dept-row-actions .dept-edit-action:hover{background:#ffe2c3;border-color:#e98d39;transform:translateY(-1px)}
+.dept-row-actions .dept-edit-action:focus-visible{outline:2px solid #c65d00;outline-offset:2px}
+.dept-row-actions .dept-edit-action svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.dept-live [data-live-results][aria-busy=true]{opacity:.65}
+.dept-results-error{margin:0;padding:12px;border:1px solid #e9b3b3;border-radius:9px;color:#922c2c;background:#fff2f2;font-size:13px}
+@@media(max-width:600px){.dept-live .dept-request-toolbar{grid-template-columns:1fr;gap:12px}}
+@@media(max-width:480px){.dept-request-results-panel .pg-panel-head h2{font-size:16px}.dept-row-actions{gap:5px}.dept-row-actions .dept-edit-action{min-height:32px;padding:5px 7px;font-size:11px}.dept-status-badge{font-size:11px;padding:4px 8px}}
+</style>
+}
+@section Scripts {
+<script>
+(() => {
+    const root = document.querySelector('[data-live-root]');
+    if (!root) return;
+    const form = root.querySelector('[data-live-form]');
+    const results = root.querySelector('[data-live-results]');
+    const status = root.querySelector('[data-live-status]');
+    const search = form.elements.namedItem('search');
+    const statusFilter = form.elements.namedItem('status');
+    const priorityFilter = form.elements.namedItem('priority');
+    const base = new URL(form.action, location.href);
+    base.search = '';
+    base.hash = '';
+    let timer, controller, sequence = 0;
+    const urlFor = page => {
+        const url = new URL(base);
+        if (search.value.trim()) url.searchParams.set('search', search.value.trim());
+        if (statusFilter.value) url.searchParams.set('status', statusFilter.value);
+        if (priorityFilter.value) url.searchParams.set('priority', priorityFilter.value);
+        if (page > 1) url.searchParams.set('page', page);
+        return url;
+    };
+    let appliedUrl = urlFor(Number(results.firstElementChild?.dataset.resultPage) || 1).href;
+    const announce = () => {
+        const count = Number(results.firstElementChild?.dataset.resultCount) || 0;
+        status.textContent = count === 0 ? 'No matching requests found.' : `${count} matching purchase request${count === 1 ? '' : 's'}.`;
+        delete status.dataset.error;
+    };
+    const invalidate = () => { clearTimeout(timer); ++sequence; controller?.abort(); };
+    const busy = value => results.setAttribute('aria-busy', String(value));
+    async function load(page, historyMode = 'replace') {
+        invalidate();
+        const requestId = sequence;
+        const url = urlFor(page);
+        if (url.href === appliedUrl) { busy(false); announce(); return; }
+        controller = new AbortController();
+        busy(true);
+        status.textContent = 'Updating results…';
+        delete status.dataset.error;
+        try {
+            const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }, credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+            if (requestId !== sequence) return;
+            if (response.redirected) { location.assign(response.url); return; }
+            if (!response.ok) throw new Error('Request failed');
+            const markup = await response.text();
+            if (requestId !== sequence) return;
+            const documentResult = new DOMParser().parseFromString(markup, 'text/html');
+            const panel = documentResult.querySelector('section[data-result-count]');
+            if (!panel) throw new Error('Unexpected response');
+            results.replaceChildren(panel);
+            const actualUrl = urlFor(Number(panel.dataset.resultPage) || 1);
+            appliedUrl = actualUrl.href;
+            if (historyMode === 'push') history.pushState({ deptLive: true }, '', actualUrl);
+            else if (historyMode === 'replace') history.replaceState({ deptLive: true }, '', actualUrl);
+            announce();
+        } catch (error) {
+            if (requestId === sequence && error.name !== 'AbortError') { status.textContent = 'Could not update results. Press Enter to try again.'; status.dataset.error = 'true'; }
+        } finally { if (requestId === sequence) busy(false); }
+    }
+    search.addEventListener('input', () => { invalidate(); busy(true); status.textContent = 'Updating results…'; timer = setTimeout(() => load(1), 300); });
+    statusFilter.addEventListener('change', () => load(1));
+    priorityFilter.addEventListener('change', () => load(1));
+    form.addEventListener('submit', event => { event.preventDefault(); load(1); });
+    results.addEventListener('click', event => {
+        const link = event.target.closest('a');
+        if (!link || !link.closest('[data-live-pagination]') || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        let page = Number(new URL(link.href).searchParams.get('page')) || 1;
+        const lastCriteria = new URL(appliedUrl); lastCriteria.searchParams.delete('page');
+        if (lastCriteria.href !== urlFor(1).href) page = 1;
+        load(page, 'push');
+    });
+    addEventListener('popstate', () => {
+        const query = new URL(location.href).searchParams;
+        search.value = query.get('search') || '';
+        statusFilter.value = query.get('status') || '';
+        priorityFilter.value = query.get('priority') || '';
+        load(Math.max(1, Number(query.get('page')) || 1), 'none');
+    });
+    announce();
+})();
+</script>
+}

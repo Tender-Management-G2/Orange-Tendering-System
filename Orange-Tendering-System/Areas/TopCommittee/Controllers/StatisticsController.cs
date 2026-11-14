@@ -18,10 +18,22 @@ public sealed class StatisticsController(ApplicationDbContext db, UserManager<Ap
     {
         if (await ActiveUser() is null) return Forbid();
         Response.Headers.CacheControl = "no-store";
-        return View("System", new ReportingPage(await new TopCommitteeReportingService(Db).Read(), true));
+        return await FullSystemPage();
     }
-    public Task<IActionResult> FullSystem() => Index();
-    public async Task<IActionResult> Management() => await ActiveUser() is null ? Forbid() : View("Index", await Committee.Statistics());
+    public async Task<IActionResult> FullSystem()
+    {
+        if (await ActiveUser() is null) return Forbid();
+        Response.Headers.CacheControl = "no-store";
+        return await FullSystemPage();
+    }
+    public async Task<IActionResult> Management()
+    {
+        if (await ActiveUser() is null) return Forbid();
+        Response.Headers.CacheControl = "no-store";
+        return await FullSystemPage();
+    }
+    private async Task<IActionResult> FullSystemPage() =>
+        View("System", new ReportingPage(await new TopCommitteeReportingService(Db).Read(), true));
     public async Task<IActionResult> Export()
     {
         if (await ActiveUser() is null) return Forbid();

@@ -17,8 +17,7 @@ public sealed class ReportsController(ApplicationDbContext db, UserManager<Appli
     public async Task<IActionResult> Index()
     {
         if (await ActiveUser() is null) return Forbid();
-        Response.Headers.CacheControl = "no-store";
-        return View("Index", new ReportingPage(await new TopCommitteeReportingService(Db).Read(), false));
+        return RedirectToAction("Index", "Statistics", new { area = "TopCommittee" });
     }
 
     [HttpGet("/Analytics", Order = -1), TopCommitteeReportsRoute]

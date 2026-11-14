@@ -38,7 +38,8 @@ public static class TopCommitteePolicy
         }
         return new Notification
         {
-            UserId = manager.Id, Title = $"Top Committee — Final Decision {outcome}",
+            UserId = manager.Id, Title = outcome == CommitteeRoundStatus.Approved
+                ? "Top Committee — Final Signed Report Approved" : "Top Committee — Final Decision Rejected",
             Message = $"Tender #{details.Tender.Id}: {details.Tender.Title}. Committee round {details.Round.RoundNumber}: {outcome}. Recommended Supplier: {recommended.TenderInvitation.Supplier.CompanyName}. All four members have voted. Decision date: {CommitteeDisplay.Date(now)}.",
             Link = $"/SourcingManager/Reports/Review/{fullReport.Id}", CreatedAt = now
         };

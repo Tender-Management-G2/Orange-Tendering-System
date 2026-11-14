@@ -1,0 +1,178 @@
+@{
+    Layout = null;
+    var workspace = WorkspaceNavigation.Current("TopCommittee", User);
+    var label = workspace?.Label ?? "Top Committee";
+    var pageTitle = ViewData["Title"]?.ToString() ?? $"{label} workspace";
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="color-scheme" content="dark light" />
+    <title>@pageTitle | Orange Sourcing</title>
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/css/workspace-shell.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
+    <style>
+        .tc-bell-host{position:relative;display:inline-flex}
+        .tc-bell-badge{position:absolute;right:-3px;top:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:#ff7900;color:#fff;font:700 10px/18px Arial,sans-serif;text-align:center;border:2px solid var(--ws-bg);pointer-events:none}
+        .tc-bell-dropdown{position:absolute;z-index:1100;right:0;top:calc(100% + 10px);width:min(360px,calc(100vw - 28px));padding:12px;border:1px solid var(--ws-rule);border-radius:14px;background:var(--ws-surface);color:var(--ws-ink);box-shadow:var(--ws-shadow)}
+        .tc-bell-head{display:flex;justify-content:space-between;align-items:center;padding:3px 4px 10px;border-bottom:1px solid var(--ws-soft-rule);font-size:14px;font-weight:700}
+        .tc-bell-count{color:var(--ws-muted);font-size:11px;font-weight:500}
+        .tc-bell-items{display:grid;max-height:min(390px,60vh);overflow:auto}
+        .tc-bell-item{position:relative;display:grid;gap:4px;width:100%;padding:11px 22px 11px 9px;border:0;border-bottom:1px solid var(--ws-soft-rule);background:transparent;color:var(--ws-ink);text-align:left;cursor:pointer}
+        .tc-bell-item:hover,.tc-bell-item:focus-visible{background:var(--ws-raised);outline:none}
+        .tc-bell-item-title{font-size:12px;font-weight:700;line-height:1.4}
+        .tc-bell-item-message{color:var(--ws-muted);font-size:11px;line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+        .tc-bell-item time{color:var(--ws-muted);font-size:10px}
+        .tc-bell-item-status{color:var(--ws-muted);font-size:10px}
+        .tc-bell-item.is-unread .tc-bell-item-status{color:var(--ws-accent);font-weight:700}
+        .tc-bell-item.is-unread:after{content:"";position:absolute;right:8px;top:16px;width:8px;height:8px;border-radius:50%;background:#ff7900}
+        .tc-bell-empty{padding:18px 8px;color:var(--ws-muted);font-size:12px;text-align:center}
+        .tc-bell-footer{padding:10px 4px 1px;text-align:center}
+        .tc-bell-footer a{color:var(--ws-accent);font-size:11px;font-weight:700;text-decoration:none}
+        .tc-bell-footer a:hover{text-decoration:underline}
+        @@media(max-width:480px){.tc-bell-dropdown{right:clamp(-150px,-35vw,-45px)}}
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="ws-shell ws-internal" data-workspace-role="@(workspace?.Role ?? "Top Committee")">
+    <a class="ws-skip" href="#workspace-main">Skip to main content</a>
+    <aside class="ws-sidebar" id="workspace-navigation" aria-label="@label workspace navigation">
+        <div class="ws-sidebar-brand">
+            <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span><span>Sourcing &amp; Tender<br />Management System</span></a>
+            <button class="ws-icon-button ws-nav-close" type="button" aria-label="Close navigation">×</button>
+        </div>
+        <partial name="_Sidebar" />
+        <div class="ws-sidebar-bottom"><span class="ws-role-label">@label</span><a asp-area="" asp-controller="Home" asp-action="Contact">Contact support <span aria-hidden="true">↗</span></a></div>
+        <div class="ws-sidebar-architecture" aria-hidden="true"></div>
+    </aside>
+    <button class="ws-backdrop" type="button" aria-label="Close navigation" hidden></button>
+    <div class="ws-stage">
+        <header class="ws-topbar">
+            <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+            <div class="ws-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Workspace search is not available yet" disabled title="Search is not implemented yet" /></div>
+            <div class="ws-topbar-actions">
+                <button type="button" class="ws-icon-button ws-utility-disabled" disabled aria-label="Voice search is not implemented yet" title="Voice search is not implemented yet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                <div class="tc-bell-host" data-preview-url="@Url.Action("Preview", "Notifications", new { area = "TopCommittee" })" data-open-url="@Url.Action("Open", "Notifications", new { area = "TopCommittee" })">
+                    <button class="ws-icon-button" type="button" data-tc-bell aria-label="Notifications" title="Notifications" aria-expanded="false" aria-controls="tc-bell-dropdown"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg><span class="tc-bell-badge" data-tc-bell-badge hidden></span></button>
+                    <section class="tc-bell-dropdown" id="tc-bell-dropdown" aria-label="Recent notifications" hidden>
+                        <div class="tc-bell-head"><span>Notifications</span><span class="tc-bell-count" data-tc-bell-count></span></div>
+                        <div class="tc-bell-items" data-tc-bell-items aria-live="polite"></div>
+                        <div class="tc-bell-footer"><a asp-area="" asp-controller="Notifications" asp-action="Index">View All Notifications</a></div>
+                    </section>
+                    <form hidden>@Html.AntiForgeryToken()</form>
+                </div>
+                <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
+                <partial name="_WorkspaceAccountMenu" />
+            </div>
+        </header>
+        <main id="workspace-main" class="ws-main" tabindex="-1"><div class="pg-page">@RenderBody()</div></main>
+        <footer class="ws-internal-footer"><span>© @DateTime.UtcNow.Year Sourcing &amp; Tender Management System · Academic project</span><a asp-area="" asp-controller="Home" asp-action="HowItWorks">How the workflow works ↗</a></footer>
+    </div>
+    <span id="workspace-theme-status" class="ws-sr-only" role="status" aria-live="polite"></span>
+    <script src="~/js/workspace-shell.js" asp-append-version="true"></script>
+    <script>
+        (() => {
+            const host = document.querySelector('.tc-bell-host');
+            if (!host) return;
+            const button = host.querySelector('[data-tc-bell]');
+            const panel = host.querySelector('#tc-bell-dropdown');
+            const itemsHost = host.querySelector('[data-tc-bell-items]');
+            const badge = host.querySelector('[data-tc-bell-badge]');
+            const countText = host.querySelector('[data-tc-bell-count]');
+            const token = host.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            let loading = false;
+
+            function setUnread(count) {
+                badge.hidden = count < 1;
+                badge.textContent = count > 99 ? '99+' : String(count);
+                button.setAttribute('aria-label', count ? `Notifications, ${count} unread` : 'Notifications');
+                countText.textContent = count ? `${count} unread` : 'All caught up';
+            }
+
+            function render(data) {
+                setUnread(data.unreadCount || 0);
+                itemsHost.replaceChildren();
+                if (!data.items?.length) {
+                    const empty = document.createElement('p');
+                    empty.className = 'tc-bell-empty';
+                    empty.textContent = 'No notifications yet.';
+                    itemsHost.append(empty);
+                    return;
+                }
+                for (const item of data.items) {
+                    const row = document.createElement(item.canOpen ? 'button' : 'div');
+                    row.className = `tc-bell-item${item.isRead ? '' : ' is-unread'}`;
+                    if (item.canOpen) {
+                        row.type = 'button';
+                        row.dataset.notificationId = item.id;
+                    }
+                    const title = document.createElement('span');
+                    title.className = 'tc-bell-item-title';
+                    title.textContent = item.title || item.message || 'Notification';
+                    const message = document.createElement('span');
+                    message.className = 'tc-bell-item-message';
+                    message.textContent = item.title ? (item.message || '') : '';
+                    const time = document.createElement('time');
+                    time.dateTime = item.createdAt;
+                    const date = new Date(item.createdAt);
+                    time.textContent = Number.isNaN(date.valueOf()) ? '' : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+                    const status = document.createElement('span');
+                    status.className = 'tc-bell-item-status';
+                    status.textContent = item.isRead ? 'Read' : 'Unread';
+                    row.append(title, message, time, status);
+                    itemsHost.append(row);
+                }
+            }
+
+            async function load() {
+                if (loading) return;
+                loading = true;
+                try {
+                    const response = await fetch(host.dataset.previewUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                    if (!response.ok) throw new Error('Could not load notifications');
+                    render(await response.json());
+                } catch {
+                    itemsHost.replaceChildren();
+                    const error = document.createElement('p');
+                    error.className = 'tc-bell-empty';
+                    error.textContent = 'Notifications could not be loaded. Try again.';
+                    itemsHost.append(error);
+                } finally { loading = false; }
+            }
+
+            function close() { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); }
+            button.addEventListener('click', async () => {
+                const opening = panel.hidden;
+                panel.hidden = !opening;
+                button.setAttribute('aria-expanded', String(opening));
+                if (opening) await load();
+            });
+            document.addEventListener('click', event => { if (!host.contains(event.target)) close(); });
+            document.addEventListener('keydown', event => { if (event.key === 'Escape' && !panel.hidden) { close(); button.focus(); } });
+            itemsHost.addEventListener('click', async event => {
+                const row = event.target.closest('[data-notification-id]');
+                if (!row || !token) return;
+                row.disabled = true;
+                try {
+                    const body = new URLSearchParams({ id: row.dataset.notificationId, __RequestVerificationToken: token });
+                    const response = await fetch(host.dataset.openUrl, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' }, body, cache: 'no-store' });
+                    if (!response.ok) throw new Error('Could not open notification');
+                    const result = await response.json();
+                    if (Number.isInteger(result.unreadCount)) setUnread(result.unreadCount);
+                    row.classList.remove('is-unread');
+                    const readStatus = row.querySelector('.tc-bell-item-status');
+                    if (readStatus) readStatus.textContent = 'Read';
+                    if (result.url) location.assign(result.url);
+                    else { await load(); }
+                } catch { row.disabled = false; }
+            });
+            load();
+        })();
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

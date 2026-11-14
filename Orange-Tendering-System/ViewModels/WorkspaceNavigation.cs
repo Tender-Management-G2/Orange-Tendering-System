@@ -93,8 +93,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Evaluation Summary", "Decisions", "ReviewEvaluation", "report"),
                 new("Voting", "Decisions", "Decision", "vote"),
                 new("Decision History", "Decisions", "History", "history"),
-                new("Management Statistics", "Statistics", "Index", "chart"),
-                new("Analytics & Exports", "Analytics", "Index", "chart", "")
+                new("Management Statistics", "Statistics", "Index", "chart")
             ])
         ];
 

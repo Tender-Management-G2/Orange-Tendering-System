@@ -1,29 +1,190 @@
 @model RoundDetails
 @{
-    ViewData["Title"] = $"T-{Model.Tender.Id} — Committee Decision";
-    ViewData["WorkspaceSection"] = "Voting";
-    ViewData["Description"] = $"{Model.Tender.Title} · committee round {Model.Round.RoundNumber}. Each member's saved vote is visible to the other assigned members.";
+ ViewData["Title"]=$"T-{Model.Tender.Id} — Committee Decision"; ViewData["WorkspaceSection"]="Voting";
+ var report=Model.Round.TenderReport;
+ var finalSignedReady=Model.FinalSignedSummaryPdf is not null && Model.SignedCount==4 && Model.Round.Status==CommitteeRoundStatus.Approved;
+ var paragraphs=System.Text.RegularExpressions.Regex.Split(report?.Content??"",@"(?:\r?\n){2,}").Where(p=>!string.IsNullOrWhiteSpace(p)).ToList();
 }
-<partial name="_PageHeader" /><partial name="_Messages" />
-<div asp-validation-summary="All" role="alert"></div>
-<nav class="pg-links"><ul><li><a asp-action="ReviewEvaluation" asp-route-id="@Model.Round.Id">Review evaluation</a></li><li><a asp-action="History" asp-route-id="@Model.Round.Id">History</a></li><li><a asp-controller="Dashboard" asp-action="Index">Dashboard</a></li></ul></nav>
-<section class="ws-panel pg-panel"><h2>Official recommendation</h2><dl class="pg-dl"><div><dt>Supplier</dt><dd>@Model.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</dd></div><div><dt>Executive summary version</dt><dd>@Model.Round.TenderReport?.VersionNumber</dd></div><div><dt>Responsible Manager</dt><dd>@Model.Manager?.FullName</dd></div><div><dt>Decision date</dt><dd>@CommitteeDisplay.Date(Model.Round.CompletedAt)</dd></div></dl><p style="white-space:pre-wrap">@Model.Round.TenderReport?.Content</p></section>
-<partial name="_VotingStatus" model="Model" />
-@if (Model.CanVote)
+<div class="tc-decision" data-signature-progress-url="@Url.Action("SignatureProgress", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })" data-final-pdf-url="@Url.Action("FinalSignedPdf", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })">
+<header class="dc-page-head"><div class="dc-breadcrumb">Top Committee <span>›</span> Voting <span>›</span> T-@Model.Tender.Id — Committee Decision</div><div class="dc-page-title"><partial name="_ReviewIcon" model='"report"' /><div><h1>T-@Model.Tender.Id — Committee Decision</h1><p>@Model.Tender.Title · committee round @Model.Round.RoundNumber. Each member's saved vote is visible to the other assigned members.</p></div></div></header>
+<partial name="_Messages" /><div asp-validation-summary="All" class="dc-validation" role="alert"></div>
+<section class="dc-card dc-official"><header class="dc-card-title"><partial name="_ReviewIcon" model='"award"' /><h2>Official Recommendation</h2></header>
+<dl class="dc-metadata">
+<div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18l-2-6H5zM5 9v12h14V9M9 21v-7h6v7M3 9v3h5V9M8 9v3h8V9M16 9v3h5V9"/></svg><div><dt>Supplier</dt><dd>@(report?.RecommendedBid?.TenderInvitation?.Supplier?.CompanyName??"—")</dd></div></div>
+<div><partial name="_ReviewIcon" model='"report"' /><div><dt>Executive Summary Version</dt><dd>@(report?.VersionNumber.ToString()??"—")</dd></div></div>
+<div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 22v-3a6 6 0 0 0-6-6h-4a6 6 0 0 0-6 6v3M16 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0"/></svg><div><dt>Responsible Manager</dt><dd>@(Model.Manager?.FullName??"Not verified")</dd></div></div>
+<div><partial name="_ReviewIcon" model='"calendar"' /><div><dt>Decision Date</dt><dd>@CommitteeDisplay.Date(Model.Round.CompletedAt)</dd></div></div>
+</dl>
+<div class="dc-summary-rows">
+@for(var i=0;i<paragraphs.Count;i++)
 {
-    <section class="ws-panel pg-panel"><h2>Record my vote</h2>
-    <form asp-action="Vote" method="post" class="pg-form">
-        <input type="hidden" name="RoundId" value="@Model.Round.Id" />
-        <fieldset><legend class="pg-legend">Decision</legend>
-            <label class="pg-check">@Html.RadioButton("Decision", "Approve") Approve the official recommendation</label>
-            <label class="pg-check">@Html.RadioButton("Decision", "Reject") Reject and return for Manager review</label>
-        </fieldset>
-        <div class="pg-field"><label for="vote-comment">Comments / justification (required for Reject)</label>@Html.TextArea("Comment", null, new { id = "vote-comment", maxlength = "2000", rows = "4" })</div>
-        <p class="pg-consequence">Your submitted vote cannot be edited or deleted. The fourth distinct vote automatically records the final outcome. Four Approve votes are required for an award. Only the responsible Manager receives the final-result notification.</p>
-        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Submit my vote</button></div>
-    </form></section>
+ var paragraph=paragraphs[i]; var split=paragraph.IndexOf(':'); var useLabel=split>0 && split<=45 && !paragraph[..split].Contains('\n');
+ var label=useLabel?paragraph[..split].Trim():i==0?"Executive Summary":"Report Text"; var content=useLabel?paragraph[(split+1)..].TrimStart():paragraph;
+ <div><strong class="dc-summary-label">@label:</strong><p dir="auto">@content</p></div>
 }
-else if (Model.MyVote is not null) { <p class="pg-note">Your vote is recorded and read-only.</p> }
-@if (Model.Blockers.Count > 0 && Model.Round.Status == CommitteeRoundStatus.InProgress)
-{ <section class="ws-panel pg-panel"><h2>Voting is not available</h2><ul>@foreach (var reason in Model.Blockers) { <li>@reason</li> }</ul></section> }
-@section Styles { <partial name="_TopStyles" /> }
+@if(paragraphs.Count==0){<p class="dc-muted">No executive summary content is available for this round.</p>}
+</div></section>
+<section class="dc-card dc-report-file"><header class="dc-card-title"><partial name="_ReviewIcon" model='"report"' /><h2>Executive Summary PDF</h2></header><p data-original-pdf-note style="@(finalSignedReady?"display:none":"")">Preview the exact submitted report version that committee signatures will approve.</p><iframe data-original-pdf title="Original Executive Summary PDF preview" style="@(finalSignedReady?"display:none":"")" src="@Url.Action("SummaryPdfPreview", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })" loading="lazy"></iframe><div data-final-signed-pdf style="@(finalSignedReady?"":"display:none")"><h3>Final Signed PDF</h3><p>The Manager's original report followed by all four committee signatures.</p><iframe title="Final signed Executive Summary PDF preview" src="@(finalSignedReady?Url.Action("FinalSignedPdf", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id, download = false }):"about:blank")" loading="lazy" data-final-preview></iframe><a class="dc-submit dc-pdf-download" asp-action="FinalSignedPdf" asp-route-roundId="@Model.Round.Id">Download Final Signed PDF</a></div></section>
+<section class="dc-card dc-members"><header class="dc-members-head"><div><div class="dc-card-title"><partial name="_ReviewIcon" model='"people"' /><h2>Committee Signatures</h2></div><p class="dc-outcome">Final outcome: <strong class="dc-pill @(Model.Round.Status==CommitteeRoundStatus.Approved?"is-approved":Model.Round.Status==CommitteeRoundStatus.Rejected?"is-rejected":"is-pending")" data-round-status>@CommitteeDisplay.Status(Model.Round.Status)</strong> <span>All four assigned members must sign the same report version to approve it.</span></p></div><span class="dc-progress" aria-label="Electronic signature progress"><span data-signed-count>@Model.SignedCount</span> / 4 Signed</span></header>
+<div class="dc-signature-grid">
+@foreach(var member in Model.TopMembers.OrderBy(m=>m.AssignedAt).ThenBy(m=>m.Id))
+{
+ var signature=Model.Round.Votes.SingleOrDefault(v=>v.CommitteeMemberId==member.Id && v.Decision==VoteDecision.Approve && v.SignatureReportId==report?.Id && !string.IsNullOrWhiteSpace(v.SignatureDocumentHash) && !string.IsNullOrWhiteSpace(v.ElectronicSignatureSvg));
+ <article class="dc-signature-card" data-member-id="@member.Id"><strong>@member.User.FullName</strong><span class="@(signature is not null?"dc-signature-signed":"dc-signature-pending")" data-signature-state>@(signature is not null?"Signed & approved":"Awaiting signature")</span>@if(signature is not null && !string.IsNullOrWhiteSpace(signature.ElectronicSignatureSvg)){<img class="dc-signature-ink" data-signature-ink alt="Electronic signature by @member.User.FullName" src="data:image/svg+xml;base64,@Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg))" />}<time data-signature-at datetime="@(signature?.VotedAt.ToString("O"))">@(signature is not null?CommitteeDisplay.Date(signature.VotedAt):"—")</time></article>
+}
+</div></section>
+<section class="dc-card dc-record"><header class="dc-card-title"><span class="dc-check-icon" aria-hidden="true">✓</span><h2>Sign &amp; Approve Report</h2></header>
+@if(Model.CanVote)
+{
+<form asp-action="SignReport" method="post" class="dc-vote-form dc-sign-form" data-sign-form><input type="hidden" name="roundId" value="@Model.Round.Id" /><fieldset class="dc-signature-pad"><legend>Draw your electronic signature</legend><p>Use your mouse, finger, or stylus to sign in the box.</p><canvas width="600" height="160" aria-label="Draw your electronic signature here" data-signature-canvas></canvas><div class="dc-signature-pad-actions"><button type="button" class="dc-clear-signature-btn" data-clear-signature>Clear signature</button><span role="status" aria-live="polite" data-signature-hint>Draw your signature, then press the button below.</span></div><p class="dc-signature-error" role="alert" data-signature-error hidden>Please draw your signature before continuing.</p><input type="hidden" name="signatureData" data-signature-data /></fieldset><button type="submit" class="dc-submit dc-sign-submit">Sign &amp; Approve Report</button></form>
+@if(Model.MyVote is null)
+{
+<form asp-action="Vote" method="post" class="dc-vote-form dc-reject-form"><input type="hidden" name="RoundId" value="@Model.Round.Id" /><input type="hidden" name="Decision" value="Reject" /><div class="dc-field"><label for="vote-comment">Rejection reason <span>(required)</span></label>@Html.TextArea("Comment",null,new{id="vote-comment",maxlength="2000",rows="3",required="required",placeholder="Explain why the report needs Manager review…"})</div><button type="submit" class="dc-reject-submit">Reject &amp; Return to Manager</button></form>
+}
+}
+else if(Model.MyVote is not null){<p class="dc-readonly" role="status">Your @Model.MyVote.Decision @(Model.MyVote.SignatureReportId is not null ? "signature and approval" : "vote") is recorded and read-only.</p>}
+else{<p class="dc-readonly">Signing is not available for this report.</p>}
+@if(Model.Blockers.Count>0 && Model.Round.Status==CommitteeRoundStatus.InProgress){<div class="dc-blockers"><strong>Signing eligibility</strong><ul>@foreach(var reason in Model.Blockers){<li>@reason</li>}</ul></div>}
+</section>
+<section class="dc-card dc-members"><header class="dc-members-head"><div><div class="dc-card-title"><partial name="_ReviewIcon" model='"people"' /><h2>Committee Voting History</h2></div><p class="dc-outcome">Rejection decisions remain recorded in the existing committee workflow.</p></div><span class="dc-progress" aria-label="Committee voting progress">@Model.ValidVotes.Select(v=>v.CommitteeMemberId).Distinct().Count() / 4 Voted</span></header>
+<div class="dc-table-wrap"><table class="dc-table"><thead><tr><th>Member</th><th>Voting Status</th><th>Decision</th><th>Comments</th><th>Voted At</th></tr></thead><tbody>
+@foreach(var member in Model.TopMembers.OrderBy(m=>m.AssignedAt).ThenBy(m=>m.Id))
+{
+ var vote=Model.Round.Votes.SingleOrDefault(v=>v.CommitteeMemberId==member.Id);
+ <tr><td><span class="dc-member"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 22v-3a5 5 0 0 0-5-5h-4a5 5 0 0 0-5 5v3M16 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0"/></svg><strong>@member.User.FullName</strong></span></td><td><span class="dc-pill @(vote is null?"is-pending":"is-voted")">@(vote is null?"◷ Pending":"✓ Voted")</span></td><td>@if(vote is not null){<span class="dc-pill @(vote.Decision==VoteDecision.Approve?"is-approved":"is-rejected")">@vote.Decision</span>}else{<span>—</span>}</td><td class="dc-comment">@(string.IsNullOrWhiteSpace(vote?.Comment)?"—":vote.Comment)</td><td>@CommitteeDisplay.Date(vote?.VotedAt)</td></tr>
+}
+@foreach(var vote in Model.Round.Votes.Where(v=>!Model.TopMembers.Any(m=>m.Id==v.CommitteeMemberId)))
+{<tr><td>@vote.CommitteeMember.User.FullName (historical assignment)</td><td>Voted</td><td>@vote.Decision</td><td class="dc-comment">@vote.Comment</td><td>@CommitteeDisplay.Date(vote.VotedAt)</td></tr>}
+@if(Model.TopMembers.Count==0 && Model.Round.Votes.Count==0){<tr><td colspan="5">No assigned members or votes.</td></tr>}
+</tbody></table></div><p class="dc-vote-note"><span aria-hidden="true">ⓘ</span> Saved committee decisions remain read-only and visible to assigned members. Refresh to load current progress.</p></section></div>
+@section Styles {<partial name="_DecisionStyles" />}
+@section Scripts {
+<script>
+(() => {
+    const root = document.querySelector('.tc-decision[data-signature-progress-url]');
+    if (!root) return;
+
+    const signForm = root.querySelector('[data-sign-form]');
+    const canvas = signForm?.querySelector('[data-signature-canvas]');
+    const context = canvas?.getContext('2d');
+    const strokes = [];
+    let currentStroke = null;
+    let totalPoints = 0;
+    if (canvas && context) {
+        context.strokeStyle = '#17212e';
+        context.lineWidth = 3;
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        const pointFrom = event => {
+            const rect = canvas.getBoundingClientRect();
+            return { x: Math.max(0, Math.min(600, Math.round((event.clientX - rect.left) * 600 / rect.width * 100) / 100)),
+                y: Math.max(0, Math.min(160, Math.round((event.clientY - rect.top) * 160 / rect.height * 100) / 100)) };
+        };
+        canvas.addEventListener('pointerdown', event => {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            event.preventDefault();
+            canvas.setPointerCapture(event.pointerId);
+            currentStroke = [pointFrom(event)];
+            context.beginPath();
+            context.moveTo(currentStroke[0].x, currentStroke[0].y);
+        });
+        canvas.addEventListener('pointermove', event => {
+            if (!currentStroke || totalPoints >= 3000) return;
+            event.preventDefault();
+            const point = pointFrom(event);
+            const prior = currentStroke[currentStroke.length - 1];
+            if (Math.hypot(point.x - prior.x, point.y - prior.y) < 0.7) return;
+            currentStroke.push(point);
+            totalPoints++;
+            context.lineTo(point.x, point.y);
+            context.stroke();
+            signForm.querySelector('[data-signature-hint]').textContent = 'Signature captured. You can clear and sign again if needed.';
+        });
+        const finishStroke = () => {
+            if (currentStroke?.length >= 2) strokes.push(currentStroke);
+            currentStroke = null;
+        };
+        canvas.addEventListener('pointerup', finishStroke);
+        canvas.addEventListener('pointercancel', finishStroke);
+        signForm.querySelector('[data-clear-signature]').addEventListener('click', () => {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            strokes.length = 0;
+            currentStroke = null;
+            totalPoints = 0;
+            signForm.querySelector('[data-signature-data]').value = '';
+            signForm.querySelector('[data-signature-error]').hidden = true;
+            signForm.querySelector('[data-signature-hint]').textContent = 'Signature required before approval.';
+        });
+    }
+
+    document.querySelectorAll('.tc-decision .dc-vote-form').forEach(form => form.addEventListener('submit', event => {
+        if (form.matches('[data-sign-form]')) {
+            if (currentStroke?.length >= 2) strokes.push(currentStroke);
+            currentStroke = null;
+            if (strokes.length === 0 || totalPoints < 1) {
+                event.preventDefault();
+                signForm.querySelector('[data-signature-error]').hidden = false;
+                return;
+            }
+            signForm.querySelector('[data-signature-data]').value = JSON.stringify(strokes);
+            signForm.querySelector('[data-signature-error]').hidden = true;
+        }
+        if (!form.reportValidity()) { event.preventDefault(); return; }
+        if (form.dataset.sending === 'true') { event.preventDefault(); return; }
+        form.dataset.sending = 'true';
+        form.querySelector('button[type="submit"]').disabled = true;
+    }));
+    addEventListener('pageshow', () => document.querySelectorAll('.tc-decision .dc-vote-form').forEach(form => {
+        delete form.dataset.sending;
+        const button = form.querySelector('button[type="submit"]');
+        if (button) button.disabled = false;
+    }));
+
+    let active = false;
+    const refresh = async () => {
+        if (active || document.hidden) return;
+        active = true;
+        try {
+            const response = await fetch(root.dataset.signatureProgressUrl, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+            if (!response.ok) return;
+            const data = await response.json();
+            root.querySelector('[data-signed-count]').textContent = data.signedCount;
+            root.querySelector('[data-round-status]').textContent = data.roundStatus === 'InProgress' ? 'In Progress' : data.roundStatus;
+            for (const member of data.members) {
+                const card = root.querySelector(`[data-member-id="${member.id}"]`);
+                if (!card) continue;
+                const state = card.querySelector('[data-signature-state]');
+                const time = card.querySelector('[data-signature-at]');
+                state.textContent = member.signed ? 'Signed & approved' : 'Awaiting signature';
+                state.className = member.signed ? 'dc-signature-signed' : 'dc-signature-pending';
+                time.textContent = member.signedAt || '—';
+                if (member.signatureSvgBase64 && !card.querySelector('[data-signature-ink]')) {
+                    const ink = document.createElement('img');
+                    ink.className = 'dc-signature-ink';
+                    ink.dataset.signatureInk = 'true';
+                    ink.alt = `Electronic signature by ${member.name}`;
+                    ink.src = `data:image/svg+xml;base64,${member.signatureSvgBase64}`;
+                    time.before(ink);
+                }
+            }
+            if (data.signedCount === 4 && data.roundStatus === 'Approved') {
+                const pdfSection = root.querySelector('.dc-report-file');
+                const final = pdfSection.querySelector('[data-final-signed-pdf]');
+                pdfSection.querySelector('[data-original-pdf-note]').style.display = 'none';
+                pdfSection.querySelector('[data-original-pdf]').style.display = 'none';
+                final.style.display = '';
+                const preview = final.querySelector('[data-final-preview]');
+                if (preview.dataset.loaded !== 'true') {
+                    const previewUrl = new URL(root.dataset.finalPdfUrl, location.href);
+                    previewUrl.searchParams.set('download', 'false');
+                    preview.src = previewUrl.href;
+                    preview.dataset.loaded = 'true';
+                }
+            }
+        } catch { }
+        finally { active = false; }
+    };
+    setInterval(refresh, 5000);
+})();
+</script>
+}

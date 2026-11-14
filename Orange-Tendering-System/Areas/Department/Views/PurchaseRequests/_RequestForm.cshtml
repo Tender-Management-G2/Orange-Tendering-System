@@ -45,7 +45,7 @@
     <div class="pg-field"><label asp-for="Attachments">Add files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" /><span asp-validation-for="Attachments"></span>
     <small class="pg-hint">PDF, PNG, JPEG, DOCX or XLSX. Up to five files per save, 5 MB each and 10 MB combined. Reselect new files if validation fails.</small></div>
     <div class="pg-actions">
-        <button type="submit" name="intent" value="save" class="pg-btn">@(Model.Id == 0 ? "Save draft" : "Save changes")</button>
+        @if (Model.Id != 0) { <button type="submit" name="intent" value="save" class="pg-btn">Save changes</button> }
         <button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary">@(Model.Id == 0 ? "Submit to Sourcing Officer" : "Submit / resubmit to Sourcing Officer")</button>
         <a class="pg-btn" asp-action="Index">Cancel</a>
     </div>

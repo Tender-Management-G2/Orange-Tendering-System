@@ -5,77 +5,238 @@
     ViewData["Title"] = $"PR-{request.Id} — {request.Title}";
     ViewData["WorkspaceSection"] = "My Requests";
     ViewData["Description"] = "Request information, supporting files and preserved submission history.";
+    var requestStatus = RequestDisplay.Status(request);
+    var statusClass = requestStatus.ToLowerInvariant().Replace(' ', '-');
+    string FileSize(long bytes) => bytes < 1024 ? $"{bytes} bytes" : bytes < 1024 * 1024 ? $"{bytes / 1024d:0.#} KB" : $"{bytes / (1024d * 1024d):0.##} MB";
 }
-<partial name="_PageHeader" />
-@if (TempData["DepartmentMessage"] is string message) { <p class="pg-note" role="status">@message</p> }
-<nav class="pg-links"><ul>
-    <li><a asp-action="Index">Back to my requests</a></li>
-    @if (Model.CanEdit) { <li><a asp-action="Edit" asp-route-id="@request.Id">Edit / resubmit</a></li> }
-</ul></nav>
-<section class="ws-panel pg-panel">
-    <h2>Request information</h2>
-    <dl class="pg-dl">
-        <div><dt>Reference</dt><dd>PR-@request.Id</dd></div>
-        <div><dt>Department</dt><dd>@request.Department.Name</dd></div>
-        <div><dt>Created by</dt><dd>@request.CreatedByUser?.FullName</dd></div>
-        <div><dt>Status</dt><dd>@RequestDisplay.Status(request)</dd></div>
-        <div><dt>Priority</dt><dd>@request.Priority</dd></div>
-        <div><dt>Needed by</dt><dd>@request.NeededBy?.ToString("yyyy-MM-dd")</dd></div>
-        <div><dt>Created</dt><dd>@RequestDisplay.Date(request.CreatedAt)</dd></div>
-        <div><dt>Last submitted</dt><dd>@RequestDisplay.Date(request.SubmittedAt)</dd></div>
-    </dl>
-    <h3>Justification</h3><p style="white-space:pre-wrap">@request.Justification</p>
-    @if (request.Tenders.Count > 0) { <p>Converted to tender: @string.Join(", ", request.Tenders.Select(t => $"T-{t.Id}: {t.Title}"))</p> }
-</section>
-<section class="ws-panel pg-panel">
-    <h2>Requested items</h2>
-    <partial name="_Items" model='request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm { Name = i.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList()' />
-</section>
-<section class="ws-panel pg-panel">
-    <h2>Supporting attachments</h2>
-    @if (request.Documents.Count == 0) { <p>No attachments.</p> }
-    <ul>@foreach (var file in request.Documents.OrderBy(d => d.UploadedAt))
+<div class="rqd-page">
+    <nav class="rqd-actions" aria-label="Purchase request actions">
+        <a class="rqd-back" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h13"/></svg>Back to my requests</a>
+        @if (Model.CanEdit) { <a class="rqd-edit" asp-action="Edit" asp-route-id="@request.Id">Edit / resubmit</a> }
+    </nav>
+    <header class="rqd-hero">
+        <nav class="rqd-breadcrumb" aria-label="Breadcrumb">
+            <a asp-area="Department" asp-controller="Dashboard" asp-action="Index">Department</a>
+            <span aria-hidden="true">›</span>
+            <a asp-action="Index">My Requests</a>
+            <span aria-hidden="true">›</span>
+            <span aria-current="page">PR-@request.Id</span>
+        </nav>
+        <div class="rqd-hero-main">
+            <span class="rqd-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H5V3z"/><path d="M14 3v5h5M8 13h8M8 17h6"/></svg></span>
+            <div><h1 dir="auto">PR-@request.Id — @request.Title</h1><p>Request information, supporting files and preserved submission history.</p></div>
+        </div>
+        <span class="rqd-wave rqd-wave-one" aria-hidden="true"></span><span class="rqd-wave rqd-wave-two" aria-hidden="true"></span>
+    </header>
+
+    @if (TempData["DepartmentMessage"] is string message)
     {
-        <li>@if (file.DocumentType == "DepartmentSupportingDocument") { <a asp-action="Download" asp-route-id="@file.Id">@file.FileName</a> } else { <span>@file.FileName — shared download integration pending</span> }
-        <small>(@file.SizeBytes bytes · @RequestDisplay.Date(file.UploadedAt))</small></li>
-    }</ul>
-</section>
-<section class="ws-panel pg-panel">
-    <h2>Submission history & Officer review notes</h2>
-    @if (request.Reviews.Count == 0) { <p>This request has not been submitted.</p> }
-    @foreach (var review in request.Reviews.OrderByDescending(r => r.SubmissionNumber))
-    {
-        <article>
-            <h3>Submission @review.SubmissionNumber</h3>
-            <p>Submitted: @RequestDisplay.Date(review.SubmittedAt) · Decision: @review.Decision</p>
-            @if (review.ReviewedAt.HasValue) { <p>Reviewed: @RequestDisplay.Date(review.ReviewedAt) · @review.ReviewedByUser?.FullName</p> }
-            @if (!string.IsNullOrWhiteSpace(review.Comment)) { <p style="white-space:pre-wrap"><strong>Officer comments / reason:</strong> @review.Comment</p> }
-            @{
+        <p class="rqd-confirm" role="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>@message</p>
+    }
+
+    <section class="rqd-card" aria-labelledby="rqd-info-title">
+        <h2 id="rqd-info-title" class="rqd-card-title"><span class="rqd-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H5V3z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg></span>Request information</h2>
+        <dl class="rqd-info-grid">
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 7l9 4 9-4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg>Reference</dt><dd>PR-@request.Id</dd></div>
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h1m4 0h1m-6 4h1m4 0h1m-5 7v-4h2v4"/></svg>Department</dt><dd dir="auto">@request.Department.Name</dd></div>
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Created by</dt><dd dir="auto">@(string.IsNullOrWhiteSpace(request.CreatedByUser?.FullName) ? "—" : request.CreatedByUser.FullName)</dd></div>
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM8 10h8m-8 4h5"/></svg>Status</dt><dd><span class="rqd-badge rqd-status-@statusClass">@requestStatus</span></dd></div>
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M17 7H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H6"/></svg>Priority</dt><dd><span class="rqd-badge rqd-priority-@request.Priority.ToString().ToLowerInvariant()">@request.Priority</span></dd></div>
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>Needed by</dt><dd>@(request.NeededBy?.ToString("yyyy-MM-dd") ?? "—")</dd></div>
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Created</dt><dd>@RequestDisplay.Date(request.CreatedAt)</dd></div>
+            <div class="rqd-info-item"><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5 15a8 8 0 1 0 2-8L4 10"/><path d="M12 8v4l3 2"/></svg>Last submitted</dt><dd>@RequestDisplay.Date(request.SubmittedAt)</dd></div>
+        </dl>
+        <div class="rqd-justification"><h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.7 7.4L3 21l2.1-5.3A8.5 8.5 0 1 1 21 11.5z"/><path d="M8 11h8M8 14h5"/></svg>Justification</h3><p dir="auto">@request.Justification</p></div>
+        @if (request.Tenders.Count > 0)
+        {
+            <p class="rqd-tender-note">Converted to tender: @string.Join(", ", request.Tenders.Select(t => $"T-{t.Id}: {t.Title}"))</p>
+        }
+    </section>
+
+    <section class="rqd-card" aria-labelledby="rqd-items-title">
+        <h2 id="rqd-items-title" class="rqd-card-title"><span class="rqd-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.2 11.5h11.6L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></span>Requested items</h2>
+        @if (request.Items.Count == 0)
+        {
+            <p class="rqd-empty">No requested items are recorded.</p>
+        }
+        else
+        {
+            <div class="rqd-table-wrap"><table class="rqd-table">
+                <thead><tr><th scope="col">#</th><th scope="col">Item / Service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead>
+                <tbody>
+                @{ var itemNumber = 0; }
+                @foreach (var item in request.Items.OrderBy(i => i.Id))
+                {
+                    itemNumber++;
+                    <tr><td>@itemNumber</td><td dir="auto">@item.Name</td><td class="rqd-prewrap" dir="auto">@item.Specifications</td><td>@item.Quantity.ToString("0.###")</td><td dir="auto">@item.Unit</td></tr>
+                }
+                </tbody>
+            </table></div>
+        }
+    </section>
+
+    <section class="rqd-card" aria-labelledby="rqd-files-title">
+        <h2 id="rqd-files-title" class="rqd-card-title"><span class="rqd-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5-5 5 5M12 5v12"/></svg></span>Supporting attachments</h2>
+        @if (request.Documents.Count == 0)
+        {
+            <p class="rqd-empty">No supporting attachments were uploaded for this request.</p>
+        }
+        else
+        {
+            <div class="rqd-attachments">
+            @foreach (var file in request.Documents.OrderBy(d => d.UploadedAt).ThenBy(d => d.Id))
+            {
+                <article class="rqd-attachment">
+                    <span class="rqd-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg></span>
+                    <div class="rqd-file-meta"><strong dir="auto">@file.FileName</strong><small>@FileSize(file.SizeBytes) <span aria-hidden="true">·</span> @RequestDisplay.Date(file.UploadedAt)</small></div>
+                    @if (file.DocumentType == "DepartmentSupportingDocument")
+                    {
+                        <a class="rqd-download" asp-action="Download" asp-route-id="@file.Id"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download</a>
+                    }
+                    else
+                    {
+                        <span class="rqd-file-unavailable">Download unavailable</span>
+                    }
+                </article>
+            }
+            </div>
+        }
+    </section>
+
+    <section class="rqd-card" aria-labelledby="rqd-history-title">
+        <h2 id="rqd-history-title" class="rqd-card-title"><span class="rqd-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M4 4v5h5"/></svg></span>Submission History &amp; Officer Review Notes</h2>
+        @if (request.Reviews.Count == 0)
+        {
+            <p class="rqd-empty">This request has not been submitted.</p>
+        }
+        else
+        {
+            <ol class="rqd-timeline">
+            @foreach (var review in request.Reviews.OrderByDescending(r => r.SubmissionNumber))
+            {
                 RequestSnapshot? snapshot = null;
                 try { snapshot = JsonSerializer.Deserialize<RequestSnapshot>(review.SubmittedSnapshotJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }); }
                 catch (JsonException) { }
+                var decisionClass = review.Decision.ToString().ToLowerInvariant();
+                <li class="rqd-timeline-entry">
+                    <span class="rqd-timeline-dot" aria-hidden="true"></span>
+                    <article class="rqd-submission">
+                        <header class="rqd-submission-head"><div><h3>Submission @review.SubmissionNumber</h3><p>Submitted: @RequestDisplay.Date(review.SubmittedAt) <span aria-hidden="true">|</span> Decision: <span class="rqd-badge rqd-decision-@decisionClass">@review.Decision</span></p></div></header>
+                        @if (review.ReviewedAt.HasValue)
+                        {
+                            <p class="rqd-reviewer">Reviewed: @RequestDisplay.Date(review.ReviewedAt) <span aria-hidden="true">·</span> @(string.IsNullOrWhiteSpace(review.ReviewedByUser?.FullName) ? "Sourcing Officer" : review.ReviewedByUser.FullName)</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(review.Comment))
+                        {
+                            <div class="rqd-officer-note"><strong>Officer comments / reason</strong><p class="rqd-prewrap" dir="auto">@review.Comment</p></div>
+                        }
+                        @if (snapshot is not null && snapshot.Items is not null)
+                        {
+                            <details class="rqd-snapshot">
+                                <summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>View submitted version</summary>
+                                <div class="rqd-snapshot-body">
+                                    <h4 dir="auto">@snapshot.Title</h4>
+                                    <p class="rqd-snapshot-justification" dir="auto">@snapshot.Justification</p>
+                                    <p class="rqd-snapshot-meta"><strong>Priority:</strong> @snapshot.Priority <span aria-hidden="true">|</span> <strong>Needed by:</strong> @(snapshot.NeededBy?.ToString("yyyy-MM-dd") ?? "—")</p>
+                                    @if (snapshot.Items.Count > 0)
+                                    {
+                                        <div class="rqd-table-wrap"><table class="rqd-table rqd-snapshot-table"><thead><tr><th scope="col">#</th><th scope="col">Item / Service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead><tbody>
+                                        @for (var i = 0; i < snapshot.Items.Count; i++)
+                                        {
+                                            var snapshotItem = snapshot.Items[i];
+                                            <tr><td>@(i + 1)</td><td dir="auto">@snapshotItem.Name</td><td class="rqd-prewrap" dir="auto">@snapshotItem.Specifications</td><td>@snapshotItem.Quantity.ToString("0.###")</td><td dir="auto">@snapshotItem.Unit</td></tr>
+                                        }
+                                        </tbody></table></div>
+                                    }
+                                    @if (snapshot.Attachments is { Count: > 0 })
+                                    {
+                                        <p class="rqd-snapshot-files"><strong>Files at submission:</strong> <span dir="auto">@string.Join(", ", snapshot.Attachments)</span></p>
+                                    }
+                                </div>
+                            </details>
+                        }
+                        else
+                        {
+                            <p class="rqd-empty rqd-snapshot-warning">The earlier snapshot cannot be displayed. Its stored record has been preserved.</p>
+                        }
+                    </article>
+                </li>
             }
-            @if (snapshot is not null && snapshot.Items is not null)
-            {
-                <details><summary>View submitted version</summary>
-                    <h4>@snapshot.Title</h4><p style="white-space:pre-wrap">@snapshot.Justification</p>
-                    <p>Priority: @snapshot.Priority · Needed by: @snapshot.NeededBy?.ToString("yyyy-MM-dd")</p>
-                    <partial name="_Items" model="snapshot.Items" />
-                    @if (snapshot.Attachments is { Count: > 0 }) { <p>Files at submission: @string.Join(", ", snapshot.Attachments)</p> }
-                </details>
-            }
-            else { <p>The earlier snapshot cannot be displayed. Its stored record has been preserved.</p> }
-        </article>
-    }
-</section>
-<section class="ws-panel pg-panel">
-    <h2>Your related clarifications</h2>
-    <p class="pg-hint">Read-only history for threads you participate in. Sending and replying depends on the shared clarification module.</p>
-    @if (Model.Clarifications.Count == 0) { <p>No related clarifications.</p> }
-    @foreach (var thread in Model.Clarifications)
-    {
-        <details><summary>@thread.Subject · @thread.Status</summary>
-        @foreach (var reply in thread.Messages.OrderBy(m => m.SentAt)) { <p style="white-space:pre-wrap">@RequestDisplay.Date(reply.SentAt): @reply.Message</p> }
-        </details>
-    }
-</section>
+            </ol>
+        }
+    </section>
+</div>
+
+@section Styles {
+<style>
+.rqd-page{--rqd-orange:#ff7900;--rqd-orange-soft:#fff3e9;--rqd-navy:#172435;display:grid;gap:16px;color:var(--ws-ink);min-width:0}
+.rqd-page *{box-sizing:border-box}
+.rqd-hero{position:relative;isolation:isolate;overflow:hidden;padding:14px 20px 20px;border:1px solid var(--ws-rule);border-radius:16px;background:linear-gradient(110deg,var(--ws-surface),color-mix(in srgb,var(--ws-surface) 84%,#ff7900 16%));box-shadow:0 5px 18px #13243a0b}
+.rqd-hero:after{content:"";position:absolute;z-index:-1;right:0;top:0;width:44%;height:100%;opacity:.7;background:radial-gradient(ellipse at 92% 5%,#ff790028,transparent 48%),radial-gradient(ellipse at 70% 100%,#ff790018,transparent 45%);clip-path:polygon(20% 0,100% 0,100% 100%,0 100%)}
+.rqd-breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:14px;color:var(--ws-muted);font-size:13px}
+.rqd-breadcrumb a{color:var(--ws-accent);text-decoration:none}.rqd-breadcrumb a:hover{text-decoration:underline}.rqd-breadcrumb [aria-current=page]{color:var(--ws-ink)}
+.rqd-hero-main{position:relative;z-index:1;display:flex;align-items:center;gap:12px;max-width:78%}
+.rqd-hero-icon,.rqd-section-icon{display:grid;place-items:center;flex:0 0 auto;color:var(--rqd-orange);background:color-mix(in srgb,var(--rqd-orange) 12%,var(--ws-surface));border:1px solid color-mix(in srgb,var(--rqd-orange) 30%,var(--ws-rule));border-radius:10px}
+.rqd-hero-icon{width:42px;height:42px}.rqd-hero-icon svg{width:24px;height:24px}
+.rqd-hero h1{margin:0;color:var(--ws-ink);font-size:clamp(23px,2.5vw,32px);line-height:1.25;letter-spacing:-.025em;overflow-wrap:anywhere}
+.rqd-hero-main p{margin:5px 0 0;color:var(--ws-muted);font-size:14px;line-height:1.5}
+.rqd-wave{position:absolute;z-index:0;pointer-events:none;border:1px solid #ff790025;border-radius:50% 0 50% 0;transform:rotate(-12deg)}
+.rqd-wave-one{right:-24px;top:-36px;width:230px;height:132px;background:linear-gradient(145deg,#ff790016,transparent 72%)}
+.rqd-wave-two{right:70px;top:-64px;width:230px;height:145px;background:linear-gradient(145deg,#ff79000e,transparent 68%)}
+.rqd-confirm{display:flex;align-items:center;gap:9px;margin:0;padding:10px 13px;border:1px solid color-mix(in srgb,var(--rqd-orange) 50%,var(--ws-rule));border-left:4px solid var(--rqd-orange);border-radius:10px;background:color-mix(in srgb,var(--rqd-orange) 10%,var(--ws-surface));color:var(--ws-ink);font-size:14px;font-weight:650}
+.rqd-confirm svg{width:17px;height:17px;flex:0 0 auto;color:var(--rqd-orange);fill:none;stroke:currentColor;stroke-width:2}
+.rqd-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.rqd-back,.rqd-edit,.rqd-download{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:8px 12px;border:1px solid var(--rqd-orange);border-radius:9px;color:var(--rqd-orange);background:transparent;text-decoration:none;font-size:13px;font-weight:700;transition:background .15s ease,color .15s ease}
+.rqd-back:hover,.rqd-edit:hover,.rqd-download:hover{background:var(--rqd-orange);color:#fff}
+.rqd-back svg,.rqd-download svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.rqd-card{min-width:0;padding:16px;border:1px solid var(--ws-rule);border-radius:14px;background:var(--ws-surface);box-shadow:0 4px 16px #14283b0a}
+.rqd-card-title{display:flex;align-items:center;gap:9px;margin:0 0 14px;color:var(--ws-ink);font-size:19px;line-height:1.3;font-weight:750;letter-spacing:-.015em}
+.rqd-section-icon{width:27px;height:27px;border-radius:8px}.rqd-section-icon svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rqd-info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;padding:0}
+.rqd-info-item{min-width:0;padding:9px 11px;border-bottom:1px solid var(--ws-soft-rule)}
+.rqd-info-item:nth-child(4n+1){padding-left:0}.rqd-info-item:nth-child(4n){padding-right:0}
+.rqd-info-item dt{display:flex;align-items:center;gap:6px;margin:0 0 5px;color:var(--ws-muted);font-size:12px;font-weight:600}
+.rqd-info-item dt svg{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:var(--rqd-orange);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rqd-info-item dd{margin:0;color:var(--ws-ink);font-size:14px;font-weight:650;overflow-wrap:anywhere}
+.rqd-badge{display:inline-flex;align-items:center;min-height:23px;padding:4px 10px;border:1px solid transparent;border-radius:999px;font-size:12px;font-weight:750;line-height:1.2;white-space:nowrap}
+.rqd-status-submitted,.rqd-status-under-review{color:#174895;background:#eaf2ff;border-color:#cbdcff}.rqd-status-draft{color:#606b77;background:#eef0f2;border-color:#d9dde1}.rqd-status-returned{color:#8b4b00;background:#fff1db;border-color:#ffdca4}.rqd-status-converted-to-tender,.rqd-status-accepted{color:#147a48;background:#e6f7ee;border-color:#c5ebd6}.rqd-status-rejected{color:#a22b35;background:#fff0f0;border-color:#f5cccc}
+.rqd-priority-low{color:#556273;background:#eff2f5;border-color:#e1e6ea}.rqd-priority-normal{color:#9a4c00;background:#fff1e3;border-color:#ffd4ad}.rqd-priority-high{color:#a34700;background:#ffe6d4;border-color:#ffc49b}.rqd-priority-urgent{color:#aa2733;background:#ffeded;border-color:#f3c4c8}
+.rqd-justification{margin-top:13px;padding:11px 13px;border:1px solid color-mix(in srgb,var(--rqd-orange) 21%,var(--ws-rule));border-radius:10px;background:linear-gradient(100deg,color-mix(in srgb,var(--rqd-orange) 9%,var(--ws-surface)),var(--ws-surface))}
+.rqd-justification h3{display:flex;align-items:center;gap:7px;margin:0 0 5px;color:var(--ws-ink);font-size:14px;font-weight:750}
+.rqd-justification h3 svg{width:16px;height:16px;fill:none;stroke:var(--rqd-orange);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.rqd-justification p,.rqd-snapshot-justification{margin:0;color:var(--ws-ink);font-size:14px;line-height:1.65;white-space:pre-wrap;unicode-bidi:plaintext}
+.rqd-tender-note{margin:10px 0 0;color:var(--ws-muted);font-size:13px}
+.rqd-table-wrap{width:100%;overflow-x:auto;border:1px solid var(--ws-soft-rule);border-radius:9px}
+.rqd-table{width:100%;border-collapse:collapse;font-size:13px}
+.rqd-table th{padding:10px;background:linear-gradient(90deg,color-mix(in srgb,var(--rqd-orange) 17%,var(--ws-surface)),color-mix(in srgb,var(--rqd-orange) 8%,var(--ws-surface)));color:var(--ws-ink);text-align:left;font-size:12px;font-weight:750;white-space:nowrap}
+.rqd-table td{padding:9px 10px;border-top:1px solid var(--ws-soft-rule);color:var(--ws-ink);line-height:1.5;vertical-align:top}
+.rqd-table tbody tr:hover{background:color-mix(in srgb,var(--rqd-orange) 4%,var(--ws-surface))}
+.rqd-prewrap{white-space:pre-wrap;unicode-bidi:plaintext}
+.rqd-empty{margin:0;padding:15px;border:1px dashed var(--ws-rule);border-radius:9px;color:var(--ws-muted);font-size:13px;text-align:center}
+.rqd-attachments{display:grid;gap:8px}
+.rqd-attachment{display:flex;align-items:center;gap:10px;min-width:0;padding:9px 10px;border:1px solid var(--ws-soft-rule);border-radius:10px;background:color-mix(in srgb,var(--ws-raised) 38%,var(--ws-surface))}
+.rqd-file-icon{display:grid;place-items:center;width:34px;height:34px;flex:0 0 auto;border-radius:8px;background:color-mix(in srgb,var(--rqd-orange) 12%,var(--ws-surface));color:var(--rqd-orange)}
+.rqd-file-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rqd-file-meta{display:grid;gap:3px;min-width:0;flex:1}.rqd-file-meta strong{overflow:hidden;color:var(--ws-ink);font-size:13px;text-overflow:ellipsis;white-space:nowrap}.rqd-file-meta small{color:var(--ws-muted);font-size:11px}
+.rqd-download{min-height:34px;padding:6px 10px;flex:0 0 auto}.rqd-file-unavailable{color:var(--ws-muted);font-size:12px}
+.rqd-timeline{position:relative;display:grid;gap:12px;margin:0;padding:0 0 0 18px;list-style:none}
+.rqd-timeline:before{content:"";position:absolute;left:5px;top:5px;bottom:8px;width:2px;border-radius:2px;background:linear-gradient(var(--rqd-orange),color-mix(in srgb,var(--rqd-orange) 16%,var(--ws-surface)))}
+.rqd-timeline-entry{position:relative;min-width:0}.rqd-timeline-dot{position:absolute;left:-18px;top:13px;width:12px;height:12px;border:3px solid var(--ws-surface);border-radius:50%;background:var(--rqd-orange);box-shadow:0 0 0 1px color-mix(in srgb,var(--rqd-orange) 50%,transparent)}
+.rqd-submission{overflow:hidden;border:1px solid var(--ws-rule);border-radius:11px;background:var(--ws-surface)}
+.rqd-submission-head{padding:10px 12px;background:linear-gradient(100deg,color-mix(in srgb,var(--rqd-orange) 14%,var(--ws-surface)),color-mix(in srgb,var(--rqd-orange) 5%,var(--ws-surface)));border-bottom:1px solid var(--ws-soft-rule)}
+.rqd-submission-head h3{margin:0 0 4px;color:var(--ws-ink);font-size:15px;font-weight:750}
+.rqd-submission-head p{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0;color:var(--ws-muted);font-size:12px}
+.rqd-decision-pending{color:#785000;background:#fff3d6;border-color:#f7dda1}.rqd-decision-returned{color:#8b4b00;background:#fff1db;border-color:#ffdca4}.rqd-decision-accepted{color:#147a48;background:#e6f7ee;border-color:#c5ebd6}.rqd-decision-rejected{color:#a22b35;background:#fff0f0;border-color:#f5cccc}
+.rqd-reviewer{margin:9px 12px;color:var(--ws-muted);font-size:12px}
+.rqd-officer-note{margin:9px 12px;padding:9px 10px;border-left:3px solid var(--rqd-orange);border-radius:0 8px 8px 0;background:color-mix(in srgb,var(--rqd-orange) 8%,var(--ws-surface))}
+.rqd-officer-note strong{display:block;margin-bottom:4px;color:var(--ws-ink);font-size:12px}.rqd-officer-note p{margin:0;color:var(--ws-ink);font-size:13px;line-height:1.55}
+.rqd-snapshot{margin:9px 12px 12px;border:1px solid var(--ws-soft-rule);border-radius:9px}
+.rqd-snapshot summary{display:flex;align-items:center;gap:6px;padding:9px;color:var(--rqd-orange);font-size:12px;font-weight:750;cursor:pointer;list-style:none}
+.rqd-snapshot summary::-webkit-details-marker{display:none}.rqd-snapshot summary svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;transition:transform .15s}.rqd-snapshot[open] summary svg{transform:rotate(90deg)}
+.rqd-snapshot-body{display:grid;gap:8px;padding:0 9px 10px}.rqd-snapshot-body h4{margin:0;color:var(--ws-ink);font-size:14px}.rqd-snapshot-justification{font-size:13px}
+.rqd-snapshot-meta,.rqd-snapshot-files{margin:0;color:var(--ws-muted);font-size:12px;line-height:1.5}.rqd-snapshot-meta strong,.rqd-snapshot-files strong{color:var(--ws-ink)}
+.rqd-snapshot-table th,.rqd-snapshot-table td{padding:8px;font-size:11px}.rqd-snapshot-warning{margin:10px 12px}
+@@media(max-width:900px){.rqd-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rqd-info-item:nth-child(4n+1){padding-left:11px}.rqd-info-item:nth-child(2n+1){padding-left:0}.rqd-info-item:nth-child(4n){padding-right:11px}.rqd-info-item:nth-child(2n){padding-right:0}}
+@@media(max-width:560px){.rqd-page{gap:12px}.rqd-hero{padding:12px 13px 16px}.rqd-hero-main{max-width:100%;align-items:flex-start}.rqd-hero-icon{width:36px;height:36px}.rqd-hero-icon svg{width:21px;height:21px}.rqd-hero h1{font-size:21px}.rqd-hero-main p{font-size:12px}.rqd-card{padding:12px}.rqd-card-title{font-size:16px;margin-bottom:11px}.rqd-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rqd-info-item{padding:8px 6px}.rqd-info-item:nth-child(4n+1){padding-left:6px}.rqd-info-item:nth-child(2n+1){padding-left:0}.rqd-info-item:nth-child(4n){padding-right:6px}.rqd-info-item:nth-child(2n){padding-right:0}.rqd-info-item dt{font-size:11px}.rqd-info-item dd{font-size:13px}.rqd-attachment{gap:7px;padding:8px}.rqd-file-icon{width:30px;height:30px}.rqd-file-meta strong{max-width:45vw}.rqd-download{font-size:11px;padding:5px 8px}.rqd-table{min-width:540px}.rqd-snapshot-table{min-width:480px}.rqd-confirm{align-items:flex-start;font-size:13px}}
+</style>
+}

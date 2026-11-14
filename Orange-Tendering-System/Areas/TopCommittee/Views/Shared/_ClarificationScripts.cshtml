@@ -1,0 +1,17 @@
+<script>
+(()=>{
+ document.querySelectorAll('[data-upload-area]').forEach(area=>{
+  const input=area.querySelector('[data-file-input]'),drop=area.querySelector('.rv-drop'),selected=area.querySelector('.rv-selected'),name=area.querySelector('[data-file-name]'),error=area.querySelector('[data-file-error]');
+  const reset=()=>{input.value='';name.textContent='';selected.hidden=true;error.hidden=true;};
+  const update=()=>{const file=input.files[0];error.hidden=true;if(!file){reset();return;}if(file.size===0||file.size>10*1024*1024||!(/\.(pdf|docx|jpe?g|png)$/i.test(file.name))){reset();error.textContent='Select a non-empty PDF, DOCX, JPG or PNG file, up to 10 MB.';error.hidden=false;return;}name.textContent=file.name;selected.hidden=false;};
+  input.addEventListener('change',update);area.querySelector('[data-remove-file]').addEventListener('click',()=>{reset();input.focus();});
+  ['dragenter','dragover'].forEach(event=>drop.addEventListener(event,e=>{e.preventDefault();drop.classList.add('is-dragging');}));
+  ['dragleave','drop'].forEach(event=>drop.addEventListener(event,e=>{e.preventDefault();drop.classList.remove('is-dragging');}));
+  drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length!==1){error.textContent='Attach one file per message.';error.hidden=false;return;}input.files=e.dataTransfer.files;update();});
+ });
+ document.querySelectorAll('[data-private-message]').forEach(form=>{
+  form.addEventListener('submit',e=>{if(form.dataset.sending==='true'){e.preventDefault();return;}if(!form.reportValidity()){e.preventDefault();return;}form.dataset.sending='true';form.querySelector('button[type="submit"]').disabled=true;form.querySelector('.rv-send-status').textContent='Sending your private message…';});
+  addEventListener('pageshow',()=>{delete form.dataset.sending;form.querySelector('button[type="submit"]').disabled=false;form.querySelector('.rv-send-status').textContent='';});
+ });
+})();
+</script>

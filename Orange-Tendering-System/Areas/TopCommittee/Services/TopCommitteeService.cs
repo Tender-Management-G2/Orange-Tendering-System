@@ -1,4 +1,5 @@
 using System.Data;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -58,7 +59,14 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
             ((c.FromUserId == userId && c.ToUserId == threadManagerId) ||
              (c.ToUserId == userId && c.FromUserId == threadManagerId)))
             .Include(c => c.Messages).ThenInclude(m => m.SenderUser)
-            .Include(c => c.FromUser).Include(c => c.ToUser).AsSplitQuery().OrderByDescending(c => c.CreatedAt).ToListAsync();
+            .Include(c => c.Messages).ThenInclude(m => m.Documents)
+            .Include(c => c.FromUser).Include(c => c.ToUser).AsSplitQuery().OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id).ToListAsync();
+        var threadKeys=threads.Select(t=>t.Id.ToString()).ToArray();
+        var contextRows=await db.AuditLogs.Where(a=>a.Action=="TopClarificationContext" && a.EntityName=="Clarification" && threadKeys.Contains(a.EntityId)).Select(a=>new {a.EntityId,a.NewValues}).ToListAsync();
+        var otherRoundThreads=contextRows.Where(a=>a.NewValues is not null && JsonSerializer.Deserialize<ClarificationContext>(a.NewValues)!.RoundId!=round.Id).Select(a=>a.EntityId).ToHashSet();
+        threads.RemoveAll(t=>otherRoundThreads.Contains(t.Id.ToString()));
+        var invited=await db.TenderInvitations.Where(i=>i.TenderRoundId==round.TenderRoundId).Select(i=>i.SupplierId).Distinct().CountAsync();
+        var received=await db.TenderInvitations.CountAsync(i=>i.TenderRoundId==round.TenderRoundId && i.Bids.Any(b=>b.SubmittedAt!=null));
         var supplierIds = bids.Select(b => b.TenderInvitation.SupplierId).Distinct().ToArray();
         var bidIds = bids.Select(b => b.Id).ToArray();
         var reportIds = reports.Select(r => r.Id).ToArray();
@@ -70,7 +78,7 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
             .AsNoTracking().OrderBy(d => d.FileName).ToListAsync();
         var details = new RoundDetails
         {
-            Round = round, Members = members, Bids = bids, Reports = reports, Evaluations = evaluations,
+            Round = round, Members = members, InvitedSuppliers = invited, ReceivedBids = received, Bids = bids, Reports = reports, Evaluations = evaluations,
             Threads = threads, Documents = documents, Manager = manager, UserId = userId,
             FullReport = reports.FirstOrDefault(r => r.ReportType == ReportType.FullEvaluation),
             FailedAttempts = await db.TenderRounds.CountAsync(r => r.TenderId == tenderId &&
@@ -83,6 +91,10 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
             HasOpenClarifications = await db.Clarifications.AnyAsync(c => c.TenderId == tenderId && c.Status != ClarificationStatus.Closed &&
                 ((c.FromUserId == managerId && topUserIds.Contains(c.ToUserId)) || (c.ToUserId == managerId && topUserIds.Contains(c.FromUserId))))
         };
+        details.OriginalSummaryPdf = details.Round.TenderReport is null ? null : documents.SingleOrDefault(d =>
+            d.TenderReportId == details.Round.TenderReport.Id && d.DocumentType == "TopCommitteeOriginalSummaryPdf");
+        details.FinalSignedSummaryPdf = details.Round.TenderReport is null ? null : documents.SingleOrDefault(d =>
+            d.TenderReportId == details.Round.TenderReport.Id && d.DocumentType == "TopCommitteeFinalSignedPdf");
         details.Blockers = TopCommitteePolicy.Blockers(details);
         return details;
     }
@@ -100,37 +112,147 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
         await db.Database.ExecuteSqlInterpolatedAsync($"DECLARE @result int; EXEC @result = sys.sp_getapplock @Resource={resource}, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000; IF @result < 0 THROW 51000, 'Committee operation is busy. Retry.', 1;");
     }
 
-    public async Task Vote(string userId, VoteInput input)
+    public async Task NotifyReportReady(string userId, int roundId)
+    {
+        var tenderId = await TenderId(userId, roundId);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        await LockTender(tenderId);
+        db.ChangeTracker.Clear();
+        var round = await AssignedRounds(userId).Include(r => r.TenderReport)
+            .SingleOrDefaultAsync(r => r.Id == roundId);
+        if (round?.TenderReport is not { ReportType: ReportType.ExecutiveSummary, SubmittedAt: not null, Status: ReportStatus.Submitted } report)
+            throw new InvalidOperationException("The submitted Executive Summary is unavailable.");
+        var members = await db.CommitteeMembers.Where(m => m.TenderId == tenderId &&
+            (m.CommitteeType == CommitteeType.Top || m.CommitteeType == TopCommitteeCompatibility.LegacyTop))
+            .ToListAsync();
+        if (members.Count != 4 || members.Any(m => m.AssignedAt > round.StartedAt))
+            throw new InvalidOperationException("The report requires its four assigned Top Committee members.");
+        var link = $"/TopCommittee/Decisions/Decision/{round.Id}";
+        var added = false;
+        foreach (var member in members)
+        {
+            if (await db.Notifications.AnyAsync(n => n.UserId == member.UserId &&
+                n.Title == "Top Committee — Report Ready" && n.Link == link)) continue;
+            db.Notifications.Add(new Notification
+            {
+                UserId = member.UserId, Title = "Top Committee — Report Ready",
+                Message = $"Executive Summary version {report.VersionNumber} is ready for review and electronic signature.",
+                Link = link, CreatedAt = DateTime.UtcNow
+            });
+            added = true;
+        }
+        if (added)
+        {
+            Audit(userId, "TopCommitteeReportReadyNotified", "TenderReport", report.Id,
+                new { round.Id, report.VersionNumber, Recipients = members.Select(m => m.UserId).ToArray() });
+            await db.SaveChangesAsync();
+        }
+        await transaction.CommitAsync();
+    }
+
+    public async Task Vote(string userId, VoteInput input, string? signatureHash = null, string? signatureSvg = null,
+        Func<RoundDetails, CancellationToken, Task<byte[]>>? finalPdfFactory = null, string? reportStorageRoot = null)
     {
         if (input.Decision is null || !Enum.IsDefined(input.Decision.Value) ||
             (input.Decision == VoteDecision.Reject && string.IsNullOrWhiteSpace(input.Comment)) || input.Comment?.Length > 2000)
             throw new InvalidOperationException("Select a valid decision and give a reason when rejecting.");
+        if (input.Decision == VoteDecision.Approve && (string.IsNullOrWhiteSpace(signatureHash) || signatureHash.Length != 64 ||
+            string.IsNullOrWhiteSpace(signatureSvg) || !signatureSvg.StartsWith("<svg xmlns=\"http://www.w3.org/2000/svg\"", StringComparison.Ordinal) || signatureSvg.Length > 100_000))
+            throw new InvalidOperationException("Electronic approval requires a valid drawn signature and the original report hash.");
         var tenderId = await TenderId(userId, input.RoundId);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        string? finalFilePath = null;
+        try
+        {
         await LockTender(tenderId);
         db.ChangeTracker.Clear();
         var details = await Load(userId, input.RoundId) ?? throw new InvalidOperationException("Round not found.");
         if (!details.CanVote) throw new InvalidOperationException(details.MyVote is null ? string.Join(" ", details.Blockers) : "Your vote is already recorded and is read-only.");
         var member = details.TopMembers.Single(m => m.UserId == userId);
-        var vote = new CommitteeVote
+        var vote = details.MyVote;
+        if (vote is not null && (input.Decision != VoteDecision.Approve || vote.Decision != VoteDecision.Approve ||
+            !string.IsNullOrWhiteSpace(vote.ElectronicSignatureSvg)))
+            throw new InvalidOperationException("Your committee decision is already recorded and cannot be replaced.");
+        var signingAt = DateTime.UtcNow;
+        if (vote is null)
+            vote = new CommitteeVote
+            {
+                CommitteeRoundId = details.Round.Id, CommitteeMemberId = member.Id, CommitteeMember = member,
+                Decision = input.Decision.Value, Comment = input.Comment?.Trim(), VotedAt = signingAt
+            };
+        else
         {
-            CommitteeRoundId = details.Round.Id, CommitteeMemberId = member.Id, CommitteeMember = member,
-            Decision = input.Decision.Value, Comment = input.Comment?.Trim(), VotedAt = DateTime.UtcNow
-        };
-        details.Round.Votes.Add(vote);
-        Audit(userId, "TopCommitteeVote", "CommitteeRound", details.Round.Id,
-            new { Member = member.Id, vote.Decision, vote.Comment, vote.VotedAt });
+            // An earlier unsigned Approve row is upgraded in place; the electronic signature gets its own timestamp and hash.
+            vote.VotedAt = signingAt;
+        }
+        if (input.Decision == VoteDecision.Approve)
+        {
+            if (details.Round.TenderReport is not { ReportType: ReportType.ExecutiveSummary, SubmittedAt: not null } report ||
+                details.OriginalSummaryPdf is not { ContentHash: not null } original ||
+                !string.Equals(original.ContentHash, signatureHash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The original submitted report PDF is unavailable or has changed. Reload the report and try again.");
+            vote.SignatureReportId = report.Id;
+            vote.SignatureDocumentHash = signatureHash!.ToUpperInvariant();
+            vote.ElectronicSignatureSvg = signatureSvg;
+        }
+        if (details.MyVote is null) details.Round.Votes.Add(vote);
+        Audit(userId, input.Decision == VoteDecision.Approve ? "TopCommitteeReportSigned" : "TopCommitteeVote", "CommitteeRound", details.Round.Id,
+            new { Member = member.Id, vote.Decision, vote.Comment, vote.VotedAt, vote.SignatureReportId, vote.SignatureDocumentHash });
         var outcome = TopCommitteePolicy.Outcome(details.TopMembers, details.Round.Votes.ToList());
         if (outcome != CommitteeRoundStatus.InProgress)
         {
             var now = DateTime.UtcNow;
-            // Exactly one final notification, addressed to the verified responsible Manager only.
-            db.Notifications.Add(TopCommitteePolicy.Complete(details, userId, now));
+            var notification = TopCommitteePolicy.Complete(details, userId, now);
+            if (outcome == CommitteeRoundStatus.Rejected)
+            {
+                // Rejection follows the existing final decision notification rule.
+                db.Notifications.Add(notification);
+            }
+            else
+            {
+                if (finalPdfFactory is null || string.IsNullOrWhiteSpace(reportStorageRoot) ||
+                    details.SignedCount != 4 || details.ValidVotes.Any(v => v.SignatureDocumentHash != signatureHash))
+                    throw new InvalidOperationException("All four signatures must approve the same original report PDF.");
+                var bytes = await finalPdfFactory(details, CancellationToken.None);
+                if (bytes.Length < 5 || !bytes.AsSpan(0, 5).SequenceEqual("%PDF-"u8))
+                    throw new InvalidOperationException("The final signed report could not be generated as a valid PDF.");
+                var hash = Convert.ToHexString(SHA256.HashData(bytes));
+                var fileName = $"TopCommittee-Final-R{details.Round.Id}-Report{details.Round.TenderReport!.Id}-V{details.Round.TenderReport.VersionNumber}.pdf";
+                var root = Path.GetFullPath(reportStorageRoot);
+                Directory.CreateDirectory(root);
+                var path = Path.Combine(root, fileName);
+                finalFilePath = path;
+                await File.WriteAllBytesAsync(path, bytes);
+                db.Documents.Add(new Document
+                {
+                    FileName = fileName, StoragePath = fileName, ContentType = "application/pdf", SizeBytes = bytes.LongLength,
+                    ContentHash = hash, DocumentType = "TopCommitteeFinalSignedPdf", UploadedByUserId = userId,
+                    UploadedAt = now, TenderReportId = details.Round.TenderReport.Id
+                });
+                notification.Title = "Top Committee — Final Signed Report Approved";
+                notification.Message = $"Tender #{details.Tender.Id}: all four committee members signed Executive Summary version {details.Round.TenderReport.VersionNumber}. The Final Signed PDF is ready.";
+                notification.Link = $"/TopCommittee/Decisions/FinalSignedPdf?roundId={details.Round.Id}";
+                db.Notifications.Add(notification);
+                Audit(userId, "TopCommitteeFinalSignedPdfCreated", "TenderReport", details.Round.TenderReport.Id,
+                    new { details.Round.Id, details.Round.TenderReport.VersionNumber, OriginalHash = signatureHash, FinalHash = hash, fileName });
+            }
             Audit(userId, "TopCommitteeFinalized", "CommitteeRound", details.Round.Id,
                 new { Outcome = outcome, details.Tender.AwardedBidId, Date = now, Manager = details.Manager!.Id });
         }
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
+        finalFilePath = null;
+        }
+        catch
+        {
+            if (finalFilePath is not null)
+            {
+                try { if (File.Exists(finalFilePath)) File.Delete(finalFilePath); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            throw;
+        }
     }
 
     public async Task Clarify(string userId, int roundId, QuestionInput? question, ReplyInput? reply, bool resolve = false)

@@ -1,38 +1,30 @@
 @model RoundDetails
-<section class="ws-panel pg-panel" id="clarifications">
-    <h2>Clarifications with the Sourcing Manager</h2>
-    <p>Pending questions pause voting until answered and resolved. Only your own directly involved conversations appear here.</p>
-    @if (Model.Threads.Count == 0) { <p>No clarification history.</p> }
-    @foreach (var thread in Model.Threads)
-    {
-        <details><summary>@thread.Subject · @CommitteeDisplay.Clarification(thread.Status)</summary>
-        @foreach (var message in thread.Messages.OrderBy(m => m.SentAt).ThenBy(m => m.Id))
-        { <article><strong>@message.SenderUser.FullName</strong><small> · @CommitteeDisplay.Date(message.SentAt)</small><p style="white-space:pre-wrap">@message.Message</p></article> }
-        @if (Model.CanClarify && thread.Status != ClarificationStatus.Closed)
-        {
-            <form asp-controller="Clarifications" asp-action="Reply" method="post" class="pg-form">
-                <input type="hidden" name="RoundId" value="@Model.Round.Id" /><input type="hidden" name="ThreadId" value="@thread.Id" />
-                <div class="pg-field"><label for="reply-@thread.Id">Follow-up message</label><textarea name="Message" id="reply-@thread.Id" maxlength="10000" required></textarea></div>
-                <div class="pg-actions"><button class="pg-btn" type="submit">Send follow-up</button></div>
-            </form>
-            @if (thread.Status == ClarificationStatus.Answered)
-            {
-                <form asp-controller="Clarifications" asp-action="Resolve" method="post"><input type="hidden" name="roundId" value="@Model.Round.Id" /><input type="hidden" name="threadId" value="@thread.Id" /><button type="submit" class="pg-btn">Mark resolved</button></form>
-            }
-        }
-        </details>
-    }
-    @if (Model.CanClarify)
-    {
-        <h3>Request additional details</h3>
-        <form asp-controller="Clarifications" asp-action="Ask" method="post" class="pg-form">
-            <input type="hidden" name="RoundId" value="@Model.Round.Id" />
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="question-subject">Subject</label><input id="question-subject" name="Subject" maxlength="200" required /></div>
-                <div class="pg-field pg-field-wide"><label for="question-message">Detailed question</label><textarea id="question-message" name="Message" maxlength="10000" required></textarea></div>
-            </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send to @Model.Manager?.FullName</button></div>
-        </form>
-    }
-    else { <p class="pg-hint">New questions require the current active committee round and a verified responsible Manager.</p> }
+<section class="rv-card rv-clarifications" id="clarifications"><header class="rv-section-head"><partial name="_ReviewIcon" model='"chat"' /><h2>Clarifications with the Sourcing Manager</h2><p>Raise any questions before the committee's decision. Your conversation is private between you and the responsible Manager.</p></header>
+@if(ViewData["ClarificationError"] is string error) { <p class="rv-error" role="alert">@error</p> }
+@if(Model.CanClarify)
+{
+<form asp-controller="Clarifications" asp-action="Ask" method="post" enctype="multipart/form-data" class="rv-message-form" data-private-message>
+<input type="hidden" name="RoundId" value="@Model.Round.Id" /><input type="hidden" name="SubmissionId" value="@Guid.NewGuid().ToString("N")" />
+<div class="rv-question-grid"><div class="rv-field"><label for="question-subject">Subject <span>*</span></label><input id="question-subject" name="Subject" maxlength="200" value="@ViewData["ClarificationSubject"]" placeholder="Request for Clarification" required /></div>
+<div class="rv-field"><label for="question-message">Detailed Question / Message <span>*</span></label><textarea id="question-message" name="Message" maxlength="10000" rows="3" placeholder="Type your question or request for clarification here…" required>@ViewData["ClarificationMessage"]</textarea><partial name="_ClarificationUpload" model='"question-attachment"' /></div></div>
+<button class="rv-primary" type="submit">➤ Send to Sourcing Manager</button><span class="rv-send-status" role="status" aria-live="polite"></span>
+</form>
+}
+else { <p class="rv-muted">New messages require the current active committee round and a verified responsible Sourcing Manager.</p> }
+@if(Model.Threads.Count>0)
+{
+<div class="rv-thread-list"><h3>Your private conversations</h3>
+@foreach(var thread in Model.Threads.OrderByDescending(t=>t.CreatedAt))
+{
+<details><summary>@thread.Subject <span>@CommitteeDisplay.Clarification(thread.Status)</span></summary>
+@foreach(var message in thread.Messages.OrderBy(m=>m.SentAt).ThenBy(m=>m.Id))
+{ <article class="rv-message"><header><strong>@message.SenderUser.FullName</strong><time>@CommitteeDisplay.Date(message.SentAt)</time></header><p class="rv-preserve" dir="auto">@message.Message</p>@foreach(var doc in message.Documents.Where(d=>d.DocumentType=="TopClarificationAttachment")){<a class="rv-file-link" asp-controller="Conversations" asp-action="Download" asp-route-id="@doc.Id">▤ @doc.FileName (@((doc.SizeBytes/1024d).ToString("0.#")) KB)</a>}</article> }
+<a class="rv-conversation-link" asp-controller="Conversations" asp-action="Details" asp-route-id="@thread.Id">Open private conversation &amp; reply →</a>
+@if(Model.CanClarify && thread.Status==ClarificationStatus.Answered)
+{ <form asp-controller="Clarifications" asp-action="Resolve" method="post"><input type="hidden" name="roundId" value="@Model.Round.Id" /><input type="hidden" name="threadId" value="@thread.Id" /><button type="submit" class="rv-secondary">Mark resolved</button></form> }
+</details>
+}
+</div>
+}
+<p class="rv-private-note">Private to you and @Model.Manager?.FullName. Pending clarifications pause voting until answered and resolved. <a asp-controller="Conversations" asp-action="Index">Private inbox →</a></p>
 </section>

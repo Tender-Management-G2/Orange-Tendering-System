@@ -1,5 +1,7 @@
 @model RoundDetails
 @{ var report = Model.Round.TenderReport; var recommended = report?.RecommendedBid; }
+@if (ViewData["ExecutiveReview"] is true) { <partial name="_ExecutiveManagerSummary" model="Model" /> }
+else {
 <section class="tc-summary" aria-labelledby="manager-summary-title">
     <header class="tc-summary-header"><div><span class="tc-summary-eyebrow">TOP COMMITTEE · T-@Model.Tender.Id</span><h2 id="manager-summary-title">Sourcing Manager Executive Summary</h2><p>@Model.Tender.Title</p></div>
     @if (ViewData["SummaryExport"] is not true && report is { ReportType: ReportType.ExecutiveSummary, SubmittedAt: not null, Status: not ReportStatus.Draft })
@@ -13,7 +15,7 @@
             <div><dt>Submitted by</dt><dd>@(report.CreatedByUser?.FullName ?? "—")</dd></div>
             <div><dt>Report reference</dt><dd>R-@report.Id · Version @report.VersionNumber</dd></div>
             <div><dt>Submitted</dt><dd>@CommitteeDisplay.Date(report.SubmittedAt)</dd></div>
-            <div><dt>Report status</dt><dd>@report.Status</dd></div>
+            <div><dt>Report status</dt><dd>@(ViewData["SummaryExport"] is true ? "Submitted" : report.Status.ToString())</dd></div>
         </dl>
         <div class="tc-summary-recommendation"><div><span>Recommended supplier</span><strong>@(recommended?.TenderInvitation?.Supplier?.CompanyName ?? "Not recorded")</strong></div>
         <div><span>Submitted offer total</span><strong>@(recommended is null ? "—" : CommitteeDisplay.Total(recommended).ToString("N2") + " " + recommended.CurrencyCode)</strong></div>
@@ -22,6 +24,8 @@
         <div class="tc-summary-content" dir="auto">@(string.IsNullOrWhiteSpace(report.Content) ? "No summary text was recorded." : report.Content)</div></div>
         <div class="tc-summary-context"><span>PR-@Model.Tender.PurchaseRequest.Id · @Model.Tender.PurchaseRequest.Title</span><span>@Model.Tender.PurchaseRequest.Department.Name</span><span>Tender round @Model.Round.TenderRound.RoundNumber · Committee round @Model.Round.RoundNumber</span></div>
         @if (ViewData["SummaryExport"] is true)
-        { <footer class="tc-summary-footer">Orange Sourcing &amp; Tender Management System · Generated @CommitteeDisplay.Date(DateTime.UtcNow)<br />Sourcing Manager recommendation. Final award is determined by the committee decision.</footer> }
+        { <footer class="tc-summary-footer">Orange Sourcing &amp; Tender Management System · Submitted @CommitteeDisplay.Date(report.SubmittedAt)<br />Sourcing Manager recommendation. Final award is determined by the committee decision.</footer> }
     }
 </section>
+
+}

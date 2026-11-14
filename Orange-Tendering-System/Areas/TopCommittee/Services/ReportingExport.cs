@@ -16,12 +16,18 @@ public static class ReportingExport
     public static async Task<byte[]> PdfView(Controller controller, IRazorViewEngine engine, object model,
         string viewPath, string contentRoot, CancellationToken cancellationToken)
     {
+        var html = await HtmlView(controller, engine, model, viewPath);
+        return await BrowserReportPdf.Create(html, contentRoot, cancellationToken);
+    }
+
+    public static async Task<string> HtmlView(Controller controller, IRazorViewEngine engine, object model, string viewPath)
+    {
         var result = engine.GetView(null, viewPath, true);
         if (!result.Success) throw new InvalidOperationException("The report export template is unavailable.");
         using var writer = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
         var data = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()) { Model = model };
         await result.View.RenderAsync(new ViewContext(controller.ControllerContext, result.View, data,
             controller.TempData, writer, new HtmlHelperOptions()));
-        return await BrowserReportPdf.Create(writer.ToString(), contentRoot, cancellationToken);
+        return writer.ToString();
     }
 }

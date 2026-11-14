@@ -1,0 +1,25 @@
+@model RoundDetails
+@{ Layout = null; }
+<style>
+.signature-appendix{margin:12px 0 0;padding:10px 0 0;border-top:2px solid #ff7900;color:#17212e;font-family:'Segoe UI',Arial,sans-serif;break-inside:avoid;page-break-inside:avoid}.signature-appendix h1{margin:0 0 4px;font-size:17px}.signature-appendix .context{margin:0 0 6px;color:#596575;font-size:9px}.signature-appendix .progress{display:inline-block;margin-bottom:7px;padding:4px 8px;border-radius:7px;background:#eaf7ee;color:#176b36;font-weight:700;font-size:9px}.signature-appendix .signature-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:stretch}.signature-appendix .signature-card{min-width:0;margin:0;padding:6px;border:1px solid #d9dfe7;border-top:2px solid #ff7900;border-radius:7px;break-inside:avoid;page-break-inside:avoid}.signature-appendix .signature-card strong{display:block;min-height:24px;margin-bottom:2px;font-size:10px;overflow-wrap:anywhere}.signature-appendix .signature-card img{display:block;width:100%;height:42px;object-fit:contain}.signature-appendix .signature-card span{display:block;margin-top:3px;color:#596575;font-size:7px;line-height:1.2}.signature-appendix .integrity{margin-top:6px;padding:5px;border-radius:6px;background:#f5f7f9;color:#596575;font-size:7px;overflow-wrap:anywhere}.signature-appendix .disclaimer{margin-top:4px;color:#596575;font-size:7px}
+</style>
+<main class="signature-appendix">
+    <h1>Top Committee - Electronic Signatures</h1>
+    <p class="context">Tender T-@Model.Tender.Id | Executive Summary version @Model.Round.TenderReport!.VersionNumber | Committee round @Model.Round.RoundNumber</p>
+    <span class="progress">Fully signed and approved | 4 of 4</span>
+    <div class="signature-grid">
+    @foreach (var member in Model.TopMembers.OrderBy(m => m.AssignedAt).ThenBy(m => m.Id))
+    {
+        var signature = Model.ValidVotes.Single(v => v.CommitteeMemberId == member.Id && v.Decision == VoteDecision.Approve &&
+            v.SignatureReportId == Model.Round.TenderReportId && !string.IsNullOrWhiteSpace(v.SignatureDocumentHash) &&
+            !string.IsNullOrWhiteSpace(v.ElectronicSignatureSvg));
+        <section class="signature-card">
+            <strong>@member.User.FullName</strong>
+            <img alt="Electronic signature by @member.User.FullName" src="data:image/svg+xml;base64,@Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg!))" />
+            <span>Signed and approved at @CommitteeDisplay.Date(signature.VotedAt)</span>
+        </section>
+    }
+    </div>
+    <div class="integrity">Original report SHA-256: @Model.ValidVotes.First().SignatureDocumentHash</div>
+    <p class="disclaimer">These records document authenticated electronic approvals in the Orange Sourcing &amp; Tender Management System. They are not certificate-based digital signatures.</p>
+</main>

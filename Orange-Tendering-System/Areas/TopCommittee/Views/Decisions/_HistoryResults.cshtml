@@ -1,0 +1,13 @@
+@model DecisionHistory
+<section class="ws-panel pg-panel" data-result-count="@Model.Total" data-result-page="@Model.Page"><h2>Committee rounds (@Model.Total)</h2><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Tender</th><th>Round / Summary Version</th><th>Recommended Supplier</th><th>Recorded Votes</th><th>Outcome</th><th>Decision Date</th><th>Details</th></tr></thead><tbody>
+@foreach (var round in Model.Rounds)
+{
+    var statusClass = round.Status switch { CommitteeRoundStatus.Approved => "is-ok", CommitteeRoundStatus.Rejected => "is-bad", _ => "is-warn" };
+    <tr><td>T-@round.TenderRound.TenderId · @round.TenderRound.Tender.Title</td><td>@round.RoundNumber / @round.TenderReport?.VersionNumber</td><td>@round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</td><td>@round.Votes.Count Voted · @round.Votes.Count(v => v.Decision == VoteDecision.Approve) Approve · @round.Votes.Count(v => v.Decision == VoteDecision.Reject) Reject</td><td><span class="pg-badge @statusClass">@CommitteeDisplay.Status(round.Status)</span></td><td>@CommitteeDisplay.Date(round.CompletedAt)</td><td><a class="tc-history-details" asp-action="Decision" asp-route-id="@round.Id" aria-label="Details for T-@round.TenderRound.TenderId, committee round @round.RoundNumber" title="Open committee decision, votes and comments">Details</a></td></tr>
+}
+@if (Model.Rounds.Count == 0) { <tr><td colspan="7">No matching results found.</td></tr> }
+</tbody></table></div><nav class="pg-actions" aria-label="History pages" data-live-pagination>
+@if (Model.Page > 1) { <a class="pg-btn" asp-route-id="" asp-route-page="@(Model.Page - 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status">Previous</a> }
+<span>Page @Model.Page of @Model.Pages</span>
+@if (Model.Page < Model.Pages) { <a class="pg-btn" asp-route-id="" asp-route-page="@(Model.Page + 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status">Next</a> }
+</nav></section>

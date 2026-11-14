@@ -33,7 +33,9 @@
 <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Tender</th><th>Round</th><th>Recommended Supplier</th><th>Approvals</th><th>Voting Progress</th><th>My Vote</th><th>Actions</th></tr></thead><tbody>
 @foreach (var item in Model.Pending)
 {
-    <tr><td>T-@item.Tender.Id<br />@item.Tender.Title</td><td>@item.Round.RoundNumber</td><td>@item.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</td><td>@item.ValidVotes.Count(v => v.Decision == VoteDecision.Approve) / 4</td><td>@item.ValidVotes.Count / 4 Voted</td><td>@(item.MyVote?.Decision.ToString() ?? "Pending")</td><td><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@item.Round.Id">Review</a>
+    var voteClass = item.MyVote?.Decision switch { VoteDecision.Approve => "is-ok", VoteDecision.Reject => "is-bad", _ => "is-warn" };
+    var progressClass = item.ValidVotes.Count >= 4 ? "is-ok" : "is-warn";
+    <tr><td>T-@item.Tender.Id<br />@item.Tender.Title</td><td>@item.Round.RoundNumber</td><td>@item.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</td><td>@item.ValidVotes.Count(v => v.Decision == VoteDecision.Approve) / 4</td><td><span class="pg-badge @progressClass">@item.ValidVotes.Count / 4 Voted</span></td><td><span class="pg-badge @voteClass">@(item.MyVote?.Decision.ToString() ?? "Pending")</span></td><td><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@item.Round.Id">Review</a>
     @if (item.CanVote) { <a class="pg-btn pg-btn-primary" asp-controller="Decisions" asp-action="Decision" asp-route-id="@item.Round.Id">Vote</a> }
     else { <span class="pg-hint">@(item.MyVote is not null ? "Vote recorded" : "Review eligibility notes")</span> }</td></tr>
 }
@@ -48,6 +50,5 @@
 { <p>Analysis available for T-@analyzed.Tender.Id — @analyzed.Tender.Title.</p><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@analyzed.Round.Id" asp-fragment="report-ai">View report analysis</a> }
 else { <p>No current report analysis is available.</p><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation">Select a Manager report to analyze</a> }
 <p class="pg-hint">Ollama analysis is advisory and does not change votes or awards.</p></section>
-<nav class="pg-links"><ul><li><a asp-controller="Statistics" asp-action="Index">Management statistics &amp; Excel report</a></li></ul></nav>
 </div>
 @section Styles { <partial name="_TopStyles" /> }

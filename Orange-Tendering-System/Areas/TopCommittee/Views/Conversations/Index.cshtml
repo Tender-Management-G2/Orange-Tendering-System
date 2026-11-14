@@ -1,0 +1,8 @@
+@model List<PrivateConversation>
+@{ ViewData["Title"]="Private Tender Conversations"; }
+<div class="tc-review"><header class="rv-page-head"><div><h1>Private Tender Conversations</h1><p>Only conversations between you and the other assigned participant are shown.</p></div></header><partial name="_Messages" />
+<div class="rv-card rv-thread-list">
+@if(Model.Count==0){<p>No private Top Committee conversations are available.</p>}
+@foreach(var item in Model){<article class="rv-message"><a asp-action="Details" asp-route-id="@item.Thread.Id"><strong>@item.Thread.Subject</strong></a><p>T-@item.Details.Tender.Id · @item.Details.Tender.Title · Committee round @item.Details.Round.RoundNumber</p><span>@CommitteeDisplay.Clarification(item.Thread.Status)</span></article>}
+</div></div>
+@section Styles {<partial name="_ReviewStyles" />}

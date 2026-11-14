@@ -40,8 +40,8 @@ public sealed record ReportingPage(ReportingData Data, bool FullSystem)
 public sealed record ReportChart(string Title, IReadOnlyList<ReportPoint> Points, string CenterLabel = "", bool Horizontal = false);
 public static class ReportFormat
 {
-    public static string Percent(decimal? value) => value.HasValue ? value.Value.ToString("0.#", CultureInfo.InvariantCulture) + "%" : "—";
+    public static string Percent(decimal? value) => value.HasValue ? value.Value.ToString("0.#", CultureInfo.InvariantCulture) + "%" : "N/A";
     public static decimal? Ratio(int value, int total) => total > 0 ? value * 100m / total : null;
-    public static string Days(double? value) => value.HasValue ? value.Value.ToString("0.#", CultureInfo.InvariantCulture) + " days" : "—";
+    public static string Days(double? value) => value.HasValue ? value.Value.ToString("0.#", CultureInfo.InvariantCulture) + " days" : "N/A";
     public static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 }

@@ -1,0 +1,45 @@
+@model RequestList
+<section class="ws-panel pg-panel dept-request-results-panel" data-result-count="@Model.Total" data-result-page="@Model.Page">
+    <div class="pg-panel-head"><h2>Purchase requests (@Model.Total)</h2><a class="pg-btn pg-btn-primary" asp-action="Create">New request</a></div>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th scope="col">Reference</th><th scope="col">Title</th><th scope="col">Priority</th><th scope="col">Needed by</th><th scope="col">Status</th><th scope="col">Last submitted (UTC)</th><th scope="col">Actions</th></tr></thead>
+        <tbody>
+        @foreach (var request in Model.Requests)
+        {
+            var displayStatus = RequestDisplay.Status(request);
+            var statusClass = displayStatus.ToLowerInvariant().Replace(' ', '-');
+            <tr>
+                <td>PR-@request.Id</td>
+                <td dir="auto">@request.Title</td>
+                <td>@request.Priority</td>
+                <td>@request.NeededBy?.ToString("yyyy-MM-dd")</td>
+                <td><span class="dept-status-badge dept-status-@statusClass">@displayStatus</span></td>
+                <td>@RequestDisplay.Date(request.SubmittedAt)</td>
+                <td>
+                    <div class="dept-row-actions">
+                        <a class="pg-btn pg-btn-primary" asp-area="Department" asp-controller="PurchaseRequests" asp-action="Details" asp-route-id="@request.Id">Details</a>
+                        @if (RequestDisplay.Editable(request, Model.UserId))
+                        {
+                            <a class="dept-edit-action" asp-area="Department" asp-controller="PurchaseRequests" asp-action="Edit" asp-route-id="@request.Id" aria-label="Edit PR-@request.Id">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>Edit
+                            </a>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+        @if (Model.Requests.Count == 0)
+        {
+            <tr><td colspan="7">No matching requests found.</td></tr>
+        }
+        </tbody>
+    </table></div>
+    @if (Model.Pages > 1)
+    {
+        <nav class="pg-actions" aria-label="Request pages" data-live-pagination>
+            @if (Model.Page > 1) { <a class="pg-btn" data-page="@(Model.Page - 1)" asp-route-page="@(Model.Page - 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-priority="@Model.Priority">Previous</a> }
+            <span>Page @Model.Page of @Model.Pages</span>
+            @if (Model.Page < Model.Pages) { <a class="pg-btn" data-page="@(Model.Page + 1)" asp-route-page="@(Model.Page + 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-priority="@Model.Priority">Next</a> }
+        </nav>
+    }
+</section>

@@ -29,6 +29,8 @@ public sealed class RoundDetails
     public CommitteeRound Round { get; init; } = null!;
     public Tender Tender => Round.TenderRound.Tender;
     public List<CommitteeMember> Members { get; init; } = [];
+    public int InvitedSuppliers { get; init; }
+    public int ReceivedBids { get; init; }
     public List<Bid> Bids { get; init; } = [];
     public List<TenderReport> Reports { get; init; } = [];
     public List<CommitteeRound> Evaluations { get; init; } = [];
@@ -41,11 +43,17 @@ public sealed class RoundDetails
     public bool IsLatest { get; set; }
     public int FailedAttempts { get; set; }
     public bool HasOpenClarifications { get; set; }
+    public Document? OriginalSummaryPdf { get; set; }
+    public Document? FinalSignedSummaryPdf { get; set; }
     public ReportAnalysis? AiAnalysis { get; set; }
     public List<CommitteeMember> TopMembers => Members.Where(m => m.CommitteeType == CommitteeType.Top).ToList();
     public List<CommitteeVote> ValidVotes => Round.Votes.Where(v => TopMembers.Any(m => m.Id == v.CommitteeMemberId)).ToList();
     public CommitteeVote? MyVote => ValidVotes.SingleOrDefault(v => v.CommitteeMember.UserId == UserId);
-    public bool CanVote => Blockers.Count == 0 && MyVote is null;
+    public int SignedCount => ValidVotes.Count(v => v.Decision == VoteDecision.Approve &&
+        v.SignatureReportId == Round.TenderReportId && !string.IsNullOrWhiteSpace(v.SignatureDocumentHash) &&
+        !string.IsNullOrWhiteSpace(v.ElectronicSignatureSvg));
+    public bool CanVote => Blockers.Count == 0 && (MyVote is null ||
+        (MyVote.Decision == VoteDecision.Approve && string.IsNullOrWhiteSpace(MyVote.ElectronicSignatureSvg)));
     public bool CanClarify => IsLatest && Round.Status == CommitteeRoundStatus.InProgress &&
         Tender.Status == TenderStatus.TopCommitteeReview && Manager is { IsActive: true };
 }
