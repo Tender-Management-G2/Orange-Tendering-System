@@ -3,7 +3,15 @@
     --officer-page-radius: 18px;
 }
 .ws-shell[data-workspace-role="Sourcing Officer"] .ws-main { padding: 22px 24px 36px; }
-.ws-shell[data-workspace-role="Sourcing Officer"] .pg-page { padding: 0; max-width: 1440px; gap: 22px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-page { padding: 22px 22px 44px; max-width: 1440px; gap: 22px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .wfl { padding: 0; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .officer-page-hero {
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    height: auto; min-height: 230px; padding: 34px 40px; margin: 0;
+}
+.ws-shell[data-workspace-role="Sourcing Officer"] .officer-page-hero .dash-welcome-copy { flex: 1 1 380px; min-width: 0; padding-block: 6px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .officer-page-hero h1 { font-size: clamp(34px, 3.6vw, 52px); line-height: 1.05; margin-bottom: 12px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .officer-page-hero p { font-size: 16px; max-width: 70ch; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-page { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .pg-header {
     position: relative; overflow: hidden; isolation: isolate; margin: 0; padding: 24px 28px;
@@ -53,6 +61,11 @@
 .ws-officer-search-tools .ws-search-microphone { flex: 0 0 auto; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .ws-topbar-actions { flex: 0 0 auto; margin-left: auto; }
 @media (max-width: 767px) {
+    .ws-shell[data-workspace-role="Sourcing Officer"] .pg-page { padding: 14px 0 28px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .officer-page-hero,
+    .ws-shell[data-workspace-role="Sourcing Officer"] .wfl-hero { padding: 24px 18px; }
+    .ws-shell[data-workspace-role="Sourcing Officer"] .officer-page-hero .dash-welcome-copy,
+    .ws-shell[data-workspace-role="Sourcing Officer"] .wfl-hero .dash-welcome-copy { padding-inline: 8px; }
     .ws-shell[data-workspace-role="Sourcing Officer"] .ws-main { padding: 16px 12px 28px; }
     .ws-shell[data-workspace-role="Sourcing Officer"] .pg-page,
     .ws-shell[data-workspace-role="Sourcing Officer"] .so-page { gap: 16px; }
