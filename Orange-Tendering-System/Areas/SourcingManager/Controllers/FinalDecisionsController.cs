@@ -20,8 +20,9 @@ public sealed class FinalDecisionsController(TenderWorkflowService workflow) : C
     [HttpPost]
     public async Task<IActionResult> Acknowledge(int id, string? comment)
     {
-        try { await workflow.ManagerAcknowledge(id, comment, User); TempData["Flash"] = "Decision acknowledged and forwarded to the Sourcing Officer."; }
-        catch (WorkflowException e) { TempData["FlashError"] = e.Message; }
+        var ajax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+        try { await workflow.ManagerAcknowledge(id, comment, User); TempData["Flash"] = "Decision acknowledged and forwarded to the Sourcing Officer."; if (ajax) return Json(new { ok = true }); }
+        catch (WorkflowException e) { if (ajax) return BadRequest(new { error = e.Message }); TempData["FlashError"] = e.Message; }
         return RedirectToAction(nameof(Index));
     }
 }

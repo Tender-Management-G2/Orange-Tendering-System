@@ -26,8 +26,9 @@ public sealed class FinalDecisionsController(TenderWorkflowService workflow, Fin
     [HttpPost]
     public async Task<IActionResult> Notify(int id)
     {
-        try { await decisions.NotifySuppliers(id, User); TempData["Flash"] = "Suppliers were notified of the final result."; }
-        catch (WorkflowException e) { TempData["FlashError"] = e.Message; }
+        var ajax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+        try { await decisions.NotifySuppliers(id, User); TempData["Flash"] = "Suppliers were notified of the final result."; if (ajax) return Json(new { ok = true }); }
+        catch (WorkflowException e) { if (ajax) return BadRequest(new { error = e.Message }); TempData["FlashError"] = e.Message; }
         return RedirectToAction(nameof(Index));
     }
 

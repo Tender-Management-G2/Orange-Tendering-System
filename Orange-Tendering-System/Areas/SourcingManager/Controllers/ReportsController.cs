@@ -14,10 +14,11 @@ public class ReportsController(TenderWorkflowService workflow) : ReportControlle
     // Pending Reports: tenders waiting for this manager's report review. Decision History: tenders already decided.
     public override async Task<IActionResult> Index()=>View("Index",(await Workflow.List(User)).Where(x=>x.Status==nameof(TenderStatus.ManagerReview)).ToList());
     public async Task<IActionResult> History()=>View("History",(await Workflow.List(User)).Where(x=>x.Status is nameof(TenderStatus.TopCommitteeReview) or nameof(TenderStatus.Awarded) or nameof(TenderStatus.Rejected) or nameof(TenderStatus.Cancelled)).ToList());
-    [HttpPost] public Task<IActionResult> Decision(int id,string decision,string documentHash,bool confirmed,string comment="")=>Execute(id,async()=>
+    [HttpPost] public Task<IActionResult> Decision(int id,string decision,string documentHash,bool confirmed,string comment="",string? signatureImage=null)=>Execute(id,async()=>
     {
+        var png=decision=="Approve"?ReadSignature(signatureImage):null;
         var report=await Workflow.ReviewReport(id,User);
-        TenderWorkflowService.Require(report.IsCurrent && decision is "Approve" or "Reject","Select an allowed decision on the current report. Use Return for Revision for corrections.");
-        await Workflow.ManagerDecision(report.Tender.Id,decision,comment,User,documentHash,confirmed);
+        TenderWorkflowService.Require(report.IsCurrent && decision is "Approve" or "Reject" or "Return","Select an allowed decision on the current report.");
+        await Workflow.ManagerDecision(report.Tender.Id,decision,comment,User,documentHash,confirmed,png);
     });
 }
