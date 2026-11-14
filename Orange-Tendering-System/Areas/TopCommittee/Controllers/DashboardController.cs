@@ -42,7 +42,7 @@ public sealed class DashboardController(ApplicationDbContext db, UserManager<App
                 catch (WorkflowException) { /* Invalid/stale documents remain reviewable with an explicit workflow error. */ }
             }
             else if (details.CanVote) awaiting++;
-            if (pending.Count < 20) pending.Add(details);
+            if ((details.CanVote || details.MyVote is not null) && pending.Count < 20) pending.Add(details);
         }
         ViewData["SignedReportRounds"] = signedReportRounds;
         return View(new CommitteeDashboard

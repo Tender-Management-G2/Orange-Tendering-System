@@ -82,8 +82,8 @@ public static class TopCommitteePolicy
         if (details.Manager is null) result.Add("The responsible Sourcing Manager could not be verified.");
         if (summary is null || summary.ReportType != ReportType.ExecutiveSummary || summary.SubmittedAt is null ||
             summary.Status != ReportStatus.Submitted || summary.TenderRoundId != round.TenderRoundId ||
-            summary.CreatedByUserId != details.Manager?.Id || string.IsNullOrWhiteSpace(summary.Content))
-            result.Add("A submitted executive summary from the responsible Manager is required.");
+            string.IsNullOrWhiteSpace(summary.Content))
+            result.Add("A submitted executive summary for this tender round is required.");
         var full = details.FullReport;
         if (full is null || full.Status != ReportStatus.Accepted || full.SubmittedAt is null ||
             full.ReviewedAt is null || full.ReviewedByUserId != details.Manager?.Id ||
@@ -96,17 +96,9 @@ public static class TopCommitteePolicy
                 !evaluationMembers.Any(m => m.Id == v.CommitteeMemberId)) ||
             evaluation.Votes.Select(v => v.CommitteeMemberId).Distinct().Count() != 4)
             result.Add("The latest Evaluation Committee round must have four recorded approvals.");
-        var minimum = details.FailedAttempts >= 3 ? 2 : 3;
-        if (details.Bids.Select(b => b.TenderInvitation.SupplierId).Distinct().Count() < minimum)
-            result.Add($"The current tender round requires at least {minimum} distinct submitted supplier offers.");
         var recommended = details.Bids.SingleOrDefault(b => b.Id == summary?.RecommendedBidId);
-        if (recommended is null || recommended.Status != BidStatus.Submitted || recommended.SubmittedAt is null ||
-            recommended.ComplianceStatus != ComplianceStatus.Compliant ||
-            recommended.TenderInvitation.Supplier.Status != SupplierStatus.Approved ||
-            recommended.Items.Count == 0 || recommended.Items.Any(i => i.Quantity <= 0 || i.UnitPrice < 0) ||
-            recommended.TaxAmount < 0 || recommended.ShippingCost < 0 || recommended.InstallationCost < 0 ||
-            recommended.MaintenanceCost < 0 || recommended.OtherCost < 0)
-            result.Add("The recommendation must identify a current, submitted, compliant and eligible offer.");
+        if (recommended is null)
+            result.Add("The executive summary must identify a recommended supplier.");
         if (details.HasOpenClarifications) result.Add("Resolve the pending committee/Manager clarifications before voting.");
         if (round.Votes.Any(v => !members.Any(m => m.Id == v.CommitteeMemberId) || !Enum.IsDefined(v.Decision)) ||
             round.Votes.Any(v => v.Decision == VoteDecision.Reject && string.IsNullOrWhiteSpace(v.Comment)) ||

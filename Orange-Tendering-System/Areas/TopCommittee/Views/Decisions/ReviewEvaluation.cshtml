@@ -2,7 +2,7 @@
 @{ var request=Model.Tender.PurchaseRequest; ViewData["Title"]=$"T-{Model.Tender.Id} — Review Tender Evaluation"; ViewData["WorkspaceSection"]="Evaluation Summary"; ViewData["ExecutiveReview"]=true; }
 <div class="tc-review">
 <partial name="_Messages" />
-<header class="rv-page-head"><div><div class="rv-breadcrumb">Procurement <span>›</span> Top Committee <span>›</span> T-@Model.Tender.Id — Review Tender Evaluation</div><div class="rv-title-line"><partial name="_ReviewIcon" model='"report"' /><div><h1>T-@Model.Tender.Id — Review Tender Evaluation</h1><p>Top Committee review and decision on the tender evaluation for @Model.Tender.Title.</p></div></div></div><nav class="rv-page-links" aria-label="Committee actions"><a asp-action="Decision" asp-route-id="@Model.Round.Id">Voting →</a><a asp-action="History" asp-route-id="@Model.Round.Id">Decision History</a></nav></header>
+<header class="rv-page-head"><div><div class="rv-breadcrumb">Procurement <span>›</span> Top Committee <span>›</span> T-@Model.Tender.Id — Review Tender Evaluation</div><div class="rv-title-line"><partial name="_ReviewIcon" model='"report"' /><div><h1>T-@Model.Tender.Id — Review Tender Evaluation</h1><p>Top Committee review and decision on the tender evaluation for @Model.Tender.Title.</p></div></div></div></header>
 <partial name="_ManagerSummary" model="Model" />
 <section class="rv-card rv-overview"><header class="rv-section-head"><partial name="_ReviewIcon" model='"laptop"' /><h2>Tender Overview</h2><p>Key information about this tender, its scope, requirements, and supplier participation.</p></header>
 <dl class="rv-overview-facts">
@@ -12,10 +12,6 @@
 @foreach(var fact in new[]{("Created Date",(DateTime?)Model.Tender.CreatedAt),("Open Date",Model.Round.TenderRound.OpensAt),("Deadline Date",Model.Round.TenderRound.Deadline)})
 { <div><partial name="_ReviewIcon" model='"calendar"' /><div><dt>@fact.Item1</dt><dd>@(fact.Item2?.ToString("dd MMM yyyy")??"—")</dd></div></div> }
 </dl></section>
-<section class="rv-card rv-snapshot"><header class="rv-section-head"><partial name="_ReviewIcon" model='"people"' /><div><h2>Supplier Snapshot</h2><p>Overview of supplier participation and outcome.</p></div></header><div class="rv-snapshot-grid">
-@foreach(var metric in new[]{("Suppliers Invited",Model.InvitedSuppliers),("Bids Received",Model.ReceivedBids),("Technically Compliant",Model.Bids.Count(b=>b.ComplianceStatus==ComplianceStatus.Compliant)),("Recommended Supplier",Model.Bids.Any(b=>b.Id==Model.Round.TenderReport?.RecommendedBidId)?1:0)})
-{ <div class="@(metric.Item1=="Recommended Supplier"?"is-recommended":"")" title="@(metric.Item1=="Technically Compliant"?"Based on the recorded offer ComplianceStatus. The schema has no separate technical pass/fail field.":metric.Item1)"><strong>@metric.Item2</strong><span>@metric.Item1</span></div> }
-</div></section>
 <partial name="_Clarifications" model="Model" />
 </div>
 @section Styles { <partial name="_ReviewStyles" /> }

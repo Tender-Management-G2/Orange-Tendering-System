@@ -24,7 +24,6 @@
 }
 @if(paragraphs.Count==0){<p class="dc-muted">No executive summary content is available for this round.</p>}
 </div></section>
-<section class="dc-card dc-report-file"><header class="dc-card-title"><partial name="_ReviewIcon" model='"report"' /><h2>Executive Summary PDF</h2></header><p data-original-pdf-note style="@(finalSignedReady?"display:none":"")">Preview the exact submitted report version that committee signatures will approve.</p><iframe data-original-pdf title="Original Executive Summary PDF preview" style="@(finalSignedReady?"display:none":"")" src="@Url.Action("SummaryPdfPreview", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })" loading="lazy"></iframe><div data-final-signed-pdf style="@(finalSignedReady?"":"display:none")"><h3>Final Signed PDF</h3><p>The Manager's original report followed by all four committee signatures.</p><iframe title="Final signed Executive Summary PDF preview" src="@(finalSignedReady?Url.Action("FinalSignedPdf", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id, download = false }):"about:blank")" loading="lazy" data-final-preview></iframe><a class="dc-submit dc-pdf-download" asp-action="FinalSignedPdf" asp-route-roundId="@Model.Round.Id">Download Final Signed PDF</a></div></section>
 <section class="dc-card dc-members"><header class="dc-members-head"><div><div class="dc-card-title"><partial name="_ReviewIcon" model='"people"' /><h2>Committee Signatures</h2></div><p class="dc-outcome">Final outcome: <strong class="dc-pill @(Model.Round.Status==CommitteeRoundStatus.Approved?"is-approved":Model.Round.Status==CommitteeRoundStatus.Rejected?"is-rejected":"is-pending")" data-round-status>@CommitteeDisplay.Status(Model.Round.Status)</strong> <span>All four assigned members must sign the same report version to approve it.</span></p></div><span class="dc-progress" aria-label="Electronic signature progress"><span data-signed-count>@Model.SignedCount</span> / 4 Signed</span></header>
 <div class="dc-signature-grid">
 @foreach(var member in Model.TopMembers.OrderBy(m=>m.AssignedAt).ThenBy(m=>m.Id))
@@ -33,6 +32,7 @@
  <article class="dc-signature-card" data-member-id="@member.Id"><strong>@member.User.FullName</strong><span class="@(signature is not null?"dc-signature-signed":"dc-signature-pending")" data-signature-state>@(signature is not null?"Signed & approved":"Awaiting signature")</span>@if(signature is not null && !string.IsNullOrWhiteSpace(signature.ElectronicSignatureSvg)){<img class="dc-signature-ink" data-signature-ink alt="Electronic signature by @member.User.FullName" src="data:image/svg+xml;base64,@Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg))" />}<time data-signature-at datetime="@(signature?.VotedAt.ToString("O"))">@(signature is not null?CommitteeDisplay.Date(signature.VotedAt):"—")</time></article>
 }
 </div></section>
+<section class="dc-card dc-report-file" data-final-signed-pdf style="@(finalSignedReady?"":"display:none")"><header class="dc-card-title"><partial name="_ReviewIcon" model='"report"' /><h2>Executive Summary PDF</h2></header><a class="dc-submit dc-pdf-download" asp-action="FinalSignedPdf" asp-route-roundId="@Model.Round.Id">Download Final Signed PDF</a></section>
 <section class="dc-card dc-record"><header class="dc-card-title"><span class="dc-check-icon" aria-hidden="true">✓</span><h2>Sign &amp; Approve Report</h2></header>
 @if(Model.CanVote)
 {
@@ -168,18 +168,8 @@ else{<p class="dc-readonly">Signing is not available for this report.</p>}
                 }
             }
             if (data.signedCount === 4 && data.roundStatus === 'Approved') {
-                const pdfSection = root.querySelector('.dc-report-file');
-                const final = pdfSection.querySelector('[data-final-signed-pdf]');
-                pdfSection.querySelector('[data-original-pdf-note]').style.display = 'none';
-                pdfSection.querySelector('[data-original-pdf]').style.display = 'none';
-                final.style.display = '';
-                const preview = final.querySelector('[data-final-preview]');
-                if (preview.dataset.loaded !== 'true') {
-                    const previewUrl = new URL(root.dataset.finalPdfUrl, location.href);
-                    previewUrl.searchParams.set('download', 'false');
-                    preview.src = previewUrl.href;
-                    preview.dataset.loaded = 'true';
-                }
+                const final = root.querySelector('[data-final-signed-pdf]');
+                if (final) final.style.display = '';
             }
         } catch { }
         finally { active = false; }

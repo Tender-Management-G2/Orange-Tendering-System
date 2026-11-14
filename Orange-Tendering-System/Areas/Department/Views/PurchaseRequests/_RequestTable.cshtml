@@ -10,7 +10,7 @@
             <td>PR-@request.Id</td><td>@request.Title</td><td>@request.Priority</td><td>@request.NeededBy?.ToString("yyyy-MM-dd")</td>
             <td><span class="dept-status-badge dept-status-@statusClass">@displayStatus</span></td><td>@RequestDisplay.Date(request.SubmittedAt)</td>
             <td><div class="dept-row-actions">
-                <a class="pg-btn pg-btn-primary" asp-area="Department" asp-controller="PurchaseRequests" asp-action="Details" asp-route-id="@request.Id">Details</a>
+                <a class="pg-btn pg-btn-primary" asp-area="Department" asp-controller="PurchaseRequests" asp-action="Details" asp-route-id="@request.Id" data-no-modal>Details</a>
                 @if (RequestDisplay.Editable(request, Model.UserId)) { <a class="dept-edit-action" asp-area="Department" asp-controller="PurchaseRequests" asp-action="Edit" asp-route-id="@request.Id" aria-label="Edit PR-@request.Id">Edit</a> }
             </div></td>
         </tr>
