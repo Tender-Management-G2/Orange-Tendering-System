@@ -1,49 +1,41 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Module: Notifications
-// Purpose: Notifications page plus the JSON API behind the live notification bell (feed, mark read, mark all read).
-// Every query is scoped to the signed-in user's own Notification rows; links are same-site relative paths only.
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
-using Orange_Tendering_System.Services;
+using Orange_Tendering_System.Models.Entities;
 
-namespace Orange_Tendering_System.Controllers
+namespace Orange_Tendering_System.Controllers;
+
+[Authorize]
+public sealed class NotificationsController(ApplicationDbContext db, UserManager<ApplicationUser> users) : Controller
 {
-    [Authorize]
-    [AutoValidateAntiforgeryToken]
-    public class NotificationsController(TenderWorkflowService workflow, ApplicationDbContext db) : Controller
+    public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        public async Task<IActionResult> Index() => View(await workflow.Notifications(User));
-        [HttpPost] public async Task<IActionResult> MarkRead() { await workflow.ReadNotifications(User); return RedirectToAction(nameof(Index)); }
+        var user = await users.GetUserAsync(User);
+        if (user is not { IsActive: true }) return Forbid();
 
-        private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        var notifications = await db.Notifications.AsNoTracking()
+            .Where(n => n.UserId == user.Id)
+            .OrderByDescending(n => n.CreatedAt).ThenByDescending(n => n.Id)
+            .Take(100).ToListAsync(cancellationToken);
+        ViewData["UnreadCount"] = notifications.Count(n => !n.IsRead);
+        return View(notifications);
+    }
 
-        // GET /Notifications/Feed: unread count and the newest notifications for the bell dropdown.
-        [HttpGet]
-        public async Task<IActionResult> Feed(int take = 12)
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkRead(int id, CancellationToken cancellationToken)
+    {
+        var user = await users.GetUserAsync(User);
+        if (user is not { IsActive: true }) return Forbid();
+
+        var notification = await db.Notifications
+            .SingleOrDefaultAsync(n => n.Id == id && n.UserId == user.Id, cancellationToken);
+        if (notification is not null && !notification.IsRead)
         {
-            take = Math.Clamp(take, 1, 50);
-            var unread = await db.Notifications.AsNoTracking().CountAsync(n => n.UserId == UserId && !n.IsRead);
-            var items = await db.Notifications.AsNoTracking().Where(n => n.UserId == UserId)
-                .OrderByDescending(n => n.CreatedAt).ThenByDescending(n => n.Id).Take(take).ToListAsync();
-            return Json(new { unread, items = items.Select(NotificationDto.From) });
+            notification.IsRead = true;
+            await db.SaveChangesAsync(cancellationToken);
         }
-
-        [HttpPost]
-        public async Task<IActionResult> Read(int id)
-        {
-            var changed = await db.Notifications.Where(n => n.Id == id && n.UserId == UserId).ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true));
-            if (changed == 0) return NotFound();
-            return Json(new { unread = await db.Notifications.CountAsync(n => n.UserId == UserId && !n.IsRead) });
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> ReadAll()
-        {
-            await db.Notifications.Where(n => n.UserId == UserId && !n.IsRead).ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true));
-            return Json(new { unread = 0 });
-        }
+        return RedirectToAction(nameof(Index));
     }
 }

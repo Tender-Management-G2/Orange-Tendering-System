@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Areas.Department.ViewModels;
@@ -7,6 +8,8 @@ namespace Orange_Tendering_System.Areas.Department.ViewModels;
 public class RequestForm
 {
     public int Id { get; set; }
+    // Keep the hidden concurrency token for edits, but never expose its absence as a model-validation message.
+    [ValidateNever]
     public string? Version { get; set; }
     [Required, StringLength(200)] public string Title { get; set; } = "";
     [Required, StringLength(10000)] public string Justification { get; set; } = "";

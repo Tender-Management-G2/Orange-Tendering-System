@@ -67,12 +67,18 @@ public class PurchaseRequestsController : Controller
         }
         var total = await query.CountAsync();
         page = Math.Clamp(page, 1, Math.Max(1, (int)Math.Ceiling(total / 20m)));
-        return View(new RequestList
+        var model = new RequestList
         {
             Search = search, Status = status, Priority = priority, Page = page, Total = total, UserId = user.Id,
             Requests = await query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
                 .Skip((page - 1) * 20).Take(20).ToListAsync()
-        });
+        };
+        if (string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+        {
+            Response.Headers.CacheControl = "no-store";
+            return PartialView("_MyRequestResults", model);
+        }
+        return View(model);
     }
 
     public async Task<IActionResult> Details(int id)

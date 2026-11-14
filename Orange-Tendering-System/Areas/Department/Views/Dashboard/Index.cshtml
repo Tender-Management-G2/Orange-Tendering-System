@@ -17,10 +17,6 @@
     var distribution = total > 0 ? $"conic-gradient({string.Join(",", segments)})" : "conic-gradient(var(--dash-empty-ring) 0deg 360deg)";
 }
 <div class="dash-board dash-internal" data-dashboard-body="true" data-dashboard-role="Requesting Department">
-    <nav class="pg-links" aria-label="Department shortcuts"><ul>
-        <li><a asp-controller="PurchaseRequests" asp-action="Create">New purchase request</a></li>
-        <li><a asp-controller="PurchaseRequests" asp-action="Index">All department requests</a></li>
-    </ul></nav>
     <section class="dash-welcome" aria-labelledby="dashboard-title">
         <div class="dash-welcome-photo" aria-hidden="true"></div>
         <div class="dash-welcome-waves" aria-hidden="true"></div>
@@ -53,19 +49,35 @@
         <article class="dash-panel dash-distribution"><div class="dash-panel-heading"><h2>Requests by Status</h2></div><div class="dash-distribution-body"><div class="dash-donut @(total > 0 ? "has-data" : "")" style="--dash-distribution:@distribution"><span><strong>@data.Number("purchase-requests")</strong><small>Requests</small></span></div><div class="dash-legend">@if(data.Statuses.Count > 0) { foreach(var status in data.Statuses) { <div><i style="background:@palette[Array.IndexOf(RequestDisplay.Statuses, status.Label)]" aria-hidden="true"></i><a asp-controller="PurchaseRequests" asp-action="Index" asp-route-status="@status.Label">@status.Label</a><b>@status.Count</b></div> } } else { <div><i></i><span>Open</span><b>—</b></div><div><i></i><span>Under Evaluation</span><b>—</b></div><div><i></i><span>Under Review</span><b>—</b></div><div><i></i><span>Closed</span><b>—</b></div> }</div></div><span class="dash-data-caption">@(data.DataConnected ? "Verified system data" : "Waiting for verified data")</span></article>
         <article class="dash-panel dash-activity"><div class="dash-panel-heading"><h2>Recent Activities</h2><a asp-controller="PurchaseRequests" asp-action="Index" class="dash-text-action">View All <span aria-hidden="true">→</span></a></div><div class="dash-activity-list">@if (data.Activities.Count > 0) { foreach(var activity in data.Activities) { <div class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@activity.Title</strong><span>@activity.Context</span></div><time>@activity.Time</time></div> } } else { <div class="dash-empty-timeline" aria-hidden="true"><i></i><i></i><i></i></div><div class="dash-empty-state"><span>@(data.DataConnected ? "No recent activities." : "Activity history is not connected.")</span></div> }</div></article>
     </section>
-    <section class="dash-panel">
+    <section class="dash-panel dash-recent-requests">
         <div class="dash-panel-heading"><h2>Recent Department Requests</h2></div>
         <partial name="~/Areas/Department/Views/PurchaseRequests/_RequestTable.cshtml" model='new RequestTable(Model.Recent, Model.UserId)' />
     </section>
-    <section class="dash-panel dash-activity">
-        <div class="dash-panel-heading"><h2>Your Department Notifications</h2></div>
-        <div class="dash-activity-list">
-        @if (Model.Notifications.Count == 0) { <div class="dash-empty-state"><span>No department notifications yet.</span></div> }
-        @foreach (var notification in Model.Notifications)
-        {
-            <article class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@notification.Title</strong><span>@notification.Message</span><span>@(notification.IsRead ? "Read" : "Unread")</span></div><time>@RequestDisplay.Date(notification.CreatedAt)</time></article>
-        }
-        </div>
-    </section>
 </div>
-@section Styles { <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" /> }
+@section Styles {
+    <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" />
+    <style>
+        .dash-recent-requests .dept-status-badge{display:inline-flex;align-items:center;justify-content:center;min-height:25px;padding:4px 10px;border:1px solid transparent;border-radius:999px;font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap}
+        .dash-recent-requests .dept-status-draft{color:#4b5563;background:#f0f2f4;border-color:#dfe3e7}
+        .dash-recent-requests .dept-status-submitted{color:#1454a0;background:#e8f2ff;border-color:#c9defb}
+        .dash-recent-requests .dept-status-under-review{color:#7135a8;background:#f3eaff;border-color:#e1cef7}
+        .dash-recent-requests .dept-status-returned{color:#a34a00;background:#fff0df;border-color:#ffd2a5}
+        .dash-recent-requests .dept-status-rejected{color:#a12432;background:#ffebed;border-color:#f5c8cd}
+        .dash-recent-requests .dept-status-accepted{color:#166b3b;background:#e6f6eb;border-color:#c3e7ce}
+        .dash-recent-requests .dept-status-converted-to-tender{color:#087078;background:#e1f6f5;border-color:#b6e5e3}
+        .dash-recent-requests .dept-status-other{color:#4b5563;background:#f0f2f4;border-color:#dfe3e7}
+        .dash-recent-requests .dept-row-actions{display:flex;align-items:center;gap:7px;white-space:nowrap}
+        .dash-recent-requests .dept-row-actions .pg-btn{min-height:34px;padding:0 11px;border-radius:8px;font-size:12px}
+        .dash-recent-requests .dept-row-actions .dept-edit-action{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 10px;border:1px solid #f4bd8d;border-radius:8px;background:#fff0e0;color:#c65d00;text-decoration:none;font-size:12px;font-weight:700}
+        .dash-recent-requests .dept-row-actions .dept-edit-action:hover{background:#ffe2c3;border-color:#e98d39}
+        [data-theme="dark"] .dash-recent-requests .dept-status-draft,[data-theme="dark"] .dash-recent-requests .dept-status-other{color:#d0d5db;background:#33383e;border-color:#4b5259}
+        [data-theme="dark"] .dash-recent-requests .dept-status-submitted{color:#9ac7ff;background:#172b43;border-color:#28517e}
+        [data-theme="dark"] .dash-recent-requests .dept-status-under-review{color:#d8b2ff;background:#30213d;border-color:#68448a}
+        [data-theme="dark"] .dash-recent-requests .dept-status-returned{color:#ffc283;background:#402b18;border-color:#805020}
+        [data-theme="dark"] .dash-recent-requests .dept-status-rejected{color:#ff9fa8;background:#421f24;border-color:#793740}
+        [data-theme="dark"] .dash-recent-requests .dept-status-accepted{color:#8de0a9;background:#183627;border-color:#2d7047}
+        [data-theme="dark"] .dash-recent-requests .dept-status-converted-to-tender{color:#82ddda;background:#163638;border-color:#267175}
+        [data-theme="dark"] .dash-recent-requests .dept-row-actions .dept-edit-action{background:#3e2b1c;border-color:#815326;color:#ffc283}
+        [data-theme="dark"] .dash-recent-requests .dept-row-actions .dept-edit-action:hover{background:#56381f;border-color:#ba7834}
+    </style>
+}

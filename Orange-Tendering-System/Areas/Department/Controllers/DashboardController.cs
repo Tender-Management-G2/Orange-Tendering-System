@@ -35,7 +35,7 @@ public class DashboardController(ApplicationDbContext db, UserManager<Applicatio
         return View(new DepartmentDashboard
         {
             DepartmentName = department.Name, UserId = user.Id, Counts = counts,
-            Recent = await query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).Take(8).ToListAsync(),
+            Recent = await query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).Take(5).ToListAsync(),
             ActionRequired = await query.Where(r => r.CreatedByUserId == user.Id && !r.Tenders.Any() &&
                 (r.Status == PurchaseRequestStatus.Draft || r.Status == PurchaseRequestStatus.Returned))
                 .OrderByDescending(r => r.Status == PurchaseRequestStatus.Returned).ThenByDescending(r => r.CreatedAt)

@@ -1,6 +1,55 @@
-@model List<Orange_Tendering_System.Models.Entities.Notification>
-@{ Layout=WorkspaceNavigation.LayoutFor(User); ViewData["Title"]="Notifications"; ViewData["WorkspaceSection"]="Notifications"; }
-<h1>Your notifications</h1>
-<form asp-area="" asp-controller="Notifications" asp-action="MarkRead" method="post"><button>Mark your notifications as read</button></form>
-@if(Model.Count==0) { <p>No notifications for your account.</p> }
-@foreach(var n in Model) { <section class="ws-panel pg-panel"><h2>@n.Title</h2><p>@n.Message</p><p>@n.CreatedAt.ToString("u") · @(n.IsRead ? "Read" : "Unread")</p>@if(n.Link!=null && Url.IsLocalUrl(n.Link)) { <a href="@n.Link">Open related tender</a> }</section> }
+@model IReadOnlyList<Orange_Tendering_System.Models.Entities.Notification>
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Notifications";
+    ViewData["WorkspaceSection"] = "Notifications";
+    ViewData["Description"] = "Messages about workflow events that concern you.";
+    var unreadCount = ViewData["UnreadCount"] as int? ?? 0;
+}
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel" aria-labelledby="notifications-title">
+    <div class="pg-panel-head">
+        <h2 id="notifications-title">Notifications</h2>
+        <span class="pg-hint">@unreadCount unread</span>
+    </div>
+    @if (Model.Count == 0)
+    {
+        <p class="pg-hint">You have no notifications.</p>
+    }
+    else
+    {
+        <div class="pg-table-wrap">
+            <table class="pg-table">
+                <thead><tr><th scope="col">Title</th><th scope="col">Message</th><th scope="col">Received</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+                <tbody>
+                @foreach (var notification in Model)
+                {
+                    <tr>
+                        <td><strong>@notification.Title</strong></td>
+                        <td>@notification.Message</td>
+                        <td>@notification.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                        <td>@(notification.IsRead ? "Read" : "Unread")</td>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(notification.Link) && Url.IsLocalUrl(notification.Link))
+                            {
+                                <a class="pg-btn" href="@notification.Link">Open</a>
+                            }
+                            @if (!notification.IsRead)
+                            {
+                                <form asp-action="MarkRead" method="post" class="pg-inline-form">
+                                    <input type="hidden" name="id" value="@notification.Id" />
+                                    <button type="submit" class="pg-btn">Mark as read</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.Count == 100)
+        {
+            <p class="pg-hint">Showing the 100 most recent notifications.</p>
+        }
+    }
+</section>

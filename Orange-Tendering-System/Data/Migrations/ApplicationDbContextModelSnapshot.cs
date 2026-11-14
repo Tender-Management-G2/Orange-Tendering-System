@@ -752,12 +752,24 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("ElectronicSignatureSvg")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SignatureDocumentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("SignatureReportId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("VotedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CommitteeMemberId");
+
+                    b.HasIndex("SignatureReportId");
 
                     b.HasIndex("CommitteeRoundId", "CommitteeMemberId")
                         .IsUnique();
@@ -806,6 +818,10 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.Property<int?>("ClarificationMessageId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
@@ -2570,9 +2586,16 @@ namespace Orange_Tendering_System.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Orange_Tendering_System.Models.Entities.TenderReport", "SignatureReport")
+                        .WithMany()
+                        .HasForeignKey("SignatureReportId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CommitteeMember");
 
                     b.Navigation("CommitteeRound");
+
+                    b.Navigation("SignatureReport");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Document", b =>
