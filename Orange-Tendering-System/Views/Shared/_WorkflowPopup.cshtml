@@ -27,7 +27,7 @@
     string SupplierName(int sid) => supplierNames.TryGetValue(sid, out var n) ? n : "Supplier #" + sid;
     string BidSupplier(int bidId) { var b = Model.Bids.FirstOrDefault(x => x.Id == bidId); return b == null ? "Offer #" + bidId : SupplierName(b.TenderInvitation.SupplierId); }
     decimal Price(Bid b) => b.Items.Sum(x => x.Quantity * x.UnitPrice) + b.OtherCost + b.ShippingCost + b.InstallationCost + b.MaintenanceCost + b.TaxAmount;
-    string Role(CommitteeResponsibility? r) => r switch { CommitteeResponsibility.SourcingManager => "Sourcing Manager", CommitteeResponsibility.DepartmentRepresentative => "Department", CommitteeResponsibility.FinancialRepresentative => "Financial", CommitteeResponsibility.TechnicalRepresentative => "Technical", _ => "Member" };
+    string Role(CommitteeResponsibility? r) => r switch { CommitteeResponsibility.SourcingManager => "Sourcing Manager", CommitteeResponsibility.DepartmentRepresentative => "Department", CommitteeResponsibility.FinancialRepresentative => "Financial", CommitteeResponsibility.TechnicalRepresentative => "Technical 1", CommitteeResponsibility.TechnicalRepresentative2 => "Technical 2", CommitteeResponsibility.ChiefExecutiveOfficer => "CEO", _ => "Member" };
 
     var evalMembers = Model.Tender.CommitteeMembers.Where(x => x.CommitteeType == CommitteeType.Evaluation).OrderBy(x => x.Responsibility).ToList();
     var matrixBids = (s?.EligibleBids.Select(x => x.BidId) ?? Model.Scores.Select(x => x.BidId)).Distinct().ToList();

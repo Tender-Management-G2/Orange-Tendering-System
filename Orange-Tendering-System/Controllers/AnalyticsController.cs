@@ -24,7 +24,13 @@ namespace Orange_Tendering_System.Controllers
 
         private bool Allowed(string key) => Audience.TryGetValue(key, out var roles) && roles.Any(User.IsInRole);
 
-        public IActionResult Index() => View(ReportingService.Catalog.Where(c => Allowed(c.Key)).ToList());
+        public IActionResult Index()
+        {
+            if (User.IsInRole(SystemRoles.Admin))
+                return View("AdminOverview", Orange_Tendering_System.ViewModels.AdminAccountOverviewViewModel.Demo());
+
+            return View(ReportingService.Catalog.Where(c => Allowed(c.Key)).ToList());
+        }
 
         public Task<IActionResult> PurchaseRequests() => Show("purchase-requests");
         public Task<IActionResult> Tenders() => Show("tenders");

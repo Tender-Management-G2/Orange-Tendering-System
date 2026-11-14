@@ -190,7 +190,12 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                 case "InvalidDescription":
                     ModelState.AddModelError(
                         nameof(CreateDepartmentViewModel.Description),
-                        "Department description cannot exceed 500 characters.");
+                        "Department description cannot exceed 160 characters.");
+                    break;
+
+                case "InactiveDepartmentEmployees":
+                    ModelState.AddModelError(nameof(CreateDepartmentViewModel.SelectedEmployeeIds),
+                        "Activate the department before assigning employees.");
                     break;
 
                 case "InvalidEmployees":
