@@ -1045,6 +1045,9 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Property<int?>("ReportReviewRoundId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ReportSentAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
