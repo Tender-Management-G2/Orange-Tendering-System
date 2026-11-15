@@ -17,8 +17,9 @@ import * as L from './layout.js';
 //                          leave a regular octagon whose inscribed radius is exactly the requested
 //                          aperture, so the live camera can be clipped to the opening the blades leave.
 //                          Coordinated motion from that one constraint, not a simulated linkage.
-//   Touch Identity         ceramic sensor slab with engraved ridges. Presentation only: fingerprint
-//                          verification does not exist yet and nothing here pretends it does.
+//   Touch Identity         ceramic sensor slab with engraved ridges, lit when the account has a passkey
+//                          (WebAuthn: the device unlocks it with its fingerprint, face or PIN, or a phone via
+//                          QR code). The server cannot tell which modality the device used.
 //   fiber                  built for the finale only, from wherever the authenticated pulse stands.
 //
 // Every value is a rig number written by the director; this module only turns numbers into a pose.
@@ -42,7 +43,7 @@ export const RIG_DEFAULTS = {
   depth: 0, lift: 0,
   pulse: 0, pulseSig: 0, pulseBranch: 0, wait: 0,
   gateOk: 0, gateErr: 0, gateWarn: 0, block: 0,
-  branches: 0, optic: 0, bezel: 0, touch: 0, fp: 0, hover: 0,
+  branches: 0, optic: 0, bezel: 0, touch: 0, fp: 0, hover: 0, touchLit: 0,
   iris: 0, irisWarn: 0, ring: 0, ringOk: 0, proc: 0, procPhase: 0,
   cable: 0, finale: 0
 };
@@ -365,8 +366,10 @@ export function buildHardware(stage, root, card, pads, sig) {
     // Touch module.
     develop(touch, touchMaterials, groundColor, rig.touch);
     touch.visible = rig.touch > 0.002;
+    _c.copy(inkColor).lerp(okColor, rig.touchLit);
     ridges.forEach((s, i) => {
       s.drawn = clamp01(rig.fp * 1.8 - i * 0.07);
+      s.material.uniforms.uColor.value.copy(_c);
     });
 
     // Pulse.

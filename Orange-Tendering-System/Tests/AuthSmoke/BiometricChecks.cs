@@ -361,6 +361,30 @@ static class BiometricChecks
         var approvedPasskey = await PhoneLogin(approvedPhone);
         check(approvedPasskey.StatusCode == HttpStatusCode.OK && (await approvedPasskey.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("redirect").GetString() == "/Supplier" &&
             (await approvedPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier signs in independently with passkey and opens dashboard");
+        using (var stepPhone = newClient())
+        {
+            // The Fingerprint / Passkey tile of the identity step: options are scoped to the account that passed
+            // the password, and the passkey completes the step.
+            var (_, stepPhoneCsrf) = await Credentials(stepPhone, password);
+            var scoped = await (await Post(stepPhone, stepPhoneCsrf, "/Biometrics/PasskeyLoginOptions", new { })).Content.ReadFromJsonAsync<JsonElement>();
+            check(scoped.TryGetProperty("allowCredentials", out var allowed) && allowed.GetArrayLength() > 0,
+                "after the password step only that account's passkeys are offered");
+            var stepSigned = await Post(stepPhone, stepPhoneCsrf, "/Biometrics/PasskeyLogin", SignedAssertion(scoped, phoneId, phoneKey, userId, phoneCounter++));
+            check(stepSigned.StatusCode == HttpStatusCode.OK && (await stepPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
+                "fingerprint / passkey completes the supplier identity step");
+        }
+        using (var unreadable = newClient())
+        {
+            // Templates encrypted under other data-protection keys: the person is told to enroll again.
+            using (var scope = services.CreateScope())
+                await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().FaceTemplates.Where(t => t.UserId == userId)
+                    .ExecuteUpdateAsync(t => t.SetProperty(x => x.ProtectedTemplate, RandomNumberGenerator.GetBytes(64)));
+            var (_, unreadableCsrf) = await Credentials(unreadable, password);
+            var unreadableFace = await Post(unreadable, unreadableCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(unreadable, unreadableCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+            check(unreadableFace.StatusCode == HttpStatusCode.Unauthorized && (await unreadableFace.Content.ReadAsStringAsync()).Contains("can no longer be read") &&
+                  (await unreadable.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+                "an unreadable stored face asks for re-enrollment and signs nobody in");
+        }
 
         using var passwordOnly = newClient();
         var refused = await PasswordLogin(passwordOnly);

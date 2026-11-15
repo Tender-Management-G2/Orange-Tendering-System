@@ -29,7 +29,8 @@
     const faceNote = document.getElementById('faceMethodNote');
     const faceHint = document.getElementById('faceHint');
     const faceActions = document.getElementById('faceActions');
-    const passkeyStep = document.getElementById('passkeyStep');
+    const passkeyButton = document.getElementById('btnPasskeyStep');
+    const passkeyNote = document.getElementById('fingerprintMethodNote');
     const bioStatus = document.getElementById('bio-status');
     const back = document.getElementById('btnBiometricBack');
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -216,7 +217,11 @@
         shell.dataset.step = 'biometric';
         root.dataset.face = String(face);
         root.dataset.passkey = String(passkey);
-        if (passkeyStep) passkeyStep.hidden = !passkey;
+        if (passkeyButton) {
+            passkeyButton.disabled = !passkey;
+            passkeyButton.toggleAttribute('data-bio-disabled', !passkey);
+            if (passkeyNote) passkeyNote.textContent = passkey ? "This device's fingerprint, or your phone via QR code" : "No passkey is set up for this account yet.";
+        }
         if (faceButton) {
             faceButton.disabled = !face;
             faceButton.toggleAttribute('data-bio-disabled', !face);

@@ -78,7 +78,10 @@ namespace Orange_Tendering_System.Controllers
         public async Task<IActionResult> PasskeyLoginOptions()
         {
             if (throttle.IsBlocked(BiometricThrottle.IpKey(Ip()))) return TooManyAttempts();
-            return Content(await passkeys.CreateLoginOptionsAsync(), "application/json");
+            // Inside a supplier's identity step (after the password) only that account's passkeys are offered: the
+            // browser asks for this device's fingerprint / Windows Hello, or shows a QR code for a phone passkey.
+            var stepUser = await preAuth.UserAsync(HttpContext, users);
+            return Content(await passkeys.CreateLoginOptionsAsync(stepUser), "application/json");
         }
 
         [AllowAnonymous, HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(100_000)]
@@ -88,6 +91,10 @@ namespace Orange_Tendering_System.Controllers
             if (throttle.IsBlocked(ipKey)) return TooManyAttempts();
 
             var result = await passkeys.VerifyLoginAsync(request.CredentialJson);
+            // After a password step the passkey must belong to that same account.
+            var stepUserId = preAuth.UserId(HttpContext);
+            if (result.Succeeded && result.User is not null && stepUserId is not null && result.User.Id != stepUserId)
+                result = BiometricResult.Fail("passkey of another account");
             if (!result.Succeeded || result.User is null)
             {
                 throttle.Failure(ipKey);
@@ -101,6 +108,7 @@ namespace Orange_Tendering_System.Controllers
                 return Unauthorized(new { error = GenericFailure });
             }
 
+            preAuth.End(HttpContext);
             throttle.Reset(ipKey);
             return Json(new { succeeded = true, redirect = await signIn.DestinationAsync(result.User, request.ReturnUrl, Url.IsLocalUrl) });
         }

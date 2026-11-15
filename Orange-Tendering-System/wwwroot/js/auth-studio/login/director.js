@@ -363,7 +363,7 @@ export class SignalDirector {
     this.to({ touch: 1 }, { duration: 1.0, ease: 'power2.out', delay: 0.45 });
     this.to({ fp: 1 }, { duration: 1.6, ease: 'power1.inOut', delay: 1.1 });
     this.to({ iris: 0, irisWarn: 0, ring: 0, ringOk: 0, proc: 0, hover: 0 }, { duration: 0.5 });
-    this.say('Password accepted. Two identity modules: Optical Identity, and Touch Identity, which is not available yet.');
+    this.say('Password accepted. Two identity modules: Optical Identity (face) and Touch Identity (fingerprint or passkey).');
     this.aim();
   }
 
@@ -388,6 +388,9 @@ export class SignalDirector {
       this.completeIntro();
       this.enterChoose(false);
     }
+    // The Touch module is live only when the account really has a passkey.
+    if (detail.step === 'biometric') this.to({ touchLit: detail.passkey ? 1 : 0 }, { duration: 0.8, delay: 1.2 });
+    else this.to({ touchLit: 0 }, { duration: 0.4 });
   }
 
   hoverFace(on) {

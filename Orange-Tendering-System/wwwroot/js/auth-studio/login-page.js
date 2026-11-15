@@ -61,5 +61,7 @@ import { fallbackSvg } from './login/fallback.js';
 
   // The form script ran first: pick up values restored by the browser and a step the server rendered.
   if (shell.authState) push(shell.authState);
-  if (shell.dataset.step === 'biometric') director.step({ step: 'biometric' });
+  if (shell.dataset.step === 'biometric') {
+    director.step({ step: 'biometric', passkey: document.getElementById('bio-root')?.dataset.passkey === 'true' });
+  }
 })();

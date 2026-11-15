@@ -22,8 +22,12 @@ public class FaceService(
     ApplicationDbContext db,
     ChallengeStore challenges,
     IDataProtectionProvider dataProtection,
-    IOptions<BiometricOptions> options)
+    IOptions<BiometricOptions> options,
+    ILogger<FaceService> logger)
 {
+    /// <summary>Shown after the password step when the stored face cannot be read (keys changed): enrolling again fixes it.</summary>
+    public const string ReEnrollRequired = "Your enrolled face can no longer be read by this server. Sign in with a passkey, or open Pending Approval / Face settings and enroll your face again.";
+
     public const string LoginPurpose = "face-login";
     public const string EnrollPurpose = "face-enroll";
     public const string DemoPurpose = "face-demo";
@@ -100,6 +104,13 @@ public class FaceService(
             {
                 // A template that can no longer be decrypted (keys changed) is ignored.
             }
+        }
+
+        if (rows.Count > 0 && templates.Count == 0)
+        {
+            // Not a mismatch: nothing to compare with. Say so (the password was already correct) instead of failing forever.
+            logger.LogWarning("Face templates for user {UserId} could not be decrypted; re-enrollment required.", user.Id);
+            return BiometricResult.Fail(ReEnrollRequired);
         }
 
         if (templates.Count == 0 || !Match(submission.Descriptors, templates).Matched)
