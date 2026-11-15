@@ -1,18 +1,18 @@
-# Our Team scene — character integration
+# Our Team page — "The Minds Behind Orange"
 
-`wwwroot/js/team-scene.js` renders the /team courtyard. Every frame is a pure function of the
-scroll progress of `#tx` (no clock, no autoplay): stopping the scroll freezes it, scrolling back reverses it.
+`wwwroot/js/team-scene.js` renders /team: a dark Orange innovation room with a miniature Orange HQ.
+The seven team cards (`wwwroot/data/team.json`) sit above it. Every state is a pure function of the
+scroll progress of `#tx` (GSAP ScrollTrigger, no clock), so the page stops when scrolling stops and reverses exactly.
 
-## Adding the character
-1. Put a rigged, animated human at `wwwroot/models/team-character.glb` (glTF binary, Y-up, facing +Z,
-   in-place clips with no root motion). The view only references it when the file exists.
-2. The clips are matched by name (`CHARACTER.clips` in team-scene.js):
-   - `walk`: a walk cycle, synced to distance (`CHARACTER.stride` metres per cycle)
-   - `sit`: stand-to-sit
-   - `sitIdle`: seated idle (optional)
-   - `react`: head-hit or surprised reaction while seated
-   - `lookUp`: seated, looking up
-3. The model is scaled to `CHARACTER.height`. The falling orange targets the first bone named `*head*`
-   at the moment of contact (scroll 55%).
+- 0.00–0.08 welcome
+- 0.08–0.82 one stage per member: the card is enlarged, an Orange line is drawn to that member's
+  building section (podium, levels 1–4, top floor, roof and sign), the section lights up, and the right panel
+  shows the member's details
+- 0.82–0.91 the camera pulls back and all seven lines connect
+- 0.91–1.00 "Seven Minds. One Connected Vision."
 
-Clip time is set from scroll (`action.time`) and the mixer is evaluated with a zero delta, so scrubbing is exact in both directions.
+## Team data
+- Photos: `wwwroot/images/team/*.jpg` (640×800, cropped from the supplied files).
+- Names come from the supplied photo filenames.
+- Roles and contributions stay "to be confirmed" until the team supplies them. Edit `role` and
+  `contributions` in team.json (separate several contributions with `;`) and set `placeholder` to false.
