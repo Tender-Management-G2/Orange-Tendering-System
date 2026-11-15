@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F6F1E9">
+  <title>Orange Auth Studio — V3 Motion Lab</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23FF7900'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="studio.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/node_modules/three/build/three.module.js",
+        "three/addons/": "/node_modules/three/examples/jsm/",
+        "gsap": "/node_modules/gsap/index.js",
+        "gsap/CustomEase": "/node_modules/gsap/CustomEase.js"
+      }
+    }
+  </script>
+  <script type="module" src="src/main.js"></script>
+</head>
+<body data-chapter="registration">
+  <a class="skip-link" href="#form-title">Skip to the form</a>
+
+  <main class="split">
+    <!-- LEFT: the animated world. Decorative: every real status is repeated as text in the form. -->
+    <section class="stage" id="stage" data-shot="wide" aria-label="Illustration">
+      <div class="stage-ui" aria-hidden="true">
+        <p class="chapter-mark"><span class="sq"></span><span id="chapter-name">Supplier Genesis</span></p>
+        <p class="tagline" id="tagline">Every great partnership begins with a small idea.</p>
+      </div>
+      <div class="stage-fallback" id="stage-fallback" hidden></div>
+      <p class="sr-only" id="scene-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- RIGHT: a normal form. It never waits for the illustration. -->
+    <section class="panel">
+      <div class="panel-inner">
+        <header class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-name">Sourcing &amp; Tender Management</span>
+        </header>
+
+        <!-- ============ Registration · step 1 (R00–R02) ============ -->
+        <form id="reg-form" class="auth-form" novalidate data-form="registration">
+          <p class="kicker">Supplier registration</p>
+          <h1 id="form-title">Create your supplier account</h1>
+          <p class="lede"><span class="lede-tagline">Every great partnership begins with a small idea. </span>Start with the person who will represent your company.</p>
+
+          <ol class="steps" aria-label="Registration steps">
+            <li class="is-current" aria-current="step"><span class="n">1</span><span class="t">Contact</span></li>
+            <li><span class="n">2</span><span class="t">Company</span></li>
+            <li><span class="n">3</span><span class="t">Documents</span></li>
+            <li><span class="n">4</span><span class="t">Face</span></li>
+            <li><span class="n">5</span><span class="t">Review</span></li>
+          </ol>
+
+          <div class="field" data-field="name">
+            <label for="reg-name">Contact person's full name</label>
+            <input id="reg-name" name="FullName" type="text" autocomplete="off" maxlength="150" aria-describedby="reg-name-error" required>
+            <p class="field-error" id="reg-name-error" hidden></p>
+          </div>
+
+          <div class="field" data-field="email">
+            <label for="reg-email">Email address</label>
+            <input id="reg-email" name="Email" type="email" inputmode="email" autocomplete="off" maxlength="256" aria-describedby="reg-email-error" required>
+            <p class="field-error" id="reg-email-error" hidden></p>
+          </div>
+
+          <div class="field" data-field="password">
+            <label for="reg-password">Password</label>
+            <div class="with-toggle">
+              <input id="reg-password" name="Password" type="password" autocomplete="new-password" maxlength="100" aria-describedby="reg-password-rules reg-password-error" required>
+              <button type="button" class="reveal" data-reveal="reg-password" aria-pressed="false">Show</button>
+            </div>
+            <ul class="rules" id="reg-password-rules" aria-label="Password requirements">
+              <li data-rule="0"><span class="tick" aria-hidden="true"></span>8 characters or more <span class="sr-only state">— not met</span></li>
+              <li data-rule="1"><span class="tick" aria-hidden="true"></span>A lowercase letter <span class="sr-only state">— not met</span></li>
+              <li data-rule="2"><span class="tick" aria-hidden="true"></span>An uppercase letter <span class="sr-only state">— not met</span></li>
+              <li data-rule="3"><span class="tick" aria-hidden="true"></span>A number <span class="sr-only state">— not met</span></li>
+              <li data-rule="4"><span class="tick" aria-hidden="true"></span>A symbol <span class="sr-only state">— not met</span></li>
+            </ul>
+            <p class="field-error" id="reg-password-error" hidden></p>
+          </div>
+
+          <div class="field" data-field="confirm">
+            <label for="reg-confirm">Confirm password</label>
+            <div class="with-toggle">
+              <input id="reg-confirm" name="ConfirmPassword" type="password" autocomplete="new-password" maxlength="100" aria-describedby="reg-confirm-error" required>
+              <button type="button" class="reveal" data-reveal="reg-confirm" aria-pressed="false">Show</button>
+            </div>
+            <p class="field-error" id="reg-confirm-error" hidden></p>
+          </div>
+
+          <button class="primary" type="submit">Continue to company details <span aria-hidden="true">→</span></button>
+          <p class="form-note" id="reg-note" role="status" aria-live="polite"></p>
+
+          <p class="links">
+            <a href="?chapter=login">Already have an account? Sign in</a>
+          </p>
+          <p class="lab-note">Motion Lab — fictional form. Nothing typed here is submitted, stored or sent anywhere.</p>
+        </form>
+
+        <!-- ============ Login (L00–L02 flat) ============ -->
+        <form id="login-form" class="auth-form" novalidate data-form="login" hidden>
+          <p class="kicker">Welcome back</p>
+          <h1 id="login-title">Sign in to your workspace</h1>
+          <p class="lede"><span class="lede-tagline">Every connection begins with a signal. </span>Use the email and password for your account.</p>
+
+          <div class="field" data-field="email">
+            <label for="login-email">Email address</label>
+            <input id="login-email" name="Email" type="email" inputmode="email" autocomplete="off" maxlength="256" aria-describedby="login-email-error" required>
+            <p class="field-error" id="login-email-error" hidden></p>
+          </div>
+
+          <div class="field" data-field="password">
+            <label for="login-password">Password</label>
+            <div class="with-toggle">
+              <input id="login-password" name="Password" type="password" autocomplete="off" maxlength="100" aria-describedby="login-password-error" required>
+              <button type="button" class="reveal" data-reveal="login-password" aria-pressed="false">Show</button>
+            </div>
+            <p class="field-error" id="login-password-error" hidden></p>
+          </div>
+
+          <label class="check"><input type="checkbox" name="RememberMe"> <span>Remember me on this device</span></label>
+
+          <button class="primary" type="submit">Continue <span aria-hidden="true">→</span></button>
+          <p class="form-note" id="login-note" role="status" aria-live="polite"></p>
+
+          <p class="links">
+            <a href="#" data-inert-link>Forgot your password?</a>
+            <a href="?chapter=registration">Register as a supplier</a>
+          </p>
+          <p class="lab-note">Motion Lab — fictional form. No credentials are checked, stored or sent anywhere.</p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- Development inspector: separate from the experience, never part of production. -->
+  <button id="inspector-toggle" class="inspector-toggle" type="button" aria-expanded="false" aria-controls="inspector">Motion Lab</button>
+  <aside id="inspector" class="inspector" aria-label="Motion Lab inspector" hidden>
+    <div class="insp-row insp-head">
+      <strong>Motion Lab <span class="gate">G2A · R00–R02 / L00–L02</span></strong>
+      <nav class="insp-links" aria-label="Lab pages">
+        <a href="?chapter=registration" data-chapter-link="registration">Registration</a>
+        <a href="?chapter=login" data-chapter-link="login">Login</a>
+        <a href="compare.html">Side by side</a>
+      </nav>
+      <div class="seg" role="group" aria-label="Driver">
+        <button type="button" id="mode-live" aria-pressed="true">Live form</button>
+        <button type="button" id="mode-reel" aria-pressed="false">Showreel</button>
+      </div>
+      <button type="button" id="inspector-close" class="ghost" aria-label="Close inspector">Close</button>
+    </div>
+
+    <div class="insp-row" id="reel-controls">
+      <button type="button" id="reel-restart" title="Restart">Restart</button>
+      <button type="button" id="reel-play" title="Play / pause">Play</button>
+      <button type="button" id="reel-reverse" title="Play backwards">Reverse</button>
+      <input type="range" id="reel-scrub" min="0" max="1000" value="0" aria-label="Timeline position">
+      <output id="reel-time" for="reel-scrub">0.00 s</output>
+      <label class="inline">Speed
+        <select id="reel-speed">
+          <option value="1">1×</option>
+          <option value="0.5">0.5×</option>
+          <option value="0.25">0.25×</option>
+        </select>
+      </label>
+      <span class="shots" id="reel-shots"></span>
+    </div>
+
+    <div class="insp-row">
+      <label class="inline"><input type="checkbox" id="opt-reduced"> Reduced motion</label>
+      <label class="inline"><input type="checkbox" id="opt-wire"> Wireframe</label>
+      <label class="inline"><input type="checkbox" id="opt-hinges"> Hinge axes</label>
+      <label class="inline"><input type="checkbox" id="opt-orbit"> Free orbit</label>
+      <button type="button" id="opt-reset" class="ghost">Reset view</button>
+      <span class="sep"></span>
+      <span class="presets" id="presets" aria-label="Synthetic form states"></span>
+    </div>
+
+    <div class="insp-row readout" id="readout" aria-live="off"></div>
+  </aside>
+</body>
+</html>

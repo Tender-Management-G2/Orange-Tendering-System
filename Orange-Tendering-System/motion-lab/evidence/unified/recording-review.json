@@ -1,0 +1,40 @@
+{
+  "videos": [
+    {
+      "name": "registration-fold-slow",
+      "duration": 7.64,
+      "moments": [
+        1.5,
+        3,
+        5
+      ]
+    },
+    {
+      "name": "registration-architecture-slow",
+      "duration": 14.76,
+      "moments": [
+        3,
+        7,
+        11
+      ]
+    },
+    {
+      "name": "login-optical-slow",
+      "duration": 9.08,
+      "moments": [
+        2,
+        4,
+        6
+      ]
+    },
+    {
+      "name": "login-fiber-slow",
+      "duration": 2.88,
+      "moments": [
+        0.5,
+        1
+      ]
+    }
+  ],
+  "errors": []
+}

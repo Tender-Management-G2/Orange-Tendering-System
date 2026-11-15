@@ -367,9 +367,10 @@ var pendingLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new(
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
     ["__RequestVerificationToken"] = supplierLoginToken
 }));
-Check(pendingLogin.StatusCode == HttpStatusCode.OK &&
-    (await pendingLogin.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"),
-    "verified pending supplier cannot sign in before Admin approval");
+Check(pendingLogin.StatusCode == HttpStatusCode.Redirect &&
+    pendingLogin.Headers.Location?.ToString().Contains("PendingApproval") == true &&
+    (await supplier.GetAsync("/Supplier")).Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "verified pending supplier can resume enrollment but cannot enter the workspace");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -392,9 +393,10 @@ var approvedLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
     ["__RequestVerificationToken"] = approvedLoginToken
 }));
-Check(approvedLogin.StatusCode == HttpStatusCode.Redirect && approvedLogin.Headers.Location?.ToString() == "/Supplier",
-    "approved supplier redirected to Supplier workspace");
-Check((await supplier.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier workspace opens");
+Check(approvedLogin.StatusCode == HttpStatusCode.Redirect && approvedLogin.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "approved supplier without biometrics reaches setup");
+Check((await supplier.GetAsync("/Supplier")).Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "approved supplier password session cannot open workspace");
 Check((await supplier.GetAsync("/Admin")).StatusCode != HttpStatusCode.OK, "supplier cannot enter Admin area");
 using (var scope = factory.Services.CreateScope())
 {
@@ -621,10 +623,20 @@ foreach (var workspace in Orange_Tendering_System.ViewModels.WorkspaceNavigation
         ["Input.Email"] = email, ["Input.Password"] = supplierPassword,
         ["__RequestVerificationToken"] = roleToken
     }));
-    Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString() == "/" + workspace.Area,
-        workspace.Role + " login routes to its dashboard");
-    Check((await roleClient.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.OK,
-        workspace.Role + " dashboard renders with authenticated cookie");
+    if (workspace.Role == SystemRoles.Supplier)
+    {
+        Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString().Contains("PendingApproval") == true,
+            "supplier password login routes to biometric setup");
+        Check((await roleClient.GetAsync("/" + workspace.Area)).Headers.Location?.ToString().Contains("PendingApproval") == true,
+            "supplier password cookie cannot open its dashboard");
+    }
+    else
+    {
+        Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString() == "/" + workspace.Area,
+            workspace.Role + " login routes to its dashboard");
+        Check((await roleClient.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.OK,
+            workspace.Role + " dashboard renders with authenticated cookie");
+    }
     if (workspace.Role != SystemRoles.Admin)
         Check((await roleClient.GetAsync("/Admin")).StatusCode != HttpStatusCode.OK, workspace.Role + " cannot enter Admin");
     using var anonymous = Client(factory);

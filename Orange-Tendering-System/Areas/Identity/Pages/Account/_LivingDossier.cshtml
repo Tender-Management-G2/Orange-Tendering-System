@@ -1,0 +1,51 @@
+@model string
+@{
+    var faceMode = Model is "face" or "login";
+}
+<div class="ld-scene" data-scene="@Model" aria-label="The Living Dossier illustration">
+    <img class="ld-art ld-art--closed" src="~/assets/living-dossier/closed-dossier.png" alt="" />
+    <img class="ld-art ld-art--open" src="~/assets/living-dossier/open-dossier.png" alt="" />
+    <div class="ld-light-sweep" aria-hidden="true"></div>
+    <div class="ld-story-card" aria-hidden="true">
+        <span class="ld-story-card__portrait">✦</span>
+        <span class="ld-story-card__label">COMPANY CONTACT</span>
+        <strong id="dossierName">Your name</strong>
+        <small id="dossierEmail">Identity begins here</small>
+    </div>
+    <div class="ld-story-envelope" aria-hidden="true"><span class="ld-envelope-flap"></span><span class="ld-envelope-seal">✦</span></div>
+    <div class="ld-paper-label ld-paper-label--company" aria-hidden="true"><span>LEGAL IDENTITY</span><strong id="dossierCompany">Your company</strong></div>
+    <div class="ld-paper-label ld-paper-label--category" aria-hidden="true"><span>FIELD OF WORK</span><strong id="dossierCategory">Your category</strong></div>
+    <div class="ld-document-markers" aria-hidden="true"><span>REG</span><span>TAX</span><span>LEGAL</span></div>
+    @if (Model is "verify" or "forgot" or "reset" or "confirm")
+    {
+        <div class="ld-verification-letter" aria-hidden="true">
+            <span>PRIVATE CORRESPONDENCE</span>
+            <strong>@(Model switch { "forgot" => "Let's find your file.", "reset" => "A fresh key.", "confirm" => "Check your inbox.", _ => "One last detail." })</strong>
+            <small>@(Model switch { "forgot" => "We'll send a secure link to your email.", "reset" => "Choose a new way into your dossier.", "confirm" => "Your next step is waiting in a letter.", _ => "Your code opens the next chapter." })</small>
+            @if (Model == "verify") { <div class="ld-code-marks"><i></i><i></i><i></i><i></i><i></i><i></i></div> }
+        </div>
+    }
+    @if (faceMode)
+    {
+        <div class="ld-pocket-target" aria-hidden="true"></div>
+        <div class="ld-portrait" id="dossierPortrait">
+            <div class="ld-portrait-base">
+                <div id="facePanel" class="ld-camera bio-hidden">
+                    <video id="faceVideo" playsinline muted autoplay aria-label="Live camera preview"></video>
+                </div>
+                <div class="ld-face-fragments" aria-hidden="true">
+                    <span class="ld-face-fragment ld-face-fragment--top"></span>
+                    <span class="ld-face-fragment ld-face-fragment--left"></span>
+                    <span class="ld-face-fragment ld-face-fragment--right"></span>
+                    <span class="ld-face-fragment ld-face-fragment--center-left"></span>
+                    <span class="ld-face-fragment ld-face-fragment--center-right"></span>
+                    <span class="ld-face-fragment ld-face-fragment--chin"></span>
+                </div>
+                <span class="ld-portrait-corner tl"></span><span class="ld-portrait-corner tr"></span><span class="ld-portrait-corner bl"></span><span class="ld-portrait-corner br"></span>
+            </div>
+        </div>
+        <div class="ld-id-card" aria-hidden="true"><img src="~/assets/living-dossier/origami-face.png" alt="" /><div><span>IDENTITY CONFIRMED</span><strong>Supplier identity</strong><small>COMPANY DOSSIER</small></div><b>✦</b></div>
+        <div class="ld-camera-orbit" aria-hidden="true"></div>
+    }
+    <div class="ld-scene-note" aria-hidden="true">THE LIVING DOSSIER <span> / </span> EVERY COMPANY HAS A STORY</div>
+</div>

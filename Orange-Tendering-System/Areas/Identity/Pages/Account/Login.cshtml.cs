@@ -60,14 +60,11 @@ public class LoginModel(
             .Select(s => (SupplierStatus?)s.Status)
             .SingleOrDefaultAsync();
         var supplierAllowed = (!isSupplier && user.SupplierId == null) ||
-            (isSupplier && supplierStatus == SupplierStatus.Approved);
+            (isSupplier && (supplierStatus is SupplierStatus.Pending or SupplierStatus.Approved));
         if (!user.IsActive || !user.EmailConfirmed || !supplierAllowed)
         {
             logger.LogWarning("Identity sign-in denied by account state for user {UserId}.", user.Id);
-            ModelState.AddModelError(string.Empty,
-                isSupplier && supplierStatus == SupplierStatus.Pending && user.EmailConfirmed
-                    ? "Your supplier registration is awaiting administrator approval."
-                    : "Invalid sign-in attempt.");
+            ModelState.AddModelError(string.Empty, "Invalid sign-in attempt.");
             return Page();
         }
 
@@ -76,7 +73,7 @@ public class LoginModel(
             (await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id) ||
              (await users.GetPasskeysAsync(user)).Count > 0))
         {
-            ModelState.AddModelError(string.Empty, "This supplier account signs in with face recognition or a passkey. Use the buttons below the form.");
+            ModelState.AddModelError(string.Empty, "Supplier accounts sign in with face recognition or a passkey. Use the supplier sign-in option above.");
             return Page();
         }
 
@@ -91,6 +88,10 @@ public class LoginModel(
 
         if (user.MustChangePassword)
             return RedirectToPage("./FirstLoginPasswordChange");
+        // Password sign-in is for supplier setup only. Protected supplier routes
+        // require a fresh face or passkey session in SupplierApprovalGate.
+        if (isSupplier)
+            return RedirectToPage("./PendingApproval");
         if (ReturnUrl != null)
             return LocalRedirect(ReturnUrl);
 
