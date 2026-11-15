@@ -173,6 +173,19 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         round.OpensAt = Now; round.Deadline = deadline.UtcDateTime; round.Status = TenderRoundStatus.Open; t.Status = TenderStatus.Bidding;
         if (round.RoundNumber > 1) await CarryForwardSuppliers(t, a, round);
     });
+    // Repairs only legacy bidding rounds created without a closing date.
+    public Task SetMissingBiddingDeadline(int id, DateTimeOffset deadline, ClaimsPrincipal principal) => Change(id, principal, "MissingBiddingDeadlineSet", async (t, a) =>
+    {
+        await Officer(t, a); var round = await Round(id); var weights = await Weights(id);
+        Require(t.Status == TenderStatus.Bidding && round.Status == TenderRoundStatus.Open && round.Deadline == null,
+            "Only an open legacy round with a missing deadline can be repaired here.");
+        Require(weights.State == WeightState.Approved, "Approved evaluation weights are required before a bidding deadline can be set.");
+        Require(deadline != default && deadline.UtcDateTime > Now, "Choose a bidding closing date and time in the future.");
+        Require(!await db.Set<EvaluationSession>().AnyAsync(x => x.TenderRoundId == round.Id), "Evaluation has already started; the deadline cannot change.");
+        round.Deadline = deadline.UtcDateTime;
+        round.OpensAt ??= Now;
+        Audit(a, id, "BiddingDeadlineRepairEvidence", new { round.Id, Deadline = round.Deadline });
+    });
     public Task Invite(int id, int supplierId, ClaimsPrincipal principal) => Change(id, principal, "SupplierInvited", async (t, a) =>
     {
         await Officer(t, a); var r = await Round(id);
