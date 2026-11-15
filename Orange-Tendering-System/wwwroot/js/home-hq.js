@@ -1,190 +1,145 @@
-/* Orange HQ hero: the approved reference image, cut into layers by Tools/HeroLayers/build_layers.py.
-   Exploded at rest (pixel-identical to the reference), assembled by scroll in the same locked perspective.
-   Layout (cover scaling) works without GSAP; the scroll assembly uses GSAP 3.12.5 + ScrollTrigger. */
+/* Orange HQ hero: the approved image of the headquarters (Tools/HeroLayers/reference.webp), cut into floors by
+   Tools/HeroLayers/build_layers.py. The building is centred. It starts with its floors lifted apart and seen from a
+   wide, low, orbiting camera; scrolling lowers every floor into place, grows the orange lines live, and moves the
+   camera to the exact approved frontal view of the completed building. Fully reversible.
+   Layout works without GSAP; the scroll sequence uses GSAP 3.12.5 + ScrollTrigger. */
 (function () {
   "use strict";
   var stage = document.getElementById("hq-stage"), world = document.getElementById("hq-world");
   if (!stage || !world) return;
   var root = document.documentElement, section = document.getElementById("home");
-  var REF_W = 1672, REF_H = 941;
+  var REF_W = 1448, REF_H = 1086, FX = 700, FY = 560; // reference size, building centre
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   var gsap = window.gsap, ScrollTrigger = window.ScrollTrigger;
   var clamp = function (v, a, b) { return Math.min(b, Math.max(a, v)); };
 
-  /* ---------- layers (geometry comes from manifest.json, written into the markup by the view) ---------- */
-  var GAPS = [6, 24, 34, 30, 34]; // keep in sync with Tools/HeroLayers/build_layers.py (also in manifest.json)
-  var STACK = { l5: 1, l4: 2, card: 2, l3: 3, l2: 4, roof: 5 };
-  // every loose piece docks fully inside the floor it belongs to (hidden behind it at 100 %)
-  var SIDE = { leftbox: [1, 153, -37, .55], papers: [1, 535, -16, .15], lslab: [2, 268, 42, .5], chip: [2, -27, 1, .6], rightcube: [2, -375, 122, .6], ulpanels: [4, 149, 15, .5] };
-  var DEPTH = { roof: 1, l2: .85, l3: .7, card: .9, l4: .55, l5: .35, leftbox: .8, rightcube: .9, ulpanels: .95, lslab: .9, chip: .6, papers: 1.1 };
+  /* ---------- floors (keep GAPS in sync with build_layers.py / manifest.json) ---------- */
+  var GAPS = [42, 48, 52, 58, 74];
+  var STACK = { f5: 1, f4: 2, card: 2, f3: 3, f2: 4, roof: 5 };
   var layers = {};
-  Array.prototype.forEach.call(world.querySelectorAll(".hq-layer"), function (el, i) { layers[el.dataset.layer] = { el: el, phase: i * 1.7 }; });
+  Array.prototype.forEach.call(world.querySelectorAll(".hq-layer"), function (el, i) { layers[el.dataset.layer] = { el: el, phase: i * 1.3 }; });
 
-  /* ---------- state (driven by the scroll timeline) ---------- */
-  var S = { g: [0, 0, 0, 0, 0], side: { leftbox: 0, rightcube: 0, ulpanels: 0, lslab: 0, chip: 0, papers: 0 }, glow: 0, pulse: 0, zoom: 0, fade: 0 };
+  /* ---------- state ---------- */
+  // g[k]: lock progress of stage k (0 = lifted, 1 = in place). The page loads exploded unless reduced motion.
+  var S = { g: reduce ? [1, 1, 1, 1, 1] : [0, 0, 0, 0, 0], glow: 0, pulse: 0, fade: 0 };
+  // camera: dolly z, orbit ry / tilt rx (deg), pan tx / rise ty (reference px). Starts wide, low and orbiting.
+  var C = reduce ? { z: 1, ry: 0, rx: 0, tx: 0, ty: 0 } : { z: .8, ry: 7, rx: 4, tx: -10, ty: 120 };
   var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
-  // camera (scroll-driven): dolly z, orbit ry/rx (degrees), rise/pan in reference pixels
-  var C = { z: 1, ry: 0, rx: 0, tx: 0, ty: 0 };
-  // final hero angle (the completed-HQ image): opacity, dolly, orbit
-  var F = { o: 0, z: 1.12, ry: 8 };
-  var finalEl = document.getElementById("hq-final");
   var view = { s: 1, ox: 0, oy: 0, wide: true };
+  var st = null;
 
-  function stackDy(k) { var d = 0; for (var j = 0; j < k; j++) d += GAPS[j] * S.g[j]; return d; }
+  // a floor is lifted by the gaps of its own stage and every stage below that has not locked yet
+  function lift(k) { var d = 0; for (var j = 0; j < k; j++) d += GAPS[j] * (1 - S.g[j]); return -d; }
   function assembled() { return (S.g[0] + S.g[1] + S.g[2] + S.g[3] + S.g[4]) / 5; }
 
-  /* ---------- orange connectors (redrawn so they stay attached to the floors) ---------- */
+  /* ---------- orange lines: each grows with the lock progress of the floor it plugs into ---------- */
   var NS = "http://www.w3.org/2000/svg", svg = document.getElementById("hq-wires");
-  // Each line grows from its panel toward the building with the lock progress (S.g) of the floor it plugs into,
-  // so it touches that floor exactly when the floor lands, and retracts when scrolling back.
-  // [stage = floor's stack index, floor layer, function(dy) -> path]
+  function left(y0, y1) { return function (d) { var e = y1 + d; return "M252 " + y0 + "H300Q310 " + y0 + " 310 " + (y0 + 10) + "V" + (e - 12).toFixed(1) + "Q310 " + e.toFixed(1) + " 322 " + e.toFixed(1) + "H357"; }; }
+  function right(x0, y0, xb, y1) { return function (d) { var e = y1 + d; return "M" + x0 + " " + y0 + "H" + (xb + 10) + "Q" + xb + " " + y0 + " " + xb + " " + (y0 + 10) + "V" + (e - 10).toFixed(1) + "Q" + xb + " " + e.toFixed(1) + " " + (xb - 12) + " " + e.toFixed(1) + "H1078"; }; }
   var WIRES = [
-    [2, "l4", function (d) { return "M669 396H704Q716 396 716 408V" + (458 + d) + "Q716 " + (470 + d) + " 728 " + (470 + d) + "H792"; }],
-    [2, null, function () { return "M680 457H714"; }],
-    [2, "l4", function (d) { return "M669 518H708Q716 518 719 " + (512 + d * .5) + "Q724 " + (507 + d) + " 736 " + (507 + d) + "H762"; }],
-    [2, null, function () { return "M669 582H704Q716 582 716 570V522"; }],
-    [3, "l3", function (d) { return "M1312 243H1240Q1222 243 1220 260Q1217 " + (300 + d) + " 1196 " + (302 + d) + "H1170"; }],
-    [2, "l4", function (d) { return "M1300 402H1262Q1251 403 1250 415Q1248 " + (436 + d) + " 1234 " + (438 + d) + "H1172"; }],
-    [1, "l5", function (d) { return "M1378 566H1282Q1262 566 1250 580Q1238 " + (598 + d) + " 1214 " + (600 + d) + "H1195"; }]
+    [1, "f5", left(535, 612), [357, 612]],               // Supplier Management -> terrace floor
+    [1, "f5", right(1222, 535, 1140, 598), [1078, 598]], // Reports -> terrace floor
+    [2, "f4", left(452, 530), [357, 530]],               // Tender Management -> floor 4
+    [3, "f3", right(1175, 322, 1136, 440), [1078, 440]], // Suppliers -> floor 3
+    [4, "f2", left(367, 440), [357, 440]],               // Sourcing -> floor 2
+    [5, "roof", right(1158, 185, 1100, 235), [1080, 235]] // Workflow & Approval -> roof
   ];
-  // The spine: one line climbing the building's right side, extended floor by floor as each one locks.
-  var SPINE_Y = [640, 590, 480, 340, 262, 196], SPINE_X = [1240, 1254, 1246, 1178, 1286]; // base, l5, l4, l3, l2, roof
-  var SPINE_LAYER = ["l5", "l4", "l3", "l2", "roof"];
-  for (var k = 1; k <= 5; k++) (function (k) {
-    WIRES.push([k, SPINE_LAYER[k - 1], function (d, dPrev) {
-      var y0 = SPINE_Y[k - 1] + dPrev, y1 = SPINE_Y[k] + d, x = 1270, tx = SPINE_X[k - 1];
-      return "M" + x + " " + y0.toFixed(1) + "V" + (y1 + 8).toFixed(1) + "Q" + x + " " + y1.toFixed(1) + " " + (x - 8) + " " + y1.toFixed(1) + "H" + tx;
-    }, SPINE_LAYER[k - 2] || null]);
-  })(k);
   var wires = WIRES.map(function (w) {
-    var g = document.createElementNS(NS, "g");
-    var glow = document.createElementNS(NS, "path"), core = document.createElementNS(NS, "path");
-    glow.setAttribute("class", "hq-w-glow"); core.setAttribute("class", "hq-w-core");
+    var glow = document.createElementNS(NS, "path"), core = document.createElementNS(NS, "path"), dot = document.createElementNS(NS, "circle");
+    glow.setAttribute("class", "hq-w-glow"); core.setAttribute("class", "hq-w-core"); dot.setAttribute("class", "hq-w-dot"); dot.setAttribute("r", "5.5");
     [glow, core].forEach(function (p) { p.setAttribute("pathLength", "1"); p.style.strokeDasharray = "1 1"; });
-    g.append(glow, core); svg.appendChild(g);
-    return { stage: w[0], layer: w[1], d: w[2], prev: w[3], glow: glow, core: core };
+    svg.append(glow, core, dot);
+    return { stage: w[0], layer: w[1], d: w[2], end: w[3], glow: glow, core: core, dot: dot };
   });
+  var glowRoof = world.querySelector(".hq-glow-roof"), glowBase = world.querySelector(".hq-glow-base"), ring = world.querySelector(".hq-ring");
 
-  /* ---------- glows that follow parts ---------- */
-  var glowRoof = world.querySelector(".hq-glow-roof"), glowBase = world.querySelector(".hq-glow-base"), glowAward = world.querySelector(".hq-glow-award"), ring = world.querySelector(".hq-ring");
-
-  /* ---------- layout: cover the stage, keep the composition of the reference ---------- */
+  /* ---------- layout: building centred ---------- */
   function layout() {
-    var W = stage.clientWidth, H = stage.clientHeight;
-    var wide = W >= 1100 && W / H >= 1.42;
-    var s, ox, oy;
+    var W = stage.clientWidth, H = stage.clientHeight, nav = parseFloat(getComputedStyle(root).getPropertyValue("--nav")) || 84;
+    var wide = W >= 1100 && W / H >= 1.2, s, ox, oy;
     if (wide) {
-      s = Math.min(Math.max(W / REF_W, H / REF_H), H / REF_H * 1.14);
-      var ww = REF_W * s;
-      ox = ww > W ? clamp((W - ww) * .35, W - ww, 0) : (W - ww) / 2;
-      oy = (H - REF_H * s) * .3;
+      s = (H - nav) / REF_H;
+      ox = (W - REF_W * s) / 2;
+      oy = nav;
     } else {
-      s = Math.min(W < 700 ? W / 860 : W / 760, H * .6 / REF_H);
-      ox = W / 2 - 968 * s;
-      oy = H - REF_H * s * .97;
+      s = Math.min(W / 980, H * .64 / REF_H);
+      ox = W / 2 - FX * s;
+      oy = H - REF_H * s;
     }
     view.s = s; view.ox = ox; view.oy = oy; view.wide = wide;
     stage.classList.toggle("hq-wide", wide); stage.classList.toggle("hq-narrow", !wide);
-    stage.style.setProperty("--s", s.toFixed(5)); stage.style.setProperty("--ox", ox.toFixed(1) + "px"); stage.style.setProperty("--oy", oy.toFixed(1) + "px");
+    stage.style.setProperty("--s", s.toFixed(5));
   }
 
   /* ---------- render ---------- */
   var t0 = performance.now();
   function render(now) {
-    var t = reduce ? 0 : (now - t0) / 1000;
-    var a = assembled();
+    var t = reduce ? 0 : (now - t0) / 1000, a = assembled(), idle = reduce ? 0 : 1 - a;
     mouse.x += (mouse.tx - mouse.x) * .06; mouse.y += (mouse.ty - mouse.y) * .06;
-    var idle = reduce ? 0 : 1 - a;   // exploded parts drift gently; it fades as the building assembles
-    var bob = Math.sin(t * .9) * 2.2 * idle; // the whole stack breathes together, so no gap ever opens
-    // camera: orbit/tilt around the building centre under the stage's perspective, plus dolly, rise and pan
-    var fx = 968, fy = 470;
-    world.style.transform = "translate(" + view.ox.toFixed(2) + "px," + view.oy.toFixed(2) + "px) scale(" + view.s.toFixed(5) + ") translate(" + fx + "px," + fy + "px) rotateY(" + C.ry.toFixed(3) + "deg) rotateX(" + C.rx.toFixed(3) + "deg) scale(" + C.z.toFixed(4) + ") translate(" + (-fx + C.tx).toFixed(2) + "px," + (-fy + C.ty).toFixed(2) + "px)";
-    finalEl.style.opacity = F.o.toFixed(3);
-    finalEl.style.transform = "rotateY(" + F.ry.toFixed(3) + "deg) scale(" + F.z.toFixed(4) + ")";
+    var bob = Math.sin(t * .9) * 2.5 * idle;
+    world.style.transform = "translate(" + view.ox.toFixed(2) + "px," + view.oy.toFixed(2) + "px) scale(" + view.s.toFixed(5) + ") translate(" + FX + "px," + FY + "px) rotateY(" + (C.ry + mouse.x * 1.2).toFixed(3) + "deg) rotateX(" + (C.rx - mouse.y * .8).toFixed(3) + "deg) scale(" + C.z.toFixed(4) + ") translate(" + (-FX + C.tx).toFixed(2) + "px," + (-FY + C.ty).toFixed(2) + "px)";
     Object.keys(layers).forEach(function (n) {
-      var L = layers[n], px = mouse.x * (DEPTH[n] || 0) * 7 * idle, py = mouse.y * (DEPTH[n] || 0) * 4 * idle, tr;
-      if (STACK[n]) {
-        tr = "translate3d(" + px.toFixed(2) + "px," + (stackDy(STACK[n]) + bob + py).toFixed(2) + "px,0)";
-      } else if (SIDE[n]) {
-        var k = S.side[n], sd = SIDE[n], sc = 1 + (sd[3] - 1) * k, drift = Math.sin(t * .7 + L.phase) * 3 * (1 - k) * (reduce ? 0 : 1);
-        tr = "translate3d(" + (sd[1] * k + px).toFixed(2) + "px," + (sd[2] * k + drift + py).toFixed(2) + "px,0) scale(" + sc.toFixed(4) + ")";
-        if (n === "papers") L.el.style.opacity = (1 - clamp((k - .55) / .45, 0, 1)).toFixed(3);
-      } else { tr = "none"; }
-      L.el.style.transform = tr;
+      var k = STACK[n], L = layers[n];
+      var sway = Math.sin(t * .6 + L.phase) * 1.6 * idle * (1 - S.g[k - 1]);
+      L.el.style.transform = "translate3d(" + sway.toFixed(2) + "px," + (lift(k) + bob * (k / 5)).toFixed(2) + "px,0)";
     });
     wires.forEach(function (w) {
-      var d = w.layer ? stackDy(STACK[w.layer]) + bob : 0, dp = w.prev ? stackDy(STACK[w.prev]) + bob : 0, path = w.d(d, dp);
-      var grow = S.g[w.stage - 1];           // live: exactly the floor's lock progress
-      var off = (1 - grow).toFixed(4);
+      var grow = S.g[w.stage - 1], d = lift(STACK[w.layer]) + bob * (STACK[w.layer] / 5), path = w.d(d), off = (1 - grow).toFixed(4);
       w.glow.setAttribute("d", path); w.core.setAttribute("d", path);
       w.glow.style.strokeDashoffset = off; w.core.style.strokeDashoffset = off;
-      w.glow.style.opacity = grow > 0 ? (.6 + .4 * S.glow).toFixed(3) : "0";
+      w.glow.style.opacity = grow > 0 ? (.65 + .35 * S.glow).toFixed(3) : "0";
       w.core.style.opacity = grow > 0 ? "1" : "0";
+      w.dot.setAttribute("cx", w.end[0]); w.dot.setAttribute("cy", (w.end[1] + d).toFixed(1));
+      w.dot.style.opacity = clamp((grow - .9) * 10, 0, 1).toFixed(3);
     });
-    var roofDy = stackDy(5) + bob;
-    glowRoof.style.transform = "translate3d(0," + roofDy.toFixed(2) + "px,0)";
-    glowRoof.style.opacity = glowBase.style.opacity = (S.glow * .9).toFixed(3);
-    glowAward.style.opacity = (S.glow).toFixed(3);
-    ring.style.opacity = S.pulse > 0 && S.pulse < 1 ? ((1 - S.pulse) * .85).toFixed(3) : "0";
-    ring.style.transform = "scale(" + (1 + S.pulse * 1.6).toFixed(3) + ")";
+    glowRoof.style.transform = "translate3d(0," + lift(5).toFixed(2) + "px,0)";
+    glowRoof.style.opacity = glowBase.style.opacity = (S.glow * .85).toFixed(3);
+    ring.style.opacity = S.pulse > 0 && S.pulse < 1 ? ((1 - S.pulse) * .8).toFixed(3) : "0";
+    ring.style.transform = "scale(" + (1 + S.pulse * 1.5).toFixed(3) + ")";
   }
   var raf = 0, visible = true;
   function loop(now) { raf = 0; if (!visible) return; render(now); if (!reduce) raf = requestAnimationFrame(loop); }
   new IntersectionObserver(function (es) { visible = es[0].isIntersecting; if (visible && !raf) raf = requestAnimationFrame(loop); }).observe(stage);
-  addEventListener("resize", function () { layout(); if (reduce) render(performance.now()); });
+  addEventListener("resize", function () { layout(); render(performance.now()); });
   if (matchMedia("(hover:hover)").matches && !reduce) {
-    stage.addEventListener("pointermove", function (e) { mouse.tx = e.clientX / innerWidth - .5; mouse.ty = e.clientY / innerHeight - .5; });
+    stage.addEventListener("pointermove", function (e) { var k = 1 - assembled(); mouse.tx = (e.clientX / innerWidth - .5) * k; mouse.ty = (e.clientY / innerHeight - .5) * k; });
     stage.addEventListener("pointerleave", function () { mouse.tx = mouse.ty = 0; });
   }
   layout(); render(performance.now());
   root.classList.add("hq-live");
+  // read-only state for automated visual QA
+  window.__hq = { get assembly() { return assembled(); }, get trigger() { return st ? { start: st.start, end: st.end } : null; }, get view() { return view; }, get camera() { return { z: C.z, ry: C.ry, rx: C.rx, ty: C.ty }; } };
+  if (!gsap || !ScrollTrigger || reduce) return; // reduced motion / no GSAP: the completed building, as approved
 
-  if (!gsap || !ScrollTrigger || reduce) return; // reduced motion / no GSAP: the exact reference frame, no pinning
-
-  /* ---------- scroll timeline: 0..80 = assembly 0..100 %, 80..100 = push toward the entrance ---------- */
+  /* ---------- scroll timeline: 0..80 = assembly 0..100 %, 80..100 = hero hold, then the sections ---------- */
   gsap.registerPlugin(ScrollTrigger);
   var STAGES = [
     [0, "00", "Scroll to assemble the headquarters"],
-    [15, "01", "Purchase Requests — the foundation locks into place"],
-    [30, "02", "Tender Management — the lower floors align"],
-    [45, "03", "Suppliers & Bidding — the middle floors slide into place"],
-    [60, "04", "Evaluation & AI — the upper floors assemble"],
+    [15, "01", "Purchase Requests — the terrace floor locks onto the podium"],
+    [30, "02", "Tender Management — the next floor lands"],
+    [45, "03", "Suppliers & Bidding — the middle floor connects"],
+    [60, "04", "Evaluation & AI — the upper floor settles"],
     [75, "05", "Reports & Approvals — the roof closes the structure"],
     [90, "06", "Final Award — one complete headquarters"]
   ];
   var A = function (p) { return p * .8; };
   var label = document.getElementById("hq-label"), bar = document.getElementById("hq-progress"), copy = document.getElementById("hq-copy"), fade = document.getElementById("hq-fade");
-  var lastIdx = -1, st = null;
+  var lastIdx = -1;
 
   function build() {
     var tl = gsap.timeline({ defaults: { ease: "none" } });
-    var g = S.g;
-    // stage k: window [15k, 15k+15]; the floor settles with a soft landing
     [0, 1, 2, 3, 4].forEach(function (k) {
-      var start = 15 + k * 15;
-      tl.fromTo(S.g, { [k]: 0 }, { [k]: 1, duration: A(11), ease: "power3.inOut", immediateRender: false }, A(start + 1));
+      var o0 = {}, o1 = {}; o0[k] = 0; o1[k] = 1;
+      tl.fromTo(S.g, o0, Object.assign({ duration: A(11), ease: "power3.inOut", immediateRender: false }, o1), A(16 + k * 15));
     });
-    Object.keys(SIDE).forEach(function (n) {
-      var start = 15 + (SIDE[n][0] - 1) * 15;
-      var o = {}; o[n] = 1;
-      tl.to(S.side, Object.assign({ duration: A(12), ease: "power2.inOut" }, o), A(start));
-    });
-    tl.to(copy, { autoAlpha: 0, y: -24, duration: 3, ease: "power2.in" }, 79.5);
+    // camera: wide low orbit -> sweeps the other way while rising -> the exact approved frontal hero view
+    tl.fromTo(C, { z: .8, ry: 7, rx: 4, tx: -10, ty: 120 }, { z: .9, ry: -5, rx: 2.5, tx: 18, ty: 64, duration: A(45), ease: "sine.inOut", immediateRender: false }, 0);
+    tl.to(C, { z: 1, ry: 0, rx: 0, tx: 0, ty: 0, duration: A(55), ease: "sine.inOut" }, A(45));
+    tl.to(C, { z: 1.05, duration: 15, ease: "sine.inOut" }, 82);
+    tl.to([copy, "#hq-shade"], { autoAlpha: 0, duration: A(8), ease: "power2.in" }, A(4));
     tl.to(S, { glow: 1, duration: A(5), ease: "power2.out" }, A(90));
     tl.fromTo(S, { pulse: 0 }, { pulse: 1, duration: A(8), ease: "power1.out", immediateRender: false }, A(91));
-    tl.to(".hq-stagebar", { autoAlpha: 0, duration: 3 }, 82);
-    // camera during assembly: slow push-in, slight rise and a gentle orbit (reverses with the scroll)
-    tl.to(C, { z: 1.05, ry: -3, rx: 1.6, ty: 10, duration: A(33), ease: "sine.inOut" }, A(12));
-    tl.to(C, { z: 1.11, ry: 2.2, rx: 2.4, ty: 18, tx: -8, duration: A(35), ease: "sine.inOut" }, A(45));
-    // completed: the camera swings into the final hero angle of the finished headquarters
-    tl.to(C, { z: 1.3, ry: -9, rx: 1, duration: 10, ease: "power2.in" }, 81);
-    // a brief orange light flare carries the cut between the two angles (no double exposure)
-    tl.fromTo("#hq-flare", { opacity: 0 }, { opacity: 1, duration: 2.2, ease: "power2.in", immediateRender: false }, 85.6)
-      .to("#hq-flare", { opacity: 0, duration: 3, ease: "power2.out" }, 87.8);
-    tl.to(world, { opacity: 0, duration: 1.4, ease: "none" }, 86.6);
-    tl.fromTo(F, { o: 0 }, { o: 1, duration: 1.4, ease: "none", immediateRender: false }, 86.8);
-    tl.fromTo(F, { z: 1.14, ry: 8 }, { z: 1, ry: 0, duration: 7, ease: "power2.out", immediateRender: false }, 86.8);
-    tl.to(F, { z: 1.05, duration: 7, ease: "sine.inOut" }, 93);
+    tl.to(".hq-stagebar", { autoAlpha: 0, duration: 3 }, 84);
     tl.to(S, { fade: 1, duration: 2.5 }, 97.5);
     tl.to({}, { duration: .01 }, 100);
     tl.eventCallback("onUpdate", function () {
@@ -202,10 +157,10 @@
   mm.add({ wide: "(min-width:1100px)", mid: "(min-width:700px) and (max-width:1099px)", small: "(max-width:699px)" }, function (ctx) {
     var c = ctx.conditions, tl = build();
     st = ScrollTrigger.create({
-      trigger: section, start: "top top", end: function () { return "+=" + Math.round(innerHeight * (c.wide ? 6 : c.mid ? 3.2 : 2.4)); },
+      trigger: section, start: "top top", end: function () { return "+=" + Math.round(innerHeight * (c.wide ? 6 : c.mid ? 3.4 : 2.6)); },
       pin: true, scrub: c.wide ? .9 : .6, anticipatePin: 1, animation: tl, invalidateOnRefresh: true
     });
-    // "See It in Action": play the whole assembly by scrolling through it, then land in the platform section
+    // "See It in Action": play the whole sequence by scrolling through it, then land in the platform section
     var see = Array.prototype.slice.call(document.querySelectorAll("[data-see-action]"));
     function onSee(e) {
       e.preventDefault();
@@ -217,7 +172,4 @@
     see.forEach(function (a) { a.addEventListener("click", onSee); });
     return function () { see.forEach(function (a) { a.removeEventListener("click", onSee); }); st && st.kill(); st = null; tl.kill(); };
   });
-
-  // read-only state for automated visual QA
-  window.__hq = { get assembly() { return assembled(); }, get trigger() { return st ? { start: st.start, end: st.end } : null; }, get view() { return view; }, get camera() { return { z: C.z, ry: C.ry, rx: C.rx, final: F.o }; } };
 })();

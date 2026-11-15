@@ -43,17 +43,18 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
     </defs>
 </svg>
 
-@* ============ 01-03  ORANGE HQ HERO: the approved reference image, cut into layers (Tools/HeroLayers),
-     exploded at rest and assembled on scroll in the same locked perspective (wwwroot/js/home-hq.js) ============ *@
+@* ============ 01-03  ORANGE HQ HERO: the approved headquarters image, cut into floors (Tools/HeroLayers).
+     Centred; starts exploded under a wide low camera, assembles on scroll into the exact approved view (wwwroot/js/home-hq.js) ============ *@
 @{
     var heroManifest = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(HostEnv.WebRootPath, "assets", "hero", "manifest.json")));
-    var heroZ = new[] { "papers", "ulpanels", "lslab", "chip", "rightcube", "supcard", "leftbox", "l5", "l4", "l3", "l2", "roof", "card" };
+    var heroZ = new[] { "f5", "f4", "f3", "f2", "roof", "card" };
 }
 <section class="hq" id="home" aria-labelledby="hc-h1">
     <div class="hq-stage" id="hq-stage">
+        <img class="hq-backdrop" src="~/assets/hero/backdrop.webp" alt="" aria-hidden="true" decoding="async" />
         <div class="hq-world" id="hq-world" aria-hidden="true">
-            <img class="hq-plate" src="~/assets/hero/plate@1x.webp" srcset="@Url.Content("~/assets/hero/plate@1x.webp") 1x, @Url.Content("~/assets/hero/plate@2x.webp") 2x" width="1672" height="941" alt="" fetchpriority="high" decoding="async" />
-            <svg class="hq-wires" id="hq-wires" viewBox="0 0 1672 941" focusable="false">
+            <img class="hq-plate" src="~/assets/hero/plate@1x.webp" srcset="@Url.Content("~/assets/hero/plate@1x.webp") 1x, @Url.Content("~/assets/hero/plate@2x.webp") 2x" width="1448" height="1086" alt="" fetchpriority="high" decoding="async" />
+            <svg class="hq-wires" id="hq-wires" viewBox="0 0 1448 1086" focusable="false">
                 <defs><filter id="hq-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.4" /></filter></defs>
             </svg>
             @foreach (var name in heroZ)
@@ -62,19 +63,12 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
                 <img class="hq-layer" data-layer="@name" src="@Url.Content($"~/assets/hero/{name}@1x.webp")" srcset="@Url.Content($"~/assets/hero/{name}@1x.webp") 1x, @Url.Content($"~/assets/hero/{name}@2x.webp") 2x"
                      style="left:@(l.GetProperty("x").GetInt32())px;top:@(l.GetProperty("y").GetInt32())px;width:@(l.GetProperty("w").GetInt32())px;height:@(l.GetProperty("h").GetInt32())px" alt="" decoding="async" />
             }
-            <i class="hq-glow hq-glow-roof" data-follow="roof"></i>
+            <i class="hq-glow hq-glow-roof"></i>
             <i class="hq-glow hq-glow-base"></i>
-            <i class="hq-glow hq-glow-award"></i>
             <i class="hq-ring"></i>
         </div>
+        <div class="hq-shade" id="hq-shade" aria-hidden="true"></div>
 
-        @* Final hero angle: the approved image of the completed headquarters (Tools/HeroLayers/build_final.py) *@
-        <div class="hq-final" id="hq-final" aria-hidden="true">
-            <img class="hq-final-bg" src="~/assets/hero/final-bg.webp" alt="" decoding="async" />
-            <img class="hq-final-img" src="~/assets/hero/final@1x.webp" srcset="@Url.Content("~/assets/hero/final@1x.webp") 1x, @Url.Content("~/assets/hero/final@2x.webp") 2x" width="1448" height="1086" alt="" fetchpriority="low" decoding="async" />
-        </div>
-
-        <i class="hq-flare" id="hq-flare" aria-hidden="true"></i>
         <div class="hq-copy" id="hq-copy">
             <p class="hq-eyebrow">Sourcing &amp; Tender Management</p>
             <h1 id="hc-h1">From Procurement Complexity to <em>One Unified Platform</em></h1>
