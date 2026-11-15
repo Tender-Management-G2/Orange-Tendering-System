@@ -18,6 +18,40 @@ public static class DemoDataSeeder
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         if (await db.Departments.AnyAsync(d => d.Name == "DEMO - Information Technology"))
         {
+            var existingDepartment = await db.Departments
+                .SingleAsync(d => d.Name == "DEMO - Information Technology");
+            var departmentRepresentative = await EnsureDepartmentRepresentativeAccountAsync(users, existingDepartment.Id);
+            var existingTopCommitteeUsers = await EnsureTopCommitteeAccountsAsync(users);
+            var topCommitteeTender = await db.Tenders
+                .Include(tender => tender.CommitteeMembers)
+                .SingleOrDefaultAsync(tender => tender.Title == "DEMO Tender - Wi-Fi equipment report approved");
+            if (topCommitteeTender != null)
+            {
+                foreach (var member in existingTopCommitteeUsers)
+                {
+                    if (!topCommitteeTender.CommitteeMembers.Any(existing => existing.UserId == member.Id))
+                    {
+                        topCommitteeTender.CommitteeMembers.Add(new CommitteeMember
+                        {
+                            UserId = member.Id,
+                            CommitteeType = CommitteeType.Top,
+                            AssignedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+
+            var departmentSeats = await db.CommitteeMembers
+                .Include(member => member.Tender)
+                .Where(member => member.CommitteeType == CommitteeType.Evaluation
+                    && member.Responsibility == CommitteeResponsibility.DepartmentRepresentative
+                    && member.Tender.Title.StartsWith("DEMO"))
+                .ToListAsync();
+            foreach (var seat in departmentSeats)
+            {
+                seat.UserId = departmentRepresentative.Id;
+            }
+
             // Add newly introduced demo pieces to an existing sample database as well.
             var demoRounds = await db.TenderRounds.Include(r => r.Tender)
                 .Where(r => r.Tender.Title.StartsWith("DEMO") && r.Status == TenderRoundStatus.Open && r.Tender.Status == TenderStatus.Bidding)
@@ -73,6 +107,8 @@ public static class DemoDataSeeder
         var manager = await CreateUser("manager@orange-demo.local", "Demo Sourcing Manager", SystemRoles.SourcingManager, null);
         var committeeUsers = new List<ApplicationUser>();
         for (var i = 1; i <= 4; i++) committeeUsers.Add(await CreateUser($"committee{i}@orange-demo.local", $"Demo Evaluator {i}", SystemRoles.EvaluationCommittee, null));
+        committeeUsers[1] = await EnsureDepartmentRepresentativeAccountAsync(users, department.Id);
+        var topCommitteeUsers = await EnsureTopCommitteeAccountsAsync(users);
 
         var supplierUsers = new List<(Supplier Supplier, ApplicationUser User)>();
         for (var i = 1; i <= 4; i++)
@@ -131,6 +167,7 @@ public static class DemoDataSeeder
         AddCommittee(returnedTender, committeeUsers, now);
         AddCommittee(rejectedTender, committeeUsers, now);
         AddCommittee(acceptedTender, committeeUsers, now);
+        AddTopCommittee(acceptedTender, topCommitteeUsers, now);
         AddCommittee(committeeReadyTender, committeeUsers, now);
         await db.SaveChangesAsync();
         AddEvaluationReport(evalTender, committeeUsers[0].Id, manager.Id, now, ReportStatus.Submitted, "Committee report submitted; ready for officer review.");
@@ -291,6 +328,110 @@ public static class DemoDataSeeder
     {
         var seats = new[] { CommitteeResponsibility.SourcingManager, CommitteeResponsibility.DepartmentRepresentative, CommitteeResponsibility.FinancialRepresentative, CommitteeResponsibility.TechnicalRepresentative };
         for (var i = 0; i < seats.Length; i++) tender.CommitteeMembers.Add(new CommitteeMember { UserId = users[i].Id, CommitteeType = CommitteeType.Evaluation, Responsibility = seats[i], AssignedAt = now.AddDays(-10) });
+    }
+
+    private static void AddTopCommittee(Tender tender, IReadOnlyList<ApplicationUser> users, DateTime now)
+    {
+        foreach (var user in users)
+        {
+            tender.CommitteeMembers.Add(new CommitteeMember
+            {
+                UserId = user.Id,
+                CommitteeType = CommitteeType.Top,
+                AssignedAt = now.AddDays(-1)
+            });
+        }
+    }
+
+    private static async Task<List<ApplicationUser>> EnsureTopCommitteeAccountsAsync(UserManager<ApplicationUser> users)
+    {
+        var accounts = new[]
+        {
+            ("ceo@orange-demo.local", "Demo CEO — Chief Executive Officer"),
+            ("cfo@orange-demo.local", "Demo CFO — Chief Financial Officer"),
+            ("coo@orange-demo.local", "Demo COO — Chief Operating Officer"),
+            ("cpo@orange-demo.local", "Demo CPO — Chief Procurement Officer")
+        };
+        var result = new List<ApplicationUser>();
+        foreach (var (email, fullName) in accounts)
+        {
+            var user = await users.FindByEmailAsync(email);
+            if (user == null)
+            {
+                user = new ApplicationUser
+                {
+                    UserName = email,
+                    Email = email,
+                    EmailConfirmed = true,
+                    FullName = fullName,
+                    IsActive = true,
+                    MustChangePassword = false
+                };
+                var created = await users.CreateAsync(user, Password);
+                if (!created.Succeeded)
+                {
+                    throw new InvalidOperationException($"Top Committee demo account creation failed for {email}: {string.Join(", ", created.Errors.Select(error => error.Code))}");
+                }
+            }
+            if (!await users.IsInRoleAsync(user, SystemRoles.TopCommittee))
+            {
+                var assigned = await users.AddToRoleAsync(user, SystemRoles.TopCommittee);
+                if (!assigned.Succeeded)
+                {
+                    throw new InvalidOperationException($"Could not assign the Top Committee role to {email}.");
+                }
+            }
+            result.Add(user);
+        }
+        return result;
+    }
+
+    private static async Task<ApplicationUser> EnsureDepartmentRepresentativeAccountAsync(
+        UserManager<ApplicationUser> users,
+        int departmentId)
+    {
+        const string email = "department.representative@orange-demo.local";
+        var user = await users.FindByEmailAsync(email);
+        if (user == null)
+        {
+            user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                FullName = "Demo Department Representative",
+                DepartmentId = departmentId,
+                IsActive = true,
+                MustChangePassword = false
+            };
+            var created = await users.CreateAsync(user, Password);
+            if (!created.Succeeded)
+            {
+                throw new InvalidOperationException($"Department Representative demo account creation failed: {string.Join(", ", created.Errors.Select(error => error.Code))}");
+            }
+        }
+        else
+        {
+            user.FullName = "Demo Department Representative";
+            user.DepartmentId = departmentId;
+            user.IsActive = true;
+            user.MustChangePassword = false;
+            var updated = await users.UpdateAsync(user);
+            if (!updated.Succeeded)
+            {
+                throw new InvalidOperationException($"Department Representative demo account update failed: {string.Join(", ", updated.Errors.Select(error => error.Code))}");
+            }
+        }
+
+        if (!await users.IsInRoleAsync(user, SystemRoles.EvaluationCommittee))
+        {
+            var assigned = await users.AddToRoleAsync(user, SystemRoles.EvaluationCommittee);
+            if (!assigned.Succeeded)
+            {
+                throw new InvalidOperationException("Could not assign the Evaluation Committee role to the Department Representative demo account.");
+            }
+        }
+        return user;
     }
 
     private static void AddEvaluationReport(Tender tender, string creatorId, string managerId, DateTime now, ReportStatus status, string comment)

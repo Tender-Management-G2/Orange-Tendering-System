@@ -186,7 +186,7 @@
         }
         @if (Model.CanApproveWeights && w != null && w.State == WeightState.AwaitingApproval)
         {
-            <div class="wp-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ApproveWeights" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Approve and lock the weights</button></form></div>
+            <div class="wp-actions"><form asp-area="EvaluationCommittee" asp-controller="WeightApprovals" asp-action="Approve" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Approve and lock the weights</button></form></div>
         }
         @if (Model.IsOfficer && status == TenderStatus.Draft && w?.State == WeightState.Approved)
         {
