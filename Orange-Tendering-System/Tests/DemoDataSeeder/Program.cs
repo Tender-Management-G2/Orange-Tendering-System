@@ -3,11 +3,22 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
 var connection = Environment.GetEnvironmentVariable("DEMO_SEED_CONNECTION")
     ?? throw new InvalidOperationException("Set DEMO_SEED_CONNECTION to the intended local database.");
 var password = Environment.GetEnvironmentVariable("DEMO_MANAGER_PASSWORD")
     ?? throw new InvalidOperationException("Set DEMO_MANAGER_PASSWORD for the demo accounts.");
+var reset = string.Equals(Environment.GetEnvironmentVariable("RESET_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase);
+
+// Safeguard: checked before any database access. Demo accounts and data are only ever written to this machine's
+// SQL Server (never a hosted database), and the destructive reset only runs on an isolated test database. The
+// original database (OrangeTenderingSystem) and anything not positively identified as a test database are refused.
+var target = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connection);
+if (!TeamDevDatabase.IsLocalServer(target.DataSource))
+    throw new InvalidOperationException($"Refusing to run against server '{target.DataSource}': demo data may only be written to a SQL Server on this machine.");
+if (reset && !(TeamDevDatabase.IsTeamDatabaseName(target.InitialCatalog) || target.InitialCatalog.StartsWith("OrangeAuthCheck_", StringComparison.OrdinalIgnoreCase)))
+    throw new InvalidOperationException($"Refusing RESET_DEMO_DATA on database '{target.InitialCatalog}': resets are allowed only on isolated test databases (OrangeTenderingTeamDev, OrangeTenderingTeamDev_*, OrangeAuthCheck_*).");
 
 var options = new DbContextOptionsBuilder<ApplicationDbContext>()
     .UseSqlServer(connection)
@@ -23,7 +34,7 @@ await EnsureRole(SystemRoles.SourcingManager);
 await EnsureRole(SystemRoles.SourcingOfficer);
 await EnsureRole(SystemRoles.TopCommittee);
 
-if (string.Equals(Environment.GetEnvironmentVariable("RESET_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase))
+if (reset)
 {
     await ResetDemoData();
     Console.WriteLine("Previous demo data was removed.");

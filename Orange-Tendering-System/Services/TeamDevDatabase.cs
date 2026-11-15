@@ -50,7 +50,8 @@ public static class TeamDevDatabase
         return IsTeamDatabaseName(connection.InitialCatalog) && IsLocalServer(connection.DataSource);
     }
 
-    private static bool IsLocalServer(string? dataSource)
+    /// <summary>True for this machine's SQL Server (localhost, ., (local), LocalDB, loopback or the machine name).</summary>
+    public static bool IsLocalServer(string? dataSource)
     {
         if (string.IsNullOrWhiteSpace(dataSource)) return false;
         var host = dataSource.Trim();
