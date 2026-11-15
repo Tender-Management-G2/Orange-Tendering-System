@@ -27,82 +27,14 @@ tokens or biometric data.
 
 <partial name="_PageHeader" />
 
-<section class="ws-panel pg-panel">
-
-    <div class="pg-panel-head">
-        <div>
-            <h2>System Audit Logs</h2>
-            <p>
-                Review system operations and administrative changes.
-            </p>
-        </div>
-    </div>
-
-    <!-- Search and Filters -->
-    <form asp-area="Admin"
-          asp-controller="AuditLogs"
-          asp-action="Index"
-          method="get"
-          class="pg-form" data-audit-filters>
-
-        <div class="pg-form-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-
-            <!-- Search -->
-            <div class="pg-field">
-                <label for="search">Search</label>
-
-                <input type="text"
-                       id="search"
-                       name="search"
-                       value="@Model.Search"
-                       class="form-control"
-                       maxlength="100"
-                       placeholder="User, action or entity" />
-            </div>
-
-
-            <!-- From Date -->
-            <div class="pg-field">
-                <label for="fromDate">From Date</label>
-
-                <input type="date"
-                       id="fromDate"
-                       name="fromDate"
-                       value="@(Model.FromDate?.ToString("yyyy-MM-dd"))"
-                       class="form-control" />
-            </div>
-
-            <!-- To Date -->
-            <div class="pg-field">
-                <label for="toDate">To Date</label>
-
-                <input type="date"
-                       id="toDate"
-                       name="toDate"
-                       value="@(Model.ToDate?.ToString("yyyy-MM-dd"))"
-                       class="form-control" />
-            </div>
-
-        </div>
-
-        <div asp-validation-summary="All"
-             class="text-danger"></div>
-
-        <div class="pg-actions">
-
-            <a asp-area="Admin"
-               asp-controller="AuditLogs"
-               asp-action="Index"
-               class="pg-btn">
-                Clear Filters
-            </a>
-
-        </div>
-
-    </form>
-
-    <p data-audit-status role="status" aria-live="polite" class="pg-hint"></p>
-    <div data-audit-results>
+<form asp-area="Admin" asp-controller="AuditLogs" asp-action="Index" method="get" class="admin-list-filters admin-audit-filters" data-admin-list-filters>
+<div class="admin-filter-field admin-filter-search"><label>Search</label><input type="text" name="search" value="@Model.Search" placeholder="User, action or entity" aria-label="Search AuditLogs" maxlength="100" /></div><div class="admin-filter-field "><label>From Date</label><input type="date" name="fromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" aria-label="From Date" /></div><div class="admin-filter-field "><label>To Date</label><input type="date" name="toDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" aria-label="To Date" /></div>
+<a asp-area="Admin" asp-controller="AuditLogs" asp-action="Index" class="pg-btn pg-btn-primary admin-clear">Clear</a>
+</form>
+<p class="pg-hint admin-list-status" data-admin-list-status role="status" aria-live="polite"></p>
+<div data-admin-list-results>
+<section class="ws-panel pg-panel admin-list-records">
+    <div asp-validation-summary="All" class="text-danger" role="alert"></div>
     <!-- Results -->
     <div class="pg-panel-head">
         <div>
@@ -259,9 +191,9 @@ tokens or biometric data.
         </nav>
     }
 
-    </div>
-</section>
 
+</section>
+</div>
 @section Scripts {
-    <script src="~/js/admin-audit-live.js" asp-append-version="true"></script>
+    <script src="~/js/admin-list-live.js" asp-append-version="true"></script>
 }

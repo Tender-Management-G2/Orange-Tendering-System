@@ -27,7 +27,7 @@ namespace Orange_Tendering_System.Models.Entities
 
     // Keep DepartmentRepresentative for historical tenders. Admin may assign two distinct technical seats.
     // ChiefExecutiveOfficer marks the Top Committee CEO seat; other Top members have no responsibility.
-    public enum CommitteeResponsibility { SourcingManager, DepartmentRepresentative, FinancialRepresentative, TechnicalRepresentative, TechnicalRepresentative2, ChiefExecutiveOfficer }
+    public enum CommitteeResponsibility { SourcingManager, DepartmentRepresentative, FinancialRepresentative, TechnicalRepresentative, TechnicalRepresentative2, ChiefExecutiveOfficer, ChiefFinancialOfficer, ChiefTechnologyOfficer, ChiefOperationsOfficer }
 
     public enum CommitteeRoundStatus { InProgress, Approved, Rejected }
 

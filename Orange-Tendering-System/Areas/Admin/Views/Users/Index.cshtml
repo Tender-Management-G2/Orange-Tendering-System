@@ -144,16 +144,8 @@ FEATURES:
      SEARCH AND FILTERS
 ===================================== -->
 
-<form asp-area="Admin"
-      asp-controller="Users"
-      asp-action="Index"
-      method="get"
-      class="pg-toolbar">
-
-   
-    
-    <!-- Role Filter -->
-    <select name="roleFilter"
+<form asp-area="Admin" asp-controller="Users" asp-action="Index" method="get" class="admin-list-filters" data-admin-list-filters>
+<div class="admin-filter-field admin-filter-search"><label>Search</label><input type="text" name="search" value="@Model.Search" placeholder="Name or email" aria-label="Search Users" maxlength="100" /></div><div class="admin-filter-field "><label>Role</label><select name="roleFilter"
             aria-label="Filter by role">
 
         <option value="All"
@@ -162,7 +154,7 @@ FEATURES:
             All Roles
         </option>
 
-        @foreach (var role in SystemRoles.All)
+        @foreach (var role in SystemRoles.PublicRoles)
         {
             <option value="@role"
                     selected="@(Model.RoleFilter == role)">
@@ -170,10 +162,7 @@ FEATURES:
             </option>
         }
 
-    </select>
-
-    <!-- Department Filter -->
-    <select name="departmentFilter"
+    </select></div><div class="admin-filter-field "><label>Department</label><select name="departmentFilter"
             aria-label="Filter by department">
 
         <option value="All"
@@ -190,10 +179,7 @@ FEATURES:
             </option>
         }
 
-    </select>
-
-    <!-- Status Filter -->
-    <select name="statusFilter"
+    </select></div><div class="admin-filter-field "><label>Status</label><select name="statusFilter"
             aria-label="Filter by status">
 
         <option value="All"
@@ -212,23 +198,11 @@ FEATURES:
             Inactive
         </option>
 
-    </select>
-
-    <!-- Search -->
-    <button type="submit"
-            class="pg-btn pg-btn-primary">
-        Search
-    </button>
-
-    <!-- Clear -->
-    <a asp-area="Admin"
-       asp-controller="Users"
-       asp-action="Index"
-       class="pg-btn">
-        Clear
-    </a>
-
+    </select></div>
+<a asp-area="Admin" asp-controller="Users" asp-action="Index" class="pg-btn pg-btn-primary admin-clear">Clear</a>
 </form>
+<p class="pg-hint admin-list-status" data-admin-list-status role="status" aria-live="polite"></p>
+
 
 
 
@@ -237,7 +211,8 @@ FEATURES:
      USERS TABLE
 ===================================== -->
 
-<section class="ws-panel pg-panel">
+<div data-admin-list-results>
+<section class="ws-panel pg-panel admin-list-records">
 
     <div class="pg-panel-head">
 
@@ -312,7 +287,7 @@ FEATURES:
                                 </span>
                             </td>
 
-                            <td>
+                            <td><div class="admin-row-actions">
                                 <a class="pg-btn"
                                    asp-area="Admin"
                                    asp-controller="Users"
@@ -328,7 +303,7 @@ FEATURES:
                                    asp-route-id="@user.Id">
                                     Edit
                                 </a>
-                            </td>
+                            </div></td>
 
                         </tr>
                     }
@@ -388,9 +363,14 @@ FEATURES:
     }
 
 </section>
+</div>
 
 
 <!-- =====================================
      EXISTING VOICE SEARCH SCRIPT
 ===================================== -->
 
+
+@section Scripts {
+    <script src="~/js/admin-list-live.js" asp-append-version="true"></script>
+}

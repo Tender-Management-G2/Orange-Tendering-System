@@ -116,6 +116,7 @@ public partial class TenderWorkflowService
     public Task SaveAdminCommittee(AdminCommitteeInput input, ClaimsPrincipal principal) => Change(input.TenderId, principal, "AdminCommitteeAssigned", async (t, actor) =>
     {
         Require(await Role(actor, SystemRoles.Admin), "Admin access is required.");
+        Require(!await db.AuditLogs.AnyAsync(x => x.EntityName == "Tender" && x.EntityId == t.Id.ToString() && x.Action == "FixedCommitteesApplied"), "This tender uses the committees saved by Admin. Its frozen membership cannot be replaced here.");
         Require(Validator.TryValidateObject(input, new ValidationContext(input), [], true), "Select four distinct members and reload the page if needed.");
         Require(t.Status is not (TenderStatus.Awarded or TenderStatus.Rejected or TenderStatus.Cancelled), "Closed tenders cannot be changed.");
         var existing = await db.CommitteeMembers.Where(x => x.TenderId == t.Id).ToListAsync();

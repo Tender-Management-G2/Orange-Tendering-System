@@ -141,20 +141,8 @@ PAGE: Department Management
      SEARCH AND FILTERS
 =================================== -->
 
-<form asp-area="Admin"
-      asp-controller="Departments"
-      asp-action="Index"
-      method="get"
-      class="admin-department-filters">
-
-    <input type="search"
-           name="search"
-           value="@Model.Search"
-           placeholder="Search departments..."
-           aria-label="Search departments"
-           maxlength="100" />
-
-    <select name="statusFilter"
+<form asp-area="Admin" asp-controller="Departments" asp-action="Index" method="get" class="admin-list-filters" data-admin-list-filters>
+<div class="admin-filter-field admin-filter-search"><label>Search</label><input type="text" name="search" value="@Model.Search" placeholder="Department name" aria-label="Search Departments" maxlength="100" /></div><div class="admin-filter-field "><label>Status</label><select name="statusFilter"
             aria-label="Filter department status">
 
         <option value="All"
@@ -173,31 +161,18 @@ PAGE: Department Management
             Inactive
         </option>
 
-    </select>
-
-    <div class="admin-department-actions">
-
-        <button type="submit"
-                class="pg-btn pg-btn-primary">
-            Search
-        </button>
-
-        <a asp-area="Admin"
-           asp-controller="Departments"
-           asp-action="Index"
-           class="pg-btn">
-            Clear
-        </a>
-
-    </div>
-
+    </select></div>
+<a asp-area="Admin" asp-controller="Departments" asp-action="Index" class="pg-btn pg-btn-primary admin-clear">Clear</a>
 </form>
+<p class="pg-hint admin-list-status" data-admin-list-status role="status" aria-live="polite"></p>
+
 
 <!-- ==================================
      DEPARTMENTS TABLE
 =================================== -->
 
-<section class="ws-panel pg-panel admin-department-records">
+<div data-admin-list-results>
+<section class="ws-panel pg-panel admin-list-records admin-department-records">
 
     <div class="pg-panel-head">
 
@@ -313,3 +288,8 @@ PAGE: Department Management
     </div>
 
 </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin-list-live.js" asp-append-version="true"></script>
+}

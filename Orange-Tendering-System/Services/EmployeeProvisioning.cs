@@ -35,7 +35,7 @@ public sealed class EmployeeProvisioning(
         };
         var created = await users.CreateAsync(user);
         if (!created.Succeeded) return created;
-        var assigned = await users.AddToRolesAsync(user, roles);
+        var assigned = await users.AddToRolesAsync(user, roles.SelectMany(SystemRoles.AccountRoles).Distinct());
         if (!assigned.Succeeded) return assigned;
 
         var token = await users.GeneratePasswordResetTokenAsync(user);

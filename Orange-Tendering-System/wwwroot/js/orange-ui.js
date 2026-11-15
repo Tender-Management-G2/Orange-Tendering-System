@@ -261,5 +261,7 @@
     if (filter) filter.addEventListener('change', () => { page = 0; draw(); });
     draw();
   }
-  $$('main table').forEach(enhance);
+  // Reuse the table kit after an Admin list refresh; existing workspace initialization stays unchanged.
+  window.orangeUi.enhanceTables = container => $('table', container).forEach(enhance);
+  $('main table').forEach(enhance);
 })();
