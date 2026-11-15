@@ -23,6 +23,8 @@ namespace Orange_Tendering_System.Models.Entities
 
     public enum ComplianceStatus { NotChecked, Compliant, NonCompliant, PendingClarification }
 
+    public enum TopExecutivePosition { CEO, CFO, CTO, COO }
+
     public enum CommitteeType { Evaluation, Top }
 
     // Keep DepartmentRepresentative for historical tenders. Admin may assign two distinct technical seats.

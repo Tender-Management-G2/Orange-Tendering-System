@@ -92,7 +92,7 @@ public class PurchaseRequestsController : Controller
             Request = request, CanEdit = RequestDisplay.Editable(request, user.Id),
             Clarifications = await db.Clarifications.AsNoTracking().Include(c => c.Messages)
                 .Where(c => c.PurchaseRequestId == id && (c.FromUserId == user.Id || c.ToUserId == user.Id))
-                .OrderByDescending(c => c.CreatedAt).ToListAsync()
+                .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id).ToListAsync()
         });
     }
 

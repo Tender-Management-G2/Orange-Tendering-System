@@ -1,0 +1,24 @@
+@if (TempData["TopMessage"] is string message)
+{
+    <dialog class="tc-success-popup" data-top-success-popup aria-labelledby="tc-success-title" aria-describedby="tc-success-message">
+        <button type="button" class="tc-success-close" data-close-success aria-label="Close notification">×</button>
+        <span class="tc-success-mark" aria-hidden="true">✓</span>
+        <h2 id="tc-success-title">Success</h2>
+        <p id="tc-success-message">@message</p>
+        <button type="button" class="tc-success-ok" data-close-success autofocus>OK</button>
+    </dialog>
+    <style>
+    .tc-success-popup{position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 32px));box-sizing:border-box;padding:30px 26px 24px;border:1px solid var(--ws-rule,#dfe3ed);border-top:4px solid #ff7900;border-radius:18px;background:var(--ws-surface,#fff);color:var(--ws-ink,#17212e);box-shadow:0 20px 70px #0004;text-align:center;font-family:inherit}.tc-success-popup::backdrop{background:#090b0d70;backdrop-filter:blur(3px)}.tc-success-popup .tc-success-close{position:absolute;top:9px;right:12px;padding:0 7px;border:0;background:transparent;color:var(--ws-muted,#596071);font-size:26px;cursor:pointer}.tc-success-mark{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 14px;border-radius:50%;background:#ff79001c;color:#ff7900;font-size:32px;font-weight:700}.tc-success-popup h2{margin:0 0 10px;font-size:23px}.tc-success-popup p{margin:0 0 22px;font-size:14px;line-height:1.65;overflow-wrap:anywhere}.tc-success-popup .tc-success-ok{min-width:110px;padding:10px 25px;border:1px solid #ff7900;border-radius:9px;background:#ff7900;color:#fff;font:inherit;font-weight:700;cursor:pointer}.tc-success-popup .tc-success-ok:hover{background:#e66d00}.tc-success-popup button:focus-visible{outline:2px solid #ff7900;outline-offset:3px}
+    </style>
+    <script>
+    (() => {
+        const popup = document.querySelector('[data-top-success-popup]');
+        if (!popup || popup.open) return;
+        popup.showModal();
+        const timer = setTimeout(() => popup.close(), 6000);
+        popup.querySelectorAll('[data-close-success]').forEach(button => button.addEventListener('click', () => popup.close()));
+        popup.addEventListener('close', () => clearTimeout(timer), { once: true });
+    })();
+    </script>
+}
+@if (TempData["TopError"] is string error) { <p class="pg-note" role="alert">@error</p> }

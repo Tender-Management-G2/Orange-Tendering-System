@@ -523,16 +523,18 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         Audit(a, id, "ManagerDecisionEvidence", new { decision, comment, s.ReportId });
         await NotifyOfficer(id, "Manager decision", $"{decision}: {comment}");
     });
-    public Task AssignTop(int id, string[] memberIds, ClaimsPrincipal principal) => Change(id, principal, "TopCommitteeAssigned", async (t, a) =>
+    public Task AssignTop(int id, Dictionary<TopExecutivePosition, string> executives, ClaimsPrincipal principal) => Change(id, principal, "TopCommitteeAssigned", async (t, a) =>
     {
         await Officer(t, a); var s = await Session(id);
         Require(s.State == SessionState.ManagerApproved && RequiresTop(t, s), "Manager approval and a configured policy requiring Top Committee are required.");
+        Require(executives.Count == 4 && Enum.GetValues<TopExecutivePosition>().All(executives.ContainsKey), "Assign CEO, CFO, CTO and COO explicitly.");
+        var memberIds = executives.Values.ToArray();
         Require(memberIds.Length == 4 && memberIds.Distinct().Count() == 4 && !await db.CommitteeMembers.AnyAsync(x => x.TenderId == id && x.CommitteeType == CommitteeType.Top), "Assign four distinct Top Committee members once.");
-        foreach (var userId in memberIds)
+        foreach (var (position, userId) in executives)
         {
             var person = await users.FindByIdAsync(userId);
             Require(person is { IsActive: true } && await Role(person, SystemRoles.TopCommittee) && !await Role(person, SystemRoles.SourcingOfficer) && !await Role(person, SystemRoles.SourcingManager) && !await db.CommitteeMembers.AnyAsync(x => x.TenderId == id && x.UserId == userId), "Top members must be active, appropriately authorized, and separate from the Evaluation Committee, officer, and manager.");
-            db.CommitteeMembers.Add(new CommitteeMember { TenderId = id, UserId = userId, CommitteeType = CommitteeType.Top, AssignedAt = Now });
+            db.CommitteeMembers.Add(new CommitteeMember { TenderId = id, UserId = userId, CommitteeType = CommitteeType.Top, ExecutivePosition = position, AssignedAt = Now });
             Notify(userId, id, "Final decision requested", "Review the finalized report, recommendation, evidence and manager decision. Do not re-enter evaluation scores.");
         }
         db.CommitteeRounds.Add(new CommitteeRound { TenderRoundId = s.TenderRoundId, CommitteeType = CommitteeType.Top, RoundNumber = 1, TenderReportId = s.ReportId, StartedAt = Now });

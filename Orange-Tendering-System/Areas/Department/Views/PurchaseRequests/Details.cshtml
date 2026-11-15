@@ -84,7 +84,7 @@
         else
         {
             <div class="rqd-attachments">
-            @foreach (var file in request.Documents.OrderBy(d => d.UploadedAt).ThenBy(d => d.Id))
+            @foreach (var file in request.Documents.OrderByDescending(d => d.UploadedAt).ThenByDescending(d => d.Id))
             {
                 <article class="rqd-attachment">
                     <span class="rqd-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg></span>
@@ -112,7 +112,12 @@
         else
         {
             <ol class="rqd-timeline">
+<<<<<<< HEAD
             @foreach (var review in request.Reviews.OrderByDescending(r => r.SubmissionNumber))
+=======
+            @{ var expandLatestSubmission = true; }
+            @foreach (var review in request.Reviews.OrderByDescending(r => r.SubmissionNumber).ThenByDescending(r => r.Id))
+>>>>>>> be32000 (temp)
             {
                 RequestSnapshot? snapshot = null;
                 try { snapshot = JsonSerializer.Deserialize<RequestSnapshot>(review.SubmittedSnapshotJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }); }

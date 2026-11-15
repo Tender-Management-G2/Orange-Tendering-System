@@ -653,6 +653,10 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("ExecutivePosition")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("Responsibility")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
@@ -668,6 +672,10 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("TenderId", "ExecutivePosition")
+                        .IsUnique()
+                        .HasFilter("[ExecutivePosition] IS NOT NULL");
+
                     b.HasIndex("TenderId", "UserId")
                         .IsUnique();
 
@@ -675,7 +683,10 @@ namespace Orange_Tendering_System.Data.Migrations
                         .IsUnique()
                         .HasFilter("[Responsibility] IS NOT NULL");
 
-                    b.ToTable("CommitteeMembers");
+                    b.ToTable("CommitteeMembers", t =>
+                        {
+                            t.HasCheckConstraint("CK_CommitteeMember_ExecutivePosition", "[ExecutivePosition] IS NULL OR ([CommitteeType] = 'Top' AND [ExecutivePosition] IN ('CEO','CFO','CTO','COO'))");
+                        });
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.CommitteeRound", b =>

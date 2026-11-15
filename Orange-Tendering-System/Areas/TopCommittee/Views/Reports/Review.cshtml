@@ -1,3 +1,4 @@
+@inject Microsoft.AspNetCore.Identity.UserManager<Orange_Tendering_System.Models.Entities.ApplicationUser> ExecutiveUsers
 @model Orange_Tendering_System.ViewModels.ReportReviewModel
 @using Orange_Tendering_System.Models.Entities
 @{ ViewData["Title"]=$"Evaluation report v{Model.Report.VersionNumber}"; var area=ViewContext.RouteData.Values["area"]?.ToString(); var id=Model.Report.Id; }
@@ -26,7 +27,11 @@
 }
 @if(Model.CanForward) { <form asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Forward" asp-route-id="@id" method="post"><p>All four current-version committee signatures are verified before forwarding.</p><button>Forward signed report to Sourcing Manager</button></form> }
 <div class="rl-scroll"><table class="rl-table"><thead><tr><th>Assigned section</th><th>Signer / role</th><th>Decision and method</th><th>UTC</th><th>Applicability / receipt</th></tr></thead><tbody>
+<<<<<<< HEAD
 @foreach(var signature in Model.Signatures) { <tr><td>@signature.Stage / @signature.Slot</td><td>@signature.SignerName<br />@signature.UserId<br />@signature.Role</td><td>@signature.Decision<br />@signature.Method</td><td>@signature.SignedAt.ToString("u")</td><td>@(signature.InvalidatedAt==null && Model.IsCurrent ? "Current endorsement" : "Historical - not valid for a new version")<br /><a asp-area="@area" asp-controller="Reports" asp-action="Receipt" asp-route-id="@signature.Id">Download signature receipt</a> · <a asp-area="@area" asp-controller="Reports" asp-action="Receipt" asp-route-id="@signature.Id" asp-route-manifest="true">Download exact signed manifest</a><br />@signature.InvalidationReason</td></tr> }
+=======
+@foreach(var signature in Model.Signatures) { <tr><td>@signature.Stage / @signature.Slot</td><td>@if(signature.Stage == ReportSigningStage.Top){var signer=await ExecutiveUsers.FindByIdAsync(signature.UserId);var title=signer is null?null:Orange_Tendering_System.Areas.TopCommittee.Services.TopExecutiveRoles.Title(await ExecutiveUsers.GetRolesAsync(signer));if(title is not null){<strong>@title</strong><br />}}@signature.SignerName<br />@signature.UserId<br />@signature.Role</td><td>@signature.Decision<br />@signature.Method</td><td>@signature.SignedAt.ToString("u")</td><td>@(signature.InvalidatedAt==null && Model.IsCurrent ? "Current endorsement" : "Historical - not valid for a new version")<br /><a asp-area="@area" asp-controller="SignedReports" asp-action="Receipt" asp-route-id="@signature.Id">Download signature receipt</a> · <a asp-area="@area" asp-controller="SignedReports" asp-action="Receipt" asp-route-id="@signature.Id" asp-route-manifest="true">Download exact signed manifest</a><br />@signature.InvalidationReason</td></tr> }
+>>>>>>> be32000 (temp)
 </tbody></table></div></section>
 @if(Model.CanReturn) {
 <section class="rl-panel"><h2>Return for Revision</h2><p>Provide feedback and the required correction. Only an approved narrative route may proceed. A request to change locked weights, submitted bids or finalized scores enters a blocked policy state.</p>
