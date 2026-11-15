@@ -1,19 +1,18 @@
 namespace Orange_Tendering_System.Models;
 
-// Account classification only. Tender-specific assignments still control access and voting.
 public static class CommitteeAccountSeats
 {
     public const string ClaimType = "orange:committee-account-seat";
     public static readonly CommitteeAccountSeat[] All =
     [
-        new("evaluation-technical-1", "Evaluation", "Technical Member 1", "First technical specialist", SystemRoles.EvaluationCommittee),
-        new("evaluation-technical-2", "Evaluation", "Technical Member 2", "Second technical specialist", SystemRoles.EvaluationCommittee),
-        new("evaluation-manager", "Evaluation", "Sourcing Manager", "Sourcing management and report review", SystemRoles.SourcingManager),
-        new("evaluation-financial", "Evaluation", "Financial Representative", "Financial evaluation specialist", SystemRoles.EvaluationCommittee),
-        new("top-ceo", "Top", "CEO", "Chief Executive Officer", SystemRoles.TopCommittee),
-        new("top-member-1", "Top", "Committee Member 1", "Top Committee decision maker", SystemRoles.TopCommittee),
-        new("top-member-2", "Top", "Committee Member 2", "Top Committee decision maker", SystemRoles.TopCommittee),
-        new("top-member-3", "Top", "Committee Member 3", "Top Committee decision maker", SystemRoles.TopCommittee)
+        new("evaluation-manager", "Evaluation", "Sourcing Manager", "committee member", SystemRoles.SourcingManager),
+        new("evaluation-technical-1", "Evaluation", "Technical", "technical representative", SystemRoles.Technical),
+        new("evaluation-financial", "Evaluation", "Finance", "financial representative", SystemRoles.Finance),
+        new("evaluation-department", "Evaluation", "Department Representative", "Department representative on the Evaluation Committee", SystemRoles.DepartmentRepresentative),
+        new("top-ceo", "Top", "Chief Executive Officer", "CEO member", SystemRoles.ChiefExecutiveOfficer),
+        new("top-cfo", "Top", "Chief Financial Officer", "CFO member", SystemRoles.ChiefFinancialOfficer),
+        new("top-cto", "Top", "Chief Technology Officer", "CTO member", SystemRoles.ChiefTechnologyOfficer),
+        new("top-coo", "Top", "Chief Operations Officer", "COO member", SystemRoles.ChiefOperationsOfficer)
     ];
     public static CommitteeAccountSeat? Find(string? key) => All.SingleOrDefault(x => x.Key == key);
 }

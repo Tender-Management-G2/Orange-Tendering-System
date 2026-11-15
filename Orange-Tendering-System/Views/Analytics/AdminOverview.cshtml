@@ -1,53 +1,39 @@
 @model AdminAccountOverviewViewModel
 @{
     Layout = "/Views/Shared/_AdminLayout.cshtml";
-    ViewData["Title"] = "Subscriptions & Maintenance";
+    ViewData["Title"] = "Maintenance & System Overview";
     ViewData["WorkspaceSection"] = "Analytics & Exports";
-    ViewData["Description"] = "Read-only overview of subscriptions, revenue and technical maintenance.";
+    ViewData["Description"] = "Maintenance planning, technical coordination and routine administration.";
 }
 <partial name="_PageHeader" />
 <aside class="pg-note" role="note">
-    <strong>Demo preview · Read only</strong>
-    <p>All counts, prices, revenue and maintenance dates below are sample data for presentation. They are not actual invoices, payments or confirmed technical appointments.</p>
+    <strong>Maintenance preview · Read only</strong>
+    <p>The maintenance date and duration below are demo information. Technical checks are a reference checklist, not live monitoring or confirmed maintenance records.</p>
 </aside>
-<section class="pg-cards" aria-label="Demo account overview">
-    <article class="pg-card" data-search-item>
-        <span>Monthly subscription revenue</span><h2>@Model.MonthlyRevenue.ToString("N0") @Model.Currency</h2>
-        <p>Demo monthly total across the plans below</p>
-    </article>
-    <article class="pg-card" data-search-item>
-        <span>Active subscriptions</span><h2>@Model.ActiveSubscriptions</h2><p>Demo subscribed organization accounts</p>
-    </article>
-    <article class="pg-card" data-search-item>
-        <span>Annual revenue projection</span><h2>@((Model.MonthlyRevenue * 12).ToString("N0")) @Model.Currency</h2>
-        <p>Demo monthly revenue × 12; not collected revenue</p>
-    </article>
+<section class="pg-cards" aria-label="Maintenance overview">
+    <article class="pg-card" data-search-item><span>Next maintenance · Demo</span><h2>@Model.NextMaintenanceUtc.ToString("dd MMM yyyy")</h2><p>@Model.NextMaintenanceUtc.ToString("HH:mm") UTC · Illustrative schedule</p></article>
+    <article class="pg-card" data-search-item><span>Estimated window · Demo</span><h2>2 hours</h2><p>Confirm timing and service impact with the technical team.</p></article>
+    <article class="pg-card" data-search-item><span>Technical coordination</span><h2>Technical team</h2><p>Coordinate the approved schedule, planned work and completion report.</p></article>
 </section>
 <section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>Subscription overview</h2><p>Sample plans and recurring monthly charges · USD</p></div></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table" data-no-enhance aria-label="Demo subscription plans">
-            <thead><tr><th>Plan</th><th>Accounts</th><th>Price / account</th><th>Billing cycle</th><th>Monthly total</th></tr></thead>
-            <tbody>
-                @foreach (var plan in Model.Subscriptions)
-                {
-                    <tr data-search-item>
-                        <td>@plan.Plan</td><td>@plan.Accounts</td><td>@plan.MonthlyPrice.ToString("N0") @Model.Currency</td>
-                        <td>@plan.BillingCycle</td><td>@((plan.Accounts * plan.MonthlyPrice).ToString("N0")) @Model.Currency</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-</section>
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>Technical maintenance</h2><p>Illustrative schedule · not a confirmed appointment</p></div></div>
+    <div class="pg-panel-head"><div><h2>Maintenance plan</h2><p>Sample plan for review with the technical team</p></div></div>
     <dl class="pg-dl">
-        <div data-search-item><dt>Next maintenance (demo, UTC)</dt><dd>@Model.NextMaintenanceUtc.ToString("yyyy-MM-dd HH:mm")</dd></div>
-        <div data-search-item><dt>Estimated duration</dt><dd>2 hours</dd></div>
-        <div data-search-item><dt>Responsible team</dt><dd>Technical Operations · Demo</dd></div>
         <div data-search-item><dt>Planned work</dt><dd>Security updates, database backup verification and platform health checks</dd></div>
-        <div data-search-item><dt>Expected impact</dt><dd>Brief service interruptions during the maintenance window</dd></div>
-        <div data-search-item><dt>Admin coordination</dt><dd>Review the confirmed schedule with the technical team and notify affected users</dd></div>
+        <div data-search-item><dt>Expected impact · Demo</dt><dd>Brief service interruptions within the agreed maintenance window</dd></div>
+        <div data-search-item><dt>Before maintenance</dt><dd>Confirm the technical contact, approved timing, backup and rollback plan.</dd></div>
+        <div data-search-item><dt>After maintenance</dt><dd>Review the completion report and confirm that sign-in and core pages work.</dd></div>
     </dl>
+</section>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><div><h2>Routine admin review</h2><p>Reference checklist for maintaining the platform</p></div></div>
+    <div class="pg-table-wrap"><table class="pg-table" data-no-enhance>
+        <thead><tr><th>Area</th><th>Review item</th><th>Coordinate with</th></tr></thead>
+        <tbody>
+            <tr data-search-item><td>User access</td><td>Review active/inactive accounts and the roles assigned to staff.</td><td>Admin</td></tr>
+            <tr data-search-item><td>Department records</td><td>Review unassigned employees and inactive departments.</td><td>Admin</td></tr>
+            <tr data-search-item><td>Audit trail</td><td>Review recorded administrative changes and investigate unexpected activity.</td><td>Admin / Technical team</td></tr>
+            <tr data-search-item><td>Backups</td><td>Confirm the latest backup and restoration check with the technical team.</td><td>Technical team</td></tr>
+            <tr data-search-item><td>Security updates</td><td>Agree on updates and verify the system after deployment.</td><td>Technical team</td></tr>
+        </tbody>
+    </table></div>
 </section>

@@ -1,13 +1,19 @@
 @model Orange_Tendering_System.ViewModels.RequirementsInput
 @inject Microsoft.AspNetCore.Identity.UserManager<Orange_Tendering_System.Models.Entities.ApplicationUser> People
+@inject Orange_Tendering_System.Services.TenderWorkflowService CommitteeConfiguration
 @inject Orange_Tendering_System.Data.ApplicationDbContext Records
 @using Microsoft.EntityFrameworkCore
 @{
     // Pick people by name instead of pasting Identity user ids: only active accounts of the right role are offered (the server re-checks every choice).
     async Task<List<(string Id, string Label, int? Dept)>> Pool(string role) => (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive)
         .Select(u => (u.Id, (string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName + " (" + u.Email + ")")!, u.DepartmentId)).OrderBy(u => u.Item2).ToList();
+    var fixedEvaluation = await CommitteeConfiguration.StandingEvaluationDefaults();
+    Model.SourcingManagerId = fixedEvaluation.GetValueOrDefault("evaluation-manager") ?? "";
+    Model.FinancialRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-financial") ?? "";
+    Model.TechnicalRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-technical-1") ?? "";
     var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager);
     var evaluators = await Pool(Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee);
+    var departmentRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.DepartmentRepresentative);
     var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted).OrderByDescending(r => r.Id)
         .Select(r => new
         {
@@ -20,7 +26,7 @@
     var seats = new (string Field, string Title, string Hint, string Icon, List<(string Id, string Label, int? Dept)> Pool, string Value)[]
     {
         ("SourcingManagerId", "Sourcing Manager", "Reviews the report and approves the weights", "M", managers, Model.SourcingManagerId),
-        ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", evaluators, Model.DepartmentRepresentativeId),
+        ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", departmentRepresentatives, Model.DepartmentRepresentativeId),
         ("FinancialRepresentativeId", "Financial Representative", "Scores the financial side", "F", evaluators, Model.FinancialRepresentativeId),
         ("TechnicalRepresentativeId", "Technical Representative", "Scores the technical side", "T", evaluators, Model.TechnicalRepresentativeId)
     };
@@ -58,7 +64,7 @@
                     <label class="tc-field tc-wide"><span>Description</span><textarea asp-for="Description" required rows="3" placeholder="What is being bought and why"></textarea></label>
                     <div class="tc-field tc-wide"><span>Technical requirements</span><textarea asp-for="TechnicalRequirements" required rows="4" placeholder="Specifications the suppliers must meet"></textarea></div>
                     <div class="tc-field tc-wide"><span>Financial and commercial conditions</span>
-                        <select class="tc-template" data-target="CommercialConditions" aria-label="Commercial conditions template"><option value="">Quick pick…</option><option>Fixed price in the tender currency, valid for 90 days. Payment within 30 days of delivery and acceptance.</option><option>Fixed price, valid for 60 days. 30% advance payment, 70% on delivery and acceptance.</option><option>Unit prices, valid for 120 days. Payment in three milestones tied to delivery stages.</option></select>
+                        <select class="tc-template" data-target="CommercialConditions" aria-label="Commercial conditions template"><option value="">Quick pick…</option><option>price in the tender currency, valid for 90 days. Payment within 30 days of delivery and acceptance.</option><option>price, valid for 60 days. 30% advance payment, 70% on delivery and acceptance.</option><option>Unit prices, valid for 120 days. Payment in three milestones tied to delivery stages.</option></select>
                         <textarea asp-for="CommercialConditions" required rows="3" placeholder="Pricing validity, payment terms, taxes"></textarea></div>
                     <div class="tc-field"><span>Delivery expectations</span>
                         <select class="tc-template" data-target="DeliveryExpectations" aria-label="Delivery template"><option value="">Quick pick…</option><option>Delivery within 30 days of the purchase order.</option><option>Delivery within 60 days of the purchase order.</option><option>Phased delivery over 90 days according to a schedule agreed with the requesting department.</option></select>
@@ -74,14 +80,17 @@
             </section>
 
             <section class="tc-card" aria-labelledby="tc-s3">
-                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p>Four different people, one for each seat. A person already chosen is disabled in the other lists.</p></div></header>
+                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p>Three members are selected by Admin. Choose the fourth member from the requesting department.</p></div></header>
+                @if (fixedEvaluation.Count != 3) { <p class="tc-alert">Ask Admin to configure the Evaluation Committee before creating a tender.</p> }
                 <div class="tc-seats">
                     @foreach (var s in seats)
                     {
+                        var fixedSeat = s.Field != "DepartmentRepresentativeId";
                         <label class="tc-seat" data-seat="@s.Field">
                             <span class="tc-avatar" aria-hidden="true">@s.Icon</span>
                             <span class="tc-seat-body"><strong>@s.Title</strong><small>@s.Hint</small>
-                                <select name="@s.Field" id="@s.Field" required class="tc-seat-select">
+                                @if (fixedSeat) { <input type="hidden" name="@s.Field" value="@s.Value" /> }
+                                <select name="@(fixedSeat ? null : s.Field)" id="@s.Field" required disabled="@fixedSeat" class="tc-seat-select">
                                     <option value="">Select a person</option>
                                     @foreach (var u in s.Pool) { <option value="@u.Id" data-dept="@u.Dept" selected="@(s.Value == u.Id)">@u.Label</option> }
                                 </select></span>

@@ -50,7 +50,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             var seat = CommitteeAccountSeats.Find(committeeSeat);
             if (committeeSeat != null && seat == null) return BadRequest();
             var model = new CreateUserViewModel { CommitteeSeat = seat?.Key };
-            if (new[] { SystemRoles.EvaluationCommittee, SystemRoles.TopCommittee, SystemRoles.SourcingManager }.Contains(role))
+            if (SystemRoles.PublicRoles.Where(r => r != SystemRoles.Supplier).Contains(role))
                 model.Role = role!;
             if (seat != null) model.Role = seat.Role;
             ViewData["ReturnUrl"] = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
@@ -185,7 +185,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                         "Please select a valid active department.",
 
                     ["DepartmentRequired"] =
-                        "A department is required for Requesting Department users.",
+                        "An assigned department is required for this role.",
 
                     ["InvalidRole"] =
                         "Please select a valid user role.",
