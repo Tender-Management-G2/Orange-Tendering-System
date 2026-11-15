@@ -21,19 +21,22 @@ namespace Orange_Tendering_System.Services
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IEmailSender _emailSender;
         private readonly LinkGenerator _links;
+        private readonly IWebHostEnvironment _environment;
 
         public AdminService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             IEmailSender emailSender,
-            LinkGenerator links)
+            LinkGenerator links,
+            IWebHostEnvironment environment)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
             _emailSender = emailSender;
             _links = links;
+            _environment = environment;
         }
 
         // A supplier application enters Admin review only after its contact verifies the OTP.
@@ -1134,7 +1137,10 @@ namespace Orange_Tendering_System.Services
                 await transaction.RollbackAsync();
                 return IdentityResult.Failed(new IdentityError
                 {
-                    Description = "The welcome email could not be delivered. The account was not created. Please try again."
+                    Description = exception is InvalidOperationException &&
+                        exception.Message == "SMTP email delivery is not configured."
+                        ? "Email delivery is not configured. The account was not created."
+                        : "The welcome email could not be delivered. The account was not created. Please try again."
                 });
             }
 
@@ -2050,41 +2056,74 @@ public async Task<string> UpdateUserAsync(
                 (supplier.Status == SupplierStatus.Approved &&
                  model.Decision == SupplierStatus.Suspended)
                 ||
-                (supplier.Status == SupplierStatus.Suspended &&
+                ((supplier.Status == SupplierStatus.Suspended ||
+                  supplier.Status == SupplierStatus.Rejected) &&
                  model.Decision == SupplierStatus.Approved);
 
             if (!allowed)
                 return "InvalidTransition";
 
+            var oldStatus = supplier.Status;
+            var reviewedAt = DateTime.UtcNow;
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
             if (model.Decision == SupplierStatus.Approved)
             {
                 var documents = await _context.Documents
-                    .AsNoTracking()
                     .Where(d => d.SupplierId == supplier.Id)
                     .ToListAsync();
 
                 if (documents.Count == 0)
                     return "DocumentsRequired";
 
-                var allVerified = documents.All(d =>
-                    d.VerificationStatus ==
-                        DocumentVerificationStatus.Verified &&
-                    (!d.ExpiresAt.HasValue ||
-                     d.ExpiresAt.Value.Date >= DateTime.UtcNow.Date));
+                if (!documents.Any(d => d.DocumentType == "CommercialRegistration"))
+                    return "DocumentsRequired";
 
-                if (!allVerified)
+                foreach (var document in documents)
+                {
+                    try
+                    {
+                        if (!File.Exists(PrivateDocumentPaths.Resolve(
+                            _environment.ContentRootPath, document.StoragePath)))
+                            return "DocumentsUnavailable";
+                    }
+                    catch (WorkflowException)
+                    {
+                        return "DocumentsUnavailable";
+                    }
+                }
+
+                if (documents.Any(d => d.VerificationStatus == DocumentVerificationStatus.Rejected))
+                    return "DocumentsRejected";
+
+                if (documents.Any(d => d.ExpiresAt.HasValue &&
+                    d.ExpiresAt.Value.Date < reviewedAt.Date))
                     return "DocumentsNotVerified";
+
+                // The Admin's approval also verifies documents still awaiting a decision.
+                foreach (var document in documents.Where(d =>
+                    d.VerificationStatus != DocumentVerificationStatus.Verified))
+                {
+                    document.VerificationStatus = DocumentVerificationStatus.Verified;
+                    document.VerifiedByUserId = adminId;
+                    document.VerifiedAt = reviewedAt;
+                    document.VerificationNotes = model.ReviewNotes?.Trim();
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        UserId = adminId,
+                        Action = "DocumentVerifiedWithSupplierApproval",
+                        EntityName = "Document",
+                        EntityId = document.Id.ToString(),
+                        CreatedAt = reviewedAt
+                    });
+                }
             }
-
-            var oldStatus = supplier.Status;
-
-            await using var transaction =
-                await _context.Database.BeginTransactionAsync();
 
             supplier.Status = model.Decision;
             supplier.ReviewNotes = model.ReviewNotes?.Trim();
             supplier.ReviewedByUserId = adminId;
-            supplier.ReviewedAt = DateTime.UtcNow;
+            supplier.ReviewedAt = reviewedAt;
 
             // Accounts linked to this supplier
             var accounts = await _context.Users
@@ -2102,9 +2141,14 @@ public async Task<string> UpdateUserAsync(
                     account.SecurityStamp = Guid.NewGuid().ToString();
                 }
             }
-
-            // Re-approving does not automatically reactivate
-            // accounts that might have been disabled separately.
+            else if (model.Decision == SupplierStatus.Approved)
+            {
+                foreach (var account in accounts.Where(a => a.EmailConfirmed))
+                {
+                    account.IsActive = true;
+                    account.SecurityStamp = Guid.NewGuid().ToString();
+                }
+            }
 
             foreach (var account in accounts)
             {

@@ -28,6 +28,8 @@ if (args.Contains("--seed-lifecycle")) { await LifecycleFixture.Run(); return; }
 if (args.Contains("--final-decision-checks")) { await FinalDecisionChecks.Run(); return; }
 if (args.Contains("--clarification-checks")) { await ClarificationChecks.Run(); return; }
 if (args.Contains("--smtp-mode-checks")) { SmtpModeChecks.Run(); return; }
+if (args.Contains("--smtp-live-check")) { await SmtpLiveChecks.Run(); return; }
+if (args.Contains("--smtp-live-create-check")) { await SmtpLiveChecks.RunCreate(); return; }
 
 var connection = Environment.GetEnvironmentVariable("AUTH_TEST_CONNECTION")
     ?? throw new InvalidOperationException("Set AUTH_TEST_CONNECTION to a migrated, isolated test database.");
@@ -379,14 +381,98 @@ using (var scope = factory.Services.CreateScope())
     var review = scope.ServiceProvider.GetRequiredService<AdminService>();
     Check((await review.GetSuppliersAsync(null, "Pending")).Suppliers.Any(s => s.Id == company.Id),
         "verified registration appears on Admin Suppliers page");
-    foreach (var documentId in await db.Documents.Where(d => d.SupplierId == company.Id).Select(d => d.Id).ToListAsync())
-        Check(await review.ReviewSupplierDocumentAsync(new SupplierDocumentReviewViewModel
-        { SupplierId = company.Id, DocumentId = documentId, Status = DocumentVerificationStatus.Verified }, adminId) == "Success",
-            "Admin verifies supplier document");
-    Check(await review.ReviewSupplierAsync(new SupplierReviewDecisionViewModel
-    { SupplierId = company.Id, Decision = SupplierStatus.Approved }, adminId) == "Success",
-        "Admin approves supplier registration");
 }
+var adminReloginToken = await Token(admin, "/Identity/Account/Login");
+var adminRelogin = await admin.PostAsync("/Identity/Account/Login", Form(new()
+{
+    ["Input.Email"] = adminEmail, ["Input.Password"] = newAdminPassword,
+    ["__RequestVerificationToken"] = adminReloginToken
+}));
+Check(adminRelogin.StatusCode == HttpStatusCode.Redirect, "Admin signs in for supplier review");
+int reviewedSupplierId;
+int reviewedDocumentId;
+using (var scope = factory.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    reviewedSupplierId = await db.Suppliers.Where(s => s.RegistrationNumber == "CR-" + suffix)
+        .Select(s => s.Id).SingleAsync();
+    reviewedDocumentId = await db.Documents.Where(d => d.SupplierId == reviewedSupplierId)
+        .Select(d => d.Id).FirstAsync();
+    var document = await db.Documents.SingleAsync(d => d.Id == reviewedDocumentId);
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var approve = new SupplierReviewDecisionViewModel
+        { SupplierId = reviewedSupplierId, Decision = SupplierStatus.Approved };
+    document.VerificationStatus = DocumentVerificationStatus.Rejected;
+    await db.SaveChangesAsync();
+    Check(await review.ReviewSupplierAsync(approve, adminId) == "DocumentsRejected",
+        "rejected document blocks supplier approval");
+    document.VerificationStatus = DocumentVerificationStatus.Pending;
+    document.ExpiresAt = DateTime.UtcNow.AddDays(-1);
+    await db.SaveChangesAsync();
+    Check(await review.ReviewSupplierAsync(approve, adminId) == "DocumentsNotVerified",
+        "expired document blocks supplier approval");
+    document.ExpiresAt = null;
+    var storedPath = document.StoragePath;
+    document.StoragePath = Path.Combine(Path.GetTempPath(), "unavailable-supplier-document.pdf");
+    await db.SaveChangesAsync();
+    Check(await review.ReviewSupplierAsync(approve, adminId) == "DocumentsUnavailable",
+        "unavailable document blocks supplier approval");
+    document.StoragePath = storedPath;
+    await db.SaveChangesAsync();
+}
+var reviewPath = $"/Admin/Suppliers/Review/{reviewedSupplierId}";
+Check((await (await admin.GetAsync("/Admin/Suppliers")).Content.ReadAsStringAsync())
+    .Contains("data-no-modal"), "Supplier review opens as a full page");
+var reviewToken = await Token(admin, reviewPath);
+Check((await admin.GetAsync($"/Admin/Suppliers/Document/{reviewedDocumentId}")).StatusCode == HttpStatusCode.OK,
+    "Admin can open the supplier document");
+var decision = await admin.PostAsync("/Admin/Suppliers/SubmitReview", Form(new()
+{
+    ["SupplierId"] = reviewedSupplierId.ToString(), ["Decision"] = "Approved",
+    ["__RequestVerificationToken"] = reviewToken
+}));
+Check(decision.StatusCode == HttpStatusCode.Redirect, "Approve form submits and redirects");
+var reviewResult = await admin.GetAsync(reviewPath);
+Check((await reviewResult.Content.ReadAsStringAsync()).Contains("Supplier review completed successfully"),
+    "Admin sees supplier approval confirmation");
+using (var scope = factory.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    Check(await db.Suppliers.AnyAsync(s => s.Id == reviewedSupplierId && s.Status == SupplierStatus.Approved),
+        "Admin approval changes supplier status");
+    Check(await db.Documents.Where(d => d.SupplierId == reviewedSupplierId)
+        .AllAsync(d => d.VerificationStatus == DocumentVerificationStatus.Verified),
+        "Admin approval verifies pending documents");
+    Check(await db.Users.AnyAsync(u => u.Email == supplierEmail && u.IsActive),
+        "approved supplier account is active");
+}
+var formCreatedEmail = $"form-created-{suffix}@example.test";
+var createUserToken = await Token(admin, "/Admin/Users/Create");
+var createdFromForm = await admin.PostAsync("/Admin/Users/Create", Form(new()
+{
+    ["FullName"] = "Form Created Evaluator", ["Email"] = formCreatedEmail,
+    ["Role"] = SystemRoles.EvaluationCommittee, ["IsActive"] = "false",
+    ["__RequestVerificationToken"] = createUserToken
+}));
+Check(createdFromForm.StatusCode == HttpStatusCode.Redirect &&
+      mail.Messages.Any(m => m.To == formCreatedEmail && m.Subject.Contains("Welcome")),
+    "Admin Create User form sends welcome email to entered address");
+mail.FailNext = true;
+var failedFormEmail = $"form-mail-fail-{suffix}@example.test";
+var failedFormToken = await Token(admin, "/Admin/Users/Create");
+var failedFromForm = await admin.PostAsync("/Admin/Users/Create", Form(new()
+{
+    ["FullName"] = "Undelivered Evaluator", ["Email"] = failedFormEmail,
+    ["Role"] = SystemRoles.EvaluationCommittee, ["IsActive"] = "false",
+    ["__RequestVerificationToken"] = failedFormToken
+}));
+Check(failedFromForm.StatusCode == HttpStatusCode.OK &&
+      (await failedFromForm.Content.ReadAsStringAsync()).Contains("welcome email could not be delivered"),
+    "Admin Create User form displays email delivery failure");
+using (var scope = factory.Services.CreateScope())
+    Check(!await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>()
+        .Users.AnyAsync(u => u.Email == failedFormEmail), "failed email leaves no user account");
 var approvedLoginToken = await Token(supplier, "/Identity/Account/Login");
 var approvedLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new()
 {
@@ -402,8 +488,13 @@ using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var company = await db.Suppliers.SingleAsync(s => s.RegistrationNumber == "CR-" + suffix);
-    company.Status = SupplierStatus.Suspended;
-    await db.SaveChangesAsync();
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.ReviewSupplierAsync(new SupplierReviewDecisionViewModel
+        { SupplierId = company.Id, Decision = SupplierStatus.Suspended, ReviewNotes = "Test suspension" }, adminId) == "Success",
+        "Admin suspends approved supplier");
+    Check(!await db.Users.Where(u => u.Email == supplierEmail).Select(u => u.IsActive).SingleAsync(),
+        "suspension disables supplier account");
 }
 Check((await supplier.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
     "existing supplier cookie revoked after suspension");
@@ -411,8 +502,13 @@ using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var company = await db.Suppliers.SingleAsync(s => s.RegistrationNumber == "CR-" + suffix);
-    company.Status = SupplierStatus.Approved;
-    await db.SaveChangesAsync();
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.ReviewSupplierAsync(new SupplierReviewDecisionViewModel
+        { SupplierId = company.Id, Decision = SupplierStatus.Approved }, adminId) == "Success",
+        "Admin restores supplier approval");
+    Check(await db.Users.Where(u => u.Email == supplierEmail).Select(u => u.IsActive).SingleAsync(),
+        "restored supplier account is active");
 }
 var reLoginToken = await Token(supplier, "/Identity/Account/Login");
 var reLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new()

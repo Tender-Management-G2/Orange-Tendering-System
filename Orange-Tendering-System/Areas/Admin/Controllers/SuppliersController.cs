@@ -21,14 +21,40 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
     public class SuppliersController : Controller
     {
         private readonly AdminService _adminService;
+        private readonly SupplierReviewService _supplierReviewService;
         private readonly UserManager<ApplicationUser> _userManager;
 
         public SuppliersController(
             AdminService adminService,
+            SupplierReviewService supplierReviewService,
             UserManager<ApplicationUser> userManager)
         {
             _adminService = adminService;
+            _supplierReviewService = supplierReviewService;
             _userManager = userManager;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Document(int id)
+        {
+            try
+            {
+                var (path, name) = await _supplierReviewService.Document(id, User);
+                var contentType = Path.GetExtension(name).ToLowerInvariant() switch
+                {
+                    ".pdf" => "application/pdf",
+                    ".png" => "image/png",
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    _ => "application/octet-stream"
+                };
+                Response.Headers["X-Content-Type-Options"] = "nosniff";
+                Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
+                return PhysicalFile(path, contentType, enableRangeProcessing: false);
+            }
+            catch (WorkflowException)
+            {
+                return NotFound();
+            }
         }
 
         // GET: /Admin/Suppliers
@@ -156,10 +182,16 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                         "A reason is required for rejection or suspension.",
 
                     "DocumentsRequired" =>
-                        "Supplier must upload legal documents before approval.",
+                        "A commercial registration document is required before approval.",
+
+                    "DocumentsUnavailable" =>
+                        "A submitted document is unavailable. Ask the supplier to upload it again before approval.",
 
                     "DocumentsNotVerified" =>
-                        "All submitted documents must be verified and valid.",
+                        "An expired document must be replaced before approval.",
+
+                    "DocumentsRejected" =>
+                        "A rejected document must be reviewed and verified before approval.",
 
                     "InvalidTransition" =>
                         "This status change is not allowed.",
