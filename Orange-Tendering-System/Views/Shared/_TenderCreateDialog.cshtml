@@ -4,10 +4,11 @@
 @using Microsoft.EntityFrameworkCore
 @{
     // Pick people by name instead of pasting Identity user ids: only active accounts of the right role are offered (the server re-checks every choice).
-    async Task<List<(string Id, string Label, int? Dept)>> Pool(string role) => (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive)
-        .Select(u => (u.Id, (string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName + " (" + u.Email + ")")!, u.DepartmentId)).OrderBy(u => u.Item2).ToList();
-    var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager);
-    var evaluators = await Pool(Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee);
+    // The Sourcing Manager seat is only for dedicated Sourcing Managers, and the three member seats only for dedicated Evaluation Committee members: nobody holds both.
+    async Task<List<(string Id, string Label, int? Dept)>> Pool(string role, string excluded) { var blocked = (await People.GetUsersInRoleAsync(excluded)).Select(b => b.Id).ToHashSet(); return (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive && !blocked.Contains(u.Id))
+        .Select(u => (u.Id, (string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName + " (" + u.Email + ")")!, u.DepartmentId)).OrderBy(u => u.Item2).ToList(); }
+    var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager, Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee);
+    var evaluators = await Pool(Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee, Orange_Tendering_System.Models.SystemRoles.SourcingManager);
     var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted).OrderByDescending(r => r.Id)
         .Select(r => new
         {
@@ -19,7 +20,7 @@
     var currencies = new[] { "JOD", "USD", "EUR", "SAR", "AED", "EGP" };
     var seats = new (string Field, string Title, string Hint, string Icon, List<(string Id, string Label, int? Dept)> Pool, string Value)[]
     {
-        ("SourcingManagerId", "Sourcing Manager", "Reviews the report and approves the weights", "M", managers, Model.SourcingManagerId),
+        ("SourcingManagerId", "Sourcing Manager", "Reviews the signed report: approve, reject or return", "M", managers, Model.SourcingManagerId),
         ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", evaluators, Model.DepartmentRepresentativeId),
         ("FinancialRepresentativeId", "Financial Representative", "Scores the financial side", "F", evaluators, Model.FinancialRepresentativeId),
         ("TechnicalRepresentativeId", "Technical Representative", "Scores the technical side", "T", evaluators, Model.TechnicalRepresentativeId)

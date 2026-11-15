@@ -33,7 +33,10 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         catch (WorkflowException e) when (ajax) { return BadRequest(new { errors = new[] { e.Message } }); }
     }
     [HttpPost] public Task<IActionResult> RequestWeights(int id) => Execute(id, () => Workflow.RequestWeights(id, User));
+    [HttpPost] public Task<IActionResult> SendReport(int id) => Execute(id, () => Workflow.SendReportToCommittee(id, User));
+    [HttpPost] public Task<IActionResult> ApproveWeights(int id) => Execute(id, () => Workflow.ApproveWeights(id, User));
     [HttpPost] public Task<IActionResult> OpenBidding(int id, DateTimeOffset deadline) => Execute(id, () => Workflow.OpenBidding(id, deadline, User));
+    [HttpPost] public Task<IActionResult> SetMissingDeadline(int id, DateTimeOffset deadline) => Execute(id, () => Workflow.SetMissingBiddingDeadline(id, deadline, User));
     // One click: invite every approved supplier that is not yet invited in the current round (each invitation follows the normal rules and is audited).
     [HttpPost] public Task<IActionResult> InviteAll(int id, int[]? supplierIds) => Execute(id, async () =>
     {
@@ -71,7 +74,8 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
     [HttpPost] public Task<IActionResult> Compliance(int id, int bidId, ComplianceStatus status, string notes, string missing = "") => Execute(id, () => Workflow.Compliance(id, bidId, status, notes, missing, User));
     [HttpPost] public Task<IActionResult> Setup(int id, SessionInput input, CancellationToken ct) => Execute(id, () => scheduling.Schedule(id, input, User, ct));
     [HttpPost] public Task<IActionResult> EndEvaluation(int id, bool confirmed, string reason) => Execute(id, () => Workflow.EndEvaluation(id, confirmed, reason, User));
-    [HttpPost] public Task<IActionResult> Analyze(int id, CancellationToken ct) => Execute(id, async () => { await AutoCheckOffers(id); await ai.Analyze(id, User, ct); });
+    // The analysis keeps running even if the browser tab is closed or navigated away (the service has its own timeout), so a click is never lost.
+    [HttpPost] public Task<IActionResult> Analyze(int id) => Execute(id, async () => { await AutoCheckOffers(id); await ai.Analyze(id, User, CancellationToken.None); });
     [HttpPost] public Task<IActionResult> ReviewAi(int id, int analysisId) => Execute(id, () => Workflow.ReviewAi(id, analysisId, User));
     [HttpPost] public Task<IActionResult> RegenerateReport(int id) => Execute(id, () => Workflow.RegenerateReport(id, User));
     [HttpPost] public Task<IActionResult> Forward(int id) => Execute(id, () => Workflow.Forward(id, User));

@@ -47,7 +47,7 @@ public partial class TenderWorkflowService
         var officer = await IsOfficer(actor);
         var top = member?.CommitteeType == CommitteeType.Top && await Role(actor, SystemRoles.TopCommittee) && !await Role(actor, SystemRoles.SourcingOfficer) && !await Role(actor, SystemRoles.SourcingManager);
         var result = new ReportReviewModel { Report = report, Tender = tender, UserId = actor.Id, IsCurrent = current, Stage = stage,
-            CanSignCommittee = current && stage == ReportReviewStage.CommitteeReview && evaluator,
+            CanSignCommittee = current && stage == ReportReviewStage.CommitteeReview && evaluator && session.ReportSentAt != null,
             CanReviewManager = current && stage == ReportReviewStage.ManagerReview && manager,
             CanVoteTop = current && stage == ReportReviewStage.TopReview && top,
             CanForward = current && stage == ReportReviewStage.OfficerHandoff && officer,
@@ -73,6 +73,16 @@ public partial class TenderWorkflowService
         });
         return copy!;
     }
+    // The Officer sends the generated report to the four committee members; only then can they open the signing screen.
+    public Task SendReportToCommittee(int id, ClaimsPrincipal principal) => Change(id, principal, "ReportSentToCommittee", async (t, a) =>
+    {
+        await Officer(t, a); var s = await Session(id);
+        Require(s.State == SessionState.ReportDraft && s.Report != null && s.Report.Status == ReportStatus.Draft, "There is no generated report waiting to be sent.");
+        Require(s.ReportSentAt == null, "The report was already sent to the committee.");
+        s.ReportSentAt = Now;
+        foreach (var member in await Members(id, CommitteeType.Evaluation)) Notify(member.UserId, id, "Report ready for your signature", "The Sourcing Officer sent the evaluation report. Open it, review it and sign it.");
+        Audit(a, id, "ReportSentToCommitteeEvidence", new { s.ReportId });
+    });
     // Regenerates a DRAFT report with the current template. Allowed only for the Officer, while nobody has signed and nothing was submitted.
     // The frozen-content guard of the DbContext stays untouched: the change is written by one narrow, conditional SQL update, and audited.
     public Task RegenerateReport(int id, ClaimsPrincipal principal) => Change(id, principal, "ReportRegenerated", async (t, a) =>
@@ -217,7 +227,7 @@ public partial class TenderWorkflowService
             CreatedAt = Now, CreatedByUserId = actor.Id, RecommendedBidId = ranking.Count(x => x.Rank == 1) == 1 ? ranking.Single(x => x.Rank == 1).BidId : null,
             RankingSnapshotJson = JsonSerializer.Serialize(ranking), Content = JsonSerializer.Serialize(new { Justification = ReportDocumentService.Explanation(old.Content), TextualCorrection = correction, RevisionRequestId = revision.Id, OriginalReportId = old.Id }) };
         await reportDocuments.Invalidate(old, version, Now);
-        session.Report = next; session.State = SessionState.ReportDraft; tender.Status = TenderStatus.Evaluation;
+        session.Report = next; session.State = SessionState.ReportDraft; session.ReportSentAt = null; tender.Status = TenderStatus.Evaluation;
         session.ReportReviewRound = new CommitteeRound { TenderRoundId = session.TenderRoundId, CommitteeType = CommitteeType.Evaluation, RoundNumber = version,
             TenderReport = next, StartedAt = Now, FinancialWeight = session.WeightRound.ApprovedFinancial, TechnicalWeight = session.WeightRound.ApprovedTechnical };
         revision.ResubmittedReport = next; revision.ResubmittedAt = Now; revision.CorrectionSummary = correction; revision.Status = RevisionStatus.Resubmitted;

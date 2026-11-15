@@ -28,6 +28,8 @@ namespace Orange_Tendering_System.Controllers
             if (round == null) return NotFound();
             var session = await db.Set<EvaluationSession>().AsNoTracking().FirstOrDefaultAsync(s => s.TenderRoundId == round.Id);
             if (session == null || string.IsNullOrWhiteSpace(session.MeetingUrl)) return NotFound();
+            // The meeting room opens exactly at the scheduled start time, never before.
+            if (DateTime.UtcNow < session.StartsAt) return Content("The meeting opens at its scheduled start time. Please come back then.", "text/plain");
             var title = await db.Tenders.AsNoTracking().Where(t => t.Id == id).Select(t => t.Title).SingleAsync();
             var name = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.FullName).SingleAsync();
             var uri = new Uri(session.MeetingUrl);

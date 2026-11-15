@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Services;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.ViewModels;
@@ -11,7 +12,7 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
 [Authorize(Roles = SystemRoles.SourcingOfficer)]
-public class TendersController(ApplicationDbContext db) : Controller
+public class TendersController(ApplicationDbContext db, TenderWorkflowService workflow) : Controller
 {
     public async Task<IActionResult> Index() => View(await db.Tenders.AsNoTracking().Include(t => t.PurchaseRequest).Include(t => t.Rounds).OrderByDescending(t => t.CreatedAt).ToListAsync());
 
@@ -156,31 +157,11 @@ public class TendersController(ApplicationDbContext db) : Controller
     public async Task<IActionResult> InviteSupplier(int roundId, int supplierId, string category)
     {
         if (!SupplierCategories.All.Contains(category)) return BadRequest();
-        var round = await db.TenderRounds.Include(r => r.Tender).Include(r => r.Invitations).SingleOrDefaultAsync(r => r.Id == roundId);
+        var round = await db.TenderRounds.AsNoTracking().SingleOrDefaultAsync(r => r.Id == roundId);
         if (round == null) return NotFound();
-        if (round.Status is not (TenderRoundStatus.Draft or TenderRoundStatus.Open) || round.Tender.Status is not (TenderStatus.Draft or TenderStatus.Bidding))
-        {
-            TempData["SupplierInviteError"] = "This round is no longer accepting invitations.";
-            return RedirectToAction(nameof(SelectSuppliers), new { id = roundId, category });
-        }
-        var alreadyInvited = round.Invitations.Any(i => i.SupplierId == supplierId);
-        var supplier = await db.Suppliers.SingleOrDefaultAsync(s => s.Id == supplierId && s.Status == SupplierStatus.Approved && s.Category == category);
-        if (supplier == null) return NotFound();
-        if (alreadyInvited)
-        {
-            TempData["SupplierInviteMessage"] = "This supplier has already been invited to this round.";
-            return RedirectToAction(nameof(SelectSuppliers), new { id = roundId, category });
-        }
-        var now = DateTime.UtcNow;
-        var invitation = new TenderInvitation { SupplierId = supplier.Id, InvitedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value, InvitedAt = now };
-        round.Invitations.Add(invitation);
-        round.Status = TenderRoundStatus.Open; round.Tender.Status = TenderStatus.Bidding;
-        await db.SaveChangesAsync();
-        var accounts = await db.Users.Where(u => u.IsActive && u.SupplierId == supplier.Id).ToListAsync();
-        foreach (var user in accounts)
-            db.Notifications.Add(new Notification { UserId = user.Id, Title = "Tender invitation", Message = $"You are invited to submit an offer for {round.Tender.Title}.", Link = $"/Supplier/Invitations/Details/{invitation.Id}", CreatedAt = now });
-        await db.SaveChangesAsync();
-        TempData["SupplierInviteMessage"] = $"Invitation sent to {supplier.CompanyName}.";
+        if (!await db.Suppliers.AnyAsync(s => s.Id == supplierId && s.Status == SupplierStatus.Approved && s.Category == category)) return BadRequest();
+        try { await workflow.Invite(round.TenderId, supplierId, User); }
+        catch (WorkflowException error) { TempData["SupplierInviteError"] = error.Message; }
         return RedirectToAction(nameof(SelectSuppliers), new { id = roundId, category });
     }
 }
