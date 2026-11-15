@@ -752,6 +752,10 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<DateTime>("VotedAt")
                         .HasColumnType("datetime2");
 
