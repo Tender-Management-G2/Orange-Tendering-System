@@ -55,7 +55,10 @@ INTEGRATED. No business logic.
     <div id="main-content" class="@(isIdentityPage ? "identity-page" : null)">
         @RenderBody()
     </div>
-    <partial name="_Footer" />
+    @if (ViewData["HideFooter"] is not true)
+    {
+        <partial name="_Footer" />
+    }
     <dialog aria-labelledby="dialog-title"><button class="close" aria-label="Close dialog">×</button><div class="dialog-content"></div></dialog>
     <partial name="_JQueryScripts" />
     @await RenderSectionAsync("Scripts", required: false)
