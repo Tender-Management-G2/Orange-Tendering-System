@@ -1,6 +1,6 @@
 # Starts the application from the authoritative workspace only.
 # Usage (from anywhere):  powershell -ExecutionPolicy Bypass -File <WorkV2>\scripts\Run-WorkV2.ps1
-# Refuses to start when the folder is not the WorkV2 repository, the branch is not WorkV2,
+# Refuses to start when the folder is not the WorkV2 repository, the branch is not WorkV3 (or the WorkV2 backup),
 # or another process already holds the official ports (5254 / 7182).
 param([switch]$NoBuild)
 
@@ -11,7 +11,7 @@ $repo = Split-Path -Parent $PSScriptRoot
 $root = (git -C $repo rev-parse --show-toplevel).Trim()
 $branch = (git -C $repo branch --show-current).Trim()
 if ($root -ne $expectedRoot) { throw "Wrong repository: $root (expected $expectedRoot). Nothing was started." }
-if ($branch -ne 'WorkV2') { throw "Wrong branch: '$branch' (expected WorkV2). Nothing was started." }
+if ($branch -notin 'WorkV3', 'WorkV2') { throw "Wrong branch: '$branch' (expected WorkV3, or WorkV2 as the backup). Nothing was started." }
 
 foreach ($port in 5254, 7182) {
     $busy = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1

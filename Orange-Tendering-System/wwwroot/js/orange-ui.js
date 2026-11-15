@@ -209,6 +209,6 @@
     draw();
   }
   // Reuse the table kit after an Admin list refresh; existing workspace initialization stays unchanged.
-  window.orangeUi.enhanceTables = container => $('table', container).forEach(enhance);
-  $('main table').forEach(enhance);
+  window.orangeUi.enhanceTables = container => $$('table', container).forEach(enhance);
+  $$('main table').forEach(enhance);
 })();
