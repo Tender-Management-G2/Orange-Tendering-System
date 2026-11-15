@@ -28,18 +28,18 @@ function init() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, lowPower ? 1 : 1.6));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = .92;
+  renderer.toneMappingExposure = .98;
   renderer.shadowMap.enabled = !lowPower;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   scene.background = skyTexture();
-  scene.fog = new THREE.FogExp2(0x15100c, 0.0042);
+  scene.fog = new THREE.FogExp2(0x1c140f, 0.0028);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
   // the studio environment only feeds subtle reflections; every material keeps envMapIntensity low for a night scene
   const camera = new THREE.PerspectiveCamera(34, 1, 0.5, 1200);
 
-  scene.add(new THREE.HemisphereLight(0x3a4252, 0x1a0e06, 0.55));
+  scene.add(new THREE.HemisphereLight(0x50525e, 0x2a1606, 0.65));
   const moon = new THREE.DirectionalLight(0xaab8ff, 0.75);
   moon.position.set(-60, 90, 70); moon.castShadow = !lowPower;
   moon.shadow.mapSize.set(2048, 2048);
@@ -47,8 +47,8 @@ function init() {
   moon.shadow.bias = -0.0004;
   scene.add(moon);
   const warm = new THREE.DirectionalLight(0xffa860, 0.55); warm.position.set(60, 25, 80); scene.add(warm);
-  const entranceLight = new THREE.PointLight(0xff9a40, 260, 40, 2); entranceLight.position.set(-3, 5, 24); scene.add(entranceLight);
-  const plazaLight = new THREE.PointLight(0xff8a30, 120, 50, 2); plazaLight.position.set(20, 3, 30); scene.add(plazaLight);
+  const entranceLight = new THREE.PointLight(0xff9a40, 150, 34, 2); entranceLight.position.set(-3, 5, 24); scene.add(entranceLight);
+  const plazaLight = new THREE.PointLight(0xff8a30, 60, 40, 2); plazaLight.position.set(20, 3, 30); scene.add(plazaLight);
 
   /* ---------------- procedural textures ---------------- */
   function canvasTex(w, h, draw, srgb = true) {
@@ -58,7 +58,7 @@ function init() {
   function skyTexture() {
     return canvasTex(4, 512, (g, w, h) => {
       const gr = g.createLinearGradient(0, 0, 0, h);
-      gr.addColorStop(0, "#0d0d10"); gr.addColorStop(.5, "#18130f"); gr.addColorStop(.72, "#3a2010"); gr.addColorStop(.8, "#1b120c"); gr.addColorStop(1, "#0a0807");
+      gr.addColorStop(0, "#111013"); gr.addColorStop(.45, "#221812"); gr.addColorStop(.68, "#5a3014"); gr.addColorStop(.78, "#3a2010"); gr.addColorStop(1, "#120c09");
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
     });
   }
@@ -91,18 +91,19 @@ function init() {
   const M = {
     slab: new THREE.MeshStandardMaterial({ color: 0xcfcac4, roughness: .42, metalness: .2, envMapIntensity: .28 }),
     slabUnder: new THREE.MeshStandardMaterial({ color: 0x8a7766, roughness: .6, metalness: .1 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: 0x1c2833, roughness: .03, metalness: .3, transparent: true, opacity: .3, envMapIntensity: .55, side: THREE.DoubleSide, depthWrite: false }),
-    mullion: new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: .45, metalness: .7, envMapIntensity: .3 }),
-    floor: new THREE.MeshStandardMaterial({ color: 0x7a4a24, roughness: .55, emissive: 0x5a2c0c, emissiveIntensity: .6, envMapIntensity: .2 }),
-    ceiling: new THREE.MeshStandardMaterial({ color: 0x2a1a0e, emissive: 0xffb36b, emissiveMap: ceilingTex, emissiveIntensity: 1.6, roughness: .9 }),
-    core: new THREE.MeshStandardMaterial({ color: 0x3a2412, emissive: 0xffffff, emissiveMap: coreTex, emissiveIntensity: 1.25, roughness: .8 }),
-    desk: new THREE.MeshStandardMaterial({ color: 0x1b1612, roughness: .7, envMapIntensity: .1 }),
-    person: new THREE.MeshStandardMaterial({ color: 0x120d0a, roughness: .9, envMapIntensity: .05 }),
-    leaf: new THREE.MeshStandardMaterial({ color: 0x1f3317, roughness: .9, emissive: 0x3a2206, emissiveIntensity: .3, envMapIntensity: .1, flatShading: false }),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0x0e1418, roughness: .02, metalness: .4, transparent: true, opacity: .2, envMapIntensity: .3, side: THREE.DoubleSide, depthWrite: false }),
+    mullion: new THREE.MeshStandardMaterial({ color: 0x6e7378, roughness: .3, metalness: .9, envMapIntensity: .35 }),
+    floor: new THREE.MeshStandardMaterial({ color: 0x8a5a30, roughness: .45, emissive: 0x6a3410, emissiveIntensity: .8, envMapIntensity: .2 }),
+    ceiling: new THREE.MeshStandardMaterial({ color: 0x3a2412, emissive: 0xffaa60, emissiveMap: ceilingTex, emissiveIntensity: 1.7, roughness: .9 }),
+    core: new THREE.MeshStandardMaterial({ color: 0x5a3416, emissive: 0xffffff, emissiveMap: coreTex, emissiveIntensity: 1.7, roughness: .8 }),
+    chair: new THREE.MeshStandardMaterial({ color: 0x2a1c14, roughness: .6, emissive: 0x2a1206, emissiveIntensity: .4 }),
+    desk: new THREE.MeshStandardMaterial({ color: 0xa87a4a, roughness: .45, emissive: 0x4a2408, emissiveIntensity: .45, envMapIntensity: .2 }),
+    person: new THREE.MeshStandardMaterial({ color: 0x1a120c, roughness: .9, envMapIntensity: .05 }),
+    leaf: new THREE.MeshStandardMaterial({ color: 0x3f6a2a, roughness: .85, emissive: 0x4a3008, emissiveIntensity: .55, envMapIntensity: .15 }),
     trunk: new THREE.MeshStandardMaterial({ color: 0x3a2618, roughness: .9 }),
     planter: new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: .6, metalness: .3 }),
     sign: new THREE.MeshBasicMaterial({ map: signTex, toneMapped: false }),
-    ground: new THREE.MeshStandardMaterial({ color: 0x0a0a0b, roughness: .22, metalness: .6, envMapIntensity: .12 }),
+    ground: new THREE.MeshStandardMaterial({ color: 0x241c16, roughness: .2, metalness: .65, envMapIntensity: .35 }),
     door: new THREE.MeshBasicMaterial({ color: 0xffc58a, toneMapped: false }),
     hidden: new THREE.MeshBasicMaterial({ visible: false }),
     rail: new THREE.MeshPhysicalMaterial({ color: 0x9fb0bc, envMapIntensity: .3, transparent: true, opacity: .14, roughness: .05, metalness: .1, side: THREE.DoubleSide, depthWrite: false }),
@@ -161,21 +162,26 @@ function init() {
       const p = glassShape.getPointAt(i / n), q = glassShape.getPointAt(((i + .01) / n) % 1);
       ms.push(mtx(p.x, gh / 2, -p.y, -Math.atan2(-(q.y - p.y), q.x - p.x)));
     }
-    g.add(instanced(new THREE.BoxGeometry(.1, gh, .22), M.mullion, ms));
+    g.add(instanced(new THREE.BoxGeometry(.06, gh, .12), M.mullion, ms));
     // interior: floor finish, glowing ceiling, warm core, desks, chairs and people silhouettes
     const fl = new THREE.Mesh(new THREE.ShapeGeometry(inner).rotateX(-Math.PI / 2), M.floor); fl.position.y = .03; fl.receiveShadow = true; g.add(fl);
     const ce = new THREE.Mesh(new THREE.ShapeGeometry(inner).rotateX(Math.PI / 2), M.ceiling); ce.position.y = gh - .06; g.add(ce);
     const core = new THREE.Mesh(new THREE.BoxGeometry(w * .12, gh - .1, d * .22), M.core); core.position.set(ox - w * .12, (gh - .1) / 2, oz - d * .2); g.add(core);
-    const dm = [], pm = [];
-    for (let i = 0; i < desks; i++) {
-      const x = ox + (rnd() - .5) * (w - 6), z = oz + (rnd() - .5) * (d - 6);
-      if (Math.abs(x - (ox - w * .12)) < w * .14 && Math.abs(z - (oz - d * .12)) < d * .18) continue;
-      dm.push(mtx(x, .38, z, rnd() > .5 ? 0 : Math.PI / 2, 1.8, .75, .9));
+    // furnished office: rows of desks with chairs along the facades, people, warm partitions and ring lights
+    const dm = [], cm = [], pm = [];
+    for (let i = 0; i < desks * 1.6; i++) {
+      const x = ox + (rnd() - .5) * (w - 5), z = oz + (rnd() - .5) * (d - 5);
+      if (Math.abs(x - (ox - w * .12)) < w * .1 && Math.abs(z - (oz - d * .2)) < d * .14) continue;
+      const rot = rnd() > .5 ? 0 : Math.PI / 2;
+      dm.push(mtx(x, .74, z, rot, 1.6, .06, .8));
+      cm.push(mtx(x + (rot ? .7 : 0), .5, z + (rot ? 0 : .7), rot, .5, 1, .5));
     }
-    for (let i = 0; i < people; i++) pm.push(mtx(ox + (rnd() - .5) * (w - 4), .85, oz + (rnd() - .5) * (d - 4) + d * .18, 0, 1, .9 + rnd() * .25, 1));
-    if (dm.length) g.add(instanced(new THREE.BoxGeometry(1, 1, 1), M.desk, dm));
-    if (pm.length) g.add(instanced(new THREE.CapsuleGeometry(.24, 1.05, 3, 8), M.person, pm));
-    if (ring) { const t = new THREE.Mesh(new THREE.TorusGeometry(4.2, .07, 6, 64), led(.8)); t.rotation.x = Math.PI / 2; t.position.set(ox + 3, gh - .25, oz + 2); g.add(t); }
+    for (let i = 0; i < people; i++) pm.push(mtx(ox + (rnd() - .5) * (w - 4), .82, oz + (rnd() - .5) * (d - 4), 0, .8, .85 + rnd() * .2, .8));
+    if (dm.length) { g.add(instanced(new THREE.BoxGeometry(1, 1, 1), M.desk, dm)); g.add(instanced(new THREE.BoxGeometry(1, 1, 1), M.chair, cm)); }
+    if (pm.length) g.add(instanced(new THREE.CapsuleGeometry(.2, 1, 3, 8), M.person, pm));
+    const part1 = new THREE.Mesh(new THREE.BoxGeometry(w * .34, gh - .2, .12), M.core); part1.position.set(ox + w * .12, (gh - .2) / 2, oz - d * .28); g.add(part1);
+    const ringMat = led(.75);
+    [[ox + w * .18, oz + d * .12, 3.2], [ox - w * .26, oz + d * .14, 2.2]].concat(ring ? [[ox + 3, oz + 2, 4.2]] : []).forEach(([x, z, r]) => { const t = new THREE.Mesh(new THREE.TorusGeometry(r, .06, 6, 64), ringMat); t.rotation.x = Math.PI / 2; t.position.set(x, gh - .3, z); g.add(t); });
     if (top) {
       const slabShape = plan(w, d, r, ox, oz);
       const slab = prism(slabShape, .45, M.slab); slab.position.y = gh; slab.castShadow = true; slab.receiveShadow = true; g.add(slab);
@@ -185,8 +191,8 @@ function init() {
   }
 
   /* ---------------- the building ---------------- */
-  const TW = 34, TD = 24, TR = [1.2, 7, 1.2, 1.2];          // tower footprint (rounded front-right corner)
-  const POD_H = 11, FH = 4.2, TOP_H = 5;
+  const TW = 30, TD = 26, TR = [1.4, 7, 1.4, 1.4];          // tower footprint (rounded front-right corner)
+  const POD_H = 11, FH = 4.8, TOP_H = 5.6;
   const building = new THREE.Group(); scene.add(building);
 
   // Podium (static foundation): two storeys, wide base with left and right wings.
@@ -229,13 +235,13 @@ function init() {
   ];
   floorDefs.forEach((f, i) => {
     const s = storey({ w: TW, d: TD, r: TR, h: FH, people: f.people, desks: f.desks, ring: f.ring });
-    { const rail = new THREE.Mesh(new THREE.ExtrudeGeometry(plan(TW + .3, TD + .3, TR.map(v => v + .15)), { depth: 1.1, bevelEnabled: false, curveSegments: 18 }).rotateX(-Math.PI / 2), [M.hidden, M.rail]); rail.position.y = FH; s.add(rail); shrubs(s, new THREE.Vector3(-16, 0, 11.85), new THREE.Vector3(14, 0, 11.85), FH, 26, .38); shrubs(s, new THREE.Vector3(16.85, 0, 6), new THREE.Vector3(16.85, 0, -10), FH, 14, .38); }
+    { const rail = new THREE.Mesh(new THREE.ExtrudeGeometry(plan(TW + .3, TD + .3, TR.map(v => v + .15)), { depth: 1.1, bevelEnabled: false, curveSegments: 18 }).rotateX(-Math.PI / 2), [M.hidden, M.rail]); rail.position.y = FH; s.add(rail); shrubs(s, new THREE.Vector3(-TW / 2 + 1, 0, TD / 2 - .15), new THREE.Vector3(TW / 2 - 4, 0, TD / 2 - .15), FH, 40, .26); shrubs(s, new THREE.Vector3(TW / 2 - .15, 0, TD / 2 - 6), new THREE.Vector3(TW / 2 - .15, 0, -TD / 2 + 2), FH, 22, .26); }
     part(f.name, s, POD_H + i * FH, i, [[.06, -1.6, 1.2], [-.08, 2.2, -1], [.1, -2.4, .6], [-.07, 1.8, -1.4]][i]);
   });
   // top floor: taller, garden terrace with a tree, upper orange sign
   const tf = storey({ w: TW, d: TD, r: TR, h: TOP_H, top: false, people: 14, desks: 16 });
-  const usign = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 4.8), M.sign); usign.position.set(1.5, 2.45, TD / 2 + .1); tf.add(usign);
-  tree(tf, -6, 0, 6, .75); shrubs(tf, new THREE.Vector3(-14, 0, 9), new THREE.Vector3(-2, 0, 9), 0, 10, .45);
+  
+  tree(tf, -6, 0, 7, .8); shrubs(tf, new THREE.Vector3(-13, 0, 10), new THREE.Vector3(-2, 0, 10), 0, 14, .32);
   part("tf", tf, POD_H + 4 * FH, 4, [.09, -2, 1.6]);
   // roof: thick slab with the cantilevered left overhang, rounded front-right corner and orange edge light
   const roof = new THREE.Group();
@@ -243,6 +249,7 @@ function init() {
   const rslab = prism(roofShape, 1.5, M.slab); rslab.castShadow = true; roof.add(rslab);
   const soffit = prism(plan(TW + 6.6, TD + 6.6, [3.8, 9.8, 3.8, 3.8], 0, .5), .06, M.slabUnder); soffit.position.y = -.03; roof.add(soffit);
   roof.add(ledLoop(plan(TW + 7.04, TD + 7.04, [4, 10, 4, 4], 0, .5), .05, 1.25, .1));
+  const rsign = new THREE.Mesh(new THREE.BoxGeometry(6.6, 6.6, .4), [M.slabUnder, M.slabUnder, M.slabUnder, M.slabUnder, M.sign, M.slabUnder]); rsign.position.set(2, .6, (TD + 7) / 2 + .5 + .25); roof.add(rsign);
   const parapet = prism(plan(TW - 2, TD - 2, [1, 6, 1, 1]), .5, M.slab); parapet.position.y = 1.5; roof.add(parapet);
   part("roof", roof, POD_H + 4 * FH + TOP_H, 5, [-.1, 2.6, -1.8]);
   // entrance canopy (structural component, lands with the first floor)
@@ -252,7 +259,9 @@ function init() {
   part("canopy", canopy, 4.2, 0, [0, 0, 6]);
 
   // per-floor attach points for the live lines (left facade corner, right facade)
-  const ATTACH = { f1: [[-17.2, 13, 10], [17.2, 13, -3]], f2: [[-17.2, 17.2, 10], [17.2, 17.2, -3]], f3: [[-17.2, 21.4, 10], [17.2, 21.4, -3]], f4: [[-17.2, 25.6, 10], [17.2, 25.6, -3]], roof: [[-17.2, 31, 10], [17.2, 31, -3]] };
+  const ATTACH = {}; // per-floor attach points for the live lines (left facade near the front corner, right facade)
+  ["f1", "f2", "f3", "f4"].forEach((n, i) => { const y = POD_H + i * FH + FH * .55; ATTACH[n] = [[-TW / 2 - .2, y, TD / 2 - 2], [TW / 2 + .2, y, -3]]; });
+  ATTACH.roof = [[-TW / 2 - .2, POD_H + 4 * FH + TOP_H * .55, TD / 2 - 2], [TW / 2 + .2, POD_H + 4 * FH + TOP_H * .55, -3]];
 
   /* ---------------- interior: the curved Orange corridor behind the entrance ----------------
      Left: curved wall with the five module tiles. Right: glass meeting rooms. Reflective floor, orange light lines,
@@ -345,22 +354,31 @@ function init() {
 
   /* ---------------- environment: plaza, trees, people, skyline ---------------- */
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), M.ground); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-  [[-3, .02, 26, 34, 16, .32], [20, .02, 24, 24, 12, .18], [-30, .02, 21, 22, 10, .16]].forEach(([x, y, z, w, d, o]) => {
+  [[-3, .02, 30, 60, 30, .42], [22, .02, 26, 34, 16, .26], [-30, .02, 24, 30, 14, .24], [0, .02, 52, 90, 30, .14]].forEach(([x, y, z, w, d, o]) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); scene.add(m);
   });
   [[-36, 21], [-24, 23], [-12, 24], [12, 23], [26, 22], [40, 18], [-46, 14], [50, 10], [32, 26], [-30, 28]].forEach(([x, z]) => tree(scene, x, 0, z, .9 + rnd() * .35));
   { const pm = []; for (let i = 0; i < 26; i++) pm.push(mtx(-14 + rnd() * 26, .9, 19 + rnd() * 6, 0, 1, .95 + rnd() * .2, 1)); scene.add(instanced(new THREE.CapsuleGeometry(.26, 1.15, 3, 8), M.person, pm)); }
-  { const cm = new THREE.MeshStandardMaterial({ color: 0x0b0c0e, roughness: .8, emissive: 0xffffff, emissiveMap: cityTex, emissiveIntensity: .5 }), ms = [];
-    for (let i = 0; i < (lowPower ? 50 : 110); i++) { const a = -1.3 + rnd() * 2.6, rad = 170 + rnd() * 160, h = 15 + rnd() * rnd() * 90; ms.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.sin(a) * rad, h / 2, -Math.cos(a) * rad * .8 - 40), new THREE.Quaternion(), new THREE.Vector3(10 + rnd() * 18, h, 10 + rnd() * 18))); }
+  { const cm = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: .8, emissive: 0xffffff, emissiveMap: cityTex, emissiveIntensity: 1.05 }), ms = [];
+    for (let i = 0; i < (lowPower ? 50 : 110); i++) { const a = -1.3 + rnd() * 2.6, rad = 230 + rnd() * 180, h = 15 + rnd() * rnd() * 80; ms.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.sin(a) * rad, h / 2, -Math.cos(a) * rad * .8 - 40), new THREE.Quaternion(), new THREE.Vector3(10 + rnd() * 18, h, 10 + rnd() * 18))); }
     scene.add(instanced(new THREE.BoxGeometry(1, 1, 1), cm, ms)); }
+
+  { // soft bokeh city lights near the horizon and orange light streaks on the wet plaza
+    const n = lowPower ? 120 : 260, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { const a = -1.5 + rnd() * 3, r = 120 + rnd() * 200; pos.set([Math.sin(a) * r, 2 + rnd() * 26, -Math.cos(a) * r * .8 - 20], i * 3); const c = rnd() > .4 ? [1, .62, .25] : [1, .9, .75]; col.set(c, i * 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 3.2, map: glowTex, vertexColors: true, transparent: true, opacity: .75, depthWrite: false, blending: THREE.AdditiveBlending })));
+    const streak = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff8a2a).multiplyScalar(1.3), toneMapped: false });
+    [[-40, 30, 90, .16, .08], [10, 42, 110, .14, -.12], [-60, 22, 60, .12, .3]].forEach(([x, z, len, wdt, ry]) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(len, wdt), streak); m.rotation.set(-Math.PI / 2, 0, ry); m.position.set(x + len / 2, .03, z); scene.add(m); });
+  }
 
   /* ---------------- post-processing ---------------- */
   let composer = null, bloom = null;
   if (!lowPower) {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), .55, .4, .93); composer.addPass(bloom);
+    bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), .38, .35, .96); composer.addPass(bloom);
     composer.addPass(new OutputPass());
   }
 
@@ -383,8 +401,8 @@ function init() {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   // 0..4: assembly (reference three-quarter -> dolly -> orbit + rise -> close to the facade -> reference hero view)
   // 4..6: orbit to the opposite three-quarter view, then fly toward the entrance
-  const CAM = new THREE.CatmullRomCurve3([V(40, 15, 104), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(34, 10, 84), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
-  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(2, 17, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
+  const CAM = new THREE.CatmullRomCurve3([V(30, 12, 100), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(24, 5, 86), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
+  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 18.5, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
   const camState = { t: 0, walk: 0, gal: 0 }; let override = null, inGallery = false;
   const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);
   // corridor walk: the camera follows the curve, dwells at each module (zero speed at every stop) and turns
@@ -404,10 +422,10 @@ function init() {
     pos.add(gallery.position); tgt.add(gallery.position);
     return [pos, tgt];
   }
-  const VIEWS = { reference: [V(34, 10, 84), V(2, 17, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
+  const VIEWS = { reference: [V(24, 5, 86), V(0, 18.5, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
   function applyCamera() {
     const W = stage.clientWidth, H = stage.clientHeight; camera.aspect = W / H;
-    camera.fov = W / H < 1 ? 52 : W / H < 1.4 ? 42 : 34;
+    camera.fov = W / H < 1 ? 54 : W / H < 1.4 ? 44 : 36;
     let p, q;
     if (override) { [p, q] = VIEWS[override]; }
     else if (inGallery) { [p, q] = galleryCamera(camState.gal); }
@@ -423,7 +441,7 @@ function init() {
   const panelsEl = document.getElementById("hq3-panels"), svg = document.getElementById("hq3-lines"), NS = "http://www.w3.org/2000/svg";
   const panels = Array.prototype.map.call(panelsEl.querySelectorAll(".hq3-panel"), el => {
     const floor = el.dataset.floor, side = el.dataset.side === "left" ? 0 : 1, stageIdx = +el.dataset.stage;
-    const anchor = V(...(side === 0 ? [-31, 0, 13] : [31, 0, 2])); anchor.y = ATTACH[floor][side][1] + (el.dataset.dy ? +el.dataset.dy : 0);
+    const anchor = V(...(side === 0 ? [-TW / 2 - 13, 0, TD / 2 + 1] : [TW / 2 + 13, 0, 2])); anchor.y = ATTACH[floor][side][1] + (el.dataset.dy ? +el.dataset.dy : 0);
     const glow = document.createElementNS(NS, "path"), core = document.createElementNS(NS, "path"), spark = document.createElementNS(NS, "path"), dot = document.createElementNS(NS, "circle");
     glow.setAttribute("class", "hq3-l-glow"); core.setAttribute("class", "hq3-l-core"); spark.setAttribute("class", "hq3-l-spark"); dot.setAttribute("class", "hq3-l-dot"); dot.setAttribute("r", "4.5");
     [glow, core, spark].forEach(x => x.setAttribute("pathLength", "1"));
