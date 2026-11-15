@@ -663,3 +663,11 @@ html[data-theme="light"] .hc-tour::backdrop{background:rgba(236,231,224,.82)}
 .hc-tour-soon-ic svg{width:30px;height:30px;fill:#fff;margin-left:4px}
 .hc-tour-soon b{font:600 clamp(18px,2vw,26px)/1.25 var(--hf);color:#fff}
 .hc-tour-soon p{max-width:46ch;color:#cfc6bc;font-size:15px;line-height:1.5}
+
+/* corridor end wall: play button for the shared platform video (sizes are in the wall's 1300x600 space) */
+.hq3-video-play{position:absolute;right:110px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:22px;border:0;background:none;color:#fff;cursor:pointer;font:600 30px/1.2 var(--hf)}
+.hq3-video-play span{display:grid;place-items:center;width:180px;height:180px;border-radius:50%;background:#ff7900;box-shadow:0 0 0 14px rgba(255,121,0,.22),0 0 90px rgba(255,121,0,.75);transition:transform .25s,box-shadow .25s}
+.hq3-video-play svg{width:76px;height:76px;fill:#fff;margin-left:10px}
+.hq3-video-play:hover span,.hq3-video-play:focus-visible span{transform:scale(1.06);box-shadow:0 0 0 20px rgba(255,121,0,.28),0 0 120px rgba(255,121,0,.9)}
+.hq3-video-play:focus-visible{outline:4px solid #ffb066;outline-offset:12px;border-radius:24px}
+@media (max-width:759px){.hq3-video-title{left:50%;top:60px;transform:translateX(-50%);width:900px;text-align:center}.hq3-video-logo{display:none}.hq3-video-title h3{font-size:58px;line-height:1.05;margin-bottom:12px}.hq3-video-title p{font-size:28px}.hq3-video-play{right:auto;left:50%;top:auto;bottom:40px;transform:translateX(-50%);flex-direction:row;gap:26px;font-size:42px;white-space:nowrap}.hq3-video-play span{width:150px;height:150px}.hq3-video-play svg{width:64px;height:64px}}

@@ -573,9 +573,7 @@ function init() {
   tileEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
   stepEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
   const closeBtn = document.getElementById("hq3-info-close"); if (closeBtn) closeBtn.addEventListener("click", () => { dismissed = station; shownStation = -2; });
-  // the overview video plays only if the project actually ships the file
-  const vid = videoEl && videoEl.querySelector("video");
-  if (vid && vid.dataset.available === "true") { vid.src = vid.dataset.src; videoEl.classList.add("has-video"); } // the server checks the file exists
+  // the end wall's play button opens the shared platform video player (home-cinema.js)
 
   /* ---------------- cinematic intro: Orange welcome -> glowing connection -> building reveal ----------------
      A 2D canvas plus HTML layer above the 3D stage. Its state is a pure function of the intro progress p (scroll):

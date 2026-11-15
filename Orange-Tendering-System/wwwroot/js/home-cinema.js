@@ -52,17 +52,17 @@
 
   /* ---------- "Explore the Platform" video player ---------- */
   (function tour() {
-    var dlg = document.getElementById("hc-tour"), btn = $("[data-tour-open]");
-    if (!dlg || !btn) return;
+    var dlg = document.getElementById("hc-tour"), btns = $$("[data-tour-open]"), opener = null;
+    if (!dlg || !btns.length) return;
     var video = dlg.querySelector("video");
-    btn.addEventListener("click", function () {
-      dlg.showModal();
+    btns.forEach(function (b) { b.addEventListener("click", function () {
+      opener = b; dlg.showModal();
       if (!video) return;
       var pl = video.play(); if (pl && pl.catch) pl.catch(function () { /* autoplay blocked: the controls stay available */ });
-    });
+    }); });
     function close() { if (dlg.open) dlg.close(); }
     dlg.addEventListener("click", function (e) { if (e.target === dlg || e.target.closest("[data-tour-close]")) close(); });
-    dlg.addEventListener("close", function () { if (video) video.pause(); btn.focus({ preventScroll: true }); });
+    dlg.addEventListener("close", function () { if (video) video.pause(); if (opener) opener.focus({ preventScroll: true }); });
   })();
 
   /* ---------- roving tablist helper ---------- */

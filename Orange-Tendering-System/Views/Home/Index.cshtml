@@ -17,9 +17,10 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
     Layout = "_HomeLayout";
     ViewData["Title"] = "Orange | From Request to Award. One Connected System.";
     var st = ViewBag.Stats as PublicStats;
-    // "Watch the Video" plays the platform video when the project ships one (wwwroot/media/platform-tour.mp4 or .webm)
+    // One platform video plays from the hero's "Watch the Video" button and from the corridor's end wall.
+    // Add it as wwwroot/media/platform-tour.mp4 (or .webm; company-overview.mp4 is also accepted).
     string? tourVideo = null, tourType = null;
-    foreach (var (file, type) in new[] { ("platform-tour.mp4", "video/mp4"), ("platform-tour.webm", "video/webm") })
+    foreach (var (file, type) in new[] { ("platform-tour.mp4", "video/mp4"), ("platform-tour.webm", "video/webm"), ("company-overview.mp4", "video/mp4"), ("company-overview.webm", "video/webm") })
         if (System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, "media", file))) { tourVideo = Url.Content("~/media/" + file); tourType = type; break; }
     var hasData = st is not null && (st.ActiveTenders + st.ApprovedSuppliers + st.CompletedRequests + st.Closed + st.Bidding + st.Evaluation + st.Approvals) > 0;
 }
@@ -129,8 +130,8 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
                 }
             </div>
             <div class="hq3-video" id="hq3-video">
-                <video data-src="@Url.Content("~/media/company-overview.mp4")" data-available="@(System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, "media", "company-overview.mp4")) ? "true" : "false")" controls playsinline preload="none" aria-label="Orange company overview video"></video>
                 <div class="hq3-video-title"><span class="hq3-video-logo">orange</span><h3>Orange<br />Company Overview</h3><p>Sourcing &amp; Tender Management System</p></div>
+                <button type="button" class="hq3-video-play" data-tour-open aria-haspopup="dialog" aria-controls="hc-tour"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span><b>Watch the Overview</b></button>
             </div>
             <aside class="hq3-info" id="hq3-info" aria-live="polite" aria-label="Module details">
                 <button type="button" class="hq3-info-close" id="hq3-info-close" aria-label="Close module details">&times;</button>
