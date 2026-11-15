@@ -74,6 +74,9 @@ public static class TopCommitteePolicy
         if (members.Count != 4 || members.Select(m => m.UserId).Distinct().Count() != 4 ||
             members.Any(m => !m.User.IsActive || m.AssignedAt > round.StartedAt))
             result.Add("Four active members assigned before this round started are required.");
+        if (details.ExecutiveTitles.Count > 0 &&
+            (details.ExecutiveTitles.Count != 4 || details.ExecutiveTitles.Values.Distinct().Count() != 4))
+            result.Add("The assigned executives must include one CEO, one CFO, one CTO and one COO.");
         var evaluationMembers = details.Members.Where(m => m.CommitteeType == CommitteeType.Evaluation).ToList();
         if (evaluationMembers.Count != 4 || evaluationMembers.Select(m => m.Responsibility).Distinct().Count() != 4 ||
             evaluationMembers.Any(m => m.Responsibility is null) ||

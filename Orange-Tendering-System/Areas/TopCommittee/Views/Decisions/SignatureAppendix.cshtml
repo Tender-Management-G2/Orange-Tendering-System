@@ -14,8 +14,8 @@
             v.SignatureReportId == Model.Round.TenderReportId && !string.IsNullOrWhiteSpace(v.SignatureDocumentHash) &&
             !string.IsNullOrWhiteSpace(v.ElectronicSignatureSvg));
         <section class="signature-card">
-            <strong>@member.User.FullName</strong>
-            <img alt="Electronic signature by @member.User.FullName" src="data:image/svg+xml;base64,@Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg!))" />
+            <strong>@Model.MemberDisplayName(member.UserId, member.User.FullName)</strong>
+            <img alt="Electronic signature by @Model.MemberDisplayName(member.UserId, member.User.FullName)" src="data:image/svg+xml;base64,@Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg!))" />
             <span>Signed and approved at @CommitteeDisplay.Date(signature.VotedAt)</span>
         </section>
     }

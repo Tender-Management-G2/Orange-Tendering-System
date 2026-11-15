@@ -142,7 +142,7 @@ else {
 @if (s.State == SessionState.ManagerApproved || s.State == SessionState.Awarded) {
 <section><h2>8. Final approval and award</h2>
 @if (Model.IsOfficer && Model.FinalPolicyConfigured && !Model.Tender.CommitteeMembers.Any(x => x.CommitteeType == CommitteeType.Top)) {
-<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="AssignTop" asp-route-id="@id" method="post"><p>If configured policy requires Top Committee approval, assign four authorized members separate from the Evaluation Committee.</p>@for(var i=0; i<4; i++) { <label>Top Committee member @(i+1) user ID<input name="memberIds" required /></label> }<button>Assign and invite Top Committee</button></form>
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="AssignTop" asp-route-id="@id" method="post"><p>If configured policy requires Top Committee approval, assign four authorized members separate from the Evaluation Committee.</p>@foreach(var position in Enum.GetValues<TopExecutivePosition>()) { <label>@position user ID<input name="executives[@position]" required /></label> }<button>Assign and invite Top Committee</button></form>
 }
 @if (Model.IsTop && s.State == SessionState.ManagerApproved && Model.FinalPolicyConfigured) {
 <p><a asp-area="@area" asp-controller="SignedReports" asp-action="Review" asp-route-id="@s.ReportId">Open the generated PDF, signing and revision workflow</a></p>

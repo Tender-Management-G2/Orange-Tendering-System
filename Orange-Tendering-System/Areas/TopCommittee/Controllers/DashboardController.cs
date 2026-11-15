@@ -1,3 +1,4 @@
+using Orange_Tendering_System.Areas.TopCommittee.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,8 +11,8 @@ using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
-[Area("TopCommittee"), Authorize(Roles = SystemRoles.TopCommittee)]
-public sealed class DashboardController(ApplicationDbContext db, UserManager<ApplicationUser> users, TenderWorkflowService workflow) : TopCommitteeControllerBase(db, users)
+[Area("TopCommittee"), Authorize(Roles = TopExecutiveRoles.Allowed)]
+public sealed class DashboardController(ApplicationDbContext db, UserManager<ApplicationUser> users, IServiceProvider services) : TopCommitteeControllerBase(db, users)
 {
     public async Task<IActionResult> Index()
     {
@@ -23,7 +24,7 @@ public sealed class DashboardController(ApplicationDbContext db, UserManager<App
         var awaiting = 0;
         var signedReportRounds = new HashSet<int>();
         var activeIds = await Committee.AssignedRounds(user.Id).Where(r => r.Status == CommitteeRoundStatus.InProgress)
-            .OrderByDescending(r => r.StartedAt).Select(r => r.Id).ToListAsync();
+            .OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).Select(r => r.Id).ToListAsync();
         foreach (var id in activeIds)
         {
             var details = await Committee.Load(user.Id, id);
@@ -32,7 +33,7 @@ public sealed class DashboardController(ApplicationDbContext db, UserManager<App
             {
                 try
                 {
-                    var review = await workflow.ReviewReport(report.Id, User);
+                    var review = await TopCommitteeWorkflow.Create(services).ReviewReport(report.Id, User);
                     if (review.CanVoteTop && details.MyVote is null)
                     {
                         awaiting++;
@@ -45,14 +46,15 @@ public sealed class DashboardController(ApplicationDbContext db, UserManager<App
             if ((details.CanVote || details.MyVote is not null) && pending.Count < 20) pending.Add(details);
         }
         ViewData["SignedReportRounds"] = signedReportRounds;
+        var executiveTitle = TopExecutiveRoles.Title(await Users.GetRolesAsync(user));
         return View(new CommitteeDashboard
         {
-            DisplayName = string.IsNullOrWhiteSpace(user.FullName) ? user.UserName ?? "Committee member" : user.FullName,
+            DisplayName = executiveTitle is not null ? executiveTitle + " · " + (string.IsNullOrWhiteSpace(user.FullName) ? user.UserName : user.FullName) : string.IsNullOrWhiteSpace(user.FullName) ? user.UserName ?? "Committee member" : user.FullName,
             Active = groups.GetValueOrDefault(CommitteeRoundStatus.InProgress),
             Approved = groups.GetValueOrDefault(CommitteeRoundStatus.Approved),
             Rejected = groups.GetValueOrDefault(CommitteeRoundStatus.Rejected), AwaitingVote = awaiting, Pending = pending,
             Recent = await Committee.RoundList(user.Id).AsNoTracking().Where(r => r.Status != CommitteeRoundStatus.InProgress)
-                .OrderByDescending(r => r.CompletedAt).Take(8).AsSplitQuery().ToListAsync()
+                .OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).Take(8).AsSplitQuery().ToListAsync()
         });
     }
 }

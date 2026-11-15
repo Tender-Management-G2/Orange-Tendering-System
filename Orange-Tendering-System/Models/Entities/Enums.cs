@@ -23,6 +23,8 @@ namespace Orange_Tendering_System.Models.Entities
 
     public enum ComplianceStatus { NotChecked, Compliant, NonCompliant, PendingClarification }
 
+    public enum TopExecutivePosition { CEO, CFO, CTO, COO }
+
     public enum CommitteeType { Evaluation, Top }
 
     // The four Evaluation Committee seats (one person each per tender). Top Committee members have none.

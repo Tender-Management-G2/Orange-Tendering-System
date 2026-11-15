@@ -14,11 +14,11 @@ else { <p class="rv-muted">New messages require the current active committee rou
 @if(Model.Threads.Count>0)
 {
 <div class="rv-thread-list"><h3>Your private conversations</h3>
-@foreach(var thread in Model.Threads.OrderByDescending(t=>t.CreatedAt))
+@foreach(var thread in Model.Threads.OrderByDescending(t=>t.CreatedAt).ThenByDescending(t=>t.Id))
 {
 <details><summary>@thread.Subject <span>@CommitteeDisplay.Clarification(thread.Status)</span></summary>
 @foreach(var message in thread.Messages.OrderBy(m=>m.SentAt).ThenBy(m=>m.Id))
-{ <article class="rv-message"><header><strong>@message.SenderUser.FullName</strong><time>@CommitteeDisplay.Date(message.SentAt)</time></header><p class="rv-preserve" dir="auto">@message.Message</p>@foreach(var doc in message.Documents.Where(d=>d.DocumentType=="TopClarificationAttachment")){<a class="rv-file-link" asp-controller="Conversations" asp-action="Download" asp-route-id="@doc.Id">▤ @doc.FileName (@((doc.SizeBytes/1024d).ToString("0.#")) KB)</a>}</article> }
+{ <article class="rv-message"><header><strong>@Model.MemberDisplayName(message.SenderUserId, message.SenderUser.FullName)</strong><time>@CommitteeDisplay.Date(message.SentAt)</time></header><p class="rv-preserve" dir="auto">@message.Message</p>@foreach(var doc in message.Documents.Where(d=>d.DocumentType=="TopClarificationAttachment")){<a class="rv-file-link" asp-controller="Conversations" asp-action="Download" asp-route-id="@doc.Id">▤ @doc.FileName (@((doc.SizeBytes/1024d).ToString("0.#")) KB)</a>}</article> }
 <a class="rv-conversation-link" asp-controller="Conversations" asp-action="Details" asp-route-id="@thread.Id">Open private conversation &amp; reply →</a>
 @if(Model.CanClarify && thread.Status==ClarificationStatus.Answered)
 { <form asp-controller="Clarifications" asp-action="Resolve" method="post"><input type="hidden" name="roundId" value="@Model.Round.Id" /><input type="hidden" name="threadId" value="@thread.Id" /><button type="submit" class="rv-secondary">Mark resolved</button></form> }

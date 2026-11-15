@@ -10,7 +10,7 @@ using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
-[Area("TopCommittee"), Authorize(Roles = SystemRoles.TopCommittee)]
+[Area("TopCommittee"), Authorize(Roles = TopExecutiveRoles.Allowed)]
 [PrivateFormFeedback]
 public sealed class ClarificationsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
     ILogger<ClarificationsController> logger, IWebHostEnvironment environment) : TopCommitteeControllerBase(db, users)

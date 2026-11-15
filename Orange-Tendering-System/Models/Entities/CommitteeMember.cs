@@ -19,6 +19,22 @@ namespace Orange_Tendering_System.Models.Entities
         // ApplicationDbContext allows each responsibility only once per tender and committee.
         public CommitteeResponsibility? Responsibility { get; set; }
 
+        // Tender-specific executive position; authorization remains Top Committee.
+        public TopExecutivePosition? ExecutivePosition { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public string ExecutiveTitle => ExecutivePosition switch
+        {
+            TopExecutivePosition.CEO => "CEO — Chief Executive Officer",
+            TopExecutivePosition.CFO => "CFO — Chief Financial Officer",
+            TopExecutivePosition.CTO => "CTO — Chief Technology Officer",
+            TopExecutivePosition.COO => "COO — Chief Operations Officer",
+            _ => "Executive position not assigned"
+        };
+
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public string ExecutiveDisplayName => $"{ExecutiveTitle} · {(string.IsNullOrWhiteSpace(User.FullName) ? User.UserName : User.FullName)}";
+
         public string UserId { get; set; } = string.Empty;
         public ApplicationUser User { get; set; } = null!;
 

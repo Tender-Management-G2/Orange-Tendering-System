@@ -111,6 +111,12 @@ namespace Orange_Tendering_System.Data
                 .IsUnique()
                 .HasFilter("[Responsibility] IS NOT NULL");
 
+            builder.Entity<CommitteeMember>()
+                .HasIndex(m => new { m.TenderId, m.ExecutivePosition }).IsUnique()
+                .HasFilter("[ExecutivePosition] IS NOT NULL");
+            builder.Entity<CommitteeMember>().ToTable(t => t.HasCheckConstraint("CK_CommitteeMember_ExecutivePosition",
+                "[ExecutivePosition] IS NULL OR ([CommitteeType] = 'Top' AND [ExecutivePosition] IN ('CEO','CFO','CTO','COO'))"));
+
             // A document belongs to exactly one owner: supplier, purchase request, tender, bid,
             // clarification message or report.
             builder.Entity<Document>().ToTable(t => t.HasCheckConstraint("CK_Documents_ExactlyOneOwner",

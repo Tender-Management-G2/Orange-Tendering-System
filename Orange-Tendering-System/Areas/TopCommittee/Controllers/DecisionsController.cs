@@ -15,7 +15,7 @@ using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
-[Area("TopCommittee"), Authorize(Roles = SystemRoles.TopCommittee)]
+[Area("TopCommittee"), Authorize(Roles = TopExecutiveRoles.Allowed)]
 public sealed class DecisionsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
     IWebHostEnvironment environment, ILogger<DecisionsController> logger, IRazorViewEngine views) : TopCommitteeControllerBase(db, users)
 {
@@ -28,7 +28,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         q = q?.Trim();
         if (string.IsNullOrEmpty(q)) return Json(new { items = Array.Empty<object>() });
         var rounds = await TopCommitteeSearch.Apply(Committee.RoundList(user.Id).AsNoTracking(), q, null)
-            .OrderByDescending(r => r.StartedAt).Take(8)
+            .OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).Take(8)
             .Select(r => new { r.Id, r.TenderRound.TenderId, r.TenderRound.Tender.Title }).ToListAsync();
         return Json(new { items = rounds.Select(r => new {
             title = r.Title, subtitle = $"T-{r.TenderId:0000}",
@@ -237,7 +237,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         var user = await ActiveUser();
         if (user is null) return Forbid();
         Document? document;
-        if (await Users.IsInRoleAsync(user, SystemRoles.TopCommittee))
+        if (TopExecutiveRoles.IsMember(User))
         {
             var details = await Committee.Load(user.Id, roundId);
             if (details?.FinalSignedPdfReady != true) return NotFound();
@@ -288,7 +288,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             var signature = round.Votes.SingleOrDefault(v => v.CommitteeMemberId == member.Id &&
                 v.Decision == VoteDecision.Approve && v.SignatureReportId == report.Id && !string.IsNullOrWhiteSpace(v.SignatureDocumentHash) &&
                 !string.IsNullOrWhiteSpace(v.ElectronicSignatureSvg));
-            return new { id = member.Id, name = member.User.FullName, signed = signature is not null,
+            var vote = round.Votes.SingleOrDefault(v => v.CommitteeMemberId == member.Id);
+            return new { decision = vote?.Decision.ToString(), comment = vote?.Comment,
+                votedAt = vote is null ? null : CommitteeDisplay.Date(vote.VotedAt), id = member.Id, name = details.MemberDisplayName(member.UserId, member.User.FullName), signed = signature is not null,
                 signedAt = signature is null ? null : CommitteeDisplay.Date(signature.VotedAt),
                 signatureSvgBase64 = string.IsNullOrWhiteSpace(signature?.ElectronicSignatureSvg) ? null :
                     Convert.ToBase64String(Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg)) };

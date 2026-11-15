@@ -18,7 +18,7 @@ foreach (var name in new[] { "Review", "Pdf", "Verify", "Receipt", "Vote", "Retu
 {
     var action = actions.Single(a => a.ActionName == name);
     if (!action.ControllerTypeInfo.GetCustomAttributes(typeof(AuthorizeAttribute), true)
-        .Cast<AuthorizeAttribute>().Any(a => a.Roles == SystemRoles.TopCommittee))
+        .Cast<AuthorizeAttribute>().Any(a => a.Roles == Orange_Tendering_System.Areas.TopCommittee.Services.TopExecutiveRoles.Allowed))
         throw new Exception($"Missing Top Committee authorization: {name}");
     if (name is "Vote" or "Return" or "ActivateRevision" or "Resubmit")
     {
@@ -66,3 +66,34 @@ round.Votes.First().SignatureDocumentHash = "original-hash";
 details.FinalSignedSummaryPdf = null;
 if (details.FinalSignedPdfReady) throw new Exception("Missing final artifact allowed final PDF.");
 Console.WriteLine("PASS final PDF requires four matching saved signatures and a final artifact.");
+
+// Executive labels follow persisted assignments, never the member's display order.
+var executive = new Orange_Tendering_System.Models.Entities.CommitteeMember
+{
+    Id = 900, CommitteeType = Orange_Tendering_System.Models.Entities.CommitteeType.Top,
+    ExecutivePosition = Orange_Tendering_System.Models.Entities.TopExecutivePosition.CFO,
+    User = new() { FullName = "Actual Executive Name" }
+};
+if (executive.ExecutiveDisplayName != "CFO — Chief Financial Officer · Actual Executive Name")
+    throw new Exception("Executive title must come from the explicit assignment and retain the real name.");
+executive.ExecutivePosition = Orange_Tendering_System.Models.Entities.TopExecutivePosition.CEO;
+if (!executive.ExecutiveDisplayName.StartsWith("CEO — Chief Executive Officer"))
+    throw new Exception("Executive title did not follow the assignment.");
+executive.ExecutivePosition = null;
+if (!executive.ExecutiveDisplayName.Contains("not assigned"))
+    throw new Exception("Legacy member was assigned an invented title.");
+Console.WriteLine("PASS stored executive positions preserve names and do not infer legacy titles.");
+
+foreach (var executiveRole in new[] { "CEO", "CFO", "CTO", "COO" })
+{
+    var principal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+        new[] { new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, executiveRole) }, "test"));
+    if (!Orange_Tendering_System.Areas.TopCommittee.Services.TopExecutiveRoles.IsMember(principal) ||
+        Orange_Tendering_System.Areas.TopCommittee.Services.TopExecutiveRoles.Title(new[] { executiveRole }) is null)
+        throw new Exception($"Executive role not recognized: {executiveRole}");
+}
+if (Orange_Tendering_System.Areas.TopCommittee.Services.TopExecutiveRoles.IsMember(
+    new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+        new[] { new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "Supplier") }, "test"))))
+    throw new Exception("Unrelated role received Top Committee access.");
+Console.WriteLine("PASS executive role aliases and unrelated-role isolation.");

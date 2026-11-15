@@ -1,3 +1,4 @@
+using Orange_Tendering_System.Areas.TopCommittee.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Controllers;
@@ -9,8 +10,8 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
 // Manager-signed full evaluations use the same version, receipts and revision
 // workflow as the Manager. Legacy executive summaries retain their own workflow.
-[Area("TopCommittee"), Authorize(Roles = SystemRoles.TopCommittee)]
-public sealed class SignedReportsController(TenderWorkflowService workflow) : ReportControllerBase(workflow)
+[Area("TopCommittee"), Authorize(Roles = TopExecutiveRoles.Allowed)]
+public sealed class SignedReportsController(IServiceProvider services) : ReportControllerBase(TopCommitteeWorkflow.Create(services))
 {
     [HttpPost]
     public Task<IActionResult> Vote(int id, VoteDecision decision, string comment, string documentHash, bool confirmed) =>

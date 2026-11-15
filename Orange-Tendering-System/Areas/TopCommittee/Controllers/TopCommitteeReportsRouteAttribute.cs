@@ -8,5 +8,5 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 public sealed class TopCommitteeReportsRouteAttribute : Attribute, IActionConstraint
 {
     public int Order => 0;
-    public bool Accept(ActionConstraintContext context) => context.RouteContext.HttpContext.User.IsInRole(SystemRoles.TopCommittee);
+    public bool Accept(ActionConstraintContext context) => Orange_Tendering_System.Areas.TopCommittee.Services.TopExecutiveRoles.IsMember(context.RouteContext.HttpContext.User);
 }

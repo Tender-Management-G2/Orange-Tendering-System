@@ -75,7 +75,7 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
             (d.BidId.HasValue && bidIds.Contains(d.BidId.Value)) ||
             (d.SupplierId.HasValue && supplierIds.Contains(d.SupplierId.Value)) ||
             (d.TenderReportId.HasValue && reportIds.Contains(d.TenderReportId.Value)))
-            .AsNoTracking().OrderBy(d => d.FileName).ToListAsync();
+            .AsNoTracking().OrderByDescending(d => d.UploadedAt).ThenByDescending(d => d.Id).ToListAsync();
         var details = new RoundDetails
         {
             Round = round, Members = members, InvitedSuppliers = invited, ReceivedBids = received, Bids = bids, Reports = reports, Evaluations = evaluations,
@@ -91,6 +91,11 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
             HasOpenClarifications = await db.Clarifications.AnyAsync(c => c.TenderId == tenderId && c.Status != ClarificationStatus.Closed &&
                 ((c.FromUserId == managerId && topUserIds.Contains(c.ToUserId)) || (c.ToUserId == managerId && topUserIds.Contains(c.FromUserId))))
         };
+        foreach (var executive in details.TopMembers)
+        {
+            var title = TopExecutiveRoles.Title(await users.GetRolesAsync(executive.User));
+            if (title is not null) details.ExecutiveTitles[executive.UserId] = title;
+        }
         details.OriginalSummaryPdf = details.Round.TenderReport is null ? null : documents.SingleOrDefault(d =>
             d.TenderReportId == details.Round.TenderReport.Id && d.DocumentType == "TopCommitteeOriginalSummaryPdf");
         details.FinalSignedSummaryPdf = details.Round.TenderReport is null ? null : documents.SingleOrDefault(d =>

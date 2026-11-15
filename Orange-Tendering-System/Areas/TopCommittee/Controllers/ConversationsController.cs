@@ -8,7 +8,7 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
-[Area("TopCommittee"),Authorize(Roles=SystemRoles.TopCommittee+","+SystemRoles.SourcingManager)]
+[Area("TopCommittee"),Authorize(Roles=TopExecutiveRoles.Allowed+","+SystemRoles.SourcingManager)]
 [PrivateFormFeedback]
 public sealed class ConversationsController(ApplicationDbContext db,UserManager<ApplicationUser> users,IWebHostEnvironment environment,ILogger<ConversationsController> logger) : TopCommitteeControllerBase(db,users)
 {

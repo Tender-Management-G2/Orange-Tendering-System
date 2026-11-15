@@ -48,6 +48,13 @@ public sealed class RoundDetails
     public ReportAnalysis? AiAnalysis { get; set; }
     public List<CommitteeMember> TopMembers => Members.Where(m => m.CommitteeType == CommitteeType.Top).ToList();
     public List<CommitteeVote> ValidVotes => Round.Votes.Where(v => TopMembers.Any(m => m.Id == v.CommitteeMemberId)).ToList();
+    public Dictionary<string, string> ExecutiveTitles { get; set; } = [];
+    public string MemberDisplayName(string userId, string fallback)
+    {
+        var name = string.IsNullOrWhiteSpace(fallback)
+            ? TopMembers.SingleOrDefault(m => m.UserId == userId)?.User.UserName ?? userId : fallback;
+        return ExecutiveTitles.TryGetValue(userId, out var title) ? $"{title} · {name}" : name;
+    }
     public CommitteeVote? MyVote => ValidVotes.SingleOrDefault(v => v.CommitteeMember.UserId == UserId);
     public int SignedCount => ValidVotes.Count(v => v.Decision == VoteDecision.Approve &&
         v.SignatureReportId == Round.TenderReportId && !string.IsNullOrWhiteSpace(v.SignatureDocumentHash) &&
