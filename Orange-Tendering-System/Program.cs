@@ -7,6 +7,8 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.Services.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
+// Development launch profiles select the isolated team database (Services/TeamDevDatabase.cs).
+TeamDevDatabase.Apply(builder);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("Default Connection") ?? throw new InvalidOperationException("Connection string 'Default Connection' not found.");
@@ -148,11 +150,32 @@ if (app.Environment.IsDevelopment())
 }
 
 await IdentityBootstrap.SeedAsync(app.Services, app.Configuration);
-// Shared team login accounts (Services/TeamAccountSeeder.cs); Development only, switch TeamAccounts:Enabled.
-if (app.Environment.IsDevelopment() && app.Configuration.GetValue("TeamAccounts:Enabled", true))
-    await TeamAccountSeeder.SeedAsync(app.Services);
-if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DemoData:Enabled"))
-    await DemoDataSeeder.SeedAsync(app.Services);
+
+// Shared team accounts and optional demo fixtures: Development AND a local team database only (fixed passwords).
+if (app.Environment.IsDevelopment())
+{
+    var startup = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("TeamDevelopment");
+    // The database the app really uses (the DbContext connection), not a configuration value read again later.
+    string? effective;
+    using (var probe = app.Services.CreateScope())
+        effective = probe.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.GetConnectionString();
+    var database = TeamDevDatabase.Describe(effective);
+    if (TeamDevDatabase.IsLocalTeamDatabase(effective))
+    {
+        startup.LogInformation("Development database: {Database} (team database).", database);
+        var teamAccounts = app.Configuration.GetValue("TeamAccounts:Enabled", true);
+        if (teamAccounts) await TeamAccountSeeder.EnsureAsync(app.Services, startup);
+        else startup.LogWarning("Team accounts were NOT provisioned: TeamAccounts:Enabled is false in this run's configuration (environment variable, User Secrets or appsettings). Remove that setting for normal team development.");
+        if (app.Configuration.GetValue<bool>("DemoData:Enabled")) await DemoDataSeeder.SeedAsync(app.Services);
+        if (teamAccounts) await TeamAccountSeeder.VerifyAsync(app.Services, startup, database);
+    }
+    else
+    {
+        startup.LogInformation("Development database: {Database}. Not a team database, so team accounts and demo data are not seeded here.", database);
+        if (app.Configuration.GetValue<bool>("DemoData:Enabled"))
+            startup.LogWarning("DemoData:Enabled is ignored: demo fixtures are only created in the OrangeTenderingTeamDev database.");
+    }
+}
 
 app.Run();
 

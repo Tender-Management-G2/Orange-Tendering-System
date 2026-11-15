@@ -1,5 +1,17 @@
 # Team setup: local SQL Server and EF Core
 
+## Everyday team workflow (WorkV2)
+
+1. `git pull origin WorkV2` in `Orange-Tendering-System-WorkV2` (see `AGENTS.md`).
+2. Open `Orange-Tendering-System.slnx` in Visual Studio and run the **https** profile (https://localhost:7182).
+3. Startup creates/migrates the local `OrangeTenderingTeamDev` database on your own SQL Server (your existing connection
+   settings are kept) and provisions the ten team accounts. Sign in with **Other User** and any account listed in
+   `Orange-Tendering-System/DEMO-DATA.md`; password `OrangeDemo2026!`.
+
+No SQL, account creation, password resets or extra environment variables are needed. Your existing
+`OrangeTenderingSystem` database is untouched; open it with the profile
+"https (existing OrangeTenderingSystem database)". The sections below are only for first-time SQL Server setup and migrations.
+
 Run these commands in PowerShell. Each developer uses their own local database. The checked-in EF Core migrations create the schema; no SQL backup or SSMS script is needed.
 
 ## Prerequisites
