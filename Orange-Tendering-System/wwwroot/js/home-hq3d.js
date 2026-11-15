@@ -422,7 +422,8 @@ function init() {
   const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 21.2, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
   // scroll timeline (0..TL_END): assembly 0..70, orbit and entrance 70..108, corridor GAL0..GAL0+GAL_LEN
   const GAL0 = 108, GAL_LEN = 120, TL_END = GAL0 + GAL_LEN + 6;
-  const camState = { t: 0, walk: 0, gal: 0 }; let override = null, inGallery = false;
+  const INTRO = 60; // cinematic intro (welcome, connection, reveal) runs on the same scroll timeline before the assembly
+  const camState = { t: 0, walk: 0, gal: 0, intro: 1 }; let override = null, inGallery = false;
   const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);
   // corridor walk: the camera follows the curve, dwells at each module (zero speed at every stop) and turns
   // toward that module's glass room; at the end it faces the overview video wall
@@ -441,6 +442,9 @@ function init() {
     pos.add(gallery.position); tgt.add(gallery.position);
     return [pos, tgt];
   }
+  // intro reveal: a long, low approach out of the darkness that ends exactly on the assembly's first camera stop
+  const INTRO_CAM = new THREE.CatmullRomCurve3([V(-6, 3, 360), V(-22, 6, 230), CAM.getPoint(0)], false, "centripetal");
+  const INTRO_TGT = new THREE.CatmullRomCurve3([V(0, 18, 0), V(0, 23, 0), TGT.getPoint(0)], false, "centripetal");
   const VIEWS = { reference: [V(0, 6, 92), V(0, 21.2, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
   function applyCamera() {
     const W = stage.clientWidth, H = stage.clientHeight; camera.aspect = W / H;
@@ -450,6 +454,7 @@ function init() {
     else if (inGallery) { [p, q] = galleryCamera(camState.gal); }
     else {
       p = CAM.getPoint(camState.t); q = TGT.getPoint(camState.t);
+      if (camState.intro < 1) { p = INTRO_CAM.getPoint(camState.intro); q = INTRO_TGT.getPoint(camState.intro); }
       if (camState.walk > 0) { p = p.clone().lerp(DOOR_IN, camState.walk); q = q.clone().lerp(DOOR_T0, camState.walk).lerp(DOOR_T1, camState.walk * .6); }
     }
     if (W / H < 1) { p = p.clone().sub(q).multiplyScalar(1.15).add(q); }
@@ -536,9 +541,9 @@ function init() {
   }
   function goStation(k) {
     if (!st) return;
-    const gal = (k + 1) / (U_STOPS.length - 1), time = GAL0 + GAL_LEN * gal;
+    const gal = (k + 1) / (U_STOPS.length - 1), time = INTRO + GAL0 + GAL_LEN * gal;
     dismissed = -1;
-    window.scrollTo({ top: st.start + (st.end - st.start) * time / TL_END, behavior: reduce ? "auto" : "smooth" });
+    window.scrollTo({ top: st.start + (st.end - st.start) * time / (INTRO + TL_END), behavior: reduce ? "auto" : "smooth" });
   }
   tileEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
   stepEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
@@ -546,6 +551,96 @@ function init() {
   // the overview video plays only if the project actually ships the file
   const vid = videoEl && videoEl.querySelector("video");
   if (vid && vid.dataset.available === "true") { vid.src = vid.dataset.src; videoEl.classList.add("has-video"); } // the server checks the file exists
+
+  /* ---------------- cinematic intro: Orange welcome -> glowing connection -> building reveal ----------------
+     A 2D canvas plus HTML layer above the 3D stage. Its state is a pure function of the intro progress p (scroll):
+       0.00-0.25 welcome: Orange logo, light ribbons and particles, headline, scroll hint
+       0.25-0.60 connection: the logo recedes into the horizon, an energy line emerges from it, the view travels
+                 forward along it while more paths light up; "Every Great Connection Starts Somewhere."
+       0.60-1.00 reveal: the paths converge on the headquarters as the darkness lifts; the camera arrives at the
+                 assembly's first stop with the floors still separated and the hero copy fades in */
+  const intro = (function () {
+    const el = document.getElementById("hq-intro");
+    const api = { p: 0, cover: 0, apply() {}, disable() {}, skip() {} };
+    if (!el) { camState.intro = 1; return api; }
+    const cv = el.querySelector(".hq-intro-fx"), g = cv.getContext("2d");
+    const logo = el.querySelector(".hq-intro-logo"), s1 = el.querySelector(".hq-intro-s1"), hint = el.querySelector(".hq-intro-hint"), s2 = el.querySelector(".hq-intro-s2"), skipBtn = el.querySelector(".hq-skip");
+    const sm = t => t * t * (3 - 2 * t), sg = (v, a, b) => clamp((v - a) / (b - a), 0, 1), lerp = (a, b, t) => a + (b - a) * t;
+    let seed2 = 5; const r = () => ((seed2 = (seed2 * 16807) % 2147483647) - 1) / 2147483646;
+    const dust = Array.from({ length: lowPower ? 120 : 240 }, () => ({ x: (r() * 2 - 1) * 46, y: r() * 7, z: r() * 170, s: .4 + r() }));
+    const ribbonDots = Array.from({ length: lowPower ? 900 : 1800 }, () => ({ u: r(), k: r(), j: r() }));
+    // one flowing S-shaped bundle: every path follows the main curve with its own lateral offset and ripple
+    const PATHS = Array.from({ length: lowPower ? 9 : 13 }, (_, k) => k === 0
+      ? { off: 0, amp: 0, f: .05, ph: 0, w: 1.15, at: 0 }
+      : { off: (k % 2 ? -1 : 1) * (.35 + Math.ceil(k / 2) * (.45 + r() * .35)), amp: .2 + r() * .6, f: .04 + r() * .05, ph: r() * 6.28, w: .35 + r() * .55, at: .06 + k * .022 });
+    const base = z => 3.4 * Math.sin(z * .026 + .6) + 1.4 * Math.sin(z * .061);
+    let W = 1, H = 1, DPR = 1, queued = false;
+    const bld = new THREE.Vector3();
+    function size() { const rc = stage.getBoundingClientRect(); W = Math.max(1, rc.width); H = Math.max(1, rc.height); DPR = Math.min(devicePixelRatio || 1, lowPower ? 1.25 : 1.75); cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); }
+    function buildingOnScreen() { applyCamera(); camera.updateMatrixWorld(); bld.set(0, POD_H + 14, 0).project(camera); return [(bld.x * .5 + .5) * W, (-bld.y * .5 + .5) * H]; }
+    function draw() {
+      queued = false;
+      const p = api.p; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
+      const cover = 1 - sm(sg(p, .6, .88)); api.cover = cover;
+      if (cover > 0) { g.globalCompositeOperation = "source-over"; g.fillStyle = `rgba(3,2,2,${cover})`; g.fillRect(0, 0, W, H); }
+      g.globalCompositeOperation = "lighter";
+      const vmin = Math.min(W, H), cx = W / 2, logoY = H * (W / H < 1 ? .3 : .32);
+      // welcome: warm halo behind the logo and two flowing ribbons of light and particles
+      const wa = 1 - sm(sg(p, .2, .34));
+      if (wa > 0) {
+        const halo = g.createRadialGradient(cx, logoY, 0, cx, logoY, vmin * .55); halo.addColorStop(0, `rgba(255,121,0,${.45 * wa})`); halo.addColorStop(.35, `rgba(255,90,0,${.12 * wa})`); halo.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = halo; g.fillRect(0, 0, W, H);
+        const drift = p * 7;
+        const yAt = (u, k) => { const x = u * W, side = Math.abs(u - .5) * 2; return logoY + H * .07 + Math.sin(u * 5.2 + k * 1.3 + drift) * H * (.03 + .09 * side) * (.6 + k * .7) - side * side * H * .05 * (k - .5); };
+        for (const d of ribbonDots) { const x = d.u * W, y = yAt(d.u, d.k) + (d.j - .5) * H * .05 * (.3 + Math.abs(d.u - .5)); g.fillStyle = `rgba(255,${130 + d.j * 60 | 0},40,${(.12 + .35 * d.j) * wa * Math.min(1, Math.abs(d.u - .5) * 6)})`; g.fillRect(x, y, 1.4, 1.4); }
+        for (let k = 0; k < 4; k++) {
+          g.beginPath(); for (let i = 0; i <= 120; i++) { const u = i / 120; g[i ? "lineTo" : "moveTo"](u * W, yAt(u, k / 3)); }
+          g.strokeStyle = `rgba(255,140,40,${(k === 1 ? .55 : .2) * wa})`; g.lineWidth = k === 1 ? 2 : 1; g.shadowColor = "#ff7900"; g.shadowBlur = 16; g.stroke(); g.shadowBlur = 0;
+        }
+      }
+      // connection: a perspective road of light paths, travelled forward by scroll
+      const ca = sm(sg(p, .25, .33)) * (1 - sm(sg(p, .86, 1)));
+      if (ca > 0) {
+        const conv = sm(sg(p, .58, .88)), [bx, by] = conv > 0 ? buildingOnScreen() : [cx, 0];
+        const vx = cx + (bx - cx) * conv, hy = lerp(logoY, H * .5, sm(sg(p, .25, .4))) + (by - H * .5) * conv * (conv > 0 ? 1 : 0);
+        const camZ = sg(p, .25, 1) * 150, camH = 2.2, f = H * 1.05, zMax = 190;
+        const proj = (x, y, z) => { const dz = Math.max(.6, z - camZ); return [vx + x * f / dz, hy + (camH - y) * f / dz, dz]; };
+        // floor particles (bokeh) along the route
+        for (const d of dust) { let z = d.z - (camZ % 170); if (z < 0) z += 170; const [sx, sy, dz] = proj(d.x * (1 - conv * .6), d.y * .6, camZ + z + 1); if (dz > zMax) continue; const rad = Math.min(7, d.s * 26 / dz); const a = ca * Math.min(1, dz / 6) * (1 - dz / zMax) * .5; g.fillStyle = `rgba(255,${150 + (d.s * 50 | 0)},60,${a})`; g.beginPath(); g.arc(sx, sy, rad, 0, 6.283); g.fill(); }
+        const grow = sm(sg(p, .25, .38));
+        PATHS.forEach((P, k) => {
+          const a = ca * (k === 0 ? 1 : sm(sg(p, .25 + P.at, .33 + P.at)));
+          if (a <= .002) return;
+          const zFar = camZ + zMax, zNear = k === 0 ? zFar - grow * (zMax - 1) : camZ + 1;
+          const pts = []; for (let i = 0; i <= 90; i++) { const t = i / 90, z = zFar - (zFar - zNear) * Math.pow(t, .55), x = (base(z) + P.off * (1 + (z - camZ) * .012) + P.amp * Math.sin(z * P.f + P.ph)) * (1 - conv * .92); pts.push(proj(x, 0, z)); }
+          [[14, .06], [5, .22], [1.6, .95]].forEach(([wd, al]) => {
+            g.strokeStyle = k === 0 || al < .5 ? `rgba(255,121,0,${al * a})` : `rgba(255,210,150,${al * a})`;
+            g.lineCap = "round";
+            for (let i = 1; i < pts.length; i++) { const [x0, y0] = pts[i - 1], [x1, y1, dz] = pts[i]; g.lineWidth = Math.max(.6, wd * P.w * Math.min(6, 22 / dz)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+          });
+        });
+        // horizon glow where the paths meet
+        const hg = g.createRadialGradient(vx, hy, 0, vx, hy, vmin * .35); hg.addColorStop(0, `rgba(255,140,40,${.35 * ca})`); hg.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = hg; g.fillRect(0, 0, W, H);
+      }
+      g.globalCompositeOperation = "source-over";
+      // HTML layer
+      const lr = sm(sg(p, .25, .44)), ly = (H * .5 - logoY) * lr, ls = 1 - .9 * lr, lo = 1 - sm(sg(p, .38, .46));
+      logo.style.transform = `translate(-50%,-50%) translateY(${ly.toFixed(1)}px) scale(${ls.toFixed(4)})`; logo.style.opacity = lo.toFixed(3);
+      const o1 = 1 - sm(sg(p, .1, .22)); s1.style.opacity = o1.toFixed(3); s1.style.transform = `translateY(${(-24 * (1 - o1)).toFixed(1)}px)`;
+      hint.style.opacity = (1 - sm(sg(p, .01, .08))).toFixed(3);
+      const o2 = sm(sg(p, .41, .47)) * (1 - sm(sg(p, .56, .63))); s2.style.opacity = o2.toFixed(3); s2.style.transform = `translateY(${(14 * (1 - o2)).toFixed(1)}px)`;
+      const so = 1 - sm(sg(p, .9, .985)); skipBtn.style.opacity = so.toFixed(3); skipBtn.hidden = so < .02;
+      el.classList.toggle("is-cover", cover > .5); el.style.visibility = p >= .995 ? "hidden" : "";
+      stage.style.setProperty("--hqi", sm(sg(p, .8, .97)).toFixed(3));
+    }
+    api.apply = v => { api.p = clamp(v, 0, 1); camState.intro = sm(sg(api.p, .5, 1)); if (!queued) { queued = true; requestAnimationFrame(draw); } };
+    api.disable = () => { el.hidden = true; api.p = 1; api.cover = 0; camState.intro = 1; stage.style.setProperty("--hqi", "1"); };
+    api.skip = () => { if (st) window.scrollTo({ top: st.start + (st.end - st.start) * INTRO / (INTRO + TL_END) + 2, behavior: "auto" }); };
+    skipBtn.addEventListener("click", api.skip);
+    addEventListener("resize", () => { size(); if (!el.hidden) draw(); });
+    size(); camState.intro = 0; api.cover = 1; draw();
+    return api;
+  })();
 
   /* ---------------- render loop ---------------- */
   function resize() {
@@ -567,7 +662,7 @@ function init() {
     if (gm !== inGallery) { inGallery = gm; gallery.visible = gm; building.visible = !gm; }
     ledMats.forEach(m => m.color.copy(ORANGE).multiplyScalar(2.2 * m.userData.k * (1 + S.glow * .6 * (.6 + .4 * Math.sin(t * 2.4)))));
     applyCamera();
-    if (composer) composer.render(); else renderer.render(scene, camera);
+    if (intro.cover < .999) { if (composer) composer.render(); else renderer.render(scene, camera); } // fully covered by the intro: skip the 3D draw
     applyPanels(t);
     applyCards();
   }
@@ -647,14 +742,16 @@ function init() {
     get inGallery() { return inGallery; },
     get station() { return station; },
     get stations() { return STATIONS.length; },
-    timeline: { gal0: GAL0, galLen: GAL_LEN, end: TL_END },
+    timeline: { intro: INTRO, gal0: INTRO + GAL0, galLen: GAL_LEN, end: INTRO + TL_END },
+    get intro() { return { p: intro.p, cover: +intro.cover.toFixed(4), camera: +camState.intro.toFixed(4) }; },
+    skipIntro() { intro.skip(); },
     goStation(k) { goStation(k); },
     // completes the scroll scrub immediately (software-rendered QA browsers draw only a few frames per second)
     sync() { if (st) { ScrollTrigger.update(); const tw = st.getTween && st.getTween(); if (tw) tw.progress(1); st.animation.progress(st.progress); } frame(); },
     frame
   };
   let st = null;
-  if (!gsap || !ScrollTrigger || reduce) { camState.t = 4 / 6; S.glow = .3; frame(); return; } // reduced motion: completed building, hero view
+  if (!gsap || !ScrollTrigger || reduce) { intro.disable(); camState.t = 4 / 6; S.glow = .3; frame(); return; } // reduced motion: completed building, hero view
 
   /* ---------------- scroll storytelling ---------------- */
   gsap.registerPlugin(ScrollTrigger);
@@ -702,8 +799,12 @@ function init() {
   }
   const mm = gsap.matchMedia();
   mm.add({ wide: "(min-width:1100px)", mid: "(min-width:700px) and (max-width:1099px)", small: "(max-width:699px)" }, ctx => {
-    const c = ctx.conditions, tl = build();
-    st = ScrollTrigger.create({ trigger: section, start: "top top", end: () => "+=" + Math.round(innerHeight * (c.wide ? 15 : c.mid ? 9 : 7) * TL_END / 200), pin: true, scrub: c.wide ? 1 : .7, anticipatePin: 1, animation: tl, invalidateOnRefresh: true });
+    const c = ctx.conditions, main = build(), tl = gsap.timeline({ defaults: { ease: "none" } });
+    // intro first, then the existing assembly / orbit / entrance / corridor timeline, all on one scrubbed timeline
+    const io = { p: 0 };
+    tl.fromTo(io, { p: 0 }, { p: 1, duration: INTRO, immediateRender: false, onUpdate() { intro.apply(io.p); } }, 0);
+    tl.add(main, INTRO);
+    st = ScrollTrigger.create({ trigger: section, start: "top top", end: () => "+=" + Math.round(innerHeight * (c.wide ? 15 : c.mid ? 9 : 7) * (INTRO + TL_END) / 200), pin: true, scrub: c.wide ? 1 : .7, anticipatePin: 1, animation: tl, invalidateOnRefresh: true });
     const see = [...document.querySelectorAll("[data-see-action]")];
     function onSee(e) {
       e.preventDefault();
@@ -713,7 +814,7 @@ function init() {
       (function step(now) { const k = Math.min(1, (now - start) / dur), e2 = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; scrollTo(0, y0 + (target - y0) * e2); if (k < 1 && !stop) requestAnimationFrame(step); else cancel(); })(start);
     }
     see.forEach(a => a.addEventListener("click", onSee));
-    return () => { see.forEach(a => a.removeEventListener("click", onSee)); st && st.kill(); st = null; tl.kill(); };
+    return () => { see.forEach(a => a.removeEventListener("click", onSee)); st && st.kill(); st = null; tl.kill(); main.kill(); };
   });
   addEventListener("load", () => ScrollTrigger.refresh());
 }
