@@ -83,7 +83,7 @@ function init(section) {
   }, [10, 1]);
 
   /* ---------------- lights ---------------- */
-  scene.add(new THREE.HemisphereLight(0x8a7464, 0x1a0b04, .55));
+  const hemi = new THREE.HemisphereLight(0x8a7464, 0x1a0b04, .55); scene.add(hemi);
   const key = new THREE.DirectionalLight(0xffe2c4, 1.6); key.position.set(9, 20, 14); key.castShadow = true;
   key.shadow.mapSize.set(lowPower ? 1024 : 2048, lowPower ? 1024 : 2048); Object.assign(key.shadow.camera, { left: -20, right: 20, top: 16, bottom: -12, near: 2, far: 70 }); key.shadow.bias = -.0005; key.shadow.normalBias = .02;
   scene.add(key);
@@ -117,6 +117,26 @@ function init(section) {
     add(new THREE.CylinderGeometry(1, .8, 1.6, 20), M.pot, x, .8, z);
     const n = 6 + (i % 3); for (let k = 0; k < n; k++) { const m = add(new THREE.IcosahedronGeometry(.9 + rnd() * .5, 1), M.leaf, x + (rnd() - .5) * 1.6, 2 + rnd() * 3.2, z + (rnd() - .5) * 1.6); m.scale.y = 1.3; }
   });
+
+  /* ---------------- day / night: follows the site theme ---------------- */
+  const windowsDay = canvasTex(512, 256, (g, w, h) => {
+    g.fillStyle = "#c9d3dc"; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 64) for (let y = 0; y < h; y += 32) { const k = rnd(); g.fillStyle = k > .7 ? "rgba(255,255,255,.75)" : k > .35 ? "rgba(170,200,228,.7)" : "rgba(140,168,196,.6)"; g.fillRect(x + 4, y + 4, 56, 24); }
+    g.strokeStyle = "rgba(90,96,104,.9)"; g.lineWidth = 6; for (let x = 0; x <= w; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  }, [10, 1]);
+  const windowsNight = M.wall.map;
+  let dayMode = null;
+  function applyDayNight() {
+    const day = document.documentElement.dataset.theme === "light"; if (day === dayMode) return false; dayMode = day;
+    scene.background.set(day ? 0xece7e0 : 0x0a0705); scene.fog.color.set(day ? 0xece7e0 : 0x0a0705);
+    hemi.color.set(day ? 0xf2f0ec : 0x8a7464); hemi.groundColor.set(day ? 0xb3a796 : 0x1a0b04); hemi.intensity = day ? 1.5 : .55;
+    key.intensity = day ? 2.4 : 1.6; glowA.intensity = day ? 25 : 70; glowB.intensity = day ? 12 : 40;
+    M.floor.color.set(day ? 0xd9d2c8 : 0x0f0b09); M.floor.roughness = day ? .3 : .16; M.floor.metalness = day ? .25 : .75;
+    M.wall.map = M.wall.emissiveMap = day ? windowsDay : windowsNight; M.wall.color.set(day ? 0xffffff : 0x15100d); M.wall.emissiveIntensity = day ? .35 : .55; M.wall.needsUpdate = true;
+    M.column.color.set(day ? 0xe7e2da : 0x1b1512); M.stone.color.set(day ? 0xcfc8be : 0x1d1714);
+    renderer.toneMappingExposure = day ? 1 : 1.05;
+    return true;
+  }
 
   /* ---------------- miniature Orange HQ on a glowing platform ---------------- */
   function rrect(w, d, r, ox = 0) { const s = new THREE.Shape(), x = -w / 2 + ox, y = -d / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d); s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
@@ -263,6 +283,8 @@ function init(section) {
     renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera); api.frames++;
     poseOverlay(p);
   }
+  new MutationObserver(() => { if (applyDayNight()) { dirty = true; request(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  applyDayNight();
   let queued = false;
   const request = () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; draw(); }); } };
   addEventListener("resize", () => { resize(); request(); });

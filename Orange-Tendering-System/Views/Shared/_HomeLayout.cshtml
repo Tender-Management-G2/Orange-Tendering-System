@@ -7,15 +7,16 @@
     var signedIn = User.Identity?.IsAuthenticated == true;
 }
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" class="hc-root">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#090909" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="description" content="Orange Sourcing & Tender Management System: one transparent digital journey from purchase request to final award." />
     <title>@(ViewData["Title"] ?? "Orange Sourcing & Tender Management System")</title>
     <link rel="icon" href="~/favicon.ico" />
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
     <script>
         /* Before first paint: mark JS/animation support. home-hq3d.js and home-cinema.js re-check. */
         (function (r) {

@@ -46,7 +46,26 @@ body{padding-top:var(--nav)}
 }
 @media (max-width:420px){.hc-brand-text{display:none}}
 .hc-nav.hc-nav-page{background:rgba(9,9,9,.94);border-bottom-color:var(--line)}
-.hc-theme{display:grid;place-items:center;width:40px;height:40px;border:1px solid rgba(255,255,255,.2);border-radius:50%;background:transparent;color:#f4f2ee}
+
+/* ---------- day / night switch and the light navbar ---------- */
+.hc-theme{display:grid;place-items:center;width:40px;height:40px;border:1px solid rgba(255,255,255,.2);border-radius:50%;background:transparent;color:#f4f2ee;padding:0;cursor:pointer;transition:border-color .2s,color .2s,background .2s}
 .hc-theme svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.hc-theme:hover{border-color:var(--o);color:var(--o)}
+.hc-theme:hover{border-color:#ff7900;color:#ff7900}
+.hc-theme .hc-theme-sun{display:none}
+html[data-theme="light"] .hc-theme .hc-theme-sun{display:block}
+html[data-theme="light"] .hc-theme .hc-theme-moon{display:none}
+.hc-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:1180px){.hc-theme{align-self:flex-start}}
+html[data-theme="light"] .hc-nav{--line:rgba(20,16,12,.12);--tx:#1c1a17}
+html[data-theme="light"] .hc-nav.is-solid,html[data-theme="light"] .hc-nav.hc-nav-page{background:rgba(250,248,244,.92);border-bottom-color:rgba(20,16,12,.12)}
+html[data-theme="light"] .hc-links>a{color:#2a2622}
+html[data-theme="light"] .hc-links>a:hover{color:#000;background:rgba(0,0,0,.05)}
+html[data-theme="light"] .hc-links>a.is-active{color:#000}
+html[data-theme="light"] .hc-links-cta .hc-btn-text{color:#1c1a17}
+html[data-theme="light"] .hc-links-cta .hc-btn-text:hover{color:#c45a00}
+html[data-theme="light"] .hc-theme{border-color:rgba(0,0,0,.18);color:#1c1a17}
+html[data-theme="light"] .hc-theme:hover{border-color:#ff7900;color:#c45a00}
+html[data-theme="light"] .hc-burger span{background:#1c1a17}
+html[data-theme="light"] .hc-burger{border-color:rgba(0,0,0,.18)}
+@media (min-width:1181px){html[data-theme="light"] .hc-links-cta{border-left-color:rgba(0,0,0,.14)}}
+@media (max-width:1180px){html[data-theme="light"] .hc-links{background:#faf8f4f5;border-bottom-color:rgba(0,0,0,.12)}html[data-theme="light"] .hc-links>a{border-bottom-color:rgba(0,0,0,.1)}html[data-theme="light"] .hc-links>a.is-active{color:#c45a00}}

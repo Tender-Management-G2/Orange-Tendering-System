@@ -39,7 +39,7 @@ function init() {
   // the studio environment only feeds subtle reflections; every material keeps envMapIntensity low for a night scene
   const camera = new THREE.PerspectiveCamera(34, 1, 0.5, 1200);
 
-  scene.add(new THREE.HemisphereLight(0x50525e, 0x2a1606, 0.65));
+  const hemi = new THREE.HemisphereLight(0x50525e, 0x2a1606, 0.65); scene.add(hemi);
   const moon = new THREE.DirectionalLight(0xaab8ff, 0.75);
   moon.position.set(-60, 90, 70); moon.castShadow = !lowPower;
   moon.shadow.mapSize.set(1024, 1024);
@@ -372,7 +372,8 @@ function init() {
   });
   [[-34, 22], [-20, 24], [14, 24], [30, 22], [-44, 15], [46, 14]].forEach(([x, z]) => tree(scene, x, 0, z, .9 + rnd() * .35));
   { const pm = []; for (let i = 0; i < 8; i++) pm.push(mtx(-14 + rnd() * 26, .9, 21 + rnd() * 6, 0, .85, .95 + rnd() * .2, .85)); scene.add(instanced(new THREE.CapsuleGeometry(.26, 1.15, 3, 8), M.person, pm)); }
-  { const cm = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: .8, emissive: 0xffffff, emissiveMap: cityTex, emissiveIntensity: 1.05 }), ms = [];
+  let cityMat = null, bokeh = null;
+  { const cm = cityMat = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: .8, emissive: 0xffffff, emissiveMap: cityTex, emissiveIntensity: 1.05 }), ms = [];
     for (let i = 0; i < (lowPower ? 18 : 40); i++) { const a = -1.3 + rnd() * 2.6, rad = 230 + rnd() * 180, h = 15 + rnd() * rnd() * 80; ms.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.sin(a) * rad, h / 2, -Math.cos(a) * rad * .8 - 40), new THREE.Quaternion(), new THREE.Vector3(10 + rnd() * 18, h, 10 + rnd() * 18))); }
     scene.add(instanced(new THREE.BoxGeometry(1, 1, 1), cm, ms)); }
 
@@ -385,10 +386,34 @@ function init() {
     const n = lowPower ? 40 : 90, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { const a = -1.5 + rnd() * 3, r = 120 + rnd() * 200; pos.set([Math.sin(a) * r, 2 + rnd() * 26, -Math.cos(a) * r * .8 - 20], i * 3); const c = rnd() > .4 ? [1, .62, .25] : [1, .9, .75]; col.set(c, i * 3); }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
-    scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 3.2, map: glowTex, vertexColors: true, transparent: true, opacity: .75, depthWrite: false, blending: THREE.AdditiveBlending })));
+    bokeh = new THREE.Points(g, new THREE.PointsMaterial({ size: 3.2, map: glowTex, vertexColors: true, transparent: true, opacity: .75, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(bokeh);
     const streak = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff8a2a).multiplyScalar(1.3), toneMapped: false });
     [[-40, 30, 90, .16, .08], [10, 42, 110, .14, -.12], [-60, 22, 60, .12, .3]].forEach(([x, z, len, wdt, ry]) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(len, wdt), streak); m.rotation.set(-Math.PI / 2, 0, ry); m.position.set(x + len / 2, .03, z); scene.add(m); });
   }
+
+  /* ---------------- day / night: the site theme switches the exterior between night and daylight ---------------- */
+  const nightSky = scene.background, daySky = canvasTex(4, 512, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, "#5f8fc4"); gr.addColorStop(.42, "#a9c6e2"); gr.addColorStop(.6, "#e8e4dc"); gr.addColorStop(.7, "#d9cdbd"); gr.addColorStop(1, "#bcb3a7");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  });
+  const isDay = () => document.documentElement.dataset.theme === "light";
+  let dayMode = null;
+  function applyDayNight() {
+    const day = isDay(); if (day === dayMode) return; dayMode = day;
+    scene.background = day ? daySky : nightSky;
+    scene.fog.color.set(day ? 0xd4d8dc : 0x1c140f); scene.fog.density = day ? .0016 : .0028;
+    hemi.color.set(day ? 0xe4ecf7 : 0x50525e); hemi.groundColor.set(day ? 0x8c7c68 : 0x2a1606); hemi.intensity = day ? 1.55 : .65;
+    moon.color.set(day ? 0xfff0d8 : 0xaab8ff); moon.intensity = day ? 2.7 : .75;
+    warm.intensity = day ? .35 : .55; entranceLight.intensity = day ? 40 : 150; plazaLight.intensity = day ? 10 : 60;
+    renderer.toneMappingExposure = day ? 1.02 : .98;
+    M.ground.color.set(day ? 0x9a958e : 0x2a2018); M.ground.roughness = day ? .38 : .12; M.ground.metalness = day ? .35 : .75;
+    if (cityMat) { cityMat.color.set(day ? 0x9aa3ad : 0x15161a); cityMat.emissiveIntensity = day ? .08 : 1.05; }
+    if (bokeh) bokeh.visible = !day;
+    if (bloom) bloom.strength = day ? .14 : .38;
+    shadowSig = "";
+  }
+  new MutationObserver(applyDayNight).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
   /* ---------------- post-processing ---------------- */
   let composer = null, bloom = null;
@@ -582,20 +607,21 @@ function init() {
       queued = false;
       const p = api.p; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
       const cover = 1 - sm(sg(p, .6, .88)); api.cover = cover;
-      if (cover > 0) { g.globalCompositeOperation = "source-over"; g.fillStyle = `rgba(3,2,2,${cover})`; g.fillRect(0, 0, W, H); }
-      g.globalCompositeOperation = "lighter";
+      const day = isDay(), ADD = day ? "source-over" : "lighter";
+      if (cover > 0) { g.globalCompositeOperation = "source-over"; g.fillStyle = day ? `rgba(246,243,238,${cover})` : `rgba(3,2,2,${cover})`; g.fillRect(0, 0, W, H); }
+      g.globalCompositeOperation = ADD;
       const vmin = Math.min(W, H), cx = W / 2, logoY = H * (W / H < 1 ? .3 : .32);
       // welcome: warm halo behind the logo and two flowing ribbons of light and particles
       const wa = 1 - sm(sg(p, .2, .34));
       if (wa > 0) {
-        const halo = g.createRadialGradient(cx, logoY, 0, cx, logoY, vmin * .55); halo.addColorStop(0, `rgba(255,121,0,${.45 * wa})`); halo.addColorStop(.35, `rgba(255,90,0,${.12 * wa})`); halo.addColorStop(1, "rgba(0,0,0,0)");
+        const halo = g.createRadialGradient(cx, logoY, 0, cx, logoY, vmin * .55); halo.addColorStop(0, `rgba(255,121,0,${(day ? .22 : .45) * wa})`); halo.addColorStop(.35, `rgba(255,90,0,${(day ? .07 : .12) * wa})`); halo.addColorStop(1, "rgba(0,0,0,0)");
         g.fillStyle = halo; g.fillRect(0, 0, W, H);
         const drift = p * 7;
         const yAt = (u, k) => { const x = u * W, side = Math.abs(u - .5) * 2; return logoY + H * .07 + Math.sin(u * 5.2 + k * 1.3 + drift) * H * (.03 + .09 * side) * (.6 + k * .7) - side * side * H * .05 * (k - .5); };
-        for (const d of ribbonDots) { const x = d.u * W, y = yAt(d.u, d.k) + (d.j - .5) * H * .05 * (.3 + Math.abs(d.u - .5)); g.fillStyle = `rgba(255,${130 + d.j * 60 | 0},40,${(.12 + .35 * d.j) * wa * Math.min(1, Math.abs(d.u - .5) * 6)})`; g.fillRect(x, y, 1.4, 1.4); }
+        for (const d of ribbonDots) { const x = d.u * W, y = yAt(d.u, d.k) + (d.j - .5) * H * .05 * (.3 + Math.abs(d.u - .5)); g.fillStyle = day ? `rgba(${230 + d.j * 25 | 0},${100 + d.j * 40 | 0},0,${(.18 + .4 * d.j) * wa * Math.min(1, Math.abs(d.u - .5) * 6)})` : `rgba(255,${130 + d.j * 60 | 0},40,${(.12 + .35 * d.j) * wa * Math.min(1, Math.abs(d.u - .5) * 6)})`; g.fillRect(x, y, 1.4, 1.4); }
         for (let k = 0; k < 4; k++) {
           g.beginPath(); for (let i = 0; i <= 120; i++) { const u = i / 120; g[i ? "lineTo" : "moveTo"](u * W, yAt(u, k / 3)); }
-          g.strokeStyle = `rgba(255,140,40,${(k === 1 ? .55 : .2) * wa})`; g.lineWidth = k === 1 ? 2 : 1; g.shadowColor = "#ff7900"; g.shadowBlur = 16; g.stroke(); g.shadowBlur = 0;
+          g.strokeStyle = `rgba(255,${day ? 110 : 140},${day ? 0 : 40},${(k === 1 ? (day ? .8 : .55) : (day ? .35 : .2)) * wa})`; g.lineWidth = k === 1 ? 2 : 1; g.shadowColor = "#ff7900"; g.shadowBlur = day ? 6 : 16; g.stroke(); g.shadowBlur = 0;
         }
       }
       // connection: a perspective road of light paths, travelled forward by scroll
@@ -606,7 +632,7 @@ function init() {
         const camZ = sg(p, .25, 1) * 150, camH = 2.2, f = H * 1.05, zMax = 190;
         const proj = (x, y, z) => { const dz = Math.max(.6, z - camZ); return [vx + x * f / dz, hy + (camH - y) * f / dz, dz]; };
         // floor particles (bokeh) along the route
-        for (const d of dust) { let z = d.z - (camZ % 170); if (z < 0) z += 170; const [sx, sy, dz] = proj(d.x * (1 - conv * .6), d.y * .6, camZ + z + 1); if (dz > zMax) continue; const rad = Math.min(7, d.s * 26 / dz); const a = ca * Math.min(1, dz / 6) * (1 - dz / zMax) * .5; g.fillStyle = `rgba(255,${150 + (d.s * 50 | 0)},60,${a})`; g.beginPath(); g.arc(sx, sy, rad, 0, 6.283); g.fill(); }
+        for (const d of dust) { let z = d.z - (camZ % 170); if (z < 0) z += 170; const [sx, sy, dz] = proj(d.x * (1 - conv * .6), d.y * .6, camZ + z + 1); if (dz > zMax) continue; const rad = Math.min(7, d.s * 26 / dz); const a = ca * Math.min(1, dz / 6) * (1 - dz / zMax) * (day ? .35 : .5); g.fillStyle = day ? `rgba(240,${110 + (d.s * 40 | 0)},20,${a})` : `rgba(255,${150 + (d.s * 50 | 0)},60,${a})`; g.beginPath(); g.arc(sx, sy, rad, 0, 6.283); g.fill(); }
         const grow = sm(sg(p, .25, .38));
         PATHS.forEach((P, k) => {
           const a = ca * (k === 0 ? 1 : sm(sg(p, .25 + P.at, .33 + P.at)));
@@ -614,13 +640,13 @@ function init() {
           const zFar = camZ + zMax, zNear = k === 0 ? zFar - grow * (zMax - 1) : camZ + 1;
           const pts = []; for (let i = 0; i <= 90; i++) { const t = i / 90, z = zFar - (zFar - zNear) * Math.pow(t, .55), x = (base(z) + P.off * (1 + (z - camZ) * .012) + P.amp * Math.sin(z * P.f + P.ph)) * (1 - conv * .92); pts.push(proj(x, 0, z)); }
           [[14, .06], [5, .22], [1.6, .95]].forEach(([wd, al]) => {
-            g.strokeStyle = k === 0 || al < .5 ? `rgba(255,121,0,${al * a})` : `rgba(255,210,150,${al * a})`;
+            g.strokeStyle = day ? (al < .5 ? `rgba(255,121,0,${al * a * .7})` : `rgba(${k === 0 ? 235 : 255},${k === 0 ? 100 : 140},0,${al * a})`) : (k === 0 || al < .5 ? `rgba(255,121,0,${al * a})` : `rgba(255,210,150,${al * a})`);
             g.lineCap = "round";
             for (let i = 1; i < pts.length; i++) { const [x0, y0] = pts[i - 1], [x1, y1, dz] = pts[i]; g.lineWidth = Math.max(.6, wd * P.w * Math.min(6, 22 / dz)); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
           });
         });
         // horizon glow where the paths meet
-        const hg = g.createRadialGradient(vx, hy, 0, vx, hy, vmin * .35); hg.addColorStop(0, `rgba(255,140,40,${.35 * ca})`); hg.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = hg; g.fillRect(0, 0, W, H);
+        const hg = g.createRadialGradient(vx, hy, 0, vx, hy, vmin * .35); hg.addColorStop(0, `rgba(255,140,40,${(day ? .18 : .35) * ca})`); hg.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = hg; g.fillRect(0, 0, W, H);
       }
       g.globalCompositeOperation = "source-over";
       // HTML layer
@@ -637,6 +663,7 @@ function init() {
     api.disable = () => { el.hidden = true; api.p = 1; api.cover = 0; camState.intro = 1; stage.style.setProperty("--hqi", "1"); };
     api.skip = () => { if (st) window.scrollTo({ top: st.start + (st.end - st.start) * INTRO / (INTRO + TL_END) + 2, behavior: "auto" }); };
     skipBtn.addEventListener("click", api.skip);
+    new MutationObserver(() => { if (!el.hidden) draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     addEventListener("resize", () => { size(); if (!el.hidden) draw(); });
     size(); camState.intro = 0; api.cover = 1; draw();
     return api;
@@ -699,7 +726,7 @@ function init() {
   new IntersectionObserver(es => { visible = es[0].isIntersecting; resume(); }).observe(stage);
   document.addEventListener("visibilitychange", resume);
   addEventListener("resize", () => { resize(); if (visible && !document.hidden) frame(); });
-  resize(); resume();
+  applyDayNight(); resize(); resume();
   root.classList.add("hq3-live");
 
   /* ---------------- verification hooks (read-only, used by the Playwright QA) ---------------- */

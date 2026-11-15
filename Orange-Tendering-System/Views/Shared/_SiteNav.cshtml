@@ -28,13 +28,11 @@
         <a asp-area="" asp-controller="Home" asp-action="About" class="@(Is("About") ? "is-active" : null)" aria-current="@(Is("About") ? "page" : null)">About</a>
         <a asp-area="" asp-controller="Home" asp-action="Contact" class="@(Is("Contact") ? "is-active" : null)" aria-current="@(Is("Contact") ? "page" : null)">Contact</a>
         <span class="hc-links-cta">
-            @if (!navHome)
-            {
-                <button class="hc-theme" type="button" id="theme-toggle" aria-label="Switch color theme" aria-pressed="false">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3a9 9 0 1 0 10.5 11Z" /></svg>
-                </button>
-                <span class="sr-only" id="theme-status" role="status"></span>
-            }
+            <button class="hc-theme" type="button" id="theme-toggle" aria-label="Switch color theme" aria-pressed="false">
+                <svg class="hc-theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3a9 9 0 1 0 10.5 11Z" /></svg>
+                <svg class="hc-theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></svg>
+            </button>
+            <span class="hc-sr" id="theme-status" role="status"></span>
             @if (signedIn)
             {
                 <a class="hc-btn hc-btn-solid" asp-area="" asp-controller="Workspace" asp-action="Index">My Workspace</a>
