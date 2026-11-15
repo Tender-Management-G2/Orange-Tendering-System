@@ -17,20 +17,16 @@ Admin
 
 ROUTE: /Admin/Users/Create
 
-FUTURE IMPLEMENTATION:
-- Add [HttpPost, ValidateAntiForgeryToken] Create with
-  server-side validation.
-- Create the user with UserManager and set FullName,
-  DepartmentId and IsActive.
-- Assign roles with UserManager.AddToRoleAsync using the
-  SystemRoles names.
-- Write an AuditLog entry without the password.
+IMPLEMENTATION:
+AdminService creates the account with a temporary password,
+assigns its role, and records an audit entry without the password.
+The user must change the temporary password at first sign-in.
 
 DEPENDENCIES:
 AspNetUsers, AspNetRoles, Departments, AuditLogs.
 
 STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+INTEGRATED.
 
 IMPORTANT:
 No hardcoded passwords or demo accounts.
@@ -125,23 +121,32 @@ No hardcoded passwords or demo accounts.
                       class="text-danger"></span>
             </div>
 
-            <div class="pg-field">
+            <div class="pg-field pg-field-wide">
                 <label asp-for="Password">
                     Temporary Password
                 </label>
 
-                <input asp-for="Password"
-                       type="password"
-                       class="form-control"
-                       autocomplete="new-password" />
+                <div class="admin-temp-password" data-temp-password>
+                    <input asp-for="Password"
+                           type="password"
+                           class="form-control"
+                           autocomplete="new-password"
+                           minlength="8"
+                           maxlength="100"
+                           spellcheck="false" />
+                    <button type="button" class="pg-btn" data-password-generate aria-label="Generate temporary password">Generate</button>
+                    <button type="button" class="pg-btn" data-password-toggle aria-label="Show temporary password" aria-pressed="false">Show</button>
+                    <button type="button" class="pg-btn" data-password-copy aria-label="Copy temporary password">Copy</button>
+                </div>
 
                 <span asp-validation-for="Password"
                       class="text-danger"></span>
 
                 <small class="pg-hint">
-                    Password must follow Identity security requirements.
-                    The account must be confirmed before sign-in.
+                    Generate or enter a strong temporary password, then copy and share it securely.
+                    The user must change it at first sign-in.
                 </small>
+                <span class="pg-hint" data-password-status role="status" aria-live="polite"></span>
             </div>
 
             <div class="pg-field">
@@ -186,4 +191,5 @@ No hardcoded passwords or demo accounts.
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/admin-temp-password.js" asp-append-version="true"></script>
 }

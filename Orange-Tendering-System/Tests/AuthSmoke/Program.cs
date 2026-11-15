@@ -425,9 +425,10 @@ using (var employee = Client(factory))
     Check(employeeLogin.Headers.Location?.ToString() == "/Department", "activated employee enters assigned workspace");
 }
 
-// The Admin Create User screen supplies the password directly. Its accounts must
-// already be confirmed because that screen has no email confirmation step.
+// The Admin Create User screen supplies a temporary password and requires a change
+// at first sign-in. Its accounts are confirmed because there is no email confirmation step.
 var adminCreatedEmail = $"admin-created-{suffix}@example.test";
+var adminCreatedNewPassword = "E!e5" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -443,7 +444,8 @@ using (var scope = factory.Services.CreateScope())
         }, adminId);
     Check(created.Succeeded, "Admin Create User saves the employee");
     var account = await db.Users.SingleAsync(u => u.Email == adminCreatedEmail);
-    Check(account.EmailConfirmed, "Admin-created employee is confirmed for password sign-in");
+    Check(account.EmailConfirmed && account.MustChangePassword,
+        "Admin-created employee is confirmed and must change the temporary password");
 }
 using (var adminCreated = Client(factory))
 {
@@ -453,10 +455,22 @@ using (var adminCreated = Client(factory))
         ["Input.Email"] = adminCreatedEmail, ["Input.Password"] = supplierPassword,
         ["__RequestVerificationToken"] = token
     }));
-    Check(response.StatusCode == HttpStatusCode.Redirect && response.Headers.Location?.ToString() == "/Department",
-        "Admin-created employee signs in with the assigned role");
+    Check(response.StatusCode == HttpStatusCode.Redirect && response.Headers.Location?.ToString().Contains("FirstLoginPasswordChange") == true,
+        "Admin-created employee is sent to change the temporary password");
+    Check((await adminCreated.GetAsync("/Department")).Headers.Location?.ToString().Contains("FirstLoginPasswordChange") == true,
+        "temporary password cannot be used to enter the workspace");
+    var employeeChangeToken = await Token(adminCreated, "/Identity/Account/FirstLoginPasswordChange");
+    var employeeChanged = await adminCreated.PostAsync("/Identity/Account/FirstLoginPasswordChange", Form(new()
+    {
+        ["Input.CurrentPassword"] = supplierPassword,
+        ["Input.NewPassword"] = adminCreatedNewPassword,
+        ["Input.ConfirmPassword"] = adminCreatedNewPassword,
+        ["__RequestVerificationToken"] = employeeChangeToken
+    }));
+    Check(employeeChanged.StatusCode == HttpStatusCode.Redirect && employeeChanged.Headers.Location?.ToString() == "/Department",
+        "Admin-created employee changes the temporary password");
     Check((await adminCreated.GetAsync("/Department")).StatusCode == HttpStatusCode.OK,
-        "Admin-created employee keeps an authenticated session");
+        "Admin-created employee enters the workspace after changing the password");
 }
 
 var forgotToken = await Token(admin, "/Identity/Account/ForgotPassword");

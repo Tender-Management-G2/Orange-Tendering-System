@@ -97,7 +97,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             TempData["SuccessMessage"] =
-                "User created successfully. The active account can now sign in.";
+                "User created. Share the temporary password securely; the user must change it at first sign-in.";
 
             if (Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl!);
 

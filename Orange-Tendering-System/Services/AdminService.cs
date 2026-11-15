@@ -1039,9 +1039,10 @@ namespace Orange_Tendering_System.Services
                 DepartmentId = model.DepartmentId,
                 SupplierId = null,
                 IsActive = model.IsActive,
+                MustChangePassword = true,
 
-                // Admin-created employees receive a password here, with no email
-                // confirmation flow. Identity requires a confirmed account to sign in.
+                // Admin-created employees use a temporary password and must replace it
+                // at first sign-in. Identity requires a confirmed account to sign in.
                 EmailConfirmed = true
             };
 

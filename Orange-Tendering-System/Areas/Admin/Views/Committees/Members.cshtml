@@ -16,7 +16,7 @@
             <h2>@slot.Seat.Title</h2>
             <p>@slot.Seat.Description</p>
             <p class="pg-hint">Committee: @title<br />Role: @slot.Seat.Role</p>
-            <a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Users" asp-action="Create"
+            <a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Users" asp-action="Create" data-no-modal
                asp-route-committeeSeat="@slot.Seat.Key" asp-route-returnUrl="@returnUrl">+ Create User</a>
             @if (slot.Accounts.Count == 0)
             {
