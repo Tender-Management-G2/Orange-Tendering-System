@@ -781,8 +781,17 @@ foreach (var workspace in Orange_Tendering_System.ViewModels.WorkspaceNavigation
     {
         Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString() == "/" + workspace.Area,
             workspace.Role + " login routes to its dashboard");
-        Check((await roleClient.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.OK,
+        var dashboardResponse = await roleClient.GetAsync("/" + workspace.Area);
+        Check(dashboardResponse.StatusCode == HttpStatusCode.OK,
             workspace.Role + " dashboard renders with authenticated cookie");
+        if (workspace.Role == SystemRoles.SourcingManager)
+        {
+            var dashboardHtml = await dashboardResponse.Content.ReadAsStringAsync();
+            Check(dashboardHtml.Contains("Pending Reviews") &&
+                  dashboardHtml.Contains("/css/sourcing-manager.css") &&
+                  dashboardHtml.Contains("/SourcingManager/ManagerReports/Pending"),
+                "Sourcing Manager landing page shows Haya dashboard and reports navigation");
+        }
     }
     if (workspace.Role != SystemRoles.Admin)
         Check((await roleClient.GetAsync("/Admin")).StatusCode != HttpStatusCode.OK, workspace.Role + " cannot enter Admin");
