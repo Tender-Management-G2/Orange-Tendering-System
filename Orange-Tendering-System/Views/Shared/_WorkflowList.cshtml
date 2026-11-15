@@ -198,9 +198,9 @@
                 if (state !== shown && now - lastRefresh > 4000) { lastRefresh = now; refreshView(); return; }
                 var jn = el.querySelector('[data-join]'); if (jn) { var locked = now < st; jn.classList.toggle('is-locked', locked); if (locked) { jn.removeAttribute('href'); jn.setAttribute('aria-disabled', 'true'); jn.tabIndex = -1; } else { jn.setAttribute('href', jn.dataset.join); jn.removeAttribute('aria-disabled'); jn.removeAttribute('tabindex'); } jn.querySelector('[data-join-label]').innerHTML = locked ? '&#128274; Opens when the meeting starts' : '&#127909; Join the meeting'; }
                 if (state === 'before') { label.textContent = 'Meeting and scoring start in'; clock.textContent = fmt(st - now); }
-                else if (state === 'open') { label.textContent = 'Scoring is open, it closes in'; clock.textContent = fmt(en - now); }
-                else { label.textContent = 'Scoring is closed'; clock.textContent = '00:00:00'; }
-                if (state === 'open' && !body.querySelector('.wp-scores') && now - lastPoll > 15000) { lastPoll = now; refreshView(); }
+                else if (state === 'open') { label.textContent = 'Meeting ends in'; clock.textContent = fmt(en - now); }
+                else { label.textContent = 'Meeting ended; evaluation remains open'; clock.textContent = '00:00:00'; }
+                if (state !== 'before' && !body.querySelector('.wp-scores') && now - lastPoll > 15000) { lastPoll = now; refreshView(); }
             };
             tick(); var iv = setInterval(function () { if (!document.body.contains(el)) { clearInterval(iv); return; } tick(); }, 1000);
         });
