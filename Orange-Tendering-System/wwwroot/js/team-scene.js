@@ -187,13 +187,13 @@ function init(section) {
 
   /* ---------------- camera ---------------- */
   const camTgt = V(0, 0, 0);
-  let W = 1, H = 1, portrait = false;
+  let W = 1, H = 1, portrait = false, camAz = 0;
   function poseCamera(p) {
     const fi = focusIndex(p);
     let dist = lerp(58, 47, smooth(seg(p, 0, A))), elev = lerp(.3, .24, smooth(seg(p, 0, A))), az = lerp(-.32, .32, smooth(seg(p, A, B)));
     let ty = 3.2;
     if (fi >= 0) { const lv = levelOf(fi).anchor.y, w = smooth(seg(localT(p, fi), .05, .4)) * (1 - smooth(seg(localT(p, fi), .9, 1))); ty = lerp(3.2, lv, .25 * w); dist -= 2.2 * w; }
-    const out = smooth(seg(p, B, C)); dist = lerp(dist, 56, out); elev = lerp(elev, .3, out); az = lerp(az, 0, out);
+    const out = smooth(seg(p, B, C)); dist = lerp(dist, 56, out); elev = lerp(elev, .3, out); az = lerp(az, 0, out); camAz = az;
     if (portrait) dist *= 1.55;
     camTgt.set(0, ty, 0);
     camera.position.set(Math.sin(az) * Math.cos(elev) * dist, ty + Math.sin(elev) * dist, Math.cos(az) * Math.cos(elev) * dist);
@@ -224,23 +224,33 @@ function init(section) {
     info.querySelector(".tx-info-section").textContent = `Connected to HQ section ${String(i + 1).padStart(2, "0")} · ${levelOf(i).name}`;
     info.dataset.member = String(i);
   }
-  function rowOffset(p) {
-    const wrapW = ui.wrap.clientWidth; if (ui.row.scrollWidth <= wrapW + 1) return 0;
-    const li = ui.row.children, step = li.length > 1 ? li[1].offsetLeft - li[0].offsetLeft : 0;
-    let c;
-    if (p >= B) c = lerp(N - 1, (N - 1) / 2, smooth(seg(p, B, C)));
-    else { const x = clamp01((p - A) / (B - A)) * N - .5, f = Math.floor(x); c = Math.min(N - 1, Math.max(0, f + smooth(clamp01((x - f) * 1.6 - .3)))); }
-    return -c * step;
+  /* the cards orbit the building on a ring above the roof: they spin on their own before the first scroll and
+     again after all seven are introduced; while scrolling through the members the scroll turns the ring so the
+     current member comes to the front */
+  const TAU = Math.PI * 2, RING = { rx: 21, rz: 12.5, y: 11.8 }, SPIN = .2; // an ellipse, wider than deep; rad/s
+  const ringPt = V(0, 0, 0);
+  const wrapAngle = a => { a %= TAU; return a < -Math.PI ? a + TAU : a > Math.PI ? a - TAU : a; };
+  const lerpAngle = (a, b, t) => a + wrapAngle(b - a) * t;
+  function ringBase(p, now) {
+    const idle = now / 1000 * SPIN;
+    const x = clamp01((p - A) / (B - A)) * N - .5, f = Math.floor(x), c = Math.min(N - 1, Math.max(0, f + smooth(clamp01((x - f) * 1.6 - .3))));
+    const scroll = camAz - c * TAU / N;
+    return lerpAngle(lerpAngle(idle, scroll, smooth(seg(p, 0, A))), idle, smooth(seg(p, B, C)));
   }
-  function poseOverlay(p) {
+  let cardW = 0, cardH = 0;
+  function measureCards() { const c = cards[0]; if (c) { cardW = c.offsetWidth; cardH = c.offsetHeight; } }
+  function poseOverlay(p, now = performance.now()) {
     const fi = focusIndex(p), stage = p < A ? 0 : p < B ? (fi < N / 2 ? 1 : 2) : 3;
     ui.journey.forEach((li, k) => { li.classList.toggle("is-on", k === stage); li.classList.toggle("is-done", k < stage); });
-    ui.row.style.transform = `translateX(${rowOffset(p).toFixed(1)}px)`;
     const sr = section.querySelector(".tx-sticky").getBoundingClientRect();
+    if (!cardW) measureCards();
+    const base = ringBase(p, now), sc = portrait ? .82 : 1;
     cards.forEach((c, i) => {
       const t = localT(p, i), e = fi >= 0 && Math.abs(i - fi) <= 1 ? smooth(seg(t, -.08, .12)) * (1 - smooth(seg(t, .9, 1.08))) : 0;
-      const dim = p < A || p >= B ? 1 : .62 + .38 * e;
-      c.style.transform = `translateY(${(-12 * e).toFixed(2)}px) scale(${(1 + .22 * e).toFixed(4)})`; c.style.opacity = dim.toFixed(3); c.style.zIndex = e > .5 ? "2" : "1";
+      const th = base + i * TAU / N, front = (Math.cos(th - camAz) + 1) / 2;
+      ringPt.set(Math.sin(th) * RING.rx * (portrait ? .62 : 1), RING.y, Math.cos(th) * RING.rz); const [cx, cy] = toScreen(ringPt);
+      const s = sc * (.6 + .4 * front) * (1 + .22 * e), dim = Math.max(.3 + .7 * front, e);
+      c.style.transform = `translate(${(cx - cardW / 2).toFixed(1)}px,${(cy - cardH / 2).toFixed(1)}px) scale(${s.toFixed(4)})`; c.style.opacity = dim.toFixed(3); c.parentElement.style.zIndex = String(Math.round(front * 100) + (e > .5 ? 200 : 0));
       c.classList.toggle("is-on", e > .5 || p >= B + .02);
       // the connection line from this card to its building section
       const draw = Math.max(i === fi ? smooth(seg(t, .1, .38)) * (1 - smooth(seg(t, .9, 1))) : 0, smooth(seg(p, B + .005, C - .03)));
@@ -285,10 +295,16 @@ function init(section) {
   }
   new MutationObserver(() => { if (applyDayNight()) { dirty = true; request(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   applyDayNight();
+  let spinning = false, onScreen = true;
+  const needsSpin = () => !reduced && onScreen && !document.hidden && (api.p < A || api.p > B);
+  function spinTick(now) { if (!needsSpin()) { spinning = false; return; } poseOverlay(api.p, now); requestAnimationFrame(spinTick); }
+  function startSpin() { if (!spinning && needsSpin()) { spinning = true; requestAnimationFrame(spinTick); } }
+  new IntersectionObserver(es => { onScreen = es[0].isIntersecting; startSpin(); }).observe(section);
+  document.addEventListener("visibilitychange", startSpin);
   let queued = false;
   const request = () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; draw(); }); } };
-  addEventListener("resize", () => { resize(); request(); });
-  function setProgress(v) { api.p = Math.round(clamp01(v) * 1e5) / 1e5; request(); }
+  addEventListener("resize", () => { cardW = 0; resize(); request(); });
+  function setProgress(v) { api.p = Math.round(clamp01(v) * 1e5) / 1e5; request(); startSpin(); }
 
   let toP = () => {};
   if (reduced) {
@@ -319,6 +335,8 @@ function init(section) {
     glow: levels.map(L => r4(L.led.emissiveIntensity)), info: { op: +ui.info.style.opacity, member: +ui.info.style.opacity > 0 ? ui.info.dataset.member : null },
     finale: +ui.finale.style.opacity, selected: cards.map(c => c.classList.contains("is-on"))
   });
+  api.ring = () => cards.map(c => { const m = new DOMMatrix(getComputedStyle(c).transform); return [+m.e.toFixed(1), +m.f.toFixed(1), +m.a.toFixed(3)]; });
+  api.spinning = () => spinning;
   api.ready = true;
 }
 

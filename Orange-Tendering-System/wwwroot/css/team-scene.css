@@ -167,3 +167,11 @@ html[data-theme="light"] .tx-dlg-role{color:#4a443d}
 html[data-theme="light"] .tx-dlg-text{color:#2a2622}
 html[data-theme="light"] .tx-dialog::backdrop{background:rgba(236,231,224,.8)}
 html[data-theme="light"] .tx-dlg-close{background:rgba(0,0,0,.55)}
+
+/* cards on a ring around the building (positions come from team-scene.js) */
+.tx-row-wrap{top:0;bottom:0}
+.tx-row{position:absolute;inset:0;display:block;margin:0;padding:0;gap:0}
+.tx-row li{position:absolute;left:0;top:0}
+.tx-row .tx-card{transform-origin:50% 50%;will-change:transform,opacity}
+@media (max-width:760px){.tx-row{padding:0}}
+.tx-journey,.tx-info{z-index:5}
