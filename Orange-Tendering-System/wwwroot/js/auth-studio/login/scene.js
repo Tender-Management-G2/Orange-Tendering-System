@@ -5,8 +5,10 @@ import { makePace } from '../core/paths.js';
 import { metalMaterial } from '../core/metal.js';
 import { COLOR, LINE } from '../core/tokens.js';
 import * as L from './layout.js';
+import { buildHardware, RIG_DEFAULTS } from './hardware.js';
 
-// ORANGE SIGNAL scene graph for L00–L02 (flat stage).
+// ORANGE SIGNAL scene graph. L00–L02 (the flat drawing) live here; L03–L10 (boundary, core,
+// identity modules, optical iris, fiber) are built by ./hardware.js on the same objects.
 // Built on the same stage, stroke, sheet and development code as Supplier Genesis: the card rises
 // out of the page exactly the way the letter does — only the materials change (ceramic and
 // champagne metal instead of paper and board).
@@ -42,7 +44,8 @@ export function createSignalScene(stage) {
     pads: 0, // contact plates develop (0..1, staggered)
     ticks: 0, // registration ticks
     halo: 0,
-    haloOn: 0
+    haloOn: 0,
+    ...RIG_DEFAULTS
   };
 
   // ------------------------------------------------------------------------------------------
@@ -176,6 +179,8 @@ export function createSignalScene(stage) {
   const groupA = groupOf('a');
   const groupB = groupOf('b');
 
+  const hw = buildHardware(stage, root, card, pads, sig);
+
   const ticks = L.cornerTicks().map(p => {
     const s = new Stroke(p, { color: COLOR.ink, width: LINE.hair + 0.004, y: 0.012 });
     root.add(s);
@@ -217,6 +222,8 @@ export function createSignalScene(stage) {
       p.mesh.scale.y = 0.05 + 0.95 * k;
       p.mesh.castShadow = k > 0.3 && rig.devShell > 0.5;
     }
+
+    hw.apply(rig, gate);
 
     const stagger = (list, v) => {
       list.forEach((t, i) => {
@@ -273,6 +280,7 @@ export function createSignalScene(stage) {
     mainPath,
     marks,
     nameLine: null,
+    hw,
     parts: { line, dot, card, shell, pads, traces, gate },
     svg: { main: mainPath.svg }
   };

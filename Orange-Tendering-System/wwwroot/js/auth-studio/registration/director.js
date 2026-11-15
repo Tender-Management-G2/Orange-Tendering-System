@@ -276,6 +276,9 @@ export class GenesisDirector {
     const g = this.segs;
     const i = this.input;
     if (!this.introDone) return 'wide';
+    // From Company Details on, the campus director (./campus-director.js) directs the camera.
+    const campusShot = this.shotOverride?.();
+    if (campusShot) return campusShot;
     if (!g.transfer.at(0) || this.cardBoxed) {
       if (!this.cardBoxed && g.transfer.tl.progress() < 0.6) return 'transfer';
       if (i.rules === 5 && i.confirm === 'match' && g.close.tl.time() >= g.close.timeOf('hesitate')) return 'sealed';
@@ -292,8 +295,9 @@ export class GenesisDirector {
   aim(force = false) {
     const name = this.shot();
     if (name === this.camName && !force) return;
+    const from = this.camName;
     this.camName = name;
-    const pose = this.frames()[name];
+    const pose = { ty: 0, ...(this.poseOf?.(name) ?? this.frames()[name]) };
     const state = this.stage.rig.state;
     gsap.killTweensOf(state);
     if (this.reduced || force) {
@@ -301,7 +305,9 @@ export class GenesisDirector {
       this.stage.invalidate();
       return;
     }
-    gsap.to(state, { ...pose, duration: 1.15, ease: 'power2.inOut', onUpdate: () => this.stage.invalidate() });
+    // Leaving the flat package for the campus is the 2D→3D handoff: slower, with a long settle.
+    const handoff = name === 'unfold' || (from === 'unfold' && name === 'campus');
+    gsap.to(state, { ...pose, duration: handoff ? 1.6 : 1.15, ease: handoff ? 'power3.inOut' : 'power2.inOut', onUpdate: () => this.stage.invalidate() });
   }
 
   /** The stage changed size or shape: re-frame the current shot. */

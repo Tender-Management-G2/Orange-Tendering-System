@@ -5,9 +5,17 @@ import { SignalDirector } from './login/director.js';
 import { fallbackSvg } from './login/fallback.js';
 
 // ORANGE SIGNAL on the real sign-in page (Areas/Identity/Pages/Account/Login.cshtml).
-// The form script (wwwroot/js/supplier-login.js) owns validation, the credential request and the
-// biometric step, and publishes a sanitised state; this module only draws it. A valid e-mail
-// format completes a drawing, nothing more: results come from the server through that state.
+// The form scripts own everything that matters: supplier-login.js (validation, the credential
+// request, the biometric step) and biometric.js (camera, face capture, the server's verdict).
+// They publish sanitised state and real outcomes as events on #authStudio; this module only draws
+// them. A valid e-mail format completes a drawing, nothing more.
+//
+//   authstudio:state      { email, hasPassword, focus }               form state (L00–L02)
+//   authstudio:signal     { phase: submitted|rejected|unavailable|timeout|accepted|biometric|incomplete }
+//   authstudio:step       { step: credentials|biometric, face, passkey }
+//   authstudio:face       { state: requesting|camera|capturing|processing|confirmed|failed|cancelled|restart, code }
+//   authstudio:signed-in  { redirect }  cancelable: cancelled here to play the short finale, which
+//                                       then goes to exactly that server-chosen redirect.
 
 (async () => {
   const shell = document.getElementById('authStudio');
@@ -21,7 +29,10 @@ import { fallbackSvg } from './login/fallback.js';
     mount(stage, { onStatus }) {
       const scene = createSignalScene(stage);
       const choreography = buildSignalChoreography(scene, stage);
-      const director = new SignalDirector({ scene, choreography, stage, onStatus });
+      const director = new SignalDirector({
+        scene, choreography, stage, onStatus, stageEl, shell,
+        cameraEl: document.getElementById('facePanel')
+      });
       return { scene, choreography, director };
     }
   });
@@ -34,5 +45,21 @@ import { fallbackSvg } from './login/fallback.js';
 
   studio.start();
   shell.addEventListener('authstudio:state', event => push(event.detail));
+  shell.addEventListener('authstudio:signal', event => director.signal(event.detail?.phase));
+  shell.addEventListener('authstudio:step', event => director.step(event.detail));
+  shell.addEventListener('authstudio:face', event => director.face(event.detail));
+  shell.addEventListener('authstudio:signed-in', event => {
+    if (director.finale(event.detail.redirect)) event.preventDefault();
+  });
+
+  const faceButton = document.getElementById('btnFaceLogin');
+  if (faceButton) {
+    for (const [name, on] of [['pointerenter', true], ['pointerleave', false], ['focus', true], ['blur', false]]) {
+      faceButton.addEventListener(name, () => director.hoverFace(on && !faceButton.disabled));
+    }
+  }
+
+  // The form script ran first: pick up values restored by the browser and a step the server rendered.
   if (shell.authState) push(shell.authState);
+  if (shell.dataset.step === 'biometric') director.step({ step: 'biometric' });
 })();

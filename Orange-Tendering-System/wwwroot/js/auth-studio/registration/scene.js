@@ -367,6 +367,8 @@ export function createGenesisScene(stage) {
       root.updateMatrixWorld(true);
       rim.copy(rimLocal);
       backLid.localToWorld(rim);
+      // Once the campus adopts the package (campus.js) the seal lives inside the parcel: back to its frame.
+      if (carton.parent !== root) carton.parent.worldToLocal(rim);
       px = rim.x;
       pz = rim.z;
       py = rim.y + T / 2 * carton.scale.y + 0.02;
@@ -415,7 +417,7 @@ export function createGenesisScene(stage) {
     setName,
     repaintText: paintStatic,
     nameLine,
-    parts: { line, dot, letter, flap, card, carton, base, left, right, back, front, backLid, frontLid, wafer },
+    parts: { line, dot, letter, flap, card, carton, base, left, right, back, front, backLid, frontLid, wafer, stamp },
     svg: {
       main: mainPath.svg,
       seams: [seamData.left.svg, seamData.right.svg],

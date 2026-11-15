@@ -3,61 +3,103 @@
 @{
     var faceDone = Model.FaceTemplateCount > 0;
     var passkeyDone = Model.PasskeyCount > 0;
-    ViewData["Title"] = faceDone ? (Model.CompanyApproved ? "Supplier dossier — Sign in with biometrics" : "Supplier dossier — Pending approval") : "Face enrollment — The Living Dossier";
+    ViewData["Title"] = faceDone ? (Model.CompanyApproved ? "Supplier identity — Sign in" : "Pending administrator approval") : "Face enrollment";
 }
-<section class="ld-shell ld-shell--face">
-    <div class="ld-interface" id="bio-root" data-return-url="" data-cinematic-face="true" data-face-complete="@(faceDone ? "true" : "false")" data-enrolled-url="/Identity/Account/PendingApproval?faceRegistered=true">
-        @Html.AntiForgeryToken()
-        <div class="ld-brand"><span class="ld-brand-symbol">◈</span><div><strong>Supplier registration</strong><small>THE LIVING DOSSIER</small></div></div>
-        <div class="ld-intro">
-            <span class="ld-kicker">Identity · final setup</span>
-            <h1>@(faceDone ? "Your identity has a place." : "Let's bring your identity to life.")</h1>
-            <p>@(faceDone ? (Model.CompanyApproved ? "Your face samples are linked to your account. Sign out, then use face recognition or a device passkey to enter your supplier workspace." : "Your face samples are linked to your account. Your company is still awaiting administrator review.") : "Use your camera to add your face to your company dossier.")</p>
+<section class="as-shell" id="authStudio" data-chapter="identity" data-face-done="@(faceDone ? "true" : "false")" data-approved="@(Model.CompanyApproved ? "true" : "false")">
+    @* LEFT: the Identity Station. Decorative: every real status is repeated as text in the form. *@
+    <div class="as-stage" id="asStage" data-shot="wide" data-caption="1">
+        <div class="as-stage-ui" aria-hidden="true">
+            <p class="as-chapter"><span class="as-sq"></span>Supplier Genesis</p>
+            <p class="as-tagline">Every great partnership begins with a small idea.</p>
         </div>
-        <ol class="ld-progress" aria-label="Registration progress">
-            <li class="is-done"><span>01</span> Company dossier</li>
-            <li class="is-done"><span>02</span> Verify email</li>
-            <li class="@(faceDone ? "is-done" : "is-current")"><span>03</span> Face enrollment</li>
-            <li class="@(faceDone ? "is-current" : "")"><span>04</span> @(Model.CompanyApproved ? "Biometric sign-in" : "Pending approval")</li>
-        </ol>
-        @if (faceDone)
-        {
-            <div class="ld-face-success" role="status">✓ Face samples registered for this account.</div>
-        }
-        <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
-        <div class="ld-face-controls">
-            <label for="bioPassword">Current password</label>
-            <input id="bioPassword" type="password" autocomplete="current-password" />
-            <small>Your password is checked before the camera opens.</small>
-            <button id="btnFaceEnroll" type="button" class="primary">@(faceDone ? "Replace face samples" : "Start face enrollment")</button>
-            <div id="faceHint" class="ld-face-hint" role="status" aria-live="polite">Position your face inside the frame. Use a well-lit environment and keep one person in view.</div>
+        @* The live camera, seen through the Paper Iris. It opens only after Start face enrollment. *@
+        <div class="as-camera bio-hidden" id="facePanel">
+            <video id="faceVideo" playsinline muted autoplay aria-label="Live camera preview"></video>
         </div>
-        <p class="ld-privacy">Your camera image stays on this device. Face measurements are sent to this application and stored encrypted. This academic implementation does not have spoof or liveness protection, so it should not be treated as production-grade biometric proof.</p>
-        @if (faceDone)
-        {
-            <div class="ld-face-passkey">
-                <h2>Device passkey <small>Optional setup</small></h2>
-                <p>Use your device's available authenticator for another sign-in method. A fingerprint is offered only if your device supports it.</p>
-                <label for="passkeyLabel">Device name</label>
-                <input id="passkeyLabel" type="text" maxlength="60" placeholder="My device" />
-                <button id="btnPasskeyRegister" type="button">@(passkeyDone ? "Add another device passkey" : "Register a device passkey")</button>
-                <small>@(passkeyDone ? Model.PasskeyCount + " passkey(s) registered." : "No device passkey registered.") This uses the password above.</small>
-                <small>Fingerprint-specific enrollment — Coming Soon. A device passkey may use a fingerprint when your authenticator offers it.</small>
-            </div>
-        }
-        <div class="ld-footer-links"><a asp-area="" asp-controller="Home" asp-action="Index">Return to homepage</a><a asp-page="./Login">Go to sign in</a></div>
-        <form asp-page="./Logout" method="post"><button type="submit" class="ld-secondary">Sign out</button></form>
+        <p class="sr-only" data-scene-status></p>
     </div>
-    <aside class="ld-visual" aria-label="Paper portrait and company dossier">
-        <partial name="_LivingDossier" model='"face"' />
-    </aside>
+
+    @* RIGHT: a normal form. *@
+    <div class="as-panel">
+        <div class="as-panel-inner" id="bio-root" data-return-url="" data-face-complete="@(faceDone ? "true" : "false")" data-enrolled-url="/Identity/Account/PendingApproval?faceRegistered=true">
+            @Html.AntiForgeryToken()
+            <p class="as-brand"><span class="as-brand-mark" aria-hidden="true"></span><span class="as-brand-name">Sourcing &amp; Tender Management</span></p>
+            <p class="as-kicker">Supplier registration · Identity</p>
+            <h1 class="as-title">@(faceDone ? (Model.CompanyApproved ? "Your identity is ready." : "Pending Administrator Approval") : "Face Enrollment")</h1>
+            <p class="as-lede">@(faceDone
+                ? (Model.CompanyApproved ? "Your identity has a place. Enter your password, then verify your face to open the supplier workspace." : "Your identity has a place. Your face samples are linked to your account. Your company is still awaiting administrator review.")
+                : "Let's bring your identity to life. Your camera is used to record face measurements for this account.")</p>
+
+            <ol class="as-steps" aria-label="Registration progress">
+                <li class="is-done"><span class="as-n">1</span><span class="as-t">Application</span></li>
+                <li class="is-done"><span class="as-n">2</span><span class="as-t">Email</span></li>
+                <li class="@(faceDone ? "is-done" : "is-current")" aria-current="@(faceDone ? null : "step")"><span class="as-n">3</span><span class="as-t">Face</span></li>
+                <li class="@(faceDone ? "is-current" : "")" aria-current="@(faceDone ? "step" : null)"><span class="as-n">4</span><span class="as-t">@(Model.CompanyApproved ? "Sign in" : "Approval")</span></li>
+            </ol>
+
+            @if (faceDone)
+            {
+                <p class="as-status is-success" role="status">Face samples registered for this account.</p>
+            }
+            <div id="bio-status" class="as-status bio-status" role="status" aria-live="polite"></div>
+
+            <div class="as-field">
+                <label for="bioPassword">Current password</label>
+                <input id="bioPassword" type="password" autocomplete="current-password" />
+                <p class="as-fine">Your password is checked before the camera opens.</p>
+            </div>
+            <div class="as-actions">
+                @if (faceDone && Model.CompanyApproved)
+                {
+                    <button id="btnFaceSetupLogin" type="button" class="as-primary">Verify face and enter workspace</button>
+                }
+                <button id="btnFaceEnroll" type="button" class="@(faceDone ? "as-secondary" : "as-primary")">@(faceDone ? "Replace face samples" : "Start face enrollment")</button>
+            </div>
+            <div class="as-actions" id="faceActions" hidden>
+                <button type="button" id="btnFaceCancel" class="as-secondary" data-bio-keep>Cancel and close the camera</button>
+            </div>
+            <p id="faceHint" class="as-hint" role="status" aria-live="polite">Use a well-lit place and keep only one person in view.</p>
+
+            <div class="as-methods" role="group" aria-label="Other identity methods">
+                <div class="as-method as-method--soon">
+                    <span class="as-method-icon" aria-hidden="true">
+                        <svg class="as-icon" viewBox="0 0 48 48"><path d="M14 40c2.6-5 3.6-10.4 3.6-16a6.4 6.4 0 0 1 12.8 0c0 6.8-1.2 12.8-3.8 18M24 24c0 6.4-1.2 12-4 17M11 33c1.2-3 1.6-5.8 1.6-9a11.4 11.4 0 0 1 22.8 0c0 4.6-.5 8.8-1.6 12.8M9.5 19.5A15.5 15.5 0 0 1 24 8.5c4 0 7.7 1.5 10.5 4M38.5 18c.6 1.9 1 3.9 1 6" /></svg>
+                    </span>
+                    <span class="as-method-text">
+                        <strong>Fingerprint Enrollment</strong>
+                        <small><span class="as-badge">Coming Soon</span> Not available yet</small>
+                    </span>
+                </div>
+            </div>
+
+            <p class="as-fine">Your camera image stays on this device. Face measurements are sent to this application and stored encrypted. This academic face check has no liveness or spoof protection, so it is not production-grade biometric proof.</p>
+
+            @if (faceDone)
+            {
+                <div class="as-note">
+                    <strong>Device passkey (optional)</strong>
+                    <p class="as-fine">A passkey uses your device's own screen lock (PIN, face or fingerprint, depending on the device). It is a separate sign-in method, not the fingerprint enrollment above.</p>
+                    <div class="as-field">
+                        <label for="passkeyLabel">Device name</label>
+                        <input id="passkeyLabel" type="text" maxlength="60" placeholder="My device" />
+                    </div>
+                    <button id="btnPasskeyRegister" type="button" class="as-secondary">@(passkeyDone ? "Add another device passkey" : "Register a device passkey")</button>
+                    <p class="as-fine">@(passkeyDone ? Model.PasskeyCount + " passkey(s) registered." : "No device passkey registered.") This uses the password above.</p>
+                </div>
+            }
+
+            <p class="as-links">
+                <a asp-area="" asp-controller="Home" asp-action="Index">Return to homepage</a>
+                <a asp-page="./Login">Go to sign in</a>
+            </p>
+            <form asp-page="./Logout" method="post"><button type="submit" class="as-quiet">Sign out</button></form>
+        </div>
+    </div>
 </section>
 @section Styles {
-    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/living-dossier.css" asp-append-version="true" />
+    <partial name="_AuthStudioHead" />
 }
 @section Scripts {
-    <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
-    <script src="~/js/living-dossier-motion.js" asp-append-version="true"></script>
     <script src="~/js/biometric.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/auth-studio/station-page.js" asp-append-version="true"></script>
 }
