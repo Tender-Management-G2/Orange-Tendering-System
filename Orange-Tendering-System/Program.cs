@@ -148,6 +148,9 @@ if (app.Environment.IsDevelopment())
 }
 
 await IdentityBootstrap.SeedAsync(app.Services, app.Configuration);
+// Shared team login accounts (Services/TeamAccountSeeder.cs); Development only, switch TeamAccounts:Enabled.
+if (app.Environment.IsDevelopment() && app.Configuration.GetValue("TeamAccounts:Enabled", true))
+    await TeamAccountSeeder.SeedAsync(app.Services);
 if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DemoData:Enabled"))
     await DemoDataSeeder.SeedAsync(app.Services);
 

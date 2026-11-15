@@ -54,6 +54,8 @@ var mail = new CapturedEmail();
 Environment.SetEnvironmentVariable("ConnectionStrings__Default Connection", connection);
 Environment.SetEnvironmentVariable("BootstrapAdmin__Email", adminEmail);
 Environment.SetEnvironmentVariable("BootstrapAdmin__Password", adminPassword);
+// The checks start from an empty database: no shared team accounts (Services/TeamAccountSeeder.cs).
+Environment.SetEnvironmentVariable("TeamAccounts__Enabled", "false");
 Environment.SetEnvironmentVariable("Smtp__Host", "test.local");
 Environment.SetEnvironmentVariable("Smtp__Mode", "Smtp");
 Environment.SetEnvironmentVariable("Smtp__Port", "587");
