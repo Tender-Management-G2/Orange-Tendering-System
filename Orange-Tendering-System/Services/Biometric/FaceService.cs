@@ -74,7 +74,7 @@ public class FaceService(
         return BiometricResult.Ok(user);
     }
 
-    /// <param name="user">The account named at sign-in; null when no such account exists (the result is the same generic failure).</param>
+    /// <param name="user">The account that passed the password step (SupplierPreAuth); null gives the same generic failure.</param>
     public async Task<BiometricResult> VerifyLoginAsync(ApplicationUser? user, FaceSubmission submission)
     {
         const string failed = "Face verification failed.";
@@ -84,7 +84,8 @@ public class FaceService(
             return BiometricResult.Fail("The request expired. Try again.");
 
         var problem = CheckSamples(submission);
-        if (problem is not null || user is null)
+        // The token was issued to the account that passed the password step; it cannot be spent on another one.
+        if (problem is not null || user is null || entry.UserId != user.Id)
             return BiometricResult.Fail(problem ?? failed);
 
         var rows = await db.FaceTemplates.Where(t => t.UserId == user.Id).ToListAsync();

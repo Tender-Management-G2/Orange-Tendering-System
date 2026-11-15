@@ -199,6 +199,9 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     ["LastAdmin"] =
                         "You cannot remove or deactivate the last active Admin.",
 
+                    ["OfficerAlreadyActive"] =
+                        "Only one active Sourcing Officer is allowed. Deactivate the current officer before activating another.",
+
                     ["RoleUpdateFailed"] =
                         "Unable to update the user's role.",
 
@@ -263,6 +266,17 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             return View(user);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResendSetupLink(string id)
+        {
+            var result = await _adminService.ResendSetupLinkAsync(id, HttpContext);
+            TempData[result.Succeeded ? "SuccessMessage" : "ErrorMessage"] = result.Succeeded
+                ? "A new password setup link was emailed. It expires in one hour."
+                : result.Errors.FirstOrDefault()?.Description ?? "The setup link could not be sent.";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
     }

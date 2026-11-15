@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
@@ -18,6 +19,7 @@ public static class DemoDataSeeder
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         if (await db.Departments.AnyAsync(d => d.Name == "DEMO - Information Technology"))
         {
+            await EnsureDemoParticipantsAsync(db, users);
             // Add newly introduced demo pieces to an existing sample database as well.
             var demoRounds = await db.TenderRounds.Include(r => r.Tender)
                 .Where(r => r.Tender.Title.StartsWith("DEMO") && r.Status == TenderRoundStatus.Open && r.Tender.Status == TenderStatus.Bidding)
@@ -162,6 +164,7 @@ public static class DemoDataSeeder
         await db.SaveChangesAsync();
         await EnsureThreeAttemptExceptionDemoAsync(db, officer, supplierUsers.Select(x => x.Supplier).ToList(), committeeUsers);
         await transaction.CommitAsync();
+        await EnsureDemoParticipantsAsync(db, users);
 
         async Task<ApplicationUser> CreateUser(string email, string name, string role, int? departmentId, int? supplierId = null)
         {
@@ -178,6 +181,136 @@ public static class DemoDataSeeder
                 if (!roleResult.Succeeded) throw new InvalidOperationException($"Could not assign demo role {role} to {email}.");
             }
             return user;
+        }
+    }
+
+    private static async Task EnsureDemoParticipantsAsync(ApplicationDbContext db, UserManager<ApplicationUser> users)
+    {
+        var demoDepartmentId = await db.Departments
+            .Where(d => d.Name == "DEMO - Information Technology")
+            .Select(d => d.Id).SingleAsync();
+        for (var i = 1; i <= 4; i++)
+        {
+            var email = $"committee{i}@orange-demo.local";
+            var account = await users.FindByEmailAsync(email);
+            if (account == null)
+            {
+                account = new ApplicationUser
+                {
+                    UserName = email, Email = email, EmailConfirmed = true,
+                    FullName = $"Demo Evaluator {i}",
+                    DepartmentId = i == 1 ? demoDepartmentId : null,
+                    IsActive = true, MustChangePassword = false
+                };
+                var created = await users.CreateAsync(account, Password);
+                if (!created.Succeeded)
+                    throw new InvalidOperationException($"Demo evaluator creation failed for {email}: {string.Join(", ", created.Errors.Select(e => e.Code))}");
+            }
+            if (account.FullName != $"Demo Evaluator {i}" || account.SupplierId != null ||
+                (await users.GetRolesAsync(account)).Any(role => role != SystemRoles.EvaluationCommittee))
+                throw new InvalidOperationException($"Demo evaluator email {email} belongs to another account.");
+            if (i == 1 && account.DepartmentId != demoDepartmentId)
+            {
+                account.DepartmentId = demoDepartmentId;
+                var updated = await users.UpdateAsync(account);
+                if (!updated.Succeeded) throw new InvalidOperationException($"Could not assign demo department to {email}.");
+            }
+            if (!await users.IsInRoleAsync(account, SystemRoles.EvaluationCommittee))
+            {
+                var assigned = await users.AddToRoleAsync(account, SystemRoles.EvaluationCommittee);
+                if (!assigned.Succeeded) throw new InvalidOperationException($"Could not assign Evaluation Committee role to {email}.");
+            }
+        }
+
+        // The original four suppliers are used by the prebuilt tender scenarios. Add the
+        // remaining six without changing invitations, bids, or supplier review decisions.
+        var categories = new[]
+        {
+            SupplierCategories.InformationTechnology, SupplierCategories.OfficeSupplies,
+            SupplierCategories.Furniture, SupplierCategories.ProfessionalServices,
+            SupplierCategories.Construction, SupplierCategories.Transport,
+            SupplierCategories.Medical, SupplierCategories.Food,
+            SupplierCategories.Facilities, SupplierCategories.Telecommunications
+        };
+        for (var i = 1; i <= 10; i++)
+        {
+            var email = $"supplier{i}@orange-demo.local";
+            var registration = $"DEMO-REG-{i:000}";
+            var supplier = await db.Suppliers.SingleOrDefaultAsync(s => s.RegistrationNumber == registration);
+            if (supplier == null)
+            {
+                supplier = new Supplier
+                {
+                    CompanyName = $"DEMO Supplier {i}", RegistrationNumber = registration,
+                    TaxNumber = $"DEMO-TAX-{i:000}", Email = email,
+                    Phone = $"+9627900000{i:00}", Address = "Amman, Jordan",
+                    Category = categories[i - 1], Status = SupplierStatus.Approved,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.Suppliers.Add(supplier);
+                await db.SaveChangesAsync();
+            }
+            if (supplier.Email != email)
+                throw new InvalidOperationException($"Demo registration number {registration} belongs to a different email.");
+
+            var account = await users.FindByEmailAsync(email);
+            if (account == null)
+            {
+                account = new ApplicationUser
+                {
+                    UserName = email, Email = email, EmailConfirmed = true,
+                    FullName = $"Demo Supplier User {i}", SupplierId = supplier.Id,
+                    IsActive = true, MustChangePassword = false
+                };
+                var created = await users.CreateAsync(account, Password);
+                if (!created.Succeeded)
+                    throw new InvalidOperationException($"Demo supplier account creation failed for {email}: {string.Join(", ", created.Errors.Select(e => e.Code))}");
+            }
+            if (account.SupplierId != supplier.Id)
+                throw new InvalidOperationException($"Demo supplier email {email} belongs to another account.");
+            if (!account.FullName.StartsWith("Demo Supplier User ", StringComparison.Ordinal) ||
+                (await users.GetRolesAsync(account)).Any(role => role != SystemRoles.Supplier))
+                throw new InvalidOperationException($"Demo supplier email {email} belongs to a non-demo account.");
+            if (!await users.IsInRoleAsync(account, SystemRoles.Supplier))
+            {
+                var assigned = await users.AddToRoleAsync(account, SystemRoles.Supplier);
+                if (!assigned.Succeeded) throw new InvalidOperationException($"Could not assign Supplier role to {email}.");
+            }
+        }
+
+        var seats = new[] { "top-ceo", "top-member-1", "top-member-2", "top-member-3" };
+        for (var i = 1; i <= 10; i++)
+        {
+            var email = $"top{i}@orange-demo.local";
+            var account = await users.FindByEmailAsync(email);
+            if (account == null)
+            {
+                account = new ApplicationUser
+                {
+                    UserName = email, Email = email, EmailConfirmed = true,
+                    FullName = i == 1 ? "Demo Top Committee CEO" : $"Demo Top Committee Member {i - 1}",
+                    IsActive = true, MustChangePassword = false
+                };
+                var created = await users.CreateAsync(account, Password);
+                if (!created.Succeeded)
+                    throw new InvalidOperationException($"Demo Top Committee account creation failed for {email}: {string.Join(", ", created.Errors.Select(e => e.Code))}");
+            }
+            if (account.SupplierId != null || account.DepartmentId != null)
+                throw new InvalidOperationException($"Demo Top Committee email {email} belongs to another account.");
+            if (!account.FullName.StartsWith("Demo Top Committee ", StringComparison.Ordinal) ||
+                (await users.GetRolesAsync(account)).Any(role => role != SystemRoles.TopCommittee))
+                throw new InvalidOperationException($"Demo Top Committee email {email} belongs to a non-demo account.");
+            if (!await users.IsInRoleAsync(account, SystemRoles.TopCommittee))
+            {
+                var assigned = await users.AddToRoleAsync(account, SystemRoles.TopCommittee);
+                if (!assigned.Succeeded) throw new InvalidOperationException($"Could not assign Top Committee role to {email}.");
+            }
+            var seat = seats[i == 1 ? 0 : 1 + (i - 2) % 3];
+            if (!(await users.GetClaimsAsync(account)).Any(c => c.Type == CommitteeAccountSeats.ClaimType && c.Value == seat))
+            {
+                var assigned = await users.AddClaimAsync(account, new Claim(CommitteeAccountSeats.ClaimType, seat));
+                if (!assigned.Succeeded) throw new InvalidOperationException($"Could not assign Top Committee seat to {email}.");
+            }
         }
     }
 

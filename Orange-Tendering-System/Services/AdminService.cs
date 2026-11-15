@@ -1,4 +1,4 @@
-﻿using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.ViewModels;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +20,7 @@ namespace Orange_Tendering_System.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IEmailSender _emailSender;
-        private readonly LinkGenerator _links;
+        private readonly AccountLinkGenerator _links;
         private readonly IWebHostEnvironment _environment;
 
         public AdminService(
@@ -28,7 +28,7 @@ namespace Orange_Tendering_System.Services
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             IEmailSender emailSender,
-            LinkGenerator links,
+            AccountLinkGenerator links,
             IWebHostEnvironment environment)
         {
             _context = context;
@@ -1005,6 +1005,15 @@ namespace Orange_Tendering_System.Services
                 });
             }
 
+            if (model.Role == SystemRoles.SourcingOfficer && model.IsActive &&
+                (await _userManager.GetUsersInRoleAsync(SystemRoles.SourcingOfficer)).Any(u => u.IsActive))
+            {
+                return IdentityResult.Failed(new IdentityError
+                {
+                    Description = "Only one active Sourcing Officer is allowed. Deactivate the current officer before activating another."
+                });
+            }
+
             if (model.DepartmentId.HasValue)
             {
                 var departmentExists = await _context.Departments
@@ -1146,6 +1155,41 @@ namespace Orange_Tendering_System.Services
             return IdentityResult.Success;
         }
 
+        public async Task<IdentityResult> ResendSetupLinkAsync(string id, HttpContext httpContext)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user is not { SupplierId: null, MustChangePassword: true } ||
+                !await _context.AuditLogs.AnyAsync(a => a.EntityName == nameof(ApplicationUser) &&
+                    a.EntityId == id && (a.Action == "Created" || a.Action == "EmployeeProvisioned")))
+                return IdentityResult.Failed(new IdentityError { Description = "This account does not need an employee setup link." });
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+            var url = _links.GetUriByPage(httpContext, "/Account/ActivateEmployee",
+                new { area = "Identity", email = user.Email, code });
+
+            try
+            {
+                await _emailSender.SendEmailAsync(user.Email!, "Set your Orange Tendering password",
+                    $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
+                    $"<p><a href=\"{HtmlEncoder.Default.Encode(url)}\">Set your private password</a> using this new link. It expires in one hour.</p>" +
+                    "<p>If you were not expecting this email, please contact your administrator.</p>");
+            }
+            catch (Exception exception) when (exception is System.Net.Mail.SmtpException or InvalidOperationException)
+            {
+                return IdentityResult.Failed(new IdentityError { Description = "The setup email could not be delivered. Please try again." });
+            }
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                UserId = _userManager.GetUserId(httpContext.User),
+                Action = "EmployeeSetupLinkResent", EntityName = nameof(ApplicationUser),
+                EntityId = user.Id, CreatedAt = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+            return IdentityResult.Success;
+        }
+
         // =============================================
         // ADMIN - USER DETAILS
         // =============================================
@@ -1187,6 +1231,10 @@ namespace Orange_Tendering_System.Services
                 })
                 .ToListAsync();
 
+            var canResendSetupLink = user.SupplierId == null && user.MustChangePassword &&
+                await _context.AuditLogs.AnyAsync(a => a.EntityName == nameof(ApplicationUser) &&
+                    a.EntityId == id && (a.Action == "Created" || a.Action == "EmployeeProvisioned"));
+
             return new UserDetailsViewModel
             {
                 Id = user.Id,
@@ -1200,6 +1248,7 @@ namespace Orange_Tendering_System.Services
 
                 IsActive = user.IsActive,
                 EmailConfirmed = user.EmailConfirmed,
+                CanResendSetupLink = canResendSetupLink,
                 LockoutEnd = user.LockoutEnd,
 
                 RecentActivities = recentActivities
@@ -1310,6 +1359,13 @@ public async Task<string> UpdateUserAsync(
                 !model.DepartmentId.HasValue)
             {
                 return "DepartmentRequired";
+            }
+
+            if (newRole == SystemRoles.SourcingOfficer && model.IsActive &&
+                (await _userManager.GetUsersInRoleAsync(SystemRoles.SourcingOfficer))
+                    .Any(officer => officer.IsActive && officer.Id != user.Id))
+            {
+                return "OfficerAlreadyActive";
             }
 
             // Validate department

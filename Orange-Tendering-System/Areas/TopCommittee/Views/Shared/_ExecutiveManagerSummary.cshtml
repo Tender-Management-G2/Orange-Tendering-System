@@ -1,0 +1,22 @@
+@model RoundDetails
+@{ var report=Model.Round.TenderReport; var bid=report?.RecommendedBid; var request=Model.Tender.PurchaseRequest; var evaluation=Model.Evaluations.OrderByDescending(e=>e.RoundNumber).FirstOrDefault(); }
+<section class="rv-card rv-summary" aria-labelledby="manager-summary-title">
+<header class="rv-summary-head"><div><span class="rv-eyebrow">TOP COMMITTEE REVIEW</span><div class="rv-title-line"><partial name="_ReviewIcon" model='"report"' /><div><h2 id="manager-summary-title">Sourcing Manager Executive Summary</h2><p>A concise, high-level view of the tender evaluation and result.</p></div></div></div>
+@if(report is {ReportType:ReportType.ExecutiveSummary,SubmittedAt:not null,Status:not ReportStatus.Draft}) { <a class="rv-primary" asp-controller="Decisions" asp-action="SummaryPdf" asp-route-id="@Model.Round.Id">↓ Download Summary PDF</a> }
+</header>
+<div class="rv-summary-inner">
+<dl class="rv-summary-facts">
+@foreach(var fact in new[]{("Tender Ref.","T-"+Model.Tender.Id,"report"),("Tender Title",Model.Tender.Title,"laptop"),("Department",request.Department.Name,"layers"),("Priority",request.Priority.ToString(),"flag"),("Required Date",request.NeededBy?.ToString("dd MMM yyyy")??"—","calendar")})
+{ <div><partial name="_ReviewIcon" model="fact.Item3" /><div><dt>@fact.Item1</dt><dd>@fact.Item2</dd></div></div> }
+</dl>
+@if(report is not {ReportType:ReportType.ExecutiveSummary,SubmittedAt:not null,Status:not ReportStatus.Draft})
+{ <p class="rv-muted">The Sourcing Manager's submitted executive summary is not available for this committee round yet.</p> }
+else
+{
+<div class="rv-recommended"><div><partial name="_ReviewIcon" model='"award"' /><div><span>Recommended Supplier</span><strong>@(bid?.TenderInvitation?.Supplier?.CompanyName??"Not recorded")</strong></div></div><div><partial name="_ReviewIcon" model='"coins"' /><div><span>Recommended Value</span><strong>@(bid is null?"—":bid.CurrencyCode+" "+CommitteeDisplay.Total(bid).ToString("N2"))</strong></div></div></div>
+<div class="rv-recommendation"><partial name="_ReviewIcon" model='"report"' /><div><h3>Sourcing Manager's Recommendation</h3><p class="rv-preserve" dir="auto">@(string.IsNullOrWhiteSpace(report.Content)?"No recommendation text was recorded.":report.Content)</p></div></div>
+@if(evaluation?.TechnicalWeight is not null || evaluation?.FinancialWeight is not null)
+{ <div class="rv-basis"><strong>Evaluation Basis:</strong>@if(evaluation.TechnicalWeight is decimal technical){<span>Technical (@technical.ToString("0.##")%)</span>}@if(evaluation.FinancialWeight is decimal financial){<span>Financial (@financial.ToString("0.##")%)</span>}</div> }
+<p class="rv-provenance">@report.CreatedByUser?.FullName · Report R-@report.Id / Version @report.VersionNumber · Submitted @CommitteeDisplay.Date(report.SubmittedAt)</p>
+}
+</div></section>

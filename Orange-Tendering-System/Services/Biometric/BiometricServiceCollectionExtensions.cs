@@ -43,6 +43,7 @@ public static class BiometricServiceCollectionExtensions
 
         services.AddSingleton<ChallengeStore>();
         services.AddSingleton<BiometricThrottle>();
+        services.AddSingleton<SupplierPreAuth>();
         services.AddScoped<PasskeyService>();
         services.AddScoped<FaceService>();
         services.AddScoped<BiometricSignInService>();

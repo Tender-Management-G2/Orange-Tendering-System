@@ -640,6 +640,26 @@ Check(welcomeEmail.Subject.Contains("Welcome") && welcomeEmail.Body.Contains("si
       welcomeEmail.Body.Contains("ActivateEmployee"), "welcome email includes password and login links");
 var welcomeUrl = WebUtility.HtmlDecode(Regex.Match(welcomeEmail.Body, "href=\\\"([^\\\"]*ActivateEmployee[^\\\"]*)\\\"").Groups[1].Value);
 var welcomeUri = new Uri(welcomeUrl);
+Check(welcomeUri.GetLeftPart(UriPartial.Authority) == "https://tendering.example.test",
+    "welcome link uses the configured public site address");
+string adminCreatedId;
+using (var scope = factory.Services.CreateScope())
+    adminCreatedId = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Users
+        .Where(u => u.Email == adminCreatedEmail).Select(u => u.Id).SingleAsync();
+var detailsPath = "/Admin/Users/Details/" + adminCreatedId;
+var resendToken = await Token(admin, detailsPath);
+var resent = await admin.PostAsync("/Admin/Users/ResendSetupLink", Form(new()
+{
+    ["id"] = adminCreatedId, ["__RequestVerificationToken"] = resendToken
+}));
+Check(resent.StatusCode == HttpStatusCode.Redirect &&
+      mail.Messages.Last(m => m.To == adminCreatedEmail).Subject.Contains("Set your Orange Tendering password"),
+    "Admin can email a fresh employee setup link");
+var resentEmail = mail.Messages.Last(m => m.To == adminCreatedEmail);
+var resentUrl = WebUtility.HtmlDecode(Regex.Match(resentEmail.Body, "href=\\\"([^\\\"]+)\\\"").Groups[1].Value);
+Check(new Uri(resentUrl).GetLeftPart(UriPartial.Authority) == "https://tendering.example.test",
+    "resent setup link uses the configured public site address");
+welcomeUri = new Uri(resentUrl);
 var welcomePassword = "W!w7" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 using (var adminCreated = Client(factory))
 {
@@ -699,6 +719,8 @@ Check(forgot.StatusCode == HttpStatusCode.Redirect, "password reset requested");
 var resetEmail = mail.Messages.Last(m => m.Subject.Contains("Reset"));
 var resetUrl = WebUtility.HtmlDecode(Regex.Match(resetEmail.Body, "href=\\\"([^\\\"]+)\\\"").Groups[1].Value);
 var resetUri = new Uri(resetUrl);
+Check(resetUri.GetLeftPart(UriPartial.Authority) == "https://tendering.example.test",
+    "password reset link uses the configured public site address");
 var encodedCode = QueryHelpers.ParseQuery(resetUri.Query)["code"].ToString();
 var resetToken = await Token(admin, resetUri.PathAndQuery);
 var reset = await admin.PostAsync("/Identity/Account/ResetPassword", Form(new()
@@ -844,6 +866,7 @@ WebApplicationFactory<Orange_Tendering_System.WebAppMarker> CreateFactory() => n
         ["BootstrapAdmin:Password"] = adminPassword,
         ["Smtp:Mode"] = "Smtp", ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test",
         ["Smtp:Username"] = "unused", ["Smtp:Password"] = "unused",
+        ["AccountLinks:PublicBaseUrl"] = "https://tendering.example.test",
         ["Biometric:MaxFailuresPerWindow"] = "100"
     }));
     builder.ConfigureTestServices(services =>

@@ -27,7 +27,8 @@ public static class UnifiedTenderChecks
     {
         var root = Environment.GetEnvironmentVariable("AUTH_PROJECT_ROOT") ?? throw new InvalidOperationException("AUTH_PROJECT_ROOT required");
         var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
-        var connection = $"Server=localhost;Database=OrangeAuthCheck_Unified_{suffix};Trusted_Connection=True;TrustServerCertificate=True";
+        var server = Environment.GetEnvironmentVariable("AUTH_TEST_SERVER") ?? "localhost";
+        var connection = $"Server={server};Database=OrangeAuthCheck_Unified_{suffix};Trusted_Connection=True;TrustServerCertificate=True";
         Environment.SetEnvironmentVariable("ConnectionStrings__Default Connection", connection);
         Environment.SetEnvironmentVariable("DemoData__Enabled", "false");
         var password = "Ut!9" + suffix + suffix;

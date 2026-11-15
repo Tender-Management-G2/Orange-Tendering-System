@@ -15,7 +15,7 @@ public sealed class EmployeeProvisioning(
     ApplicationDbContext db,
     UserManager<ApplicationUser> users,
     IEmailSender emailSender,
-    LinkGenerator links)
+    AccountLinkGenerator links)
 {
     public async Task<IdentityResult> CreateAsync(HttpContext context, string fullName, string email,
         int departmentId, IReadOnlyCollection<string> roles)

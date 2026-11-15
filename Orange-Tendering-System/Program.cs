@@ -44,6 +44,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddTransient<SmtpEmailSender>();
 builder.Services.AddTransient<IEmailSender>(services => services.GetRequiredService<SmtpEmailSender>());
 builder.Services.AddScoped<EmployeeProvisioning>();
+builder.Services.AddSingleton<AccountLinkGenerator>();
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddBiometrics(builder.Configuration);
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierProfileService>();

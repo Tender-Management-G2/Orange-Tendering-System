@@ -4,17 +4,29 @@
 @inject Orange_Tendering_System.Data.ApplicationDbContext Records
 @using Microsoft.EntityFrameworkCore
 @{
-    // Pick people by name instead of pasting Identity user ids: only active accounts of the right role are offered (the server re-checks every choice).
-    // Keep manager and evaluation accounts distinct while showing Admin's saved committee choices.
-    async Task<List<(string Id, string Label, int? Dept)>> Pool(string role, string excluded) { var blocked = (await People.GetUsersInRoleAsync(excluded)).Select(b => b.Id).ToHashSet(); return (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive && !blocked.Contains(u.Id))
-        .Select(u => (u.Id, (string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName + " (" + u.Email + ")")!, u.DepartmentId)).OrderBy(u => u.Item2).ToList(); }
+    // Show only accounts eligible for the seat; Create validates the selection again.
+    async Task<List<(string Id, string Label, int? Dept)>> Pool(string role)
+    {
+        var result = new List<(string Id, string Label, int? Dept)>();
+        foreach (var person in (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive))
+        {
+            var roles = await People.GetRolesAsync(person);
+            if (roles.Contains(Orange_Tendering_System.Models.SystemRoles.Admin) ||
+                roles.Contains(Orange_Tendering_System.Models.SystemRoles.Supplier) ||
+                roles.Contains(Orange_Tendering_System.Models.SystemRoles.SourcingOfficer) ||
+                Orange_Tendering_System.Models.SystemRoles.AccountRoles(role).Any(required => !roles.Contains(required))) continue;
+            result.Add((person.Id, (string.IsNullOrWhiteSpace(person.FullName) ? person.Email : person.FullName + " (" + person.Email + ")")!, person.DepartmentId));
+        }
+        return result.OrderBy(u => u.Label).ToList();
+    }
     var fixedEvaluation = await CommitteeConfiguration.StandingEvaluationDefaults();
     Model.SourcingManagerId = fixedEvaluation.GetValueOrDefault("evaluation-manager") ?? "";
     Model.FinancialRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-financial") ?? "";
     Model.TechnicalRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-technical-1") ?? "";
-    var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager, Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee);
-    var evaluators = await Pool(Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee, Orange_Tendering_System.Models.SystemRoles.SourcingManager);
-    var departmentRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.DepartmentRepresentative, Orange_Tendering_System.Models.SystemRoles.SourcingManager);
+    var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager);
+    var financialRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.Finance);
+    var technicalRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.Technical);
+    var departmentRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.DepartmentRepresentative);
     var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted && !r.Tenders.Any()).OrderByDescending(r => r.Id)
         .Select(r => new
         {
@@ -28,8 +40,8 @@
     {
         ("SourcingManagerId", "Sourcing Manager", "Reviews the signed report: approve, reject or return", "M", managers, Model.SourcingManagerId),
         ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", departmentRepresentatives, Model.DepartmentRepresentativeId),
-        ("FinancialRepresentativeId", "Financial Representative", "Scores the financial side", "F", evaluators, Model.FinancialRepresentativeId),
-        ("TechnicalRepresentativeId", "Technical Representative", "Scores the technical side", "T", evaluators, Model.TechnicalRepresentativeId)
+        ("FinancialRepresentativeId", "Financial Representative", "Scores the financial side", "F", financialRepresentatives, Model.FinancialRepresentativeId),
+        ("TechnicalRepresentativeId", "Technical Representative", "Scores the technical side", "T", technicalRepresentatives, Model.TechnicalRepresentativeId)
     };
 }
 <dialog id="tc-dialog" class="tc-dialog" aria-labelledby="tc-title">
@@ -81,17 +93,14 @@
             </section>
 
             <section class="tc-card" aria-labelledby="tc-s3">
-                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p>Three members are selected by Admin. Choose the fourth member from the requesting department.</p></div></header>
-                @if (fixedEvaluation.Count != 3) { <p class="tc-alert">Ask Admin to configure the Evaluation Committee before creating a tender.</p> }
+                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p>Choose active users assigned to each role by Admin. The department representative must belong to the requesting department.</p></div></header>
                 <div class="tc-seats">
                     @foreach (var s in seats)
                     {
-                        var fixedSeat = s.Field != "DepartmentRepresentativeId";
                         <label class="tc-seat" data-seat="@s.Field">
                             <span class="tc-avatar" aria-hidden="true">@s.Icon</span>
                             <span class="tc-seat-body"><strong>@s.Title</strong><small>@s.Hint</small>
-                                @if (fixedSeat) { <input type="hidden" name="@s.Field" value="@s.Value" /> }
-                                <select name="@(fixedSeat ? null : s.Field)" id="@s.Field" required disabled="@fixedSeat" class="tc-seat-select">
+                                <select name="@s.Field" id="@s.Field" required class="tc-seat-select">
                                     <option value="">Select a person</option>
                                     @foreach (var u in s.Pool) { <option value="@u.Id" data-dept="@u.Dept" selected="@(s.Value == u.Id)">@u.Label</option> }
                                 </select></span>

@@ -124,24 +124,16 @@ public partial class TenderWorkflowService
     public async Task<Dictionary<string, string>> StandingEvaluationDefaults() => (await ReadStanding("Evaluation")).Members
         .Where(x => x.Key != "evaluation-department").ToDictionary(x => x.Key, x => x.Value);
 
-    private async Task<(Dictionary<string, string> Evaluation, Dictionary<string, string> Top)> RequiredStandingCommittees()
+    private async Task<Dictionary<string, string>> RequiredStandingTopCommittee()
     {
-        var evaluation = await ReadStanding("Evaluation", true);
-        // The Admin roster also records its preferred Department Representative.
-        // Preserve the existing workflow contract: other cycles still select that seat per tender.
-        evaluation.Members.Remove("evaluation-department");
         var top = await ReadStanding("Top", true);
-        foreach (var committee in new[] { "Evaluation", "Top" })
+        Require(top.Members.Count == FixedSeats("Top").Length, "Admin must configure the Top Committee before creating a tender.");
+        foreach (var seat in FixedSeats("Top"))
         {
-            var roster = committee == "Top" ? top : evaluation;
-            Require(roster.Members.Count == FixedSeats(committee).Length, $"Admin must configure the {committee} Committee before creating a tender.");
-            foreach (var seat in FixedSeats(committee))
-            {
-                Require(roster.Members.TryGetValue(seat.Key, out var id), "A committee seat is missing.");
-                await ValidateStandingPerson(id!, seat.Role);
-            }
+            Require(top.Members.TryGetValue(seat.Key, out var id), "A committee seat is missing.");
+            await ValidateStandingPerson(id!, seat.Role);
         }
-        Require(evaluation.Members.Values.Concat(top.Members.Values).Distinct().Count() == 7, "The committees must contain seven different people; the eighth is the tender's department representative.");
-        return (evaluation.Members, top.Members);
+        Require(top.Members.Values.Distinct().Count() == 4, "The Top Committee must contain four different people.");
+        return top.Members;
     }
 }

@@ -5,7 +5,9 @@
 //   - GET Fingerprint / Face: enrollment pages for the signed-in user.
 //   - JSON endpoints called by wwwroot/js/biometric.js. Every POST is protected by the anti-forgery token.
 // Security: face sign-in compares freshly captured descriptors with encrypted enrolled templates (one-time token
-//   per attempt; NO liveness/spoof protection by owner decision). Passkeys require real WebAuthn proof.
+//   per attempt; NO liveness/spoof protection by owner decision). It is a second step only: it works inside the
+//   pre-auth transaction the Login page opens after a correct password (SupplierPreAuth), for that account.
+//   Passkeys require real WebAuthn proof and sign in on their own.
 //   Enrollment is allowed for verified pending suppliers; sign-in requires an Approved supplier company.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -26,6 +28,7 @@ namespace Orange_Tendering_System.Controllers
         PasskeyService passkeys,
         FaceService faces,
         BiometricSignInService signIn,
+        SupplierPreAuth preAuth,
         BiometricThrottle throttle) : Controller
     {
         private const string GenericFailure = "Sign-in failed. Check your details and account approval, then try again.";
@@ -135,36 +138,57 @@ namespace Orange_Tendering_System.Controllers
         public IActionResult FaceChallenge()
         {
             if (throttle.IsBlocked(BiometricThrottle.IpKey(Ip()))) return TooManyAttempts();
-            return Json(faces.CreateChallenge(FaceService.LoginPurpose, null));
+            // The one-time token is tied to the account that passed the password step.
+            var userId = preAuth.UserId(HttpContext);
+            return userId is null ? PasswordStepRequired() : Json(faces.CreateChallenge(FaceService.LoginPurpose, userId));
         }
 
         [AllowAnonymous, HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
         public async Task<IActionResult> FaceLogin([FromBody] FaceSubmission submission)
         {
             var ipKey = BiometricThrottle.IpKey(Ip());
-            var accountKey = BiometricThrottle.AccountKey(submission.Email);
-            if (throttle.IsBlocked(ipKey, accountKey)) return TooManyAttempts();
+            if (throttle.IsBlocked(ipKey)) return TooManyAttempts();
 
-            var user = string.IsNullOrWhiteSpace(submission.Email) ? null : await users.FindByEmailAsync(submission.Email.Trim());
+            // The account is the one that just passed the password check, never one named by the browser.
+            var user = await preAuth.UserAsync(HttpContext, users);
+            if (user is null)
+            {
+                throttle.Failure(ipKey);
+                await signIn.RegisterFailureAsync(null, BiometricSignInService.FaceMethod, "no password step", Ip());
+                return PasswordStepRequired();
+            }
+
+            var accountKey = BiometricThrottle.AccountKey(user.Email);
+            if (throttle.IsBlocked(accountKey)) return TooManyAttempts();
+
             var result = await faces.VerifyLoginAsync(user, submission);
             if (!result.Succeeded || result.User is null)
             {
                 throttle.Failure(ipKey, accountKey);
                 await signIn.RegisterFailureAsync(user, BiometricSignInService.FaceMethod, result.Error ?? "failed", Ip());
-                // Capture problems are checked before the account is looked at, so they are safe to show; a mismatch is generic.
+                // Failed face checks count toward the account lockout; a locked account starts again from the password.
+                if (await signIn.IsLockedOutAsync(user))
+                {
+                    preAuth.End(HttpContext);
+                    return PasswordStepRequired();
+                }
+
+                // Capture problems are checked before the templates are compared, so they are safe to show; a mismatch is generic.
                 return Unauthorized(new { error = result.Error ?? GenericFailure });
             }
 
             if (!await signIn.SignInAsync(result.User, BiometricSignInService.FaceMethod, Ip()))
             {
-                // The face matched, so the person has proven who they are: tell a pending supplier why.
+                preAuth.End(HttpContext);
+                // The password and the face matched, so the person has proven who they are: tell a pending supplier why.
                 var pending = result.User.SupplierId != null && await db.Suppliers.AsNoTracking()
                     .AnyAsync(s => s.Id == result.User.SupplierId && s.Status == SupplierStatus.Pending);
-                return Unauthorized(new { error = pending
+                return Unauthorized(new { restart = true, error = pending
                     ? "Face recognised, but your company is still awaiting administrator approval."
                     : GenericFailure });
             }
 
+            preAuth.End(HttpContext);
             throttle.Reset(ipKey, accountKey);
             return Json(new { succeeded = true, redirect = await signIn.DestinationAsync(result.User, submission.ReturnUrl, Url.IsLocalUrl) });
         }
@@ -189,5 +213,9 @@ namespace Orange_Tendering_System.Controllers
 
         private ObjectResult TooManyAttempts() =>
             StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Too many attempts. Wait a few minutes and try again." });
+
+        // No live password step in this browser (never started, expired, cancelled, or already used).
+        private UnauthorizedObjectResult PasswordStepRequired() =>
+            Unauthorized(new { restart = true, error = "Enter your email and password again to continue." });
     }
 }

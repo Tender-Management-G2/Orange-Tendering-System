@@ -107,16 +107,21 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var pr = await db.PurchaseRequests.FromSqlInterpolated($"SELECT * FROM PurchaseRequests WITH (UPDLOCK,HOLDLOCK) WHERE Id={input.PurchaseRequestId}").Include(x => x.Items).SingleOrDefaultAsync();
         Require(pr?.Status == PurchaseRequestStatus.Accepted && pr.Items.Count > 0, "An accepted Purchase Request with line items is required.");
         Require(!await db.Tenders.AnyAsync(t => t.PurchaseRequestId == input.PurchaseRequestId), "This request already has a tender. Continue that tender or create a new round instead.");
-        var fixedCommittees = await RequiredStandingCommittees();
-        input.SourcingManagerId = fixedCommittees.Evaluation["evaluation-manager"];
-        input.FinancialRepresentativeId = fixedCommittees.Evaluation["evaluation-financial"];
-        input.TechnicalRepresentativeId = fixedCommittees.Evaluation["evaluation-technical-1"];
+        var fixedEvaluation = await StandingEvaluationDefaults();
+        var topCommittee = await RequiredStandingTopCommittee();
+        Require(fixedEvaluation.ContainsKey("evaluation-manager") && fixedEvaluation.ContainsKey("evaluation-financial") && fixedEvaluation.ContainsKey("evaluation-technical-1"), "Admin must configure the Evaluation Committee before creating a tender.");
+        input.SourcingManagerId = fixedEvaluation["evaluation-manager"];
+        input.FinancialRepresentativeId = fixedEvaluation["evaluation-financial"];
+        input.TechnicalRepresentativeId = fixedEvaluation["evaluation-technical-1"];
         await ValidateStandingPerson(input.DepartmentRepresentativeId, SystemRoles.DepartmentRepresentative);
-        Require(!fixedCommittees.Top.Values.Contains(input.DepartmentRepresentativeId), "The department representative cannot also sit on Top Committee.");
+        Require(!topCommittee.Values.Contains(input.DepartmentRepresentativeId), "The department representative cannot also sit on Top Committee.");
         var ids = new[] { input.SourcingManagerId, input.DepartmentRepresentativeId, input.FinancialRepresentativeId, input.TechnicalRepresentativeId };
         Require(ids.Distinct().Count() == 4 && !ids.Contains(actor.Id), "Assign four distinct committee members, separate from the officer.");
+        Require(!ids.Intersect(topCommittee.Values).Any(), "Evaluation Committee members cannot also sit on the Top Committee.");
+        var seatRoles = new[] { SystemRoles.SourcingManager, SystemRoles.DepartmentRepresentative, SystemRoles.Finance, SystemRoles.Technical };
         for (var i = 0; i < ids.Length; i++)
         {
+            await ValidateStandingPerson(ids[i], seatRoles[i]);
             var person = await users.FindByIdAsync(ids[i]);
             Require(person is { IsActive: true }, "Committee account missing or inactive.");
             Require(await Role(person!, i == 0 ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee), "Each member must have the appropriate Identity role.");
@@ -139,9 +144,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                 "top-cto" => CommitteeResponsibility.ChiefTechnologyOfficer,
                 _ => CommitteeResponsibility.ChiefOperationsOfficer
             };
-            db.CommitteeMembers.Add(new CommitteeMember { TenderId = tender.Id, UserId = fixedCommittees.Top[seat.Key], CommitteeType = CommitteeType.Top, Responsibility = responsibility, AssignedAt = Now });
+            db.CommitteeMembers.Add(new CommitteeMember { TenderId = tender.Id, UserId = topCommittee[seat.Key], CommitteeType = CommitteeType.Top, Responsibility = responsibility, AssignedAt = Now });
         }
-        Audit(actor, tender.Id, "FixedCommitteesApplied", new { fixedCommittees.Evaluation, fixedCommittees.Top, DepartmentRepresentativeId = input.DepartmentRepresentativeId });
+        Audit(actor, tender.Id, "FixedCommitteesApplied", new { Evaluation = ids, Top = topCommittee });
         Audit(actor, tender.Id, "RequirementsCreated", input);
         await db.SaveChangesAsync(); await tx.CommitAsync(); return tender.Id;
     }

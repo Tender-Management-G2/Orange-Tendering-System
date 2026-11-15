@@ -4,69 +4,180 @@
 @inject IConfiguration Configuration
 @using Orange_Tendering_System.Services
 @{
-    ViewData["Title"] = "Supplier Registration — The Living Dossier";
+    ViewData["Title"] = "Supplier registration";
 }
-<section class="ld-shell" id="livingRegistration">
-    <div class="ld-interface">
-        <div class="ld-brand"><span class="ld-brand-symbol">◈</span><div><strong>Supplier registration</strong><small>THE LIVING DOSSIER</small></div></div>
-        <div class="ld-intro"><span class="ld-kicker">Every company has a story</span><h1>Build your company dossier.</h1><p>Tell us about your company. Each detail becomes part of your application for review.</p></div>
-        <ol class="ld-progress" aria-label="Registration steps">
-            <li class="is-current"><span>01</span> Contact account</li>
-            <li><span>02</span> Company details</li>
-            <li><span>03</span> Official documents</li>
-            <li><span>04</span> Review &amp; submit</li>
-        </ol>
-        <form id="registerForm" method="post" enctype="multipart/form-data" novalidate>
-            <div id="registrationErrors" class="validation-summary" role="alert" aria-live="polite"></div>
-            <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-            <fieldset class="ld-step" data-step="0">
-                <legend>Contact account</legend><p class="ld-step-copy">The person who will represent your company.</p>
-                <div class="ld-fields">
-                    <div><label asp-for="Input.FullName">Contact person's full name</label><input asp-for="Input.FullName" autocomplete="name" /><span asp-validation-for="Input.FullName" class="field-error"></span></div>
-                    <div><label asp-for="Input.Email">Email address</label><input asp-for="Input.Email" autocomplete="email" /><span asp-validation-for="Input.Email" class="field-error"></span></div>
-                    <div><label asp-for="Input.Password">Password</label><input asp-for="Input.Password" autocomplete="new-password" /><span asp-validation-for="Input.Password" class="field-error"></span></div>
-                    <div><label asp-for="Input.ConfirmPassword">Confirm password</label><input asp-for="Input.ConfirmPassword" autocomplete="new-password" /><span asp-validation-for="Input.ConfirmPassword" class="field-error"></span></div>
-                </div>
-            </fieldset>
-            <fieldset class="ld-step" data-step="1">
-                <legend>Company details</legend><p class="ld-step-copy">Give your dossier its legal identity.</p>
-                <div class="ld-fields">
-                    <div><label asp-for="Input.CompanyName">Legal company name</label><input asp-for="Input.CompanyName" /><span asp-validation-for="Input.CompanyName" class="field-error"></span></div>
-                    <div><label asp-for="Input.Category">Main supply category</label><select asp-for="Input.Category"><option value="">Choose your category</option>@foreach (var category in Model.Categories) { <option value="@category">@category</option> }</select><span asp-validation-for="Input.Category" class="field-error"></span></div>
-                    <div><label asp-for="Input.RegistrationNumber">Commercial registration number</label><input asp-for="Input.RegistrationNumber" /><span asp-validation-for="Input.RegistrationNumber" class="field-error"></span></div>
-                    <div><label asp-for="Input.TaxNumber">Tax number (where applicable)</label><input asp-for="Input.TaxNumber" /><span asp-validation-for="Input.TaxNumber" class="field-error"></span></div>
-                    <div><label asp-for="Input.CompanyEmail">Company email</label><input asp-for="Input.CompanyEmail" autocomplete="email" /><span asp-validation-for="Input.CompanyEmail" class="field-error"></span></div>
-                    <div><label asp-for="Input.CompanyPhone">Company telephone number</label><input asp-for="Input.CompanyPhone" type="tel" /><span asp-validation-for="Input.CompanyPhone" class="field-error"></span></div>
-                    <div class="ld-wide"><label asp-for="Input.CompanyAddress">Company address</label><input asp-for="Input.CompanyAddress" /><span asp-validation-for="Input.CompanyAddress" class="field-error"></span></div>
-                </div>
-            </fieldset>
-            <fieldset class="ld-step" data-step="2">
-                <legend>Official documents</legend><p class="ld-step-copy">PDF, PNG or JPEG, up to 10 MB each. Your files are checked again on the server.</p>
-                <div class="ld-fields ld-files">
-                    <div><label asp-for="CommercialRegistrationCertificate">Commercial registration certificate</label><input asp-for="CommercialRegistrationCertificate" type="file" accept=".pdf,.png,.jpg,.jpeg" /><span asp-validation-for="CommercialRegistrationCertificate" class="field-error"></span></div>
-                    <div><label asp-for="TaxCertificate">Tax certificate <small>Required if a tax number was entered</small></label><input asp-for="TaxCertificate" type="file" accept=".pdf,.png,.jpg,.jpeg" /><span asp-validation-for="TaxCertificate" class="field-error"></span></div>
-                    <div class="ld-wide"><label asp-for="LegalDocuments">Business licenses or other legal documents</label><input asp-for="LegalDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg" /><span asp-validation-for="LegalDocuments" class="field-error"></span></div>
-                </div>
-            </fieldset>
-            <fieldset class="ld-step" data-step="3">
-                <legend>Review &amp; submit</legend><p class="ld-step-copy">Check your details before we send your email verification code.</p>
-                <dl class="ld-review" id="registrationReview"></dl>
-                <p class="ld-process-note">After email verification, enroll your face on the next screen. Your company remains pending until an administrator approves it.</p>
-            </fieldset>
-            <div class="ld-actions"><button type="button" class="ld-secondary" id="registrationBack" hidden>← Back</button><button type="button" class="primary" id="registrationNext" hidden>Continue →</button><button id="registerSubmit" type="submit" class="primary">Send verification code →</button></div>
-        </form>
-        <div class="ld-footer-links"><a asp-page="./VerifyEmail">Verify an existing application</a><a asp-page="./Login">Already have an account? Sign in</a></div>
-        @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
-        {
-            <p class="ld-dev-note">Local mail inbox: run <code>node Tools/DevMail/server.js</code>, then open <a href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">the inbox</a>.</p>
-        }
+<section class="as-shell" id="authStudio" data-chapter="registration">
+    @* LEFT: the animated world. Decorative: every real status is repeated as text in the form. *@
+    <div class="as-stage" id="asStage" data-shot="wide" data-caption="1">
+        <div class="as-stage-ui" aria-hidden="true">
+            <p class="as-chapter"><span class="as-sq"></span>Supplier Genesis</p>
+            <p class="as-tagline">Every great partnership begins with a small idea.</p>
+        </div>
+        <div class="as-stage-fallback" data-stage-fallback hidden></div>
+        <p class="sr-only" data-scene-status></p>
     </div>
-    <aside class="ld-visual" aria-label="Illustration of your company dossier"><partial name="_LivingDossier" model='"registration"' /></aside>
+
+    @* RIGHT: a normal form. It never waits for the illustration. *@
+    <div class="as-panel">
+        <div class="as-panel-inner">
+            <p class="as-brand"><span class="as-brand-mark" aria-hidden="true"></span><span class="as-brand-name">Sourcing &amp; Tender Management</span></p>
+            <p class="as-kicker">Supplier registration</p>
+            <h1 class="as-title">Create your supplier account</h1>
+            <p class="as-lede"><span class="as-lede-tagline">Every great partnership begins with a small idea. </span>Tell us who you are and which company you represent. An administrator reviews every application.</p>
+
+            <ol class="as-steps" aria-label="Registration steps">
+                <li class="is-current" aria-current="step"><span class="as-n">1</span><span class="as-t">Contact</span></li>
+                <li><span class="as-n">2</span><span class="as-t">Company</span></li>
+                <li><span class="as-n">3</span><span class="as-t">Documents</span></li>
+                <li><span class="as-n">4</span><span class="as-t">Review</span></li>
+            </ol>
+
+            <form id="registerForm" method="post" enctype="multipart/form-data" novalidate>
+                <div id="registrationErrors" class="as-summary" role="alert" aria-live="polite"></div>
+                <div asp-validation-summary="ModelOnly" class="as-summary" role="alert"></div>
+
+                <fieldset class="as-step" data-step="0">
+                    <legend class="as-step-title">Contact account</legend>
+                    <p class="as-step-copy">The person who will represent your company.</p>
+                    <div class="as-fields as-fields--single">
+                        <div class="as-field">
+                            <label asp-for="Input.FullName">Contact person's full name</label>
+                            <input asp-for="Input.FullName" autocomplete="name" />
+                            <span asp-validation-for="Input.FullName" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="Input.Email">Email address</label>
+                            <input asp-for="Input.Email" autocomplete="email" inputmode="email" />
+                            <span asp-validation-for="Input.Email" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="Input.Password">Password</label>
+                            <div class="as-with-toggle">
+                                <input asp-for="Input.Password" autocomplete="new-password" aria-describedby="passwordRules" />
+                                <button type="button" class="as-reveal" data-reveal="Input_Password" aria-pressed="false">Show</button>
+                            </div>
+                            <ul class="as-rules" id="passwordRules" aria-label="Password requirements">
+                                <li><span class="as-tick" aria-hidden="true"></span>8 characters or more <span class="sr-only">— not met</span></li>
+                                <li><span class="as-tick" aria-hidden="true"></span>A lowercase letter <span class="sr-only">— not met</span></li>
+                                <li><span class="as-tick" aria-hidden="true"></span>An uppercase letter <span class="sr-only">— not met</span></li>
+                                <li><span class="as-tick" aria-hidden="true"></span>A number <span class="sr-only">— not met</span></li>
+                                <li><span class="as-tick" aria-hidden="true"></span>A symbol <span class="sr-only">— not met</span></li>
+                            </ul>
+                            <span asp-validation-for="Input.Password" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="Input.ConfirmPassword">Confirm password</label>
+                            <div class="as-with-toggle">
+                                <input asp-for="Input.ConfirmPassword" autocomplete="new-password" />
+                                <button type="button" class="as-reveal" data-reveal="Input_ConfirmPassword" aria-pressed="false">Show</button>
+                            </div>
+                            <span asp-validation-for="Input.ConfirmPassword" class="as-field-error"></span>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="as-step" data-step="1">
+                    <legend class="as-step-title">Company details</legend>
+                    <p class="as-step-copy">The legal identity of the company you are registering.</p>
+                    <div class="as-fields">
+                        <div class="as-field as-wide">
+                            <label asp-for="Input.CompanyName">Legal company name</label>
+                            <input asp-for="Input.CompanyName" autocomplete="organization" />
+                            <span asp-validation-for="Input.CompanyName" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field as-wide">
+                            <label asp-for="Input.Category">Main supply category</label>
+                            <select asp-for="Input.Category">
+                                <option value="">Choose your category</option>
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category">@category</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Input.Category" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="Input.RegistrationNumber">Commercial registration number</label>
+                            <input asp-for="Input.RegistrationNumber" />
+                            <span asp-validation-for="Input.RegistrationNumber" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="Input.TaxNumber">Tax number <small>(where applicable)</small></label>
+                            <input asp-for="Input.TaxNumber" />
+                            <span asp-validation-for="Input.TaxNumber" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="Input.CompanyEmail">Company email</label>
+                            <input asp-for="Input.CompanyEmail" autocomplete="email" inputmode="email" />
+                            <span asp-validation-for="Input.CompanyEmail" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="Input.CompanyPhone">Company telephone</label>
+                            <input asp-for="Input.CompanyPhone" type="tel" autocomplete="tel" />
+                            <span asp-validation-for="Input.CompanyPhone" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field as-wide">
+                            <label asp-for="Input.CompanyAddress">Company address</label>
+                            <input asp-for="Input.CompanyAddress" autocomplete="street-address" />
+                            <span asp-validation-for="Input.CompanyAddress" class="as-field-error"></span>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="as-step" data-step="2">
+                    <legend class="as-step-title">Official documents</legend>
+                    <p class="as-step-copy">PDF, PNG or JPEG, up to 10 MB each. Files are checked again on the server and reviewed by an administrator.</p>
+                    <div class="as-fields as-fields--single">
+                        <div class="as-field">
+                            <label asp-for="CommercialRegistrationCertificate">Commercial registration certificate</label>
+                            <input asp-for="CommercialRegistrationCertificate" type="file" accept=".pdf,.png,.jpg,.jpeg" />
+                            <p class="as-file-state" data-file-state="CommercialRegistrationCertificate" role="status"></p>
+                            <span asp-validation-for="CommercialRegistrationCertificate" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="TaxCertificate">Tax certificate <small>(required if a tax number was entered)</small></label>
+                            <input asp-for="TaxCertificate" type="file" accept=".pdf,.png,.jpg,.jpeg" />
+                            <p class="as-file-state" data-file-state="TaxCertificate" role="status"></p>
+                            <span asp-validation-for="TaxCertificate" class="as-field-error"></span>
+                        </div>
+                        <div class="as-field">
+                            <label asp-for="LegalDocuments">Business licenses or other legal documents</label>
+                            <input asp-for="LegalDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg" />
+                            <p class="as-file-state" data-file-state="LegalDocuments" role="status"></p>
+                            <span asp-validation-for="LegalDocuments" class="as-field-error"></span>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="as-step" data-step="3">
+                    <legend class="as-step-title">Review and submit</legend>
+                    <p class="as-step-copy">Check your details before we send your email verification code.</p>
+                    <dl class="as-review" id="registrationReview"></dl>
+                    <p class="as-note">After email verification you enroll your face on the next screen. Your company stays pending until an administrator approves it.</p>
+                </fieldset>
+
+                <div class="as-actions">
+                    <button type="button" class="as-secondary" id="registrationBack" hidden><span aria-hidden="true">←</span> Back</button>
+                    <button type="button" class="as-primary" id="registrationNext" hidden>Continue <span aria-hidden="true">→</span></button>
+                    <button id="registerSubmit" type="submit" class="as-primary">Send verification code →</button>
+                </div>
+            </form>
+
+            <p class="as-links">
+                <a asp-page="./VerifyEmail">Already started? Verify your email</a>
+                <a asp-page="./Login">Already have an account? Sign in</a>
+            </p>
+            @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
+            {
+                <p class="as-dev-note">Local mail inbox: run <code>node Tools/DevMail/server.js</code>, then open <a href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">the inbox</a>.</p>
+            }
+        </div>
+    </div>
 </section>
-@section Styles { <link rel="stylesheet" href="~/css/living-dossier.css" asp-append-version="true" /> }
+@section Styles {
+    <partial name="_AuthStudioHead" />
+}
 @section Scripts {
-    <partial name="_ValidationScriptsPartial" />
     <script src="~/js/supplier-registration.js" asp-append-version="true"></script>
-    <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
-    <script src="~/js/living-dossier-motion.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/auth-studio/register-page.js" asp-append-version="true"></script>
 }

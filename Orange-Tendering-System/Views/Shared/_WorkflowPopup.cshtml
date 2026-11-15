@@ -534,13 +534,13 @@
                     }
                     @if (Model.Scores.Count > 0 && matrixBids.Count > 0)
                         {
-                            @if (s.State == SessionState.Scheduled) { <p class="wp-hint">Each member's scores stay private until the evaluation ends, so nobody is influenced by anyone else. Your own scores are always visible to you.</p> }
+                            @if (s?.State == SessionState.Scheduled) { <p class="wp-hint">Each member's scores stay private until the evaluation ends, so nobody is influenced by anyone else. Your own scores are always visible to you.</p> }
                             <div class="wp-table wp-matrix"><table class="wp-sortable"><thead><tr><th>Member</th><th>Role</th>@foreach (var bidId in matrixBids) { <th data-num>@BidSupplier(bidId)</th> }</tr></thead><tbody>
                             @foreach (var m in evalMembers)
                             {
                                 <tr><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td>
                                 @foreach (var bidId in matrixBids) { var f = Cell(m.Id, bidId, CriterionType.Financial); var t = Cell(m.Id, bidId, CriterionType.Technical); var ws = Weighted(m.Id, bidId);
-                                    <td data-v="@(ws?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "")">@if (f == null) { <span class="wp-dim">@(s.Invitations.Any(x => x.CommitteeMemberId == m.Id && x.SubmittedAt != null) ? "✓ Submitted, hidden until the evaluation ends" : "Waiting")</span> } else { <b>@(ws?.ToString("0.00") ?? "\u2014")</b><small>@f.Value.ToString("0.##") / @t?.ToString("0.##")</small> }</td> }
+                                    <td data-v="@(ws?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "")">@if (f == null) { <span class="wp-dim">@(s?.Invitations.Any(x => x.CommitteeMemberId == m.Id && x.SubmittedAt != null) == true ? "✓ Submitted, hidden until the evaluation ends" : "Waiting")</span> } else { <b>@(ws?.ToString("0.00") ?? "\u2014")</b><small>@f.Value.ToString("0.##") / @t?.ToString("0.##")</small> }</td> }
                                 </tr>
                             }
                             @if (Model.Ranking.Count > 0)

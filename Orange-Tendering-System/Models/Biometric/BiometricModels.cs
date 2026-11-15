@@ -25,8 +25,14 @@ public class BiometricOptions
     /// </summary>
     public int PasskeyChallengeSeconds { get; set; } = 300;
 
-    /// <summary>Legacy setting, not used: face sign-in is email + live face (suppliers use the password only for setup).</summary>
+    /// <summary>
+    /// Legacy setting, not read. Face sign-in always follows a correct password: the password step opens a
+    /// short-lived pre-auth transaction (SupplierPreAuth) and the face check is accepted only inside it.
+    /// </summary>
     public bool FaceLoginRequiresPassword { get; set; } = true;
+
+    /// <summary>How long a supplier has, after a correct password, to complete the face step before starting again.</summary>
+    public int PreAuthSeconds { get; set; } = 300;
 
     public int MaxFaceTemplatesPerUser { get; set; } = 10;
     public int MaxPasskeysPerUser { get; set; } = 10;

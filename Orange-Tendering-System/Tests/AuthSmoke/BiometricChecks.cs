@@ -174,15 +174,9 @@ static class BiometricChecks
         {
             var faceCsrf = await token(faceAnonymous, "/Identity/Account/Login");
             check((await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceLogin", forged)).StatusCode == HttpStatusCode.Unauthorized, "forged face login token creates no Identity cookie");
-            check((await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(faceAnonymous, faceCsrf, "/Biometrics/FaceChallenge", new { }), RandomFace(2), email))).StatusCode == HttpStatusCode.Unauthorized,
-                "a different face is rejected");
+            check((await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized,
+                "face challenge requires the supplier password step");
             check((await faceAnonymous.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.Redirect, "a failed face match never signs the user in");
-            var matching = FaceBody(await FaceChallenge(faceAnonymous, faceCsrf, "/Biometrics/FaceChallenge", new { }), face, email);
-            var faceLogin = await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceLogin", matching);
-            check(faceLogin.StatusCode == HttpStatusCode.OK && (await faceAnonymous.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.OK, "the enrolled face signs in");
-            using var faceReplayer = newClient();
-            var replayFaceCsrf = await token(faceReplayer, "/Identity/Account/Login");
-            check((await Post(faceReplayer, replayFaceCsrf, "/Biometrics/FaceLogin", matching)).StatusCode == HttpStatusCode.Unauthorized, "a captured face login cannot be replayed");
         }
         await SupplierFaceChecks(newClient, token, check, services, suffix);
         await FaceDemoChecks(newClient, token, check, services);
@@ -302,9 +296,8 @@ static class BiometricChecks
 
         using var visitor = newClient();
         var visitorCsrf = await token(visitor, "/Identity/Account/Login");
-        var pendingFace = await Post(visitor, visitorCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
-        check(pendingFace.StatusCode == HttpStatusCode.Unauthorized && (await pendingFace.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"),
-            "a pending supplier's face is recognised but cannot sign in");
+        check((await Post(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized,
+            "pending supplier cannot start a face sign-in without the password step");
 
         using (var scope = services.CreateScope())
         {
@@ -312,10 +305,19 @@ static class BiometricChecks
             (await db.Suppliers.SingleAsync(s => s.Id == companyId)).Status = SupplierStatus.Approved;
             await db.SaveChangesAsync();
         }
-        var approvedFace = await Post(visitor, visitorCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+        var approvedPassword = await PasswordLogin(visitor);
+        check(approvedPassword.StatusCode == HttpStatusCode.OK &&
+            (await visitor.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+            "approved supplier password starts the biometric step without opening the workspace");
+        var matching = FaceBody(await FaceChallenge(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { }), face, email);
+        var approvedFace = await Post(visitor, visitorCsrf, "/Biometrics/FaceLogin", matching);
         var approvedBody = await approvedFace.Content.ReadFromJsonAsync<JsonElement>();
         check(approvedFace.StatusCode == HttpStatusCode.OK && approvedBody.GetProperty("redirect").GetString() == "/Supplier" &&
               (await visitor.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier signs in with face and opens the Supplier workspace");
+        using var faceReplayer = newClient();
+        var replayFaceCsrf = await token(faceReplayer, "/Identity/Account/Login");
+        check((await Post(faceReplayer, replayFaceCsrf, "/Biometrics/FaceLogin", matching)).StatusCode == HttpStatusCode.Unauthorized,
+            "a captured supplier face login cannot be replayed");
         using var approvedPhone = newClient();
         var approvedPasskey = await PhoneLogin(approvedPhone);
         check(approvedPasskey.StatusCode == HttpStatusCode.OK && (await approvedPasskey.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("redirect").GetString() == "/Supplier" &&
@@ -323,7 +325,7 @@ static class BiometricChecks
 
         using var passwordOnly = newClient();
         var refused = await PasswordLogin(passwordOnly);
-        check(refused.StatusCode == HttpStatusCode.OK && (await refused.Content.ReadAsStringAsync()).Contains("Supplier accounts sign in with face recognition") &&
+        check(refused.StatusCode == HttpStatusCode.OK && (await refused.Content.ReadAsStringAsync()).Contains("data-step=\"biometric\"") &&
               (await passwordOnly.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK, "approved supplier with face enrolled cannot bypass it with the password");
         foreach (var status in new[] { SupplierStatus.Rejected, SupplierStatus.Suspended })
         {
