@@ -22,6 +22,7 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
+if (args.Contains("--ai-help-checks")) { await AiHelpChecks.Run(); return; }
 if (args.Contains("--search-checks")) { await SearchChecks.Run(); return; }
 if (args.Contains("--clarification-workflow-checks")) { await ClarificationWorkflowChecks.Run(); return; }
 if (args.Contains("--notification-checks")) { await NotificationChecks.Run(); return; }
