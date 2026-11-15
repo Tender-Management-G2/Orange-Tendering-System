@@ -658,3 +658,8 @@ button.hq-cta{border:0;cursor:pointer}
 .hc-tour-video{display:block;width:100%;max-height:calc(100vh - 140px);aspect-ratio:16/9;background:#000}
 html[data-theme="light"] .hc-tour::backdrop{background:rgba(236,231,224,.82)}
 @media (prefers-reduced-motion:reduce){.hc-tour[open]{animation:none}}
+.hc-tour-soon{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;aspect-ratio:16/9;max-height:calc(100vh - 140px);padding:24px;text-align:center;background:radial-gradient(60% 70% at 50% 45%,rgba(255,121,0,.22),transparent 70%),#0d0a08}
+.hc-tour-soon-ic{display:grid;place-items:center;width:72px;height:72px;border-radius:50%;background:#ff7900;box-shadow:0 0 40px rgba(255,121,0,.6)}
+.hc-tour-soon-ic svg{width:30px;height:30px;fill:#fff;margin-left:4px}
+.hc-tour-soon b{font:600 clamp(18px,2vw,26px)/1.25 var(--hf);color:#fff}
+.hc-tour-soon p{max-width:46ch;color:#cfc6bc;font-size:15px;line-height:1.5}

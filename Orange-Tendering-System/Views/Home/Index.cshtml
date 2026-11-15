@@ -190,11 +190,7 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
             <h1 id="hc-h1">From Procurement Complexity to <em>One Unified Platform</em></h1>
             <p class="hq-lead">Orange's intelligent sourcing and tender management platform connects suppliers, evaluations, approvals and procurement workflows in one secure digital experience.</p>
             <div class="hq-actions">
-                @* The video button appears only when the video file exists, so it never opens an empty player. *@
-                @if (tourVideo != null)
-                {
-                    <button type="button" class="hq-cta" data-tour-open aria-haspopup="dialog" aria-controls="hc-tour"><span class="hq-cta-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span>Watch the Video</button>
-                }
+                <button type="button" class="hq-cta" data-tour-open aria-haspopup="dialog" aria-controls="hc-tour"><span class="hq-cta-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span>Watch the Video</button>
                 <a class="hq-play" href="#platform" data-see-action><span class="hq-play-i" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span>See It in Action</a>
             </div>
             <p class="hq-account">
@@ -237,15 +233,24 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
     </div>
 </section>
 
-@if (tourVideo != null)
-{
-    <dialog class="hc-tour" id="hc-tour" aria-label="Orange platform video">
+<dialog class="hc-tour" id="hc-tour" aria-label="Orange platform video">
         <div class="hc-tour-box">
             <div class="hc-tour-head"><span class="hc-tour-logo" aria-hidden="true">orange</span><b>Orange Sourcing &amp; Tender Management</b><button type="button" class="hc-tour-close" data-tour-close aria-label="Close video">&times;</button></div>
-            <video class="hc-tour-video" controls playsinline preload="metadata"><source src="@tourVideo" type="@tourType" />Your browser cannot play this video.</video>
+            @if (tourVideo != null)
+            {
+                <video class="hc-tour-video" controls playsinline preload="metadata"><source src="@tourVideo" type="@tourType" />Your browser cannot play this video.</video>
+            }
+            else
+            {
+                @* Shown until wwwroot/media/platform-tour.mp4 (or .webm) is added; the video then plays here automatically. *@
+                <div class="hc-tour-soon">
+                    <span class="hc-tour-soon-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span>
+                    <b>The platform video is coming soon.</b>
+                    <p>Meanwhile, scroll through the headquarters to see the full journey from purchase request to award.</p>
+                </div>
+            }
         </div>
     </dialog>
-}
 
 @* ============ 09  WORKSPACES ============ *@
 <section class="hc-sec hc-sec-alt" id="platform" aria-labelledby="hc-ws-h">

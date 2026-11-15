@@ -57,11 +57,12 @@
     var video = dlg.querySelector("video");
     btn.addEventListener("click", function () {
       dlg.showModal();
+      if (!video) return;
       var pl = video.play(); if (pl && pl.catch) pl.catch(function () { /* autoplay blocked: the controls stay available */ });
     });
     function close() { if (dlg.open) dlg.close(); }
     dlg.addEventListener("click", function (e) { if (e.target === dlg || e.target.closest("[data-tour-close]")) close(); });
-    dlg.addEventListener("close", function () { video.pause(); btn.focus({ preventScroll: true }); });
+    dlg.addEventListener("close", function () { if (video) video.pause(); btn.focus({ preventScroll: true }); });
   })();
 
   /* ---------- roving tablist helper ---------- */
