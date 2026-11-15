@@ -42,6 +42,7 @@ public static class ClarificationWorkflowChecks
     int? supplierId=null;if(role is SystemRoles.Supplier or "SupplierTwo"){var s=new Supplier{CompanyName=role+" test company",Email=Guid.NewGuid().ToString("N")+"@clarification.invalid",RegistrationNumber=Guid.NewGuid().ToString(),Status=SupplierStatus.Approved};db.Add(s);await db.SaveChangesAsync();supplierId=s.Id;companies[role]=s.Id;}
     var email="u"+ids.Count+"@clarification.invalid";var u=new ApplicationUser{UserName=email,Email=email,FullName=role,IsActive=true,EmailConfirmed=true,SupplierId=supplierId,DepartmentId=role==SystemRoles.RequestingDepartment?d.Id:null};
     if(!(await users.CreateAsync(u,pw)).Succeeded||!(await users.AddToRoleAsync(u,role=="SupplierTwo"?SystemRoles.Supplier:role)).Succeeded)throw new Exception("Identity fixture failed");ids[role]=u.Id;
+    if(role is SystemRoles.Supplier or "SupplierTwo"){db.FaceTemplates.Add(new FaceTemplate{UserId=u.Id,ProtectedTemplate=[1],CreatedAt=DateTime.UtcNow});await db.SaveChangesAsync();}
    }
    var pr=new PurchaseRequest{Title="Clarification request",DepartmentId=d.Id,CreatedByUserId=ids[SystemRoles.RequestingDepartment],Status=PurchaseRequestStatus.Accepted,Justification="SQL fixture"};
    var foreign=new PurchaseRequest{Title="Other department request",DepartmentId=other.Id,CreatedByUserId=ids[SystemRoles.SourcingOfficer],Status=PurchaseRequestStatus.Accepted,Justification="SQL fixture"};db.AddRange(pr,foreign);await db.SaveChangesAsync();request=pr.Id;foreignRequest=foreign.Id;
@@ -78,12 +79,14 @@ public static class ClarificationWorkflowChecks
   Check(!await Service(sp=>sp.GetRequiredService<ClarificationService>().ReplyAsync(ids[SystemRoles.TopCommittee],threads[(SystemRoles.SourcingManager,SystemRoles.TopCommittee)],"Inactive")),"inactive participant cannot continue");
   await Db(async db=>{(await db.Users.SingleAsync(u=>u.Id==ids[SystemRoles.TopCommittee])).IsActive=true;await db.SaveChangesAsync();});
   var clients=new Dictionary<string,HttpClient>();var csrf=new Dictionary<string,string>();
-  async Task<string> Token(HttpClient c,string url){var html=await(await c.GetAsync(url)).Content.ReadAsStringAsync();var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");if(!m.Success)throw new Exception("No CSRF token "+url);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<string> Token(HttpClient c,string url){var response=await c.GetAsync(url);var html=await response.Content.ReadAsStringAsync();var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");if(!m.Success)throw new Exception("No CSRF token "+url+" status="+response.StatusCode+" location="+response.Headers.Location);return WebUtility.HtmlDecode(m.Groups[1].Value);}
   foreach(var role in roles.Append("SupplierTwo")){
    var client=app.CreateClient(new(){BaseAddress=new Uri("https://localhost"),AllowAutoRedirect=false});clients[role]=client;var token=await Token(client,"/Identity/Account/Login");
    var i=Array.IndexOf(roles,role);if(i<0)i=7;
-   var login=await client.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","u"+i+"@clarification.invalid"},{"Input.Password",pw},{"__RequestVerificationToken",token}}));Check(login.StatusCode==HttpStatusCode.Redirect,role+": actual Identity login");
-   csrf[role]=await Token(client,"/Notifications");
+   var login=await client.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","u"+i+"@clarification.invalid"},{"Input.Password",pw},{"__RequestVerificationToken",token}}));
+   if(role is SystemRoles.Supplier or "SupplierTwo"){Check(login.StatusCode==HttpStatusCode.OK,role+": password accepted before identity step");var step=await client.PostAsync("/Identity/Account/Login?handler=PasswordOnly",new FormUrlEncodedContent(new Dictionary<string,string>{{"__RequestVerificationToken",token}}));Check(step.IsSuccessStatusCode && (await step.Content.ReadAsStringAsync()).Contains("signedIn"),role+": password-only identity step completed");}
+   else Check(login.StatusCode==HttpStatusCode.Redirect,role+": actual Identity login");
+   csrf[role]=await Token(client, role == SystemRoles.Supplier || role == "SupplierTwo" ? "/Supplier/Clarifications" : "/Clarifications");
   }
   async Task<HttpResponseMessage> Post(string role,string url,Dictionary<string,string> form){form["__RequestVerificationToken"]=csrf[role];return await clients[role].PostAsync(url,new FormUrlEncodedContent(form));}
   var officer=clients[SystemRoles.SourcingOfficer];var supplier=clients[SystemRoles.Supplier];
