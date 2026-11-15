@@ -68,6 +68,13 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
             <i class="hq-ring"></i>
         </div>
 
+        @* Final hero angle: the approved image of the completed headquarters (Tools/HeroLayers/build_final.py) *@
+        <div class="hq-final" id="hq-final" aria-hidden="true">
+            <img class="hq-final-bg" src="~/assets/hero/final-bg.webp" alt="" decoding="async" />
+            <img class="hq-final-img" src="~/assets/hero/final@1x.webp" srcset="@Url.Content("~/assets/hero/final@1x.webp") 1x, @Url.Content("~/assets/hero/final@2x.webp") 2x" width="1448" height="1086" alt="" fetchpriority="low" decoding="async" />
+        </div>
+
+        <i class="hq-flare" id="hq-flare" aria-hidden="true"></i>
         <div class="hq-copy" id="hq-copy">
             <p class="hq-eyebrow">Sourcing &amp; Tender Management</p>
             <h1 id="hc-h1">From Procurement Complexity to <em>One Unified Platform</em></h1>

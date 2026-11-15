@@ -23,6 +23,11 @@
   /* ---------- state (driven by the scroll timeline) ---------- */
   var S = { g: [0, 0, 0, 0, 0], side: { leftbox: 0, rightcube: 0, ulpanels: 0, lslab: 0, chip: 0, papers: 0 }, glow: 0, pulse: 0, zoom: 0, fade: 0 };
   var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+  // camera (scroll-driven): dolly z, orbit ry/rx (degrees), rise/pan in reference pixels
+  var C = { z: 1, ry: 0, rx: 0, tx: 0, ty: 0 };
+  // final hero angle (the completed-HQ image): opacity, dolly, orbit
+  var F = { o: 0, z: 1.12, ry: 8 };
+  var finalEl = document.getElementById("hq-final");
   var view = { s: 1, ox: 0, oy: 0, wide: true };
 
   function stackDy(k) { var d = 0; for (var j = 0; j < k; j++) d += GAPS[j] * S.g[j]; return d; }
@@ -91,10 +96,11 @@
     mouse.x += (mouse.tx - mouse.x) * .06; mouse.y += (mouse.ty - mouse.y) * .06;
     var idle = reduce ? 0 : 1 - a;   // exploded parts drift gently; it fades as the building assembles
     var bob = Math.sin(t * .9) * 2.2 * idle; // the whole stack breathes together, so no gap ever opens
-    // world transform (+ final push toward the entrance)
-    var z = 1 + S.zoom * 1.15, fx = 988, fy = 800;
-    var s = view.s * z, ox = view.ox + fx * view.s * (1 - z), oy = view.oy + fy * view.s * (1 - z);
-    world.style.transform = "translate(" + ox.toFixed(2) + "px," + oy.toFixed(2) + "px) scale(" + s.toFixed(5) + ")";
+    // camera: orbit/tilt around the building centre under the stage's perspective, plus dolly, rise and pan
+    var fx = 968, fy = 470;
+    world.style.transform = "translate(" + view.ox.toFixed(2) + "px," + view.oy.toFixed(2) + "px) scale(" + view.s.toFixed(5) + ") translate(" + fx + "px," + fy + "px) rotateY(" + C.ry.toFixed(3) + "deg) rotateX(" + C.rx.toFixed(3) + "deg) scale(" + C.z.toFixed(4) + ") translate(" + (-fx + C.tx).toFixed(2) + "px," + (-fy + C.ty).toFixed(2) + "px)";
+    finalEl.style.opacity = F.o.toFixed(3);
+    finalEl.style.transform = "rotateY(" + F.ry.toFixed(3) + "deg) scale(" + F.z.toFixed(4) + ")";
     Object.keys(layers).forEach(function (n) {
       var L = layers[n], px = mouse.x * (DEPTH[n] || 0) * 7 * idle, py = mouse.y * (DEPTH[n] || 0) * 4 * idle, tr;
       if (STACK[n]) {
@@ -163,12 +169,23 @@
       var o = {}; o[n] = 1;
       tl.to(S.side, Object.assign({ duration: A(12), ease: "power2.inOut" }, o), A(start));
     });
-    tl.to(copy, { autoAlpha: 0, y: -24, duration: 4, ease: "power2.in" }, 82);
+    tl.to(copy, { autoAlpha: 0, y: -24, duration: 3, ease: "power2.in" }, 79.5);
     tl.to(S, { glow: 1, duration: A(5), ease: "power2.out" }, A(90));
     tl.fromTo(S, { pulse: 0 }, { pulse: 1, duration: A(8), ease: "power1.out", immediateRender: false }, A(91));
     tl.to(".hq-stagebar", { autoAlpha: 0, duration: 3 }, 82);
-    tl.to(S, { zoom: 1, duration: 16, ease: "power2.in" }, 84);
-    tl.to(S, { fade: 1, duration: 4 }, 96);
+    // camera during assembly: slow push-in, slight rise and a gentle orbit (reverses with the scroll)
+    tl.to(C, { z: 1.05, ry: -3, rx: 1.6, ty: 10, duration: A(33), ease: "sine.inOut" }, A(12));
+    tl.to(C, { z: 1.11, ry: 2.2, rx: 2.4, ty: 18, tx: -8, duration: A(35), ease: "sine.inOut" }, A(45));
+    // completed: the camera swings into the final hero angle of the finished headquarters
+    tl.to(C, { z: 1.3, ry: -9, rx: 1, duration: 10, ease: "power2.in" }, 81);
+    // a brief orange light flare carries the cut between the two angles (no double exposure)
+    tl.fromTo("#hq-flare", { opacity: 0 }, { opacity: 1, duration: 2.2, ease: "power2.in", immediateRender: false }, 85.6)
+      .to("#hq-flare", { opacity: 0, duration: 3, ease: "power2.out" }, 87.8);
+    tl.to(world, { opacity: 0, duration: 1.4, ease: "none" }, 86.6);
+    tl.fromTo(F, { o: 0 }, { o: 1, duration: 1.4, ease: "none", immediateRender: false }, 86.8);
+    tl.fromTo(F, { z: 1.14, ry: 8 }, { z: 1, ry: 0, duration: 7, ease: "power2.out", immediateRender: false }, 86.8);
+    tl.to(F, { z: 1.05, duration: 7, ease: "sine.inOut" }, 93);
+    tl.to(S, { fade: 1, duration: 2.5 }, 97.5);
     tl.to({}, { duration: .01 }, 100);
     tl.eventCallback("onUpdate", function () {
       var pct = clamp(tl.time() / .8, 0, 100), idx = 0;
@@ -202,5 +219,5 @@
   });
 
   // read-only state for automated visual QA
-  window.__hq = { get assembly() { return assembled(); }, get trigger() { return st ? { start: st.start, end: st.end } : null; }, get view() { return view; } };
+  window.__hq = { get assembly() { return assembled(); }, get trigger() { return st ? { start: st.start, end: st.end } : null; }, get view() { return view; }, get camera() { return { z: C.z, ry: C.ry, rx: C.rx, final: F.o }; } };
 })();
