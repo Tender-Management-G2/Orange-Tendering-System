@@ -1,30 +1,27 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Module: Top Committee - final decision pages (spec 4.7): review of results, voting entry point and bid history.
-// These pages are read-only. The vote and the signature are cast on the signed report page (Reports/Review -> TenderWorkflowService.TopVote),
-// which enforces the Manager's prior signature, the committee signatures, one vote per member and the 3-of-4 approval rule.
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Razor;
+using System.Security.Cryptography;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using Orange_Tendering_System.Areas.TopCommittee.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Areas.TopCommittee.ViewModels;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Models.Entities;
 
-<<<<<<< HEAD
-namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
-=======
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
 [Area("TopCommittee"), Authorize(Roles = TopExecutiveRoles.Allowed)]
 public sealed class DecisionsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
     IWebHostEnvironment environment, ILogger<DecisionsController> logger, IRazorViewEngine views) : TopCommitteeControllerBase(db, users)
->>>>>>> be32000 (temp)
 {
-    [Area("TopCommittee")]
-    [Authorize(Roles = SystemRoles.TopCommittee)]
-    public class DecisionsController(TopCommitteeService service) : Controller
+    [HttpGet]
+    public async Task<IActionResult> Search(string? q)
     {
-<<<<<<< HEAD
-        private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-=======
         var user = await ActiveUser();
         if (user is null) return Forbid();
         Response.Headers.CacheControl = "no-store";
@@ -38,34 +35,163 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             url = Url.Action(nameof(Decision), "Decisions", new { area = "TopCommittee", id = r.Id })
         }) });
     }
->>>>>>> be32000 (temp)
 
-        public IActionResult Index() => RedirectToAction(nameof(ReviewEvaluation));
-
-        // GET /TopCommittee/Decisions/ReviewEvaluation/{id?}: the tenders waiting for me, or one tender's full results.
-        public async Task<IActionResult> ReviewEvaluation(int? id)
+    public async Task<IActionResult> ReviewEvaluation(int? id, string? search = null, CommitteeRoundStatus? status = null, int page = 1)
+    {
+        var user = await ActiveUser();
+        if (user is null) return Forbid();
+        if (!id.HasValue) return await SelectRound(user.Id, nameof(ReviewEvaluation), search, status, page);
+        var details = await Committee.Load(user.Id, id.Value);
+        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation } report)
+            return RedirectToAction("Review", "SignedReports", new { area = "TopCommittee", id = report.Id });
+        return details is null ? NotFound() : View(details);
+    }
+    public async Task<IActionResult> Decision(int? id, string? search = null, CommitteeRoundStatus? status = null, int page = 1)
+    {
+        var user = await ActiveUser();
+        if (user is null) return Forbid();
+        Response.Headers.CacheControl = "no-store";
+        if (!id.HasValue) return await SelectRound(user.Id, nameof(Decision), search, status, page);
+        var details = await Committee.Load(user.Id, id.Value);
+        if (details?.Round.TenderReport is { ReportType: ReportType.ExecutiveSummary, SubmittedAt: not null, Status: ReportStatus.Submitted })
         {
-            if (id == null) return View("Cases", (await service.Cases(UserId)).Where(c => c.Outcome == null).ToList());
-            var details = await service.Details(UserId, id.Value);
-            return details == null ? NotFound() : View(details);
+            try
+            {
+                await Committee.NotifyReportReady(user.Id, id.Value);
+                details = await Committee.Load(user.Id, id.Value);
+            }
+            catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
         }
+        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation } report)
+            return RedirectToAction("Review", "SignedReports", new { area = "TopCommittee", id = report.Id });
+        return details is null ? NotFound() : View(details);
+    }
 
-        // GET /TopCommittee/Decisions/Decision/{id?}: voting status of a tender and the entry to the signed report page.
-        public async Task<IActionResult> Decision(int? id)
+    private async Task<IActionResult> SelectRound(string userId, string targetAction, string? search, CommitteeRoundStatus? status, int page)
+    {
+        if (status.HasValue && !Enum.IsDefined(status.Value)) return BadRequest();
+        Response.Headers.CacheControl = "no-store";
+        search = search?.Trim();
+        var query = TopCommitteeSearch.Apply(Committee.RoundList(userId).AsNoTracking(), search, status);
+        var total = await query.CountAsync();
+        page = Math.Clamp(page, 1, Math.Max(1, (int)Math.Ceiling(total / 20m)));
+        var model = new RoundSelection
         {
-            if (id == null) return View("Cases", (await service.Cases(UserId)).Where(c => c.AwaitingMyVote).ToList());
-            var details = await service.Details(UserId, id.Value);
-            return details == null ? NotFound() : View(details);
+            TargetAction = targetAction, UserId = userId,
+            Listing = new DecisionHistory
+            {
+                Search = search, Status = status, Total = total, Page = page,
+                Rounds = await query.OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id)
+                    .Skip((page - 1) * 20).Take(20).AsSplitQuery().ToListAsync()
+            }
+        };
+        return Request.Headers["X-TopCommittee-Live"] == "1" ? PartialView("_RoundResults", model) : View("SelectRound", model);
+    }
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Vote(VoteInput input)
+    {
+        var user = await ActiveUser();
+        if (user is null) return Forbid();
+        if (input.Decision != VoteDecision.Reject)
+        {
+            TempData["TopError"] = "Use Sign & Approve Report to record an approval. The signature is the approval.";
+            return RedirectToAction(nameof(Decision), new { id = input.RoundId });
         }
+        if (input.Decision == VoteDecision.Reject && string.IsNullOrWhiteSpace(input.Comment))
+            ModelState.AddModelError(nameof(input.Comment), "A written rejection reason is required.");
+        if (!ModelState.IsValid)
+        {
+            var details = await Committee.Load(user.Id, input.RoundId);
+            return details is null ? NotFound() : View("Decision", details);
+        }
+        try
+        {
+            await Committee.Vote(user.Id, input);
+            TempData["TopMessage"] = "Your vote was saved. The final result is processed automatically after all four members vote.";
+        }
+        catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
+        catch (Exception exception) when (exception is DbUpdateException or System.Data.Common.DbException)
+        {
+            logger.LogWarning(exception, "Committee vote could not be committed");
+            TempData["TopError"] = "The vote could not be committed. Refresh to check the latest votes before retrying.";
+        }
+        return RedirectToAction(nameof(Decision), new { id = input.RoundId });
+    }
 
-        // GET /TopCommittee/Decisions/History: every tender I was assigned to with its outcome.
-        public async Task<IActionResult> History(int? id)
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SignReport(int roundId, string? signatureData, CancellationToken cancellationToken)
+    {
+        var user = await ActiveUser();
+        if (user is null) return Forbid();
+        if (!TryBuildElectronicSignatureSvg(signatureData, out var signatureSvg))
         {
-            if (id != null) return RedirectToAction(nameof(ReviewEvaluation), new { id });
-            return View((await service.Cases(UserId)).Where(c => c.Outcome != null || c.MyVote != null).ToList());
+            TempData["TopError"] = "Draw your electronic signature in the signing area before approving the report.";
+            return RedirectToAction(nameof(Decision), new { id = roundId });
         }
-<<<<<<< HEAD
-=======
+        try
+        {
+            var details = await Committee.Load(user.Id, roundId);
+            if (details is null) return NotFound();
+            if (!details.CanVote) throw new InvalidOperationException(string.Join(" ", details.Blockers));
+            var original = await GetOrCreateOriginalPdf(details, user.Id, cancellationToken);
+            var hash = Convert.ToHexString(SHA256.HashData(original));
+            await Committee.Vote(user.Id, new VoteInput { RoundId = roundId, Decision = VoteDecision.Approve },
+                signatureHash: hash, signatureSvg: signatureSvg,
+                finalPdfFactory: async (round, token) =>
+                {
+                    var sourceHtml = await ReadOriginalHtml(round, token)
+                        ?? throw new InvalidOperationException("The preserved original report source is unavailable or failed its integrity check.");
+                    var appendix = await ReportingExport.HtmlView(this, views, round,
+                        "/Areas/TopCommittee/Views/Decisions/SignatureAppendix.cshtml");
+                    var bodyEnd = sourceHtml.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+                    if (bodyEnd < 0) throw new InvalidOperationException("The preserved original report is malformed.");
+                    return await BrowserReportPdf.Create(sourceHtml.Insert(bodyEnd, appendix), environment.ContentRootPath, token);
+                }, reportStorageRoot: ReportStorageRoot);
+            TempData["TopMessage"] = "Your signature and approval were recorded for this exact report version.";
+        }
+        catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
+        catch (Exception exception) when (exception is DbUpdateException or System.Data.Common.DbException or IOException)
+        {
+            logger.LogWarning(exception, "Top Committee report signature could not be committed for round {RoundId}", roundId);
+            TempData["TopError"] = "The signature could not be committed. Refresh the report and check the latest signature status before retrying.";
+        }
+        return RedirectToAction(nameof(Decision), new { id = roundId });
+    }
+
+    private static bool TryBuildElectronicSignatureSvg(string? json, out string svg)
+    {
+        svg = string.Empty;
+        if (string.IsNullOrWhiteSpace(json) || json.Length > 100_000) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 8 });
+            if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() is < 1 or > 20) return false;
+            var paths = new StringBuilder();
+            var totalPoints = 0;
+            var totalDistance = 0d;
+            foreach (var stroke in document.RootElement.EnumerateArray())
+            {
+                if (stroke.ValueKind != JsonValueKind.Array || stroke.GetArrayLength() is < 2 or > 1000) return false;
+                var path = new StringBuilder();
+                var first = true;
+                double lastX = 0, lastY = 0;
+                foreach (var point in stroke.EnumerateArray())
+                {
+                    if (point.ValueKind != JsonValueKind.Object || !point.TryGetProperty("x", out var xValue) ||
+                        !point.TryGetProperty("y", out var yValue) || !xValue.TryGetDouble(out var x) || !yValue.TryGetDouble(out var y) ||
+                        !double.IsFinite(x) || !double.IsFinite(y) || x is < 0 or > 600 || y is < 0 or > 160) return false;
+                    if (first) path.Append("M "); else { path.Append(" L "); totalDistance += Math.Sqrt(Math.Pow(x - lastX, 2) + Math.Pow(y - lastY, 2)); }
+                    path.Append(x.ToString("0.##", CultureInfo.InvariantCulture)).Append(' ')
+                        .Append(y.ToString("0.##", CultureInfo.InvariantCulture));
+                    lastX = x; lastY = y; first = false; totalPoints++;
+                    if (totalPoints > 3000) return false;
+                }
+                paths.Append("<path d=\"").Append(path).Append("\" fill=\"none\" stroke=\"#17212e\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>");
+            }
+            if (totalDistance < 8) return false;
+            svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 600 160\" width=\"600\" height=\"160\">" + paths + "</svg>";
+            return true;
+        }
         catch (JsonException) { return false; }
     }
 
@@ -318,6 +444,5 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         if (!System.IO.File.Exists(path)) return NotFound();
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return PhysicalFile(path, "application/octet-stream", document.FileName);
->>>>>>> be32000 (temp)
     }
 }

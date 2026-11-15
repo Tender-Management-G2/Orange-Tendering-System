@@ -1,35 +1,21 @@
-<<<<<<< HEAD
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Doulat
-// Module: Top Committee
-// Purpose: MVC endpoints for the Dashboard pages of the Top Committee workspace.
-// Status: Dashboard data comes from InternalDashboardService (real, role-scoped SQL Server counts).
-=======
 using Orange_Tendering_System.Areas.TopCommittee.Services;
->>>>>>> be32000 (temp)
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Areas.TopCommittee.ViewModels;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
-using Orange_Tendering_System.ViewModels;
+using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
-<<<<<<< HEAD
-namespace Orange_Tendering_System.Areas.TopCommittee.Controllers
-=======
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
 [Area("TopCommittee"), Authorize(Roles = TopExecutiveRoles.Allowed)]
 public sealed class DashboardController(ApplicationDbContext db, UserManager<ApplicationUser> users, IServiceProvider services) : TopCommitteeControllerBase(db, users)
->>>>>>> be32000 (temp)
 {
-    [Area("TopCommittee")]
-    [Authorize(Roles = SystemRoles.TopCommittee)]
-    public class DashboardController : Controller
+    public async Task<IActionResult> Index()
     {
-<<<<<<< HEAD
-        // Top Committee Dashboard — Owner: Doulat · Trello: Top Committee Dashboard (https://trello.com/c/8Z6bnMsb)
-        // GET /TopCommittee. TODO: build the view model from real data in a service.
-        public async Task<IActionResult> Index([FromServices] Orange_Tendering_System.Services.InternalDashboardService dashboard) => View(await dashboard.GetAsync(SystemRoles.TopCommittee, User));
-=======
         var user = await ActiveUser();
         if (user is null) return Forbid();
         var groups = await Committee.AssignedRounds(user.Id).GroupBy(r => r.Status)
@@ -70,6 +56,5 @@ public sealed class DashboardController(ApplicationDbContext db, UserManager<App
             Recent = await Committee.RoundList(user.Id).AsNoTracking().Where(r => r.Status != CommitteeRoundStatus.InProgress)
                 .OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).Take(8).AsSplitQuery().ToListAsync()
         });
->>>>>>> be32000 (temp)
     }
 }

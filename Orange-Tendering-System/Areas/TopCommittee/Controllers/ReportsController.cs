@@ -1,25 +1,43 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Orange_Tendering_System.Controllers;
+using Microsoft.AspNetCore.Mvc.Razor;
+using Orange_Tendering_System.Areas.TopCommittee.Services;
+using Orange_Tendering_System.Areas.TopCommittee.ViewModels;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
-using Orange_Tendering_System.Services;
+
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
-<<<<<<< HEAD
-[Area("TopCommittee"), Authorize(Roles=SystemRoles.TopCommittee)]
-public class ReportsController(TenderWorkflowService workflow) : ReportControllerBase(workflow)
-=======
 
 [Area("TopCommittee"), Authorize(Roles = TopExecutiveRoles.Allowed)]
 public sealed class ReportsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
     IWebHostEnvironment environment, IRazorViewEngine views) : TopCommitteeControllerBase(db, users)
->>>>>>> be32000 (temp)
 {
-    [HttpPost] public Task<IActionResult> Vote(int id,VoteDecision decision,string documentHash,bool confirmed,string comment,string? signatureImage=null)=>Execute(id,async()=>
+    public async Task<IActionResult> Index()
     {
-        var png=ReadSignature(signatureImage);
-        var report=await Workflow.ReviewReport(id,User);
-        TenderWorkflowService.Require(report.IsCurrent,"Only the current report can receive a final decision.");
-        await Workflow.TopVote(report.Tender.Id,decision,comment,User,documentHash,confirmed,png);
-    });
+        if (await ActiveUser() is null) return Forbid();
+        return RedirectToAction("Index", "Statistics", new { area = "TopCommittee" });
+    }
+
+    [HttpGet("/Analytics", Order = -1), TopCommitteeReportsRoute]
+    public Task<IActionResult> ExistingSidebarEntry() => Index();
+
+    public async Task<IActionResult> ExportExcel()
+    {
+        if (await ActiveUser() is null) return Forbid();
+        var page = new ReportingPage(await new TopCommitteeReportingService(Db).Read(), false);
+        Response.Headers.CacheControl = "no-store";
+        return File(ReportingWorkbook.Create(page), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"TopCommittee-Reports-{page.Data.GeneratedAt:yyyyMMdd-HHmm}.xlsx");
+    }
+
+    public async Task<IActionResult> ExportPdf(CancellationToken cancellationToken)
+    {
+        if (await ActiveUser() is null) return Forbid();
+        var page = new ReportingPage(await new TopCommitteeReportingService(Db).Read(), false);
+        Response.Headers.CacheControl = "no-store";
+        try { return File(await ReportingExport.Pdf(this, views, page, environment.ContentRootPath, cancellationToken), "application/pdf", $"TopCommittee-Reports-{page.Data.GeneratedAt:yyyyMMdd-HHmm}.pdf"); }
+        catch (InvalidOperationException exception) { return Problem(title: "PDF export unavailable", detail: exception.Message, statusCode: 503); }
+    }
 }
+

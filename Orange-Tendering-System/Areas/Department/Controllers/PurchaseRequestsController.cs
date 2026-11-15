@@ -142,8 +142,8 @@ public class PurchaseRequestsController : Controller
         if (form.Items.Count is < 1 or > 100)
             ModelState.AddModelError("Items", "Add between 1 and 100 items.");
         for (var i = 0; i < form.Items.Count; i++)
-            if (decimal.Round(form.Items[i].Quantity, 3) != form.Items[i].Quantity)
-                ModelState.AddModelError($"Items[{i}].Quantity", "Use at most three decimal places.");
+            if (form.Items[i].Quantity < 1 || decimal.Truncate(form.Items[i].Quantity) != form.Items[i].Quantity)
+                ModelState.AddModelError($"Items[{i}].Quantity", "Use a whole number of 1 or more.");
         if (form.NeededBy?.Date < DateTime.UtcNow.Date && intent == "submit")
             ModelState.AddModelError("NeededBy", "Choose today or a future needed-by date when submitting.");
         await ValidateAttachments(form.Attachments);

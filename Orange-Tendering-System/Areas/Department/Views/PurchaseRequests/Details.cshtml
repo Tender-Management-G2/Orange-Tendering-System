@@ -7,6 +7,15 @@
     ViewData["Description"] = "Request information, supporting files and preserved submission history.";
     var requestStatus = RequestDisplay.Status(request);
     var statusClass = requestStatus.ToLowerInvariant().Replace(' ', '-');
+    var routeMessage = request.Status switch
+    {
+        PurchaseRequestStatus.Submitted => "Request submitted directly to the Sourcing Officer.",
+        PurchaseRequestStatus.UnderReview => "Your request is with the Sourcing Officer for review.",
+        PurchaseRequestStatus.Returned => "The Sourcing Officer returned this request for changes.",
+        PurchaseRequestStatus.Approved or PurchaseRequestStatus.Accepted or PurchaseRequestStatus.ConvertedToTender => "The Sourcing Officer has accepted this request.",
+        PurchaseRequestStatus.Rejected => "The Sourcing Officer rejected this request.",
+        _ => null
+    };
     string FileSize(long bytes) => bytes < 1024 ? $"{bytes} bytes" : bytes < 1024 * 1024 ? $"{bytes / 1024d:0.#} KB" : $"{bytes / (1024d * 1024d):0.##} MB";
 }
 <div class="rqd-page">
@@ -28,6 +37,11 @@
         </div>
         <span class="rqd-wave rqd-wave-one" aria-hidden="true"></span><span class="rqd-wave rqd-wave-two" aria-hidden="true"></span>
     </header>
+
+    @if (routeMessage is not null)
+    {
+        <p class="rqd-route-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 7l9 4 9-4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg>@routeMessage</p>
+    }
 
     @if (TempData["DepartmentMessage"] is string message)
     {
@@ -112,12 +126,8 @@
         else
         {
             <ol class="rqd-timeline">
-<<<<<<< HEAD
-            @foreach (var review in request.Reviews.OrderByDescending(r => r.SubmissionNumber))
-=======
             @{ var expandLatestSubmission = true; }
             @foreach (var review in request.Reviews.OrderByDescending(r => r.SubmissionNumber).ThenByDescending(r => r.Id))
->>>>>>> be32000 (temp)
             {
                 RequestSnapshot? snapshot = null;
                 try { snapshot = JsonSerializer.Deserialize<RequestSnapshot>(review.SubmittedSnapshotJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }); }
@@ -125,8 +135,9 @@
                 var decisionClass = review.Decision.ToString().ToLowerInvariant();
                 <li class="rqd-timeline-entry">
                     <span class="rqd-timeline-dot" aria-hidden="true"></span>
-                    <article class="rqd-submission">
-                        <header class="rqd-submission-head"><div><h3>Submission @review.SubmissionNumber</h3><p>Submitted: @RequestDisplay.Date(review.SubmittedAt) <span aria-hidden="true">|</span> Decision: <span class="rqd-badge rqd-decision-@decisionClass">@review.Decision</span></p></div></header>
+                    <details class="rqd-submission" open="@(expandLatestSubmission ? "open" : null)">
+                        <summary class="rqd-submission-head"><div><h3>Submission @review.SubmissionNumber</h3><p>Submitted: @RequestDisplay.Date(review.SubmittedAt) <span aria-hidden="true">|</span> Decision: <span class="rqd-badge rqd-decision-@decisionClass">@review.Decision</span></p></div><svg class="rqd-submission-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                        <div class="rqd-submission-body">
                         @if (review.ReviewedAt.HasValue)
                         {
                             <p class="rqd-reviewer">Reviewed: @RequestDisplay.Date(review.ReviewedAt) <span aria-hidden="true">·</span> @(string.IsNullOrWhiteSpace(review.ReviewedByUser?.FullName) ? "Sourcing Officer" : review.ReviewedByUser.FullName)</p>
@@ -164,8 +175,10 @@
                         {
                             <p class="rqd-empty rqd-snapshot-warning">The earlier snapshot cannot be displayed. Its stored record has been preserved.</p>
                         }
-                    </article>
+                        </div>
+                    </details>
                 </li>
+                expandLatestSubmission = false;
             }
             </ol>
         }
@@ -241,7 +254,22 @@
 .rqd-snapshot-body{display:grid;gap:8px;padding:0 9px 10px}.rqd-snapshot-body h4{margin:0;color:var(--ws-ink);font-size:14px}.rqd-snapshot-justification{font-size:13px}
 .rqd-snapshot-meta,.rqd-snapshot-files{margin:0;color:var(--ws-muted);font-size:12px;line-height:1.5}.rqd-snapshot-meta strong,.rqd-snapshot-files strong{color:var(--ws-ink)}
 .rqd-snapshot-table th,.rqd-snapshot-table td{padding:8px;font-size:11px}.rqd-snapshot-warning{margin:10px 12px}
-@@media(max-width:900px){.rqd-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rqd-info-item:nth-child(4n+1){padding-left:11px}.rqd-info-item:nth-child(2n+1){padding-left:0}.rqd-info-item:nth-child(4n){padding-right:11px}.rqd-info-item:nth-child(2n){padding-right:0}}
-@@media(max-width:560px){.rqd-page{gap:12px}.rqd-hero{padding:12px 13px 16px}.rqd-hero-main{max-width:100%;align-items:flex-start}.rqd-hero-icon{width:36px;height:36px}.rqd-hero-icon svg{width:21px;height:21px}.rqd-hero h1{font-size:21px}.rqd-hero-main p{font-size:12px}.rqd-card{padding:12px}.rqd-card-title{font-size:16px;margin-bottom:11px}.rqd-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rqd-info-item{padding:8px 6px}.rqd-info-item:nth-child(4n+1){padding-left:6px}.rqd-info-item:nth-child(2n+1){padding-left:0}.rqd-info-item:nth-child(4n){padding-right:6px}.rqd-info-item:nth-child(2n){padding-right:0}.rqd-info-item dt{font-size:11px}.rqd-info-item dd{font-size:13px}.rqd-attachment{gap:7px;padding:8px}.rqd-file-icon{width:30px;height:30px}.rqd-file-meta strong{max-width:45vw}.rqd-download{font-size:11px;padding:5px 8px}.rqd-table{min-width:540px}.rqd-snapshot-table{min-width:480px}.rqd-confirm{align-items:flex-start;font-size:13px}}
+.rqd-page{gap:14px;font-family:Inter,"Segoe UI",Arial,sans-serif;letter-spacing:.005em}
+.rqd-hero{padding:18px 22px 22px;border-radius:16px;background:linear-gradient(112deg,var(--ws-surface),color-mix(in srgb,var(--ws-surface) 82%,#ff7900 18%))}
+.rqd-breadcrumb{margin-bottom:13px;font-size:12px}.rqd-hero-main{gap:13px;max-width:82%}.rqd-hero-icon{width:46px;height:46px}.rqd-hero-icon svg{width:25px;height:25px}
+.rqd-hero h1{font-size:clamp(24px,2.4vw,31px);font-weight:780}.rqd-hero-main p{margin-top:5px;font-size:13px}
+.rqd-route-note{padding:10px 13px;border-radius:10px;font-size:13px;font-weight:650}.rqd-route-note svg{width:17px;height:17px}
+.rqd-actions{gap:9px}.rqd-back,.rqd-edit{min-height:36px;padding:7px 12px;font-size:12px}
+.rqd-card{padding:17px;border-radius:14px;box-shadow:0 6px 20px #14283b10}.rqd-card-title{margin-bottom:14px;font-size:18px}.rqd-section-icon{width:29px;height:29px}.rqd-section-icon svg{width:17px;height:17px}
+.rqd-info-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.rqd-info-item{padding:10px 12px}.rqd-info-item:nth-child(5n+1){padding-left:12px}.rqd-info-item:nth-child(5n){padding-right:12px}.rqd-info-item:nth-child(4n+1){padding-left:0}.rqd-info-item:nth-child(4n){padding-right:0}
+.rqd-info-item dt{margin-bottom:5px;font-size:11px}.rqd-info-item dd{font-size:14px;font-weight:700}.rqd-badge{min-height:23px;padding:4px 9px;font-size:11px}
+.rqd-justification{margin-top:14px;padding:12px 14px}.rqd-justification h3{font-size:14px}.rqd-justification p{font-size:14px;line-height:1.65}
+.rqd-table{font-size:13px}.rqd-table th{padding:10px 11px;font-size:11px}.rqd-table td{padding:10px 11px;font-size:13px}
+.rqd-attachment{padding:10px 12px}.rqd-file-icon{width:34px;height:34px}.rqd-file-meta strong{font-size:13px}.rqd-file-meta small{font-size:11px}.rqd-download{min-height:34px;padding:6px 10px;font-size:11px}
+.rqd-submission-head{padding:11px 13px}.rqd-submission-head h3{font-size:14px}.rqd-submission-head p{font-size:11px}.rqd-reviewer{font-size:12px}.rqd-officer-note p{font-size:13px}
+.rqd-hero h1{font-size:clamp(27px,2.7vw,34px)}.rqd-hero-main p{font-size:14px}.rqd-card-title{font-size:20px}.rqd-info-item dt{font-size:12px}.rqd-info-item dd{font-size:15px}.rqd-badge{font-size:12px}.rqd-justification h3{font-size:15px}.rqd-justification p{font-size:15px}.rqd-table{font-size:14px}.rqd-table th{font-size:12px}.rqd-table td{font-size:14px}.rqd-file-meta strong{font-size:14px}.rqd-file-meta small,.rqd-submission-head p,.rqd-reviewer{font-size:12px}.rqd-submission-head h3{font-size:15px}.rqd-snapshot summary{font-size:13px}
+.rqd-route-note{display:flex;align-items:center;gap:11px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--rqd-orange) 55%,var(--ws-rule));border-left:5px solid var(--rqd-orange);border-radius:12px;background:linear-gradient(100deg,color-mix(in srgb,var(--rqd-orange) 14%,var(--ws-surface)),color-mix(in srgb,var(--rqd-orange) 4%,var(--ws-surface)));color:var(--ws-ink);font-size:15px;font-weight:750;line-height:1.45;box-shadow:0 4px 14px #ff790012}.rqd-route-note svg{display:grid;place-items:center;width:22px;height:22px;padding:3px;flex:0 0 auto;border-radius:7px;background:color-mix(in srgb,var(--rqd-orange) 16%,var(--ws-surface));stroke:var(--rqd-orange);stroke-width:2}
+@@media(max-width:900px){.rqd-info-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.rqd-info-item{padding:6px}.rqd-info-item:nth-child(5n+1){padding-left:6px}.rqd-info-item:nth-child(3n+1){padding-left:0}.rqd-info-item:nth-child(5n){padding-right:6px}.rqd-info-item:nth-child(3n){padding-right:0}}
+@@media(max-width:560px){.rqd-page{gap:8px}.rqd-hero{padding:9px 10px 11px}.rqd-hero-main{max-width:100%;align-items:flex-start}.rqd-hero h1{font-size:18px}.rqd-hero-main p{font-size:10px}.rqd-card{padding:9px}.rqd-card-title{font-size:13px;margin-bottom:7px}.rqd-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rqd-info-item{padding:6px 5px}.rqd-info-item:nth-child(3n+1){padding-left:5px}.rqd-info-item:nth-child(2n+1){padding-left:0}.rqd-info-item:nth-child(3n){padding-right:5px}.rqd-info-item:nth-child(2n){padding-right:0}.rqd-info-item dt{font-size:9px}.rqd-info-item dd{font-size:10px}.rqd-attachment{gap:6px;padding:6px}.rqd-file-icon{width:26px;height:26px}.rqd-file-meta strong{max-width:45vw}.rqd-download{font-size:9px;padding:4px 6px}.rqd-table{min-width:480px}.rqd-snapshot-table{min-width:450px}.rqd-confirm{align-items:flex-start;font-size:11px}}
 </style>
 }

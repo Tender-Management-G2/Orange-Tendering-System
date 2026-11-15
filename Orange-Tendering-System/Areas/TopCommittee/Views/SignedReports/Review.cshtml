@@ -1,0 +1,3 @@
+@model Orange_Tendering_System.ViewModels.ReportReviewModel
+@{ ViewData["Title"] = $"Evaluation report v{Model.Report.VersionNumber}"; }
+@await Html.PartialAsync("~/Areas/TopCommittee/Views/Reports/Review.cshtml", Model)
