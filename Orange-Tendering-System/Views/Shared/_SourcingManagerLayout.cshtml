@@ -32,6 +32,7 @@ through WorkspaceNavigation.LayoutFor.
     <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/orange-ui.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/sourcing-manager.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="ws-shell ws-internal" data-workspace-role="Sourcing Manager">
@@ -42,11 +43,12 @@ through WorkspaceNavigation.LayoutFor.
             <button class="ws-icon-button ws-nav-close" type="button" aria-label="Close navigation">×</button>
         </div>
         <nav class="ws-primary-nav" aria-label="Sourcing Manager navigation">
-            <a class="ws-nav-item @Active("SourcingManager", new[] { "Dashboard" })" asp-area="SourcingManager" asp-controller="Dashboard" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("home"))</svg><span>Dashboard</span></a>
+            <a class="ws-nav-item @Active("SourcingManager", new[] { "ManagerDashboard" })" asp-area="SourcingManager" asp-controller="ManagerDashboard" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("home"))</svg><span>Dashboard</span></a>
             <a class="ws-nav-item @Active("SourcingManager", new[] { "Workflow" })" asp-area="SourcingManager" asp-controller="Workflow" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>Weighted Evaluation</span></a>
-            <a class="ws-nav-item @Active("SourcingManager", new[] { "Reports" }, "!History")" asp-area="SourcingManager" asp-controller="Reports" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("request"))</svg><span>Pending Reports</span></a>
+            <a class="ws-nav-item @(ViewData["WorkspaceSection"]?.ToString() == "Pending Reports" ? "is-active" : "")" asp-area="SourcingManager" asp-controller="ManagerReports" asp-action="Pending"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("request"))</svg><span>Pending Reports</span></a>
+            <a class="ws-nav-item @(ViewData["WorkspaceSection"]?.ToString() == "Forwarding" ? "is-active" : "")" asp-area="SourcingManager" asp-controller="ManagerReports" asp-action="Forwarding"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("send"))</svg><span>Forwarding</span></a>
             <a class="ws-nav-item @Active("SourcingManager", new[] { "FinalDecisions" })" asp-area="SourcingManager" asp-controller="FinalDecisions" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg><span>Final Decisions</span></a>
-            <a class="ws-nav-item @Active("SourcingManager", new[] { "Reports" }, "History")" asp-area="SourcingManager" asp-controller="Reports" asp-action="History"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("history"))</svg><span>Decision History</span></a>
+            <a class="ws-nav-item @Active("SourcingManager", new[] { "ManagerReports" }, "History")" asp-area="SourcingManager" asp-controller="ManagerReports" asp-action="History"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("history"))</svg><span>Decision History</span></a>
             <a class="ws-nav-item @Active("SourcingManager", new[] { "Analytics" })" asp-area="SourcingManager" asp-controller="Analytics" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chart"))</svg><span>Analytics & Exports</span></a>
             <a class="ws-nav-item @Active("SourcingManager", new[] { "Clarifications" })" asp-area="SourcingManager" asp-controller="Clarifications" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chat"))</svg><span>Clarifications</span></a>
         </nav>
@@ -81,6 +83,7 @@ through WorkspaceNavigation.LayoutFor.
     <script src="~/js/report-signature.js" asp-append-version="true"></script>
     <script src="~/js/orange-ui.js" asp-append-version="true"></script>
     <script src="~/js/ai-chat.js" asp-append-version="true"></script>
+    <script src="~/js/sourcing-manager-filters.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

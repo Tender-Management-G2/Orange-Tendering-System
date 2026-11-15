@@ -119,6 +119,12 @@ app.MapStaticAssets();
 // Role workspaces: /Admin, /Department, /SourcingOfficer, /Supplier, /EvaluationCommittee,
 // /SourcingManager, /TopCommittee (see docs/ROUTE_MAP.md).
 app.MapControllerRoute(
+    name: "sourcing-manager-home",
+    pattern: "SourcingManager",
+    defaults: new { area = "SourcingManager", controller = "ManagerDashboard", action = "Index" })
+    .WithStaticAssets();
+
+app.MapControllerRoute(
     name: "areas",
     pattern: "{area:exists}/{controller=Dashboard}/{action=Index}/{id?}")
     .WithStaticAssets();
