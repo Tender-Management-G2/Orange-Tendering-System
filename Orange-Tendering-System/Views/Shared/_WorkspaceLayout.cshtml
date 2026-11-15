@@ -33,6 +33,10 @@ INTEGRATED. Search and voice search are visible but disabled
 until implemented. Notifications link to the shared page shell.
 ===========================================================
 *@
+@using System.Security.Claims
+@using Microsoft.EntityFrameworkCore
+@using Orange_Tendering_System.Data
+@inject ApplicationDbContext Db
 @{
     Layout = null;
     var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
@@ -42,6 +46,13 @@ until implemented. Notifications link to the shared page shell.
         workspace?.Role,
         "Sourcing Manager",
         StringComparison.OrdinalIgnoreCase);
+    var notificationUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var recentNotifications = isSourcingManager && !string.IsNullOrWhiteSpace(notificationUserId)
+        ? await Db.Notifications.Where(item => item.UserId == notificationUserId)
+            .OrderBy(item => item.IsRead).ThenByDescending(item => item.CreatedAt)
+            .Take(5).AsNoTracking().ToListAsync()
+        : [];
+    var unreadNotifications = recentNotifications.Count(item => !item.IsRead);
 }
 <!doctype html>
 <html lang="en">
@@ -104,7 +115,41 @@ until implemented. Notifications link to the shared page shell.
                 {
                     <button type="button" class="ws-icon-button ws-utility-disabled" disabled aria-label="Voice search is not implemented yet" title="Voice search is not implemented yet"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
                 }
-                <a class="ws-icon-button" asp-area="" asp-controller="Notifications" asp-action="Index" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg></a>
+                @if (isSourcingManager)
+                {
+                    <details class="sm-notification-menu">
+                        <summary class="ws-icon-button" aria-label="Notifications" title="Notifications">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg>
+                            @if (unreadNotifications > 0)
+                            {
+                                <span class="sm-notification-count">@unreadNotifications</span>
+                            }
+                        </summary>
+                        <div class="sm-notification-dropdown">
+                            <div class="sm-notification-heading"><strong>Notifications</strong><a asp-area="" asp-controller="Notifications" asp-action="Index">View all</a></div>
+                            @if (recentNotifications.Count == 0)
+                            {
+                                <p class="sm-notification-empty">You have no notifications.</p>
+                            }
+                            else
+                            {
+                                @foreach (var notification in recentNotifications)
+                                {
+                                    <a class="sm-notification-item @(!notification.IsRead ? "is-unread" : "")"
+                                       asp-area="" asp-controller="Notifications" asp-action="Open" asp-route-id="@notification.Id">
+                                        <strong>@notification.Title</strong>
+                                        <span>@notification.Message</span>
+                                        <small>@notification.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                                    </a>
+                                }
+                            }
+                        </div>
+                    </details>
+                }
+                else
+                {
+                    <a class="ws-icon-button" asp-area="" asp-controller="Notifications" asp-action="Index" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg></a>
+                }
                 <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
                 <partial name="_WorkspaceAccountMenu" />
             </div>

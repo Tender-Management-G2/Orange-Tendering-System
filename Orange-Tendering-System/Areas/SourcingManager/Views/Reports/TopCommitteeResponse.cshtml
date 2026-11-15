@@ -1,0 +1,52 @@
+@model Orange_Tendering_System.ViewModels.TopCommitteeResponseDetailsViewModel
+@using Orange_Tendering_System.Models.Entities
+@{
+    ViewData["Title"] = "Top Committee final report";
+    ViewData["WorkspaceSection"] = "Forwarding";
+    ViewData["Description"] = "Review and download the final committee decision.";
+    var approved = Model.Decision == CommitteeRoundStatus.Approved;
+}
+
+<partial name="_PageHeader" />
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<section class="ws-panel pg-panel sm-final-hero">
+    <div>
+        <p class="forward-eyebrow">Top Committee decision</p>
+        <h2>@Model.TenderTitle</h2>
+        <p>The final response is ready for the next sourcing step.</p>
+    </div>
+    <span class="sm-status @(approved ? "is-accepted" : "is-returned")">
+        @(approved ? "Award approved" : "Further details requested")
+    </span>
+</section>
+
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Decision details</h2></div>
+    <dl class="pg-dl">
+        <div><dt>Executive summary</dt><dd>Version @Model.ExecutiveSummaryVersion</dd></div>
+        <div><dt>Decision date</dt><dd>@(Model.DecidedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not available")</dd></div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Executive summary sent to the committee</h2></div>
+    <div class="sm-report-content">@Model.ExecutiveSummary</div>
+</section>
+
+<section class="ws-panel pg-panel sm-final-actions">
+    <div>
+        <p class="forward-eyebrow">Next step</p>
+        <h2>Final report</h2>
+        <p>Download a copy of the final committee decision for your records.</p>
+    </div>
+    <div class="pg-actions">
+        <a asp-action="DownloadFinalReport" asp-route-id="@Model.CommitteeRoundId" class="pg-btn pg-btn-secondary">Download final report</a>
+    </div>
+</section>
+
+<a asp-action="Forwarding" class="pg-btn pg-btn-ghost">Back to forwarding</a>

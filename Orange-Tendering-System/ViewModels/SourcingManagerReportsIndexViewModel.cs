@@ -18,3 +18,14 @@ public sealed record TopCommitteeResponseRow(
     int ExecutiveSummaryVersion,
     CommitteeRoundStatus Decision,
     DateTime? DecidedAt);
+
+public sealed class TopCommitteeResponseDetailsViewModel
+{
+    public int CommitteeRoundId { get; init; }
+    public int EvaluationReportId { get; init; }
+    public string TenderTitle { get; init; } = string.Empty;
+    public int ExecutiveSummaryVersion { get; init; }
+    public CommitteeRoundStatus Decision { get; init; }
+    public DateTime? DecidedAt { get; init; }
+    public string ExecutiveSummary { get; init; } = string.Empty;
+}

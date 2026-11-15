@@ -9,6 +9,7 @@ using Orange_Tendering_System.Models;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using System.Security.Claims;
+using System.Text;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.ViewModels;
 
@@ -28,6 +29,12 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
         // GET /SourcingManager/Reports. TODO: query the data in a service and pass a view model.
         public async Task<IActionResult> Index(string? search, string? status, bool forwarding = false)
         {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                await EnsureTopCommitteeDecisionNotificationsAsync(userId);
+            }
+
             var officerReportsQuery = _context.TenderReports
                 .Include(r => r.TenderRound)
                     .ThenInclude(tr => tr.Tender)
@@ -90,6 +97,127 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 Status = status,
                 IsForwarding = forwarding
             });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> TopCommitteeResponse(int id)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId)) return Challenge();
+
+            var round = await _context.CommitteeRounds
+                .Include(item => item.TenderRound).ThenInclude(item => item.Tender)
+                .Include(item => item.TenderReport).ThenInclude(item => item!.PreviousReport)
+                    .ThenInclude(item => item!.CreatedByUser)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id &&
+                    item.CommitteeType == CommitteeType.Top &&
+                    item.Status != CommitteeRoundStatus.InProgress &&
+                    item.TenderReport != null);
+
+            if (round?.TenderReport?.PreviousReport == null) return NotFound();
+
+            return View(new TopCommitteeResponseDetailsViewModel
+            {
+                CommitteeRoundId = round.Id,
+                EvaluationReportId = round.TenderReport.PreviousReport.Id,
+                TenderTitle = round.TenderRound.Tender.Title,
+                ExecutiveSummaryVersion = round.TenderReport.VersionNumber,
+                Decision = round.Status,
+                DecidedAt = round.CompletedAt,
+                ExecutiveSummary = round.TenderReport.Content
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadFinalReport(int id)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId)) return Challenge();
+
+            var round = await _context.CommitteeRounds
+                .Include(item => item.TenderRound).ThenInclude(item => item.Tender)
+                .Include(item => item.TenderReport)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id && item.CommitteeType == CommitteeType.Top &&
+                    item.Status != CommitteeRoundStatus.InProgress && item.TenderReport != null);
+            if (round?.TenderReport == null) return NotFound();
+
+            var decision = round.Status == CommitteeRoundStatus.Approved ? "Award approved" : "Further details requested";
+            var report = $"TOP COMMITTEE FINAL REPORT\r\n\r\nTender: {round.TenderRound.Tender.Title}\r\nExecutive summary version: {round.TenderReport.VersionNumber}\r\nCommittee response: {decision}\r\nDecided at: {(round.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not available")}\r\n\r\nEXECUTIVE SUMMARY\r\n{round.TenderReport.Content}";
+            return File(Encoding.UTF8.GetBytes(report), "text/plain; charset=utf-8", $"Top-Committee-Final-Report-{round.Id}.txt");
+        }
+
+        private async Task EnsureTopCommitteeDecisionNotificationsAsync(string userId)
+        {
+            var rounds = await _context.CommitteeRounds
+                .Where(item => item.CommitteeType == CommitteeType.Top && item.Status != CommitteeRoundStatus.InProgress &&
+                    item.TenderReport != null && item.TenderReport.CreatedByUserId == userId &&
+                    item.TenderReport.PreviousReportId != null)
+                .Select(item => new
+                {
+                    item.Id,
+                    TenderTitle = item.TenderRound.Tender.Title,
+                    OfficerUserId = item.TenderReport!.PreviousReport!.CreatedByUserId,
+                    EvaluationReportId = item.TenderReport.PreviousReportId!.Value,
+                    item.Status
+                })
+                .ToListAsync();
+            if (rounds.Count == 0) return;
+
+            var managerLinks = rounds.Select(item => $"/SourcingManager/Reports/TopCommitteeResponse/{item.Id}").ToList();
+            var existingManagerLinks = await _context.Notifications
+                .Where(item => item.UserId == userId && item.Title == "Top Committee Decision" && managerLinks.Contains(item.Link!))
+                .Select(item => item.Link!)
+                .ToListAsync();
+
+            var officerLinks = rounds
+                .Select(item => $"/SourcingOfficer/Reports/EvaluationResult/{item.EvaluationReportId}")
+                .ToList();
+            var officerIds = rounds.Select(item => item.OfficerUserId).Distinct().ToList();
+            var existingOfficerLinks = await _context.Notifications
+                .Where(item => officerIds.Contains(item.UserId) &&
+                    item.Title == "Top Committee Final Decision" &&
+                    officerLinks.Contains(item.Link!))
+                .Select(item => new { item.UserId, Link = item.Link! })
+                .ToListAsync();
+
+            foreach (var round in rounds)
+            {
+                var managerLink = $"/SourcingManager/Reports/TopCommitteeResponse/{round.Id}";
+                if (!existingManagerLinks.Contains(managerLink))
+                {
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = userId,
+                        Title = "Top Committee Decision",
+                        Message = $"The Top Committee has completed its decision for '{round.TenderTitle}'.",
+                        Link = managerLink,
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                var officerLink = $"/SourcingOfficer/Reports/EvaluationResult/{round.EvaluationReportId}";
+                var officerAlreadyNotified = existingOfficerLinks.Any(item =>
+                    item.UserId == round.OfficerUserId && item.Link == officerLink);
+                if (!string.IsNullOrWhiteSpace(round.OfficerUserId) && !officerAlreadyNotified)
+                {
+                    var outcome = round.Status == CommitteeRoundStatus.Approved
+                        ? "approved the award"
+                        : "requested further details";
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = round.OfficerUserId,
+                        Title = "Top Committee Final Decision",
+                        Message = $"The Top Committee has {outcome} for '{round.TenderTitle}'.",
+                        Link = officerLink,
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+            await _context.SaveChangesAsync();
         }
 
         // Sidebar destination for reports that have arrived for managerial review.
@@ -418,12 +546,9 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
             var report = await _context.TenderReports
                 .Include(r => r.TenderRound)
                     .ThenInclude(tr => tr.Tender)
-                        .ThenInclude(t => t.Items)
                 .Include(r => r.RecommendedBid)
                     .ThenInclude(b => b!.TenderInvitation)
                         .ThenInclude(i => i.Supplier)
-                .Include(r => r.RecommendedBid)
-                    .ThenInclude(b => b!.Items)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r =>
                     r.Id == id &&
@@ -456,23 +581,6 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                     "This evaluation is already with the Top Committee.";
 
                 return RedirectToAction(nameof(Forwarding));
-            }
-
-            // Add Total Cost calculation here
-            if (report.RecommendedBid != null)
-            {
-                var bid = report.RecommendedBid;
-
-                var itemsTotal = bid.Items.Sum(item =>
-                    item.Quantity * item.UnitPrice);
-
-                ViewBag.TotalCost =
-                    itemsTotal +
-                    bid.ShippingCost +
-                    bid.InstallationCost +
-                    bid.MaintenanceCost +
-                    bid.TaxAmount +
-                    bid.OtherCost;
             }
 
             ViewBag.Summary = "";
@@ -630,7 +738,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitToTopCommittee( int id,bool costAndItemsReviewed, bool supplierReviewed,bool readyForCommittee)
+        public async Task<IActionResult> SubmitToTopCommittee(int id, bool readyForCommittee)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -639,9 +747,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 return Challenge();
             }
 
-            if (!costAndItemsReviewed ||
-                !supplierReviewed ||
-                !readyForCommittee)
+            if (!readyForCommittee)
             {
                 TempData["Error"] =
                     "Please confirm all forwarding requirements.";
