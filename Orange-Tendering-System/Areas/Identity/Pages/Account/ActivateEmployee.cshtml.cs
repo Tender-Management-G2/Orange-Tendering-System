@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 
@@ -34,7 +35,10 @@ public class ActivateEmployeeModel(UserManager<ApplicationUser> users, Applicati
     {
         if (!ModelState.IsValid) return Page();
         var user = await users.FindByEmailAsync(Input.Email.Trim());
-        if (user is not { DepartmentId: not null, MustChangePassword: true } || user.EmailConfirmed)
+        var invitation = user is not null && await db.AuditLogs.AnyAsync(a =>
+            a.EntityName == nameof(ApplicationUser) && a.EntityId == user.Id &&
+            (a.Action == "Created" || a.Action == "EmployeeProvisioned"));
+        if (user is not { SupplierId: null, MustChangePassword: true } || !invitation)
         {
             ModelState.AddModelError(string.Empty, "Activation link is invalid or expired.");
             return Page();

@@ -14,6 +14,7 @@ namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 public class ForgotPasswordModel(
     UserManager<ApplicationUser> users,
     IEmailSender emailSender,
+    AccountLinkGenerator accountLinks,
     IConfiguration configuration,
     ILogger<ForgotPasswordModel> logger) : PageModel
 {
@@ -39,8 +40,8 @@ public class ForgotPasswordModel(
 
         var code = await users.GeneratePasswordResetTokenAsync(user);
         var encoded = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var url = Url.Page("/Account/ResetPassword", pageHandler: null, values: new { area = "Identity", code = encoded }, protocol: Request.Scheme);
-        if (url == null) throw new InvalidOperationException("Could not generate password-reset URL.");
+        var url = accountLinks.GetUriByPage(HttpContext, "/Account/ResetPassword",
+            new { area = "Identity", code = encoded });
         try
         {
             await emailSender.SendEmailAsync(user.Email!, "Reset your password",

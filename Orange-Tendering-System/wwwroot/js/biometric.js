@@ -6,6 +6,10 @@
     // Face recognition runs in the browser; the camera image never leaves the device, only 128-number
     // descriptors are sent. face-api.js 1.7.13 and its models are served locally from wwwroot/lib/face-api.
     var FACE_BASE = '/lib/face-api';
+    var activeStreams = new Set();
+    window.addEventListener('pagehide', function () {
+        activeStreams.forEach(function (stream) { stopCamera(stream); });
+    });
 
     // ---------- Small helpers ----------
 
@@ -43,7 +47,11 @@
         var data = null;
         try { data = await response.json(); } catch (e) { /* no body */ }
         if (!response.ok) {
-            throw new Error((data && data.error) || 'The request failed (' + response.status + ').');
+            var failure = new Error((data && data.error) || 'The request failed (' + response.status + ').');
+            failure.status = response.status;
+            // The server ended the password step (expired, used, cancelled or locked): start again from the password.
+            failure.restart = !!(data && data.restart);
+            throw failure;
         }
         return data;
     }
@@ -136,13 +144,14 @@
         });
     }
 
-    // ---------- Face recognition (five-second capture) ----------
+    // ---------- Face recognition (seven-second capture, holding still) ----------
     // Detect a face, take a few descriptors from consecutive camera frames, send them. There are no liveness
     // steps (owner decision for the academic demo), so a photo of the person held up to the camera can pass.
 
-    var CAPTURE_MS = 5000;
-    var NO_FACE_TIMEOUT_MS = 30000; // time to position the face and complete a continuous capture
-    var MIN_FACE_WIDTH = 80;       // pixels in the analysed frame; smaller faces give unreliable descriptors
+    var CAPTURE_MS = 7000;     // a steady seven-second hold, one sample every 0.7 s
+    var SAMPLE_MS = 700;
+    var NO_FACE_TIMEOUT_MS = 40000; // time to position the face and complete a continuous capture
+    var MIN_FACE_WIDTH = 110;      // pixels in the analysed frame; smaller faces give unreliable descriptors
 
     function loadScript(src) {
         return new Promise(function (resolve, reject) {
@@ -194,8 +203,21 @@
                 audio: false
             });
         } catch (e) {
-            throw new Error('The camera is not available. Allow camera access and try again.');
+            // The code lets the page tell "permission denied" from "no camera" without parsing the text.
+            var problem;
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                problem = new Error('Camera access was denied. Allow this site to use the camera, then try again.');
+                problem.code = 'cameraDenied';
+            } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+                problem = new Error('No camera was found. Connect a camera, then try again.');
+                problem.code = 'cameraMissing';
+            } else {
+                problem = new Error('The camera is not available. Check that another app is not using it, then try again.');
+                problem.code = 'cameraUnavailable';
+            }
+            throw problem;
         }
+        activeStreams.add(stream);
         video.srcObject = stream;
         try { await video.play(); }
         catch (e) { stopCamera(stream, video); throw new Error('The camera preview could not start. Try again.'); }
@@ -206,18 +228,25 @@
     }
 
     function stopCamera(stream, video) {
-        if (stream) { stream.getTracks().forEach(function (track) { track.stop(); }); }
+        if (stream) { stream.getTracks().forEach(function (track) { track.stop(); }); activeStreams.delete(stream); }
         if (video) { video.srcObject = null; }
     }
 
     function nextFrame() { return new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); }); }
 
+    function cancelled() {
+        var error = new Error('Face verification was cancelled.');
+        error.code = 'cancelled';
+        return error;
+    }
+
     // onDetect (optional, used by /face-demo): called for every analysed frame with true/false (face found).
-    async function capture(video, setHint, onDetect) {
+    // isCancelled (optional): checked on every frame so the person can leave the camera step at any time.
+    async function capture(video, setHint, onDetect, isCancelled) {
         var faceapi = window.faceapi;
         // Fast detector first; after 1.5 s without a face a more sensitive one (dim light, face further away).
-        var fast = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
-        var sensitive = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 });
+        var fast = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
+        var sensitive = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.3 });
         var cpuTried = false;
 
         // Each frame is read from a plain 2D canvas instead of straight from the <video>: on some graphics drivers
@@ -238,9 +267,10 @@
         var lastFrameTime = -1;
         var captureStarted = null;
         var lastSample = -Infinity;
-        setHint('Look at the camera for 5 seconds.');
+        setHint('Hold still and look straight at the camera for 7 seconds.');
 
         while (performance.now() - started < NO_FACE_TIMEOUT_MS) {
+            if (isCancelled && isCancelled()) { throw cancelled(); }
             // Only analyse a new camera frame, so every sample comes from a different picture.
             if (video.currentTime === lastFrameTime) { await nextFrame(); continue; }
             lastFrameTime = video.currentTime;
@@ -262,17 +292,17 @@
                 lastSeen = performance.now();
                 if (captureStarted === null) { captureStarted = lastSeen; }
                 var elapsed = lastSeen - captureStarted;
-                if (lastSeen - lastSample >= 1000 || elapsed >= CAPTURE_MS) {
+                if (lastSeen - lastSample >= SAMPLE_MS || elapsed >= CAPTURE_MS) {
                     descriptors.push({ t: Math.round(elapsed), v: Array.from(found.descriptor) });
                     lastSample = lastSeen;
                 }
-                setHint('Keep looking at the camera: ' + Math.max(0, Math.ceil((CAPTURE_MS - elapsed) / 1000)) + ' seconds remaining.');
+                setHint('Hold still: ' + Math.max(0, Math.ceil((CAPTURE_MS - elapsed) / 1000)) + ' seconds remaining.');
                 if (elapsed >= CAPTURE_MS && descriptors.length >= 3) { return { descriptors: descriptors }; }
             } else {
                 captureStarted = null;
                 descriptors = [];
                 lastSample = -Infinity;
-                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 5-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 5-second capture will restart.');
+                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 7-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 7-second capture will restart.');
             }
         }
 
@@ -282,6 +312,7 @@
     }
 
     async function runFace(options, challengeUrl, submitUrl, extra, challengeBody) {
+        if (options.onState) { options.onState('requesting'); }
         options.setStatus('Starting the camera...');
         // The token first: a wrong enrollment password fails before the camera opens.
         var challenge = await post(challengeUrl, challengeBody);
@@ -293,24 +324,37 @@
             throw e;
         }
         var stream = await cameraStarting;
+        if (options.isCancelled && options.isCancelled()) { stopCamera(stream, options.video); throw cancelled(); }
         if (options.onCamera) { options.onCamera(true); }
+        if (options.onState) { options.onState('camera'); }
         try {
             options.setStatus('Looking for your face...');
-            var evidence = await capture(options.video, options.setHint, options.onDetect);
+            if (options.onState) { options.onState('capturing'); }
+            var evidence = await capture(options.video, options.setHint, options.onDetect, options.isCancelled);
             options.setStatus('Checking...');
-            return await post(submitUrl, Object.assign({ token: challenge.token }, evidence, extra));
+            if (options.onState) { options.onState('processing'); }
+            var result = await post(submitUrl, Object.assign({ token: challenge.token }, evidence, extra));
+            if (result && result.succeeded && options.onState) { options.onState('confirmed'); }
+            return result;
         } finally {
             stopCamera(stream, options.video);
             if (options.onCamera) { options.onCamera(false); }
         }
     }
 
-    function faceLogin(options, email, returnUrl) {
-        return runFace(options, '/Biometrics/FaceChallenge', '/Biometrics/FaceLogin', { email: email, returnUrl: returnUrl });
+    // Second step of supplier sign-in: the server takes the account from the password step it has just
+    // accepted (SupplierPreAuth), so no email is sent here and a face alone cannot start a sign-in.
+    function faceLogin(options, returnUrl) {
+        return runFace(options, '/Biometrics/FaceChallenge', '/Biometrics/FaceLogin', { returnUrl: returnUrl });
     }
 
     function faceEnroll(options, replace, password) {
         return runFace(options, '/Biometrics/FaceEnrollChallenge', '/Biometrics/FaceEnroll', { replace: !!replace }, { password: password });
+    }
+
+    function faceSetupLogin(options, password) {
+        return runFace(options, '/Biometrics/FaceSetupChallenge', '/Biometrics/FaceSetupLogin',
+            { returnUrl: '/Supplier' }, { password: password });
     }
 
     // ---------- Page wiring ----------
@@ -327,7 +371,9 @@
 
         function setStatus(message, kind) {
             if (!statusBox) { return; }
-            statusBox.className = 'bio-status bio-status--' + (kind || 'info');
+            // Only the state classes change, so a page can give the box its own styling.
+            ['info', 'success', 'danger'].forEach(function (k) { statusBox.classList.remove('bio-status--' + k); });
+            statusBox.classList.add('bio-status', 'bio-status--' + (kind || 'info'));
             statusBox.textContent = message;
         }
 
@@ -337,45 +383,81 @@
             buttons.forEach(function (b) { if (b) { b.disabled = isBusy || b.hasAttribute('data-bio-disabled'); } });
         }
 
-        var faceOptions = { video: video, setStatus: setStatus, setHint: setHint };
-        var allButtons = Array.prototype.slice.call(root.querySelectorAll('button'));
+        // The illustration beside the form: the Auth Studio shell (Login), or the Living Dossier scene.
+        // It is told what really happened (camera, capture, server result) and never decides anything.
+        var studio = document.getElementById('authStudio');
+        var scene = studio || document.querySelector('.ld-scene[data-scene="face"], .ld-scene[data-scene="login"]');
+        var faceCancelled = false;
+        function announce(state, detail) {
+            if (!scene) { return; }
+            scene.dispatchEvent(new CustomEvent(studio ? 'authstudio:face' : 'dossier:face-state',
+                { detail: Object.assign({ state: state }, detail || {}) }));
+        }
+        var faceOptions = { video: video, setStatus: setStatus, setHint: setHint,
+            isCancelled: function () { return faceCancelled; },
+            onCamera: function (active) { if (scene && panel) { panel.classList.toggle('bio-hidden', !active); } },
+            onState: announce };
+        // Buttons marked data-bio-keep (Cancel) stay usable while a biometric action is running.
+        var allButtons = Array.prototype.slice.call(root.querySelectorAll('button'))
+            .filter(function (b) { return !b.hasAttribute('data-bio-keep'); });
 
-        async function guarded(action, successMessage) {
+        // method: 'face' (default) or 'passkey' — tells the illustration which step a result belongs to.
+        async function guarded(action, successMessage, method) {
             busy(allButtons, true);
             try {
                 var result = await action();
                 if (result && result.redirect) {
+                    if (method === 'passkey') { announce('confirmed', { method: 'passkey' }); }
                     setStatus('Signed in. Redirecting...', 'success');
-                    window.location.href = result.redirect;
+                    // The server has issued the session. A studio page may play a short closing
+                    // transition before it navigates (it cancels this event and navigates itself).
+                    if (studio && !studio.dispatchEvent(new CustomEvent('authstudio:signed-in',
+                        { cancelable: true, detail: { redirect: result.redirect } }))) { return; }
+                    var delay = scene && scene.dataset.faceState === 'confirmed' &&
+                        !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1450 : 0;
+                    window.setTimeout(function () { window.location.href = result.redirect; }, delay);
                     return;
                 }
                 setStatus(successMessage, 'success');
+                if (method === 'passkey') { announce('confirmed', { method: 'passkey' }); }
                 return result;
             } catch (e) {
-                setStatus(e.message, 'danger');
+                if (e && e.code === 'cancelled') {
+                    setStatus('');
+                    announce('cancelled', { method: method || 'face' });
+                } else {
+                    setStatus(e.message, 'danger');
+                    announce(e.restart ? 'restart' : 'failed', { method: method || 'face', code: e.code || null, message: e.message });
+                }
             } finally {
                 if (panel) { panel.classList.add('bio-hidden'); }
                 busy(allButtons, false);
             }
         }
 
-        var passkeyLoginButton = $('btnPasskeyLogin');
-        if (passkeyLoginButton) {
+        // A device passkey signs in on its own; the button is offered beside the password form
+        // and again on the supplier's biometric step.
+        [$('btnPasskeyLogin'), $('btnPasskeyStep')].forEach(function (passkeyLoginButton) {
+            if (!passkeyLoginButton) { return; }
             passkeyLoginButton.addEventListener('click', function () {
-                setStatus('Use your fingerprint, face or PIN when your device asks.');
-                guarded(function () { return passkeyLogin(returnUrl); }, 'Signed in.');
+                setStatus('Use your fingerprint, face or PIN when your device asks, or choose a phone and scan the QR code.');
+                announce('requesting', { method: 'passkey' });
+                guarded(function () { return passkeyLogin(returnUrl); }, 'Signed in.', 'passkey');
             });
-        }
+        });
 
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) {
             faceLoginButton.addEventListener('click', function () {
-                var emailBox = $('Input_Email');
-                var email = ((emailBox && emailBox.value) || '').trim();
-                if (!email) { setStatus('Enter your email above first.', 'danger'); return; }
-                if (panel) { panel.classList.remove('bio-hidden'); }
-                guarded(function () { return faceLogin(faceOptions, email, returnUrl); }, 'Signed in.');
+                faceCancelled = false;
+                if (panel && !scene) { panel.classList.remove('bio-hidden'); }
+                guarded(function () { return faceLogin(faceOptions, returnUrl); }, 'Signed in.');
             });
+        }
+
+        var faceCancelButton = $('btnFaceCancel');
+        if (faceCancelButton) {
+            faceCancelButton.addEventListener('click', function () { faceCancelled = true; });
         }
 
         var passkeyRegisterButton = $('btnPasskeyRegister');
@@ -384,9 +466,12 @@
                 var label = ($('passkeyLabel').value || '').trim() || 'My device';
                 var password = ($('bioPassword') || {}).value || '';
                 if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
-                setStatus('Use your fingerprint, face or PIN when your device asks.');
-                guarded(function () { return passkeyRegister(label, password); }, 'Fingerprint / Passkey Registered Successfully').then(function (ok) {
-                    if (ok) { window.location.reload(); }
+                setStatus('Use your fingerprint, face or PIN when your device asks, or choose a phone and scan the QR code.');
+                announce('requesting', { method: 'passkey' });
+                guarded(function () { return passkeyRegister(label, password); }, 'Fingerprint / Passkey Registered Successfully', 'passkey').then(function (ok) {
+                    // Let the Identity Station finish its confirmed sequence before the page shows the new state.
+                    var delay = ok && scene && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1700 : 0;
+                    if (ok) { window.setTimeout(function () { window.location.reload(); }, delay); }
                 });
             });
         }
@@ -394,23 +479,37 @@
         root.querySelectorAll('[data-remove-passkey]').forEach(function (button) {
             button.addEventListener('click', function () {
                 if (!window.confirm('Remove this passkey from your account?')) { return; }
-                guarded(function () { return post('/Biometrics/PasskeyRemove?id=' + encodeURIComponent(button.dataset.removePasskey)); }, 'Passkey removed.').then(function (ok) {
+                guarded(function () { return post('/Biometrics/PasskeyRemove?id=' + encodeURIComponent(button.dataset.removePasskey)); }, 'Passkey removed.', 'passkey').then(function (ok) {
                     if (ok) { window.location.reload(); }
                 });
             });
         });
 
         var faceEnrollButton = $('btnFaceEnroll');
+        var faceSetupLoginButton = $('btnFaceSetupLogin');
+        if (faceSetupLoginButton) {
+            faceSetupLoginButton.addEventListener('click', function () {
+                var password = ($('bioPassword') || {}).value || '';
+                if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
+                faceCancelled = false;
+                guarded(function () { return faceSetupLogin(faceOptions, password); }, 'Signed in.');
+            });
+        }
         if (faceEnrollButton) {
             faceEnrollButton.addEventListener('click', function () {
                 var password = ($('bioPassword') || {}).value || '';
                 if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
                 var replaceBox = $('faceReplace');
-                if (panel) { panel.classList.remove('bio-hidden'); }
+                if (panel && !scene) { panel.classList.remove('bio-hidden'); }
                 guarded(function () { return faceEnroll(faceOptions, replaceBox ? replaceBox.checked : true, password); }, 'Face registered successfully.').then(function (ok) {
                     // The registration step moves on to its confirmation; the settings page just reloads.
                     var next = root.getAttribute('data-enrolled-url');
-                    if (ok) { if (next) { window.location.href = next; } else { window.location.reload(); } }
+                    if (ok) {
+                        if (next) {
+                            var delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1750;
+                            window.setTimeout(function () { window.location.href = next; }, delay);
+                        } else { window.location.reload(); }
+                    }
                 });
             });
         }
@@ -563,8 +662,13 @@
         initFaceDemo();
         initPasskeyDemo();
         if ($('btnFaceEnroll') || $('face-demo-root')) { preloadFace(); }
-        var supplierEmail = $('Input_Email');
-        if (supplierEmail) { supplierEmail.addEventListener('focus', preloadFace, { once: true }); }
+        // Sign-in page: the models are fetched once a supplier with a face enrolled reaches the biometric step.
+        var studio = $('authStudio');
+        if (studio) {
+            studio.addEventListener('authstudio:step', function (event) {
+                if (event.detail && event.detail.step === 'biometric' && event.detail.face) { preloadFace(); }
+            });
+        }
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) { faceLoginButton.addEventListener('pointerenter', preloadFace, { once: true }); }
     }
