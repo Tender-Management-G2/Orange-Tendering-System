@@ -33,17 +33,23 @@ LAYERS = {
     "l5":    ([(628, 640), (722, 600), (722, 556), (800, 560), (905, 552), (1070, 549), (1182, 552), (1240, 558), (1242, 600), (1176, 594), (1000, 614), (800, 642), (700, 674), (630, 678)], True),
     "leftbox":   ([(486, 662), (590, 632), (608, 642), (608, 712), (522, 742), (486, 738)], False),
     "rightcube": ([(1506, 300), (1630, 290), (1644, 300), (1642, 396), (1520, 406), (1506, 396)], False),
-    "ulpanels":  ([(574, 228), (642, 236), (726, 266), (728, 322), (690, 320), (640, 300), (574, 290)], False),
+    "ulpanels":  ([(568, 222), (645, 230), (732, 260), (734, 328), (690, 326), (640, 304), (568, 296)], False),
+    "lslab":     ([(464, 402), (526, 400), (528, 504), (466, 506)], False),
+    "chip":      ([(1244, 526), (1268, 526), (1268, 562), (1244, 562)], False),
+    # the stream of documents (bright pixels only, see PAPERS_LUMA)
+    "papers":    ([(0, 488), (300, 500), (528, 504), (528, 612), (420, 640), (300, 690), (240, 745), (0, 745)], False),
     # static: the Suppliers panel is drawn above the right glass module so the module can slide behind it
     "supcard":   ([(1297, 338), (1478, 313), (1490, 322), (1490, 463), (1306, 480), (1297, 470)], False),
 }
 STATIC = {"supcard"}
 # Assembly (reference pixels). Stage k closes gap GAPS[k-1]; a floor moves by the sum of the gaps of
 # stages up to its own, so the whole stack above settles together and gaps only ever close.
-GAPS = [6, 10, 10, 18, 16]
+GAPS = [6, 24, 34, 30, 34]
 STACK = {"l5": 1, "l4": 2, "card": 2, "l3": 3, "l2": 4, "roof": 5}
 # side pieces: stage, final offset and scale (scale around the piece centre)
-SIDE = {"leftbox": (1, 44, 26, .96), "rightcube": (3, -313, 122, .72), "ulpanels": (4, 141, 55, .8)}
+# Every loose piece ends fully inside the building (hidden behind the floor it docks into).
+SIDE = {"leftbox": (1, 153, -37, .55), "papers": (1, 535, -16, .15), "lslab": (2, 268, 42, .5), "chip": (2, -27, 1, .6),
+        "rightcube": (2, -375, 122, .6), "ulpanels": (4, 149, 15, .5)}
 
 
 def final_transform(name, w, h):
@@ -129,13 +135,18 @@ def main(debug=False):
     lum_c = cv2.cvtColor(clean, cv2.COLOR_BGR2GRAY).astype(np.float32)
     taken = np.zeros(lum.shape, np.uint8)
     masks = {}
-    order = ["card", "roof", "l2", "l3", "l4", "l5", "leftbox", "rightcube", "ulpanels", "supcard"]
+    order = ["card", "roof", "l2", "l3", "l4", "l5", "leftbox", "rightcube", "ulpanels", "lslab", "chip", "papers", "supcard"]
     for name in order:
         poly, feather = LAYERS[name]
         m = poly_mask(img.shape, poly)
         m = cv2.subtract(m, taken)          # each pixel belongs to one layer only
         taken = cv2.bitwise_or(taken, m)
         a = cv2.GaussianBlur(m, (3, 3), 0).astype(np.float32) / 255
+        if name == "papers":
+            bb, gg, rr = [clean[..., i].astype(np.int32) for i in range(3)]
+            keep = ((lum_c > 72) | ((rr - bb > 60) & (lum_c > 60))).astype(np.uint8) * 255
+            keep = cv2.dilate(keep, np.ones((9, 9), np.uint8))
+            a = a * cv2.GaussianBlur(keep, (5, 5), 0).astype(np.float32) / 255
         if feather:
             # inside a band near the cut line, dark "gap" pixels become transparent
             inner = cv2.erode(m, np.ones((19, 19), np.uint8))
@@ -143,7 +154,7 @@ def main(debug=False):
             k = np.clip((lum_c - 30) / 45, 0, 1)
             a = np.where(band, a * k, a)
         if name not in STATIC:
-            (union_small if name in ("leftbox", "rightcube", "ulpanels") else union_floor)[m > 0] = 255
+            (union_small if name in SIDE else union_floor)[m > 0] = 255
         ys, xs = np.where(a > 0.01)
         x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
         x0 -= x0 % SCALE; y0 -= y0 % SCALE
@@ -156,7 +167,7 @@ def main(debug=False):
         if name in STACK: entry["stack"] = STACK[name]
         if name in SIDE: entry.update({"stage": SIDE[name][0], "dx": SIDE[name][1], "dy": SIDE[name][2], "scale": SIDE[name][3]})
         manifest["layers"].append(entry)
-        masks[name] = (a > 0.5).astype(np.uint8) * 255
+        masks[name] = (a > (0.15 if name == "papers" else 0.5)).astype(np.uint8) * 255
         print(name, manifest["layers"][-1])
 
     # 4) background plate: the clean image, except the areas that are uncovered once the parts move
@@ -191,14 +202,43 @@ def main(debug=False):
             while l > 8 and (moving_any[y, l - 1] or fill[y, l - 1]): l -= 1
             r = R
             while r < plate.shape[1] - 9 and (moving_any[y, r + 1] or fill[y, r + 1]): r += 1
-            lc = clean[y, max(0, l - 8):max(1, l - 1)].reshape(-1, 3).astype(np.float32).mean(0)
-            rc = clean[y, r + 1:r + 8].reshape(-1, 3).astype(np.float32).mean(0)
+            lc = clean[y, max(0, l - 70):max(1, l - 50)].reshape(-1, 3).astype(np.float32).mean(0)  # clear of edge glow
+            rc = clean[y, min(plate.shape[1] - 2, r + 50):min(plate.shape[1] - 1, r + 70)].reshape(-1, 3).astype(np.float32).mean(0)
+            # never pull colour from glowing neighbours (panel edges, signs): keep the darker, plain sky side
+            if abs(rc.mean() - lc.mean()) > 10 or rc[2] - rc[0] > 12 or lc[2] - lc[0] > 12:
+                lc = rc = np.minimum(lc, rc) if lc.mean() > 0 and rc.mean() > 0 else lc
             t = np.linspace(0, 1, r - l + 1)[:, None]
             row = lc * (1 - t) + rc * t
             plate[y, L:R + 1] = row[L - l:R - l + 1]
-    plate = np.where(fill[..., None] > 0, cv2.GaussianBlur(plate, (0, 0), 5), plate)
-    side_fill = cv2.dilate(cv2.bitwise_and(moving_side, cv2.bitwise_not(cv2.erode(cover, k))), k)
-    plate = cv2.inpaint(plate, side_fill, 9, cv2.INPAINT_TELEA)
+    # smooth only with filled pixels (blurring the whole plate would bleed the sign's orange into the sky)
+    fm = (fill > 0).astype(np.float32)[..., None]
+    num = cv2.GaussianBlur(plate.astype(np.float32) * fm, (0, 0), 22); den = cv2.GaussianBlur(fm, (0, 0), 22); den = den[..., None] if den.ndim == 2 else den
+    plate = np.where(fill[..., None] > 0, (num / np.maximum(den, 1e-3)).clip(0, 255).astype(np.uint8), plate)
+    side_fill = np.zeros(lum.shape, np.uint8)
+    MIRROR = {"leftbox": "L", "ulpanels": "L", "lslab": "L", "rightcube": "R", "chip": "R"}
+    for name, m in masks.items():
+        if name not in SIDE:
+            continue
+        reg = cv2.dilate(m, k)  # a loose piece's original spot is always cleared
+        side_fill |= reg
+        if name not in MIRROR:
+            continue
+        # refill by mirroring the neighbouring background (sky / skyline), not by smearing the building
+        for y in np.where(reg.any(1))[0]:
+            xs = np.where(reg[y] > 0)[0]
+            L, R = xs.min(), xs.max()
+            n = R - L + 1
+            W2 = plate.shape[1]
+            if MIRROR[name] == "L":
+                src = [max(0, L - 1 - (i % max(1, L))) for i in range(n)]
+            else:
+                src = [min(W2 - 1, R + 1 + (i % max(1, W2 - R - 1))) for i in range(n)][::-1]
+            plate[y, L:R + 1] = plate[y, src]
+    papers_reg = cv2.dilate(masks["papers"], k)
+    plate = cv2.inpaint(plate, papers_reg, 9, cv2.INPAINT_TELEA)
+    soft = cv2.GaussianBlur(plate, (0, 0), 10)
+    pm = cv2.GaussianBlur(papers_reg, (0, 0), 6).astype(np.float32)[..., None] / 255
+    plate = (plate * (1 - pm) + soft * pm).astype(np.uint8)
     if debug:
         cv2.imwrite(os.path.join(HERE, "debug_fill.png"), cv2.resize(cv2.merge([fill, side_fill, cover // 3]), (W, H)))
     pim = Image.fromarray(cv2.cvtColor(plate, cv2.COLOR_BGR2RGB))

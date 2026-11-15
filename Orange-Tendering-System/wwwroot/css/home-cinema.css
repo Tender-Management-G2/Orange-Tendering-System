@@ -334,7 +334,6 @@ html.hc-anim .hc-checks li em{opacity:0}
 .hq-wires{position:absolute;left:0;top:0;width:1672px;height:941px;overflow:visible;pointer-events:none}
 .hq-w-glow{fill:none;stroke:#ff7a00;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;filter:url(#hq-glow);opacity:.6}
 .hq-w-core{fill:none;stroke:#ffbf7a;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.hq-w-pulse{fill:none;stroke:#fff6ea;stroke-width:3;stroke-linecap:round;stroke-dasharray:.08 1.2;stroke-dashoffset:1;opacity:0}
 .hq-glow{position:absolute;border-radius:50%;pointer-events:none;mix-blend-mode:screen;opacity:0;background:radial-gradient(closest-side,rgba(255,150,40,.85),rgba(255,121,0,.35) 45%,rgba(255,121,0,0) 100%)}
 .hq-glow-roof{left:880px;top:60px;width:230px;height:200px}
 .hq-glow-base{left:960px;top:560px;width:250px;height:240px}
