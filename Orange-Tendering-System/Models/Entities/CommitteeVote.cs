@@ -17,6 +17,7 @@ namespace Orange_Tendering_System.Models.Entities
         public CommitteeMember CommitteeMember { get; set; } = null!;
 
         public VoteDecision Decision { get; set; }
+        public TopRejectionReason? RejectionReason { get; set; }
 
         [MaxLength(2000)]
         public string? Comment { get; set; }

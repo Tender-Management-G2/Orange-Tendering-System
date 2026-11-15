@@ -526,13 +526,15 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         db.CommitteeRounds.Add(new CommitteeRound { TenderRoundId = s.TenderRoundId, CommitteeType = CommitteeType.Top, RoundNumber = 1, TenderReportId = s.ReportId, StartedAt = Now });
         t.Status = TenderStatus.TopCommitteeReview;
     });
-    public Task TopVote(int id, VoteDecision decision, string comment, ClaimsPrincipal principal, string? documentHash = null, bool confirmed = false, byte[]? signatureImage = null) => Change(id, principal, "TopCommitteeDecision", async (t, a) =>
+    public Task TopVote(int id, VoteDecision decision, string comment, ClaimsPrincipal principal, string? documentHash = null, bool confirmed = false, byte[]? signatureImage = null, TopRejectionReason? rejectionReason = null) => Change(id, principal, "TopCommitteeDecision", async (t, a) =>
     {
+        Require(decision != VoteDecision.Reject || rejectionReason.HasValue && Enum.IsDefined(rejectionReason.Value), "Select one of the two valid rejection reasons.");
+        if (decision != VoteDecision.Reject) rejectionReason = null;
         var member = await Member(t, a, CommitteeType.Top); var s = await Session(id);
         var topSeats = await db.CommitteeMembers.Where(x => x.TenderId == id && x.CommitteeType == CommitteeType.Top).OrderBy(x => x.Id).Select(x => x.Id).ToListAsync();
         var slot = (topSeats.IndexOf(member.Id) + 1).ToString();
         if (s.Report != null && await db.Set<ReportSignature>().AnyAsync(x => x.TenderReportId == s.ReportId && x.Stage == ReportSigningStage.Top && x.UserId == a.Id))
-        { await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Top, SystemRoles.TopCommittee, slot, decision.ToString(), documentHash, confirmed, Now, signatureImage); return; }
+        { Require(await db.CommitteeVotes.AnyAsync(v => v.CommitteeRound.TenderReportId == s.ReportId && v.CommitteeMemberId == member.Id && v.Decision == decision && v.RejectionReason == rejectionReason), "Your signed vote and rejection reason cannot be changed. Use the separate reason agreement to resolve a conflict."); await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Top, SystemRoles.TopCommittee, slot, decision.ToString(), documentHash, confirmed, Now, signatureImage); return; }
         Require(s.State == SessionState.ManagerApproved && t.Status == TenderStatus.TopCommitteeReview && RequiresTop(t, s), "This recommendation is not awaiting Top Committee decisions.");
         Require(Enum.IsDefined(decision) && !string.IsNullOrWhiteSpace(comment), "An official decision and justification are required.");
         await reportDocuments.RequireCommitteeSignatures(s.Report!, s);
@@ -540,11 +542,13 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         await reportDocuments.Sign(s.Report!, s, a, ReportSigningStage.Top, SystemRoles.TopCommittee, slot, decision.ToString(), documentHash, confirmed, Now, signatureImage);
         var cr = await db.CommitteeRounds.SingleAsync(x => x.TenderRoundId == s.TenderRoundId && x.CommitteeType == CommitteeType.Top && x.TenderReportId == s.ReportId);
         Require(!await db.CommitteeVotes.AnyAsync(x => x.CommitteeRoundId == cr.Id && x.CommitteeMemberId == member.Id), "Your final decision is already recorded.");
-        db.CommitteeVotes.Add(new CommitteeVote { CommitteeRoundId = cr.Id, CommitteeMemberId = member.Id, Decision = decision, Comment = comment, VotedAt = Now });
+        db.CommitteeVotes.Add(new CommitteeVote { CommitteeRoundId = cr.Id, CommitteeMemberId = member.Id, Decision = decision, RejectionReason = rejectionReason, Comment = comment, VotedAt = Now });
         var priorVotes = await db.CommitteeVotes.Where(x => x.CommitteeRoundId == cr.Id).Select(x => x.Decision).ToListAsync();
         var approvesNow = priorVotes.Count(d => d == VoteDecision.Approve) + (decision == VoteDecision.Approve ? 1 : 0);
         if (approvesNow >= FinalPolicy(s).TopApprovalsRequired) await RecordFinalDecision(t, s, approvesNow, priorVotes.Count + 1, false);
-        Audit(a, id, "TopDecisionEvidence", new { decision, comment, s.ReportId, PolicyVersion = FinalPolicy(s).Version });
+        await db.SaveChangesAsync();
+        await FinalizeTopRejectionReason(t, s, cr, a);
+        Audit(a, id, "TopDecisionEvidence", new { decision, rejectionReason, comment, s.ReportId, PolicyVersion = FinalPolicy(s).Version });
     });
     public Task Award(int id, ClaimsPrincipal principal) => Change(id, principal, "TenderAwardedAndClosed", async (t, a) =>
     {

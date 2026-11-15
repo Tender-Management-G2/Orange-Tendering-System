@@ -176,6 +176,7 @@
     </header>
     @if (TempData["WorkflowMessage"] is string message) { <div class="wf-flash" role="status"><b aria-hidden="true">&#10003;</b>@message</div> }
     <div class="wf-error" role="alert" hidden></div>
+    @if (Model.IsTop && rv != null) { <p><a asp-area="TopCommittee" asp-controller="Rejections" asp-action="Details" asp-route-id="@rv.Report.Id">Top Committee decision and rejection reason agreement</a></p> }
 
     <div class="wp-layout"><div class="wp-main" data-view="@(stepIndex == 4 ? "approval" : "journey")">
     <section class="wp-now wp-now-@tone" aria-live="polite">
@@ -403,7 +404,7 @@
                 @if (rv.CanVoteTop && !mySigned)
                 {
                     <form asp-area="TopCommittee" asp-controller="SignedReports" asp-action="Vote" asp-route-id="@rv.Report.Id" method="post" class="wp-form wp-sign"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" />
-                        <div class="wp-cols"><label>Your vote<select name="decision"><option>Approve</option><option>Reject</option></select></label><label>Why?<textarea name="comment" maxlength="2000" required rows="2"></textarea></label></div>
+                        <div class="wp-cols"><label>Your vote<select name="decision"><option>Approve</option><option>Reject</option></select></label><label>Rejection reason (used only for Reject)<select name="rejectionReason"><option value="NotNeeded">Company No Longer Needs This Tender</option><option value="UnacceptableOffers">No Supplier Offers Are Acceptable</option></select></label><label>Why?<textarea name="comment" maxlength="2000" required rows="2"></textarea></label></div>
                         <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
                         <label class="wp-check"><input type="checkbox" name="confirmed" value="true" required /> I reviewed the report. My vote is my signature.</label>
                         <button class="wp-primary">Submit my vote</button></form>
