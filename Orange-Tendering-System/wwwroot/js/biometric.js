@@ -144,12 +144,12 @@
         });
     }
 
-    // ---------- Face recognition (five-second capture) ----------
+    // ---------- Face recognition (eight-second capture) ----------
     // Detect a face, take a few descriptors from consecutive camera frames, send them. There are no liveness
     // steps (owner decision for the academic demo), so a photo of the person held up to the camera can pass.
 
-    var CAPTURE_MS = 5000;
-    var NO_FACE_TIMEOUT_MS = 30000; // time to position the face and complete a continuous capture
+    var CAPTURE_MS = 8000;     // one sample a second: more varied samples match more reliably
+    var NO_FACE_TIMEOUT_MS = 40000; // time to position the face and complete a continuous capture
     var MIN_FACE_WIDTH = 80;       // pixels in the analysed frame; smaller faces give unreliable descriptors
 
     function loadScript(src) {
@@ -266,7 +266,7 @@
         var lastFrameTime = -1;
         var captureStarted = null;
         var lastSample = -Infinity;
-        setHint('Look at the camera for 5 seconds.');
+        setHint('Look at the camera for 8 seconds.');
 
         while (performance.now() - started < NO_FACE_TIMEOUT_MS) {
             if (isCancelled && isCancelled()) { throw cancelled(); }
@@ -301,7 +301,7 @@
                 captureStarted = null;
                 descriptors = [];
                 lastSample = -Infinity;
-                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 5-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 5-second capture will restart.');
+                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 8-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 8-second capture will restart.');
             }
         }
 

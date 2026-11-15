@@ -10,7 +10,7 @@ using Orange_Tendering_System.Models.Entities;
 namespace Orange_Tendering_System.Services.Biometric;
 
 /// <summary>
-/// Face sign-in with five-second capture. The browser turns a few camera frames into 128-number descriptors
+/// Face sign-in with an eight-second capture. The browser turns a few camera frames into 128-number descriptors
 /// (face-api.js); the server issues a one-time token per attempt (so a captured request cannot be replayed),
 /// checks the samples are valid and from one face, and compares them with the templates enrolled for the account.
 ///
@@ -34,8 +34,8 @@ public class FaceService(
 
     private const int DescriptorLength = 128;
     private const int MinSamples = 3;
-    private const int MaxSamples = 8;
-    private const int SamplesStored = 5;
+    private const int MaxSamples = 12; // the browser sends one sample a second over 8 s
+    private const int SamplesStored = 8; // more enrolled views of the face: fewer false rejections
 
     private readonly IDataProtector protector = dataProtection.CreateProtector("Orange.Biometric.FaceTemplate.v1");
 
@@ -186,8 +186,8 @@ public class FaceService(
             for (var j = i + 1; j < samples.Count; j++)
                 largest = Math.Max(largest, Distance(samples[i].V, samples[j].V));
 
-        // One person in every sample ...
-        if (largest > 0.5)
+        // One person in every sample (a little slack for natural movement over eight seconds) ...
+        if (largest > 0.55)
             return "The captured samples are not all the same face. Look at the camera alone and try again.";
 
         // ... but never a perfect copy: a real camera always adds a little noise, so identical
