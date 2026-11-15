@@ -769,7 +769,7 @@ namespace Orange_Tendering_System.Services
             if (!string.IsNullOrWhiteSpace(roleFilter) &&
                 roleFilter != "All")
             {
-                if (SystemRoles.All.Contains(roleFilter))
+                if (SystemRoles.PublicRoles.Contains(roleFilter))
                 {
                     query = query.Where(u =>
                         _context.UserRoles.Any(ur =>
@@ -915,9 +915,7 @@ namespace Orange_Tendering_System.Services
                     .OrderBy(r => r)
                     .ToList();
 
-                user.Roles = roles.Count > 0
-                    ? string.Join(", ", roles)
-                    : "No Role";
+                user.Roles = SystemRoles.RoleText(roles);
             }
 
             // =========================================
@@ -964,7 +962,7 @@ namespace Orange_Tendering_System.Services
             model.Departments = departments;
 
             // Internal roles only - suppliers register themselves
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier)
                 .ToList();
 
@@ -995,7 +993,7 @@ namespace Orange_Tendering_System.Services
             if (model.CommitteeSeat != null && (committeeSeat == null || committeeSeat.Role != model.Role))
                 return IdentityResult.Failed(new IdentityError { Description = "The selected committee category does not match the account role." });
 
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier);
 
             if (!allowedRoles.Contains(model.Role) ||
@@ -1023,7 +1021,7 @@ namespace Orange_Tendering_System.Services
             }
 
             // Requesting Department accounts need a department
-            if (model.Role == SystemRoles.RequestingDepartment &&
+            if ((model.Role == SystemRoles.RequestingDepartment || model.Role == SystemRoles.DepartmentRepresentative) &&
                 !model.DepartmentId.HasValue)
             {
                 return IdentityResult.Failed(new IdentityError
@@ -1072,8 +1070,8 @@ namespace Orange_Tendering_System.Services
             }
 
             // Assign the initial role
-            var roleResult = await _userManager.AddToRoleAsync(
-                user, model.Role);
+            var roleResult = await _userManager.AddToRolesAsync(
+                user, SystemRoles.AccountRoles(model.Role));
 
             if (!roleResult.Succeeded)
             {
@@ -1194,9 +1192,7 @@ namespace Orange_Tendering_System.Services
                 Id = user.Id,
                 FullName = user.FullName,
                 Email = user.Email ?? "",
-                Roles = roles.Count > 0
-                    ? string.Join(", ", roles)
-                    : "No Role",
+                Roles = SystemRoles.RoleText(roles),
 
                 DepartmentName = user.Department?.Name ?? "—",
                 SupplierName = user.Supplier?.CompanyName ?? "—",
@@ -1248,7 +1244,7 @@ namespace Orange_Tendering_System.Services
                 .ToListAsync();
 
             availableRoles = availableRoles
-                .Where(r => SystemRoles.All.Contains(r.Value))
+                .Where(r => SystemRoles.PublicRoles.Contains(r.Value))
                 .ToList();
 
             // Return data to Edit.cshtml
@@ -1260,8 +1256,8 @@ namespace Orange_Tendering_System.Services
                 DepartmentId = user.DepartmentId,
                 IsActive = user.IsActive,
 
-                CurrentRoles = string.Join(", ", roles),
-                SelectedRole = roles.FirstOrDefault() ?? "",
+                CurrentRoles = SystemRoles.RoleText(roles),
+                SelectedRole = SystemRoles.DisplayRoles(roles).FirstOrDefault() ?? "",
 
                 Departments = departments,
                 AvailableRoles = availableRoles
@@ -1300,7 +1296,7 @@ public async Task<string> UpdateUserAsync(
             // Validate selected role
             if (string.IsNullOrWhiteSpace(newRole) ||
                 newRole == SystemRoles.Supplier ||
-                !SystemRoles.All.Contains(newRole) ||
+                !SystemRoles.PublicRoles.Contains(newRole) ||
                 !await _roleManager.RoleExistsAsync(newRole))
             {
                 return "InvalidRole";
@@ -1310,7 +1306,7 @@ public async Task<string> UpdateUserAsync(
             var currentRoles = await _userManager.GetRolesAsync(user);
 
             // Requesting Department requires a department
-            if (newRole == SystemRoles.RequestingDepartment &&
+            if ((newRole == SystemRoles.RequestingDepartment || newRole == SystemRoles.DepartmentRepresentative) &&
                 !model.DepartmentId.HasValue)
             {
                 return "DepartmentRequired";
@@ -1387,9 +1383,8 @@ public async Task<string> UpdateUserAsync(
                     Role = newRole
                 });
 
-            bool roleChanged =
-                currentRoles.Count != 1 ||
-                !currentRoles.Contains(newRole);
+            var desiredRoles = SystemRoles.AccountRoles(newRole);
+            bool roleChanged = !currentRoles.ToHashSet(StringComparer.Ordinal).SetEquals(desiredRoles);
 
             bool accountChanged =
                 user.FullName != newName ||
@@ -1434,8 +1429,8 @@ public async Task<string> UpdateUserAsync(
                 }
 
                 var addResult =
-                    await _userManager.AddToRoleAsync(
-                        user, newRole);
+                    await _userManager.AddToRolesAsync(
+                        user, desiredRoles);
 
                 if (!addResult.Succeeded)
                 {
@@ -1527,7 +1522,7 @@ public async Task<string> UpdateUserAsync(
 
             var result = new List<RoleListViewModel>();
 
-            foreach (var roleName in SystemRoles.All)
+            foreach (var roleName in SystemRoles.PublicRoles)
             {
                 var users = memberships
                     .Where(m => m.RoleName == roleName)
@@ -1538,7 +1533,7 @@ public async Task<string> UpdateUserAsync(
                 result.Add(new RoleListViewModel
                 {
                     RoleName = roleName,
-                    Purpose = descriptions[roleName],
+                    Purpose = descriptions.GetValueOrDefault(roleName, "Committee member job role"),
                     UserCount = users.Count,
                     IsSeeded = dbRoles.Any(r => r.Name == roleName),
                     Users = users
@@ -1569,7 +1564,7 @@ public async Task<string> UpdateUserAsync(
                 .ToListAsync();
 
             // Only predefined internal roles
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier)
                 .ToList();
 
@@ -1604,7 +1599,7 @@ public async Task<string> UpdateUserAsync(
             if (user.SupplierId != null)
                 return "SupplierAccount";
 
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier);
 
             if (!allowedRoles.Contains(roleName) ||
@@ -1614,15 +1609,16 @@ public async Task<string> UpdateUserAsync(
             if (await _userManager.IsInRoleAsync(user, roleName))
                 return "AlreadyAssigned";
 
-            if (roleName == SystemRoles.RequestingDepartment &&
+            if ((roleName == SystemRoles.RequestingDepartment || roleName == SystemRoles.DepartmentRepresentative) &&
                 !user.DepartmentId.HasValue)
                 return "DepartmentRequired";
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
-            var result = await _userManager.AddToRoleAsync(
-                user, roleName);
+            var existingRoles = await _userManager.GetRolesAsync(user);
+            var result = await _userManager.AddToRolesAsync(
+                user, SystemRoles.AccountRoles(roleName).Except(existingRoles));
 
             if (!result.Succeeded)
             {
@@ -1667,7 +1663,7 @@ public async Task<string> UpdateUserAsync(
             if (user.SupplierId != null)
                 return "SupplierAccount";
 
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier);
 
             if (!allowedRoles.Contains(roleName))
@@ -1705,8 +1701,9 @@ public async Task<string> UpdateUserAsync(
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
-            var result = await _userManager.RemoveFromRoleAsync(
-                user, roleName);
+            var assignedRoles = await _userManager.GetRolesAsync(user);
+            var result = await _userManager.RemoveFromRolesAsync(
+                user, SystemRoles.RolesToRemove(assignedRoles, roleName));
 
             if (!result.Succeeded)
             {

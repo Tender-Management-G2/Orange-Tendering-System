@@ -107,6 +107,12 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var pr = await db.PurchaseRequests.FromSqlInterpolated($"SELECT * FROM PurchaseRequests WITH (UPDLOCK,HOLDLOCK) WHERE Id={input.PurchaseRequestId}").Include(x => x.Items).SingleOrDefaultAsync();
         Require(pr?.Status == PurchaseRequestStatus.Accepted && pr.Items.Count > 0, "An accepted Purchase Request with line items is required.");
         Require(!await db.Tenders.AnyAsync(t => t.PurchaseRequestId == input.PurchaseRequestId), "This request already has a tender. Continue that tender or create a new round instead.");
+        var fixedCommittees = await RequiredStandingCommittees();
+        input.SourcingManagerId = fixedCommittees.Evaluation["evaluation-manager"];
+        input.FinancialRepresentativeId = fixedCommittees.Evaluation["evaluation-financial"];
+        input.TechnicalRepresentativeId = fixedCommittees.Evaluation["evaluation-technical-1"];
+        await ValidateStandingPerson(input.DepartmentRepresentativeId, SystemRoles.DepartmentRepresentative);
+        Require(!fixedCommittees.Top.Values.Contains(input.DepartmentRepresentativeId), "The department representative cannot also sit on Top Committee.");
         var ids = new[] { input.SourcingManagerId, input.DepartmentRepresentativeId, input.FinancialRepresentativeId, input.TechnicalRepresentativeId };
         Require(ids.Distinct().Count() == 4 && !ids.Contains(actor.Id), "Assign four distinct committee members, separate from the officer.");
         for (var i = 0; i < ids.Length; i++)
@@ -125,6 +131,17 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         await db.SaveChangesAsync();
         db.TenderRounds.Add(new TenderRound { TenderId = tender.Id, RoundNumber = 1, CreatedByUserId = actor.Id, CreatedAt = Now });
         for (var i = 0; i < ids.Length; i++) db.CommitteeMembers.Add(new CommitteeMember { TenderId = tender.Id, UserId = ids[i], CommitteeType = CommitteeType.Evaluation, Responsibility = (CommitteeResponsibility)i, AssignedAt = Now });
+        foreach (var seat in FixedSeats("Top"))
+        {
+            var responsibility = seat.Key switch {
+                "top-ceo" => CommitteeResponsibility.ChiefExecutiveOfficer,
+                "top-cfo" => CommitteeResponsibility.ChiefFinancialOfficer,
+                "top-cto" => CommitteeResponsibility.ChiefTechnologyOfficer,
+                _ => CommitteeResponsibility.ChiefOperationsOfficer
+            };
+            db.CommitteeMembers.Add(new CommitteeMember { TenderId = tender.Id, UserId = fixedCommittees.Top[seat.Key], CommitteeType = CommitteeType.Top, Responsibility = responsibility, AssignedAt = Now });
+        }
+        Audit(actor, tender.Id, "FixedCommitteesApplied", new { fixedCommittees.Evaluation, fixedCommittees.Top, DepartmentRepresentativeId = input.DepartmentRepresentativeId });
         Audit(actor, tender.Id, "RequirementsCreated", input);
         await db.SaveChangesAsync(); await tx.CommitAsync(); return tender.Id;
     }
@@ -483,9 +500,8 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                 var assignedTop = await Members(id, CommitteeType.Top);
                 if (assignedTop.Count == 0)
                 {
-                    // Tender-specific membership is explicitly selected by Admin.
-                    foreach (var admin in (await users.GetUsersInRoleAsync(SystemRoles.Admin)).Where(x => x.IsActive))
-                        db.Notifications.Add(new Notification { UserId = admin.Id, Title = "Top Committee assignment required", Message = $"Assign the CEO and three members for tender #{id}.", Link = $"/Admin/Committees/Manage/{id}", CreatedAt = Now });
+                    await CaptureStandingTop(t, a);
+                    await db.SaveChangesAsync(); assignedTop = await Members(id, CommitteeType.Top);
                 }
                 if (assignedTop.Count == 4 && !await db.CommitteeRounds.AnyAsync(x => x.TenderRoundId == s.TenderRoundId && x.CommitteeType == CommitteeType.Top && x.TenderReportId == s.ReportId))
                 {

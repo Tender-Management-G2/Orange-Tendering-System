@@ -16,7 +16,24 @@ public sealed class CommitteesController(TenderWorkflowService workflow) : Contr
     public async Task<IActionResult> Members(string committee)
     {
         if (committee is not ("Evaluation" or "Top")) return NotFound();
-        return View(await workflow.AdminCommitteeAccounts(committee, User));
+        return View(await workflow.StandingCommittee(committee, User));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveStanding(StandingCommitteeInput input)
+    {
+        if (input.Committee is not ("Evaluation" or "Top")) return BadRequest();
+        if (ModelState.IsValid)
+        {
+            try
+            {
+                await workflow.SaveStandingCommittee(input, User);
+                TempData["SuccessMessage"] = "committee members saved. New tenders will use this configuration.";
+                return RedirectToAction(nameof(Members), new { committee = input.Committee });
+            }
+            catch (WorkflowException error) { ModelState.AddModelError("", error.Message); }
+        }
+        return View("Members", await workflow.StandingCommittee(input.Committee, User));
     }
 
     [HttpGet]

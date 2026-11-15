@@ -1,37 +1,60 @@
-@model AdminCommitteeAccountsViewModel
+@model StandingCommitteeViewModel
 @{
     var title = Model.Committee == "Top" ? "Top Committee" : "Evaluation Committee";
     ViewData["Title"] = title;
     ViewData["WorkspaceSection"] = "Committees";
-    ViewData["Description"] = "Create accounts from the four member categories below. The committee and role are selected automatically.";
+    ViewData["Description"] = "Choose exactly four different members, one for each role.";
     var returnUrl = Url.Action("Members", "Committees", new { area = "Admin", committee = Model.Committee });
+    var fields = new[] { "MemberOneId", "MemberTwoId", "MemberThreeId", "MemberFourId" };
 }
 <partial name="_PageHeader" />
 @if (TempData["SuccessMessage"] is string success) { <p class="pg-note" role="status">@success</p> }
-<div class="pg-actions"><a class="pg-btn" asp-area="Admin" asp-controller="Committees" asp-action="Index">← Back to Committees</a></div>
-<section class="admin-committee-grid" aria-label="@title member categories">
-    @foreach (var slot in Model.Slots)
-    {
-        <article class="admin-committee-seat">
-            <h2>@slot.Seat.Title</h2>
-            <p>@slot.Seat.Description</p>
-            <p class="pg-hint">Committee: @title<br />Role: @slot.Seat.Role</p>
-            <a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Users" asp-action="Create" data-no-modal
-               asp-route-committeeSeat="@slot.Seat.Key" asp-route-returnUrl="@returnUrl">+ Create User</a>
-            @if (slot.Accounts.Count == 0)
-            {
-                <p class="pg-hint">No accounts created in this category yet.</p>
-            }
-            else
-            {
-                <ul class="admin-committee-accounts">
-                    @foreach (var account in slot.Accounts)
-                    {
-                        <li data-search-item><strong>@account.Name</strong><span>@account.Email</span><small>@(account.Active ? "Active" : "Inactive")</small></li>
-                    }
-                </ul>
-            }
-        </article>
-    }
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
+<div class="pg-actions"><a class="pg-btn" asp-area="Admin" asp-controller="Committees" asp-action="Index">← Back to Committees</a><span class="pg-status">@(Model.Configured ? "Configured" : "Not configured")</span></div>
+<section class="ws-panel pg-panel" aria-labelledby="saved-committee-title">
+    <div class="pg-panel-head"><div><h2 id="saved-committee-title">Committee Members</h2><p>Current saved members of @title</p></div></div>
+    <div class="admin-saved-members">
+        @foreach (var slot in Model.Slots)
+        {
+            var member = Model.SavedMembers.SingleOrDefault(x => x.SeatKey == slot.Seat.Key);
+            <article class="admin-saved-member" data-search-item>
+                <span class="admin-saved-member-role">@slot.Seat.Title</span>
+                @if (member != null)
+                {
+                    <strong>@member.Name</strong><span>@member.Email</span>
+                    @if (!member.Active || !member.RoleMatches) { <small>Account needs review</small> }
+                }
+                else
+                {
+                    <strong>Not assigned yet</strong><span>Choose a user below, then save.</span>
+                }
+            </article>
+        }
+    </div>
 </section>
-<p class="pg-hint">These categories organize accounts. Membership and voting access for a specific tender are assigned separately.</p>
+<p class="pg-hint">Existing users appear when they have the matching job role. Update older committee accounts in Users → Edit if their job role has not been set.</p>
+<form asp-area="Admin" asp-controller="Committees" asp-action="SaveStanding" method="post" data-committee-form>
+    <input type="hidden" name="Committee" value="@Model.Committee" />
+    <input type="hidden" name="Version" value="@Model.Version" />
+    <section class="admin-committee-grid" aria-label="@title members">
+        @for (var i = 0; i < Model.Slots.Count; i++)
+        {
+            var slot = Model.Slots[i];
+            <article class="admin-committee-seat">
+                <h2>@slot.Seat.Title</h2><p>@slot.Seat.Description</p>
+                    <label for="standing-member-@i">Registered users · @slot.Seat.Role</label>
+                    <select id="standing-member-@i" name="@fields[i]" required class="form-control">
+                        <option value="">Choose a user</option>
+                        @if (slot.SelectedId != null && !slot.Candidates.Any(x => x.Value == slot.SelectedId))
+                        { <option value="" selected>Saved account is inactive or its role changed · select a replacement</option> }
+                        @foreach (var user in slot.Candidates)
+                        { <option value="@user.Value" selected="@(user.Value == slot.SelectedId)">@user.Text</option> }
+                    </select>
+                <a class="pg-btn" asp-area="Admin" asp-controller="Users" asp-action="Create" data-no-modal asp-route-committeeSeat="@slot.Seat.Key" asp-route-returnUrl="@returnUrl">+ Create User</a>
+            </article>
+        }
+    </section>
+    <button type="submit" class="pg-btn pg-btn-primary">Add / Save Committee Members</button>
+</form>
+<p class="pg-hint">Saved changes apply to new tenders. Existing tender memberships and votes remain unchanged.</p>
+@section Scripts { <script src="~/js/admin-committees.js" asp-append-version="true"></script> }

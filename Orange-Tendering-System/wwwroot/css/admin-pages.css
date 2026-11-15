@@ -25,3 +25,22 @@ body[data-workspace-role="Admin"] .admin-committee-accounts li{display:grid;gap:
 body[data-workspace-role="Admin"] .admin-committee-accounts span,body[data-workspace-role="Admin"] .admin-committee-accounts small{color:var(--ws-muted)}
 
 body[data-workspace-role="Admin"] .admin-department-records .ui-table-search{display:none}
+
+/* Compact list filters and actions, scoped to the Admin workspace. */
+body[data-workspace-role="Admin"] .admin-list-filters{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;margin:20px 0 0;padding:0}
+body[data-workspace-role="Admin"] .admin-list-filters .admin-filter-field{display:flex;flex-direction:column;gap:6px;flex:0 1 170px;min-width:140px}
+body[data-workspace-role="Admin"] .admin-list-filters .admin-filter-search{flex:1 1 250px;max-width:380px}
+body[data-workspace-role="Admin"] .admin-list-filters label{font-size:12px;color:var(--ws-muted);line-height:1.4}
+body[data-workspace-role="Admin"] .admin-list-filters input,body[data-workspace-role="Admin"] .admin-list-filters select{width:100%;height:40px;min-height:40px;margin:0;padding:8px 12px;font-size:13px;border:1px solid var(--ws-rule);border-radius:10px;background:var(--ws-surface);color:var(--ws-ink)}
+body[data-workspace-role="Admin"] .admin-list-filters .admin-clear{height:40px;min-height:40px;padding:8px 18px;font-size:13px;white-space:nowrap}
+body[data-workspace-role="Admin"] .admin-list-status{min-height:18px;margin:6px 0 12px;font-size:12px}
+body[data-workspace-role="Admin"] .admin-list-records .ui-table-bar{display:none}
+body[data-workspace-role="Admin"] .admin-list-records .admin-row-actions,body[data-workspace-role="Admin"] .admin-list-records td .pg-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:0}
+body[data-workspace-role="Admin"] .admin-list-records td .pg-btn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:58px;min-height:30px;height:30px;padding:5px 10px;font-size:12px;line-height:1;border-radius:8px;white-space:nowrap}
+@media(max-width:650px){body[data-workspace-role="Admin"] .admin-list-filters .admin-filter-field{flex:1 1 140px}body[data-workspace-role="Admin"] .admin-list-filters .admin-filter-search{flex:1 1 100%;max-width:none}}
+
+body[data-workspace-role="Admin"] .admin-saved-members{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+body[data-workspace-role="Admin"] .admin-saved-member{display:flex;flex-direction:column;gap:9px;min-width:0;padding:18px;border:1px solid var(--ws-rule);border-radius:14px;background:var(--ws-surface);overflow-wrap:anywhere}
+body[data-workspace-role="Admin"] .admin-saved-member-role{font-size:12px;color:var(--ws-accent);font-weight:600}
+body[data-workspace-role="Admin"] .admin-saved-member strong{font-size:17px;color:var(--ws-ink)}
+body[data-workspace-role="Admin"] .admin-saved-member>span:not(.admin-saved-member-role),body[data-workspace-role="Admin"] .admin-saved-member small{font-size:12px;color:var(--ws-muted)}
