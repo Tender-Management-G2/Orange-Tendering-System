@@ -12,6 +12,7 @@ using System.Security.Claims;
 
 namespace Orange_Tendering_System.Areas.Supplier.Controllers
 {
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Area("Supplier")]
     [Authorize(Roles = SystemRoles.Supplier)]
     public class ClarificationsController(SupplierCommunicationService communication) : Controller
@@ -47,6 +48,14 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             var id = await communication.CreateAsync(userId, input);
             if (id == null) return NotFound();
             return RedirectToAction("Details", new { id });
+        }
+
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> Resolve(int id)
+        {
+            if (!await communication.ResolveAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id)) return NotFound();
+            TempData["ClarificationMessage"] = "Marked as resolved.";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
         [HttpPost, ValidateAntiForgeryToken]

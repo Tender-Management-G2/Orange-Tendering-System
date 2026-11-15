@@ -17,7 +17,7 @@
     {
         var own = item.SenderUserId == userId;
         <article class="so-message @(own ? "is-own" : "")"><small><strong>@(own ? "You" : item.SenderUser?.UserName)</strong> · @item.SentAt.ToLocalTime().ToString("d MMM yyyy h:mm tt")</small><p style="white-space:pre-wrap">@item.Message</p>
-            @if (item.Documents.Count > 0) { <ul>@foreach (var document in item.Documents) { <li>@document.FileName</li> }</ul> }
+            @if (item.Documents.Count > 0) { <ul>@foreach (var document in item.Documents) { <li><a asp-area="" asp-controller="Clarifications" asp-action="Download" asp-route-id="@document.Id">@document.FileName</a></li> }</ul> }
         </article>
     }
     @if (Model.Messages.Count == 0) { <p>No messages yet.</p> }

@@ -23,7 +23,7 @@
     <a asp-area="" asp-controller="Clarifications" asp-action="Index" class="pg-btn">Reset</a>
 </form>
 <section class="ws-panel pg-panel" aria-labelledby="tbl-my-clarifications">
-    <div class="pg-panel-head"><h2 id="tbl-my-clarifications">My clarifications</h2>@if (!User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Supplier)) { <a class="pg-btn pg-btn-primary" asp-action="New">+ New clarification</a> }</div>
+    <div class="pg-panel-head"><h2 id="tbl-my-clarifications">My clarifications</h2>@if (!User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Supplier) && !User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Admin)) { <a class="pg-btn pg-btn-primary" asp-action="New">+ New clarification</a> }</div>
     <div class="pg-table-wrap"><table class="pg-table">
         <thead><tr><th>Subject</th><th>With</th><th>Linked to</th><th>Status</th><th>Opened</th><th>Last message</th><th></th></tr></thead>
         <tbody>

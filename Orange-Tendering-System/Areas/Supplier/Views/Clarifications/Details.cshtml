@@ -15,4 +15,5 @@
 @if (Model.CanReply) {
 <section class="ws-panel pg-panel"><form asp-action="Reply" asp-route-id="@Model.Id" method="post" class="pg-form"><label for="reply-message">Reply to Sourcing Officer</label><textarea id="reply-message" name="message" rows="5" maxlength="10000" required></textarea><button type="submit" class="pg-btn pg-btn-primary">Send reply</button></form></section>
 }
+@if (Model.CanReply) { <form asp-action="Resolve" asp-route-id="@Model.Id" method="post"><button type="submit" class="pg-btn">Mark as resolved</button></form> }
 <a asp-action="Index">Back to clarifications</a>
