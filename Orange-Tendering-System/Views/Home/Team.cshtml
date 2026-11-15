@@ -18,10 +18,10 @@ Anonymous
 
 ROUTE: /team
 
-CHARACTER:
-The animated character is loaded from
-wwwroot/models/team-character.glb only when that file exists
-(see Tools/TeamScene/README.md for the expected clips).
+SEQUENCE:
+One segment per member in team.json order: walk in, sit on the
+bench, the orange falls, profile card, then take a place in the
+line beside the bench. Finale: the whole team side by side.
 
 FUTURE IMPLEMENTATION:
 - Replace the placeholder entries in team.json with the verified
@@ -38,30 +38,36 @@ STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
 *@
 @using Orange_Tendering_System.ViewModels
 @model IReadOnlyList<TeamMemberViewModel>
-@inject IWebHostEnvironment HostEnv
-@{
-    ViewData["Title"] = "Our Team | Orange Sourcing";
-    var characterFile = System.IO.Path.Combine(HostEnv.WebRootPath, "models", "team-character.glb");
-    var characterSrc = System.IO.File.Exists(characterFile) ? Url.Content("~/models/team-character.glb") : "";
-}
+@{ ViewData["Title"] = "Our Team | Orange Sourcing"; }
 @section Styles {<link rel="stylesheet" href="~/css/team-scene.css" asp-append-version="true" />}
 <main class="public-page team-page tx-page">
-  <section class="tx" id="tx" data-character-src="@characterSrc" aria-labelledby="tx-title">
+  <section class="tx" id="tx" style="--tx-n:@Model.Count" aria-labelledby="tx-title">
     <div class="tx-sticky">
       <canvas class="tx-canvas" aria-hidden="true"></canvas>
       <div class="tx-shade" aria-hidden="true"></div>
       <div class="tx-intro">
         <span class="tx-eyebrow">OUR TEAM</span>
         <h1 id="tx-title">The people behind<br /><em>the system.</em></h1>
-        <p>A short walk through the Orange courtyard. Scroll to move through it, stop to pause, scroll back to rewind.</p>
+        <p>@Model.Count people, one bench and one orange tree. Scroll to meet the team one by one; stop to pause, scroll back to rewind.</p>
         <span class="tx-hint" aria-hidden="true">Scroll <i></i></span>
       </div>
       <ol class="tx-stages" aria-hidden="true">
-        <li>Arrival</li><li>A pause</li><li>The spark</li><li>Curiosity</li><li>The team</li>
+        @for (var i = 0; i < Model.Count; i++) { <li>@((i + 1).ToString("00"))</li> }
+        <li class="tx-stage-all">Team</li>
       </ol>
       <span class="tx-live sr-only" role="status" aria-live="polite"></span>
       <div class="tx-progress" aria-hidden="true"><i></i></div>
-      <div class="tx-flash" aria-hidden="true"></div>
+      <aside class="tx-member" aria-live="polite" aria-label="Team member profile" inert>
+        <div class="tx-member-photo"><img alt="" hidden /><span class="tx-ph" aria-hidden="true"><b></b><small>Portrait pending</small></span></div>
+        <div class="tx-member-copy">
+          <span class="tx-member-idx"></span>
+          <span class="tx-member-status"></span>
+          <h3></h3>
+          <p class="tx-member-role"></p>
+          <p class="tx-member-text"></p>
+          <button type="button" class="tx-member-open" aria-haspopup="dialog" aria-controls="tx-dialog">View full profile <span aria-hidden="true">&rarr;</span></button>
+        </div>
+      </aside>
       <div class="tx-reveal" id="team-reveal" inert>
         <div class="tx-reveal-head">
           <span class="tx-brand" aria-hidden="true"><span>orange</span></span>
@@ -94,7 +100,6 @@ STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
                     <span class="tx-card-status">@(m.Placeholder ? "Awaiting verification" : "Project contributor")</span>
                     <strong>@m.FullName</strong>
                     <span class="tx-card-role">@m.Role</span>
-                    <span class="tx-card-text">@m.Contributions</span>
                     <span class="tx-card-more">View profile <span aria-hidden="true">&rarr;</span></span>
                   </span>
                 </button>

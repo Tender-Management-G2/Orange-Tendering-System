@@ -5,20 +5,19 @@
  * Nothing animates on a clock: no autoplay, no loop. The page renders only when p (or the viewport)
  * changes, so it freezes the instant scrolling stops and reverses exactly when scrolling back.
  *
- *   0.00–0.25  the character walks along the path toward the orange tree
- *   0.25–0.45  turns and sits on the bench
- *   0.45–0.65  an orange falls, touches the character's head, the character reacts
- *   0.65–0.80  looks up with curiosity while the camera moves closer
- *   0.80–1.00  Orange-branded transition, "Great Ideas Start with Great People." and the team cards
+ * Sequence: a short establishing shot, then one segment per team member (team.json order). In each
+ * segment the member walks along the path, sits on the bench, an orange falls on their head, they react
+ * and look up while their profile card opens, then they stand up and take their place in a line beside
+ * the bench. Each orange ends up in the crate, so the bench is left clear. The finale shows the whole
+ * team side by side with "Great Ideas Start with Great People." and the team row.
  *
- * Character: a rigged GLB at the path in data-character-src (set by the view only when the file exists).
- * Its clips are matched by name (see CHARACTER below) and driven deterministically: action.time is set
- * from p and the mixer is evaluated with a zero delta. See Tools/TeamScene/README.md.
+ * The people are procedural articulated figures (hips, knees, ankles, shoulders, elbows, neck, head)
+ * posed analytically from p: a foot-synced walk cycle, sitting, the hit reaction and looking up.
  */
 import * as THREE from "three";
 import { RoomEnvironment } from "./vendor/three/examples/jsm/environments/RoomEnvironment.js";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 
+let openProfile = () => {};
 const root = document.getElementById("tx");
 if (root) init(root);
 
@@ -28,14 +27,13 @@ function init(section) {
   const lowPower = innerWidth < 760 || (navigator.hardwareConcurrency || 8) <= 4;
   const ui = {
     intro: section.querySelector(".tx-intro"),
-    flash: section.querySelector(".tx-flash"),
     reveal: section.querySelector(".tx-reveal"),
     cards: [...section.querySelectorAll(".tx-card")],
     stages: [...section.querySelectorAll(".tx-stages li")],
     bar: section.querySelector(".tx-progress i"),
     live: section.querySelector(".tx-live")
   };
-  const api = window.__team = { p: 0, frames: 0, character: "none", ready: false, mode: reduced ? "static" : "scroll" };
+  const api = window.__team = { p: 0, frames: 0, ready: false, mode: reduced ? "static" : "scroll" };
 
   let renderer;
   try {
@@ -270,138 +268,215 @@ function init(section) {
     for (let i = 0; i < 34; i++) { const [c, r] = CANOPY[i % CANOPY.length], d = V(rnd() - .5, -rnd() * .6 - .1, rnd() - .5).normalize(), rr = r * (.86 + rnd() * .08); o.position.set(c.x + d.x * rr, c.y + d.y * rr * .78, c.z + d.z * rr); o.rotation.set(rnd() * 3, rnd() * 3, 0); const s = .085 + rnd() * .025; o.scale.set(s, s * .95, s); o.updateMatrix(); oi.setMatrixAt(i, o.matrix); }
     oi.castShadow = true; scene.add(oi);
   })();
-  const fruit = mesh(new THREE.SphereGeometry(.095, 28, 20), M.orange, HANG.x, HANG.y, HANG.z);
-  const fruitStem = new THREE.Mesh(new THREE.CylinderGeometry(.008, .01, .05, 6), M.stem); fruitStem.position.y = .11; fruit.add(fruitStem);
-
   /* ---------------- a few shrubs and the far courtyard edge ---------------- */
   for (let i = 0; i < 26; i++) { const a = rnd() * 6.28, r = 16 + rnd() * 18, x = Math.sin(a) * r, z = Math.cos(a) * r + 4; if (z < -14) continue; const m = mesh(new THREE.IcosahedronGeometry(.6 + rnd() * .5, 4), M.shrub, x, .45, z); m.scale.set(1.4, .8, 1.2); }
 
-  /* ---------------- character integration point ---------------- */
-  const CHARACTER = {
-    src: section.dataset.characterSrc || "",
-    height: 1.75,           // metres; the model is scaled to this standing height
-    stride: 1.45,           // metres covered by one walk cycle (keeps feet planted on the path)
-    seatForward: .05,       // seated root position relative to the bench seat centre (z, toward the front edge)
-    clips: { walk: /walk/i, sit: /sit.*down|stand.*sit|sit(?!.*idle)/i, sitIdle: /sit.*idle|sitting/i, react: /react|hit|surpri|head/i, lookUp: /look/i }
-  };
-  const standSpot = WALK.getPointAt(1), seatSpot = V(BENCH.x, 0, BENCH.z + CHARACTER.seatForward);
-  const walkLen = WALK.getLength();
-  const char = { group: new THREE.Group(), mixer: null, actions: {}, head: null, loaded: false };
-  scene.add(char.group);
+  /* ---------------- crate beside the bench: every fallen orange ends up here ---------------- */
+  const CRATE = V(4.36, 0, -4.15);
+  (function crate() {
+    const g = new THREE.Group(); g.position.copy(CRATE); scene.add(g);
+    const add = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M.wood); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; g.add(m); };
+    add(.68, .03, .6, 0, .045, 0);
+    [-1, 1].forEach(s => { add(.68, .12, .025, 0, .1, s * .29); add(.68, .07, .025, 0, .23, s * .29); add(.025, .12, .6, s * .33, .1, 0); add(.025, .07, .6, s * .33, .23, 0); });
+    [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([a, b]) => add(.04, .3, .04, a * .32, .15, b * .28));
+  })();
+  const crateSlot = i => V(CRATE.x - .2 + (i % 3) * .2, .155 + Math.floor(i / 9) * .17, CRATE.z - .18 + (Math.floor(i / 3) % 3) * .19);
 
-  // anchor pose of the character for progress p (position on the ground, yaw), shared by camera and orange
-  function anchorAt(p) {
-    if (p <= .25) { const u = smooth(seg(p, 0, .25)) * .92 + seg(p, 0, .25) * .08, pt = WALK.getPointAt(Math.min(u, 1)), tg = WALK.getTangentAt(Math.min(u, .999)); return { pos: pt, yaw: Math.atan2(tg.x, tg.z), dist: u * walkLen }; }
-    const tg = WALK.getTangentAt(.999), yaw0 = Math.atan2(tg.x, tg.z), turn = smooth(seg(p, .25, .31));
-    let yaw1 = 0; while (yaw1 - yaw0 > Math.PI) yaw1 -= Math.PI * 2; while (yaw0 - yaw1 > Math.PI) yaw1 += Math.PI * 2;
-    const sitMove = smooth(seg(p, .31, .43));
-    return { pos: standSpot.clone().lerp(seatSpot, sitMove), yaw: lerp(yaw0, yaw1, turn), dist: walkLen };
-  }
-
-  function loadCharacter() {
-    if (!CHARACTER.src) { api.character = "missing"; return; }
-    api.character = "loading";
-    new GLTFLoader().load(CHARACTER.src, gltf => {
-      const model = gltf.scene;
-      model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } if (o.isBone && !char.head && /head/i.test(o.name) && !/top|end/i.test(o.name)) char.head = o; });
-      const box = new THREE.Box3().setFromObject(model), h = box.max.y - box.min.y || 1, s = CHARACTER.height / h;
-      model.scale.setScalar(s); model.position.y = -box.min.y * s;
-      char.group.add(model);
-      char.mixer = new THREE.AnimationMixer(model);
-      for (const [key, re] of Object.entries(CHARACTER.clips)) {
-        const clip = gltf.animations.find(c => re.test(c.name) && !Object.values(char.actions).some(a => a.getClip() === c));
-        if (clip) { const a = char.mixer.clipAction(clip); a.play(); a.setEffectiveWeight(0); a.setEffectiveTimeScale(0); char.actions[key] = a; }
-      }
-      char.loaded = true; api.character = Object.keys(char.actions).length ? "ready" : "no-clips"; api.clips = Object.keys(char.actions);
-      contactCache = null; draw(true);
-    }, undefined, () => { api.character = "error"; });
-  }
-
-  function poseCharacter(p) {
-    const an = anchorAt(p);
-    char.group.position.copy(an.pos); char.group.rotation.y = an.yaw;
-    if (!char.loaded || !char.mixer) return;
-    const A = char.actions, w = {}, t = {};
-    const dur = k => A[k] ? A[k].getClip().duration : 0;
-    // walk: foot-synced cycle time from distance walked; cross-fades into the sit clip during the turn
-    const toSit = smooth(seg(p, .25, .31));
-    w.walk = 1 - toSit; t.walk = (an.dist / CHARACTER.stride % 1) * dur("walk");
-    w.sit = toSit; t.sit = seg(p, .31, .45) * dur("sit");
-    const idle = smooth(seg(p, .45, .48)), react = smooth(seg(p, .55, .57)) * (1 - smooth(seg(p, .66, .69))), look = smooth(seg(p, .65, .69));
-    if (A.sitIdle) { w.sitIdle = idle * (1 - react) * (1 - look); w.sit *= 1 - idle; t.sitIdle = seg(p, .45, .55) * dur("sitIdle"); }
-    if (A.react) { w.react = react; t.react = seg(p, .55, .65) * dur("react"); }
-    if (A.lookUp) { w.lookUp = look; t.lookUp = seg(p, .65, .8) * dur("lookUp"); }
-    // keep the weights summed to 1 so the rig never blends toward its bind pose
-    let sum = 0; for (const k in A) sum += w[k] || 0;
-    if (sum < 1e-3) { const last = A.lookUp && p > .65 ? "lookUp" : A.react && p > .55 ? "react" : A.sitIdle && p > .45 ? "sitIdle" : A.sit && p > .25 ? "sit" : "walk"; if (A[last]) { w[last] = 1; sum = 1; } }
-    for (const k in A) { A[k].setEffectiveWeight((w[k] || 0) / (sum || 1)); A[k].time = Math.min(t[k] || 0, Math.max(0, dur(k) - 1e-4)); }
-    char.mixer.update(0);
-  }
-
-  // the point the falling orange touches: the head bone at the moment of contact (p = .55), or the empty seat
-  let contactCache = null;
-  function contactPoint() {
-    if (contactCache) return contactCache;
-    if (char.loaded && char.head) { poseCharacter(.55); char.group.updateMatrixWorld(true); contactCache = char.head.getWorldPosition(V(0, 0, 0)).add(V(0, .14, .02)); }
-    else contactCache = V(seatSpot.x + .05, .45 + .095, seatSpot.z + .02);
-    return contactCache;
-  }
-
-  /* ---------------- falling orange ---------------- */
-  function poseFruit(p) {
-    const C = contactPoint(), G = V(C.x + .9, .095, C.z + 1.35), R = V(C.x + 1.5, .095, C.z + 2.05);
-    let pos, spin = 0;
-    if (p < .45) { const sway = Math.sin(p * 90) * .012 * seg(p, .36, .45); pos = HANG.clone().add(V(sway, 0, sway * .6)); }
-    else if (p < .55) { const t = seg(p, .45, .55); pos = V(lerp(HANG.x, C.x, t), lerp(HANG.y, C.y, t * t), lerp(HANG.z, C.z, t)); spin = t * 2; }
-    else if (p < .65) { const t = seg(p, .55, .65); pos = C.clone().lerp(G, t); pos.y = lerp(C.y, G.y, t) + Math.sin(t * Math.PI) * .38 * (1 - t * .4); spin = 2 + t * 9; }
-    else { const t = smooth(seg(p, .65, .8)); pos = G.clone().lerp(R, t); spin = 11 + t * 7; }
-    fruit.position.copy(pos); fruit.rotation.set(spin, spin * .4, 0);
-    fruitStem.visible = p < .45;
-    return pos;
-  }
-
-  /* ---------------- camera ---------------- */
-  const KEYS = [
-    [0, V(-21, 3.4, 23), V(-6, 1.7, 4)],
-    [.12, V(-15.5, 2.5, 16.5), V(-3.5, 1.4, 3)],
-    [.25, V(-6.8, 2.1, 6.4), V(2.2, 1.15, -3.2)],
-    [.35, V(-1.6, 1.9, 3.6), V(3, 1, -4)],
-    [.45, V(2.1, 1.55, 1.7), V(3, 1.45, -4.1)],
-    [.55, V(2.75, 1.4, -1.35), V(3.05, 1.3, -4.05)],
-    [.65, V(1.9, 1.15, -1.75), V(3.1, 1.25, -4.1)],
-    [.8, V(3.5, .75, -2.05), V(3.3, 2.9, -4.7)],
-    [1, V(3.25, 1.75, -3.25), V(3.45, 4.3, -5)]
+  /* ---------------- the team: procedural, fully articulated people ---------------- */
+  const cards = ui.cards, N = Math.max(1, cards.length);
+  const LOOKS = [
+    { h: 1.78, skin: 0xd9a37c, shirt: 0x17181b, pants: 0x2b2f36, hair: 0x1d1510, shoes: 0x111111, long: false, sleeve: true },
+    { h: 1.66, skin: 0xf0c7a2, shirt: 0xff7900, pants: 0x23262b, hair: 0x4a2c16, shoes: 0xe9e4dc, long: true, sleeve: false },
+    { h: 1.84, skin: 0x9a6440, shirt: 0xe9e6e1, pants: 0x3a3f47, hair: 0x0f0c0a, shoes: 0x2a1c12, long: false, sleeve: true },
+    { h: 1.71, skin: 0xc68d63, shirt: 0x2f4a6b, pants: 0xcfc4b0, hair: 0x2a1a10, shoes: 0x222222, long: false, sleeve: false },
+    { h: 1.75, skin: 0xe8b996, shirt: 0x5b5f66, pants: 0x1a1c20, hair: 0x6b4423, shoes: 0x111111, long: true, sleeve: true },
+    { h: 1.63, skin: 0x7c4f33, shirt: 0xf3efe8, pants: 0x2e3238, hair: 0x120e0b, shoes: 0xff7900, long: true, sleeve: false },
+    { h: 1.81, skin: 0xdcae88, shirt: 0x1f2d24, pants: 0x55493c, hair: 0x302014, shoes: 0x1b1b1b, long: false, sleeve: true }
   ];
-  const camCurve = new THREE.CatmullRomCurve3(KEYS.map(k => k[1]), false, "centripetal"), tgtCurve = new THREE.CatmullRomCurve3(KEYS.map(k => k[2]), false, "centripetal");
-  function keyU(p) { for (let i = 0; i < KEYS.length - 1; i++) if (p <= KEYS[i + 1][0]) return (i + seg(p, KEYS[i][0], KEYS[i + 1][0])) / (KEYS.length - 1); return 1; }
+  const matCache = {};
+  const mat = (c, r = .7) => matCache[c + ":" + r] || (matCache[c + ":" + r] = new THREE.MeshStandardMaterial({ color: c, roughness: r, envMapIntensity: .5 }));
+  function limb(parent, r, len, m, x, y, z) { const j = new THREE.Group(); j.position.set(x, y, z); parent.add(j); const s = new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(.01, len - r * 2), 4, 12), m); s.position.y = -len / 2; s.castShadow = true; s.receiveShadow = true; j.add(s); return j; }
+  function makePerson(L) {
+    const k = L.h / 1.75, skin = mat(L.skin, .55), shirt = mat(L.shirt, .8), pants = mat(L.pants, .85), hairM = mat(L.hair, .6), shoe = mat(L.shoes, .5);
+    const root = new THREE.Group(), body = new THREE.Group(); body.scale.setScalar(k); root.add(body); scene.add(root);
+    const hips = new THREE.Group(); hips.position.y = .92; body.add(hips);
+    const pelvis = new THREE.Mesh(new THREE.CapsuleGeometry(.13, .1, 4, 12).rotateZ(Math.PI / 2), pants); pelvis.scale.z = .75; pelvis.position.y = .01; pelvis.castShadow = true; hips.add(pelvis);
+    const spine = new THREE.Group(); spine.position.y = .05; hips.add(spine);
+    const prof = [[.12, 0], [.135, .08], [.14, .2], [.155, .32], [.18, .41], [.16, .47], [.06, .51]].map(([r, y]) => new THREE.Vector2(r, y));
+    const torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 20), shirt); torso.scale.z = .62; torso.castShadow = true; spine.add(torso);
+    const neck = new THREE.Group(); neck.position.y = .5; spine.add(neck);
+    const nm = new THREE.Mesh(new THREE.CylinderGeometry(.04, .045, .09, 12), skin); nm.position.y = .03; nm.castShadow = true; neck.add(nm);
+    const head = new THREE.Group(); head.position.y = .07; neck.add(head);
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(.1, 24, 18), skin); skull.scale.set(.88, 1.1, .97); skull.position.set(0, .1, .01); skull.castShadow = true; head.add(skull);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(.106, 24, 14, 0, Math.PI * 2, 0, Math.PI * .55), hairM); hair.scale.set(.92, 1.12, 1.02); hair.position.set(0, .115, -.005); hair.rotation.x = -.25; head.add(hair);
+    if (L.long) { const back = new THREE.Mesh(new THREE.CapsuleGeometry(.08, .12, 4, 12), hairM); back.scale.set(1.05, 1, .55); back.position.set(0, .03, -.06); back.castShadow = true; head.add(back); }
+    const eyeM = mat(0x1a1410, .3); [-1, 1].forEach(s => { const e = new THREE.Mesh(new THREE.SphereGeometry(.011, 8, 6), eyeM); e.position.set(s * .033, .115, .093); head.add(e); });
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(.012, .035, 8).rotateX(Math.PI / 2), skin); nose.position.set(0, .09, .1); head.add(nose);
+    const sh = [], el = [], hip = [], kn = [], an = [];
+    [1, -1].forEach(s => {
+      const a = limb(spine, .047, .29, shirt, s * .19, .44, 0); sh.push(a);
+      const e = limb(a, .041, .26, L.sleeve ? shirt : skin, 0, -.29, 0); el.push(e);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(.045, 12, 10), skin); hand.scale.set(.75, 1.25, .55); hand.position.y = -.29; hand.castShadow = true; e.add(hand);
+      const t = limb(hips, .072, .44, pants, s * .095, -.03, 0); hip.push(t);
+      const kj = limb(t, .056, .43, pants, 0, -.44, 0); kn.push(kj);
+      const aj = new THREE.Group(); aj.position.y = -.43; kj.add(aj); an.push(aj);
+      const foot = new THREE.Mesh(new THREE.CapsuleGeometry(.045, .14, 4, 10).rotateX(Math.PI / 2), shoe); foot.scale.y = .75; foot.position.set(0, -.035, .05); foot.castShadow = true; aj.add(foot);
+    });
+    return { root, hips, spine, neck, head, sh, el, hip, kn, an, k, L };
+  }
+  const people = Array.from({ length: N }, (_, i) => makePerson(LOOKS[i % LOOKS.length]));
+
+  // poses are plain numbers so they can be blended; angles in radians, hip height in metres (unscaled body)
+  const POSE0 = { hy: .92, hz: 0, lean: 0, chest: 0, nod: 0, tilt: 0, yawP: 0, hf: [0, 0], kf: [0, 0], sf: [0, 0], sa: [.07, .07], ef: [.12, .12] };
+  const clonePose = p => ({ ...p, hf: [...p.hf], kf: [...p.kf], sf: [...p.sf], sa: [...p.sa], ef: [...p.ef] });
+  function mix(a, b, t) { const o = clonePose(a); for (const key in a) { if (Array.isArray(a[key])) o[key] = a[key].map((v, i) => lerp(v, b[key][i], t)); else o[key] = lerp(a[key], b[key], t); } return o; }
+  function walkPose(phase, amp = 1) {
+    const p = clonePose(POSE0), s = Math.sin(phase), c = Math.cos(phase);
+    p.hf = [.42 * s * amp, -.42 * s * amp];
+    p.kf = [(.06 + .72 * Math.pow(Math.max(0, c), 1.6)) * amp, (.06 + .72 * Math.pow(Math.max(0, -c), 1.6)) * amp];
+    p.hy = .92 - .005 * amp + .018 * Math.cos(2 * phase) * amp;
+    p.sf = [-.32 * s * amp, .32 * s * amp]; p.ef = [.12 + (.1 + .25 * Math.max(0, -s)) * amp, .12 + (.1 + .25 * Math.max(0, s)) * amp];
+    p.lean = .05 * amp; p.yawP = .07 * s * amp; p.nod = -.02 * amp;
+    return p;
+  }
+  function sitPose(s) {
+    const p = clonePose(POSE0);
+    p.hf = [1.52 * s, 1.52 * s]; p.kf = [1.55 * s, 1.55 * s]; p.hy = lerp(.92, .55, s);
+    p.lean = Math.sin(Math.PI * Math.min(1, s * 1.05)) * .42 - .06 * s; p.sf = [.38 * s, .38 * s]; p.ef = [.12 + .85 * s, .12 + .85 * s]; p.sa = [.07 + .08 * s, .07 + .08 * s];
+    return p;
+  }
+  function applyPose(P, q) {
+    P.hips.position.y = q.hy; P.hips.position.z = q.hz; P.hips.rotation.y = q.yawP;
+    P.spine.rotation.set(q.lean, -q.yawP * 1.4, 0); P.neck.rotation.x = q.chest; P.head.rotation.set(q.nod, 0, q.tilt);
+    for (let i = 0; i < 2; i++) {
+      P.hip[i].rotation.x = -q.hf[i]; P.kn[i].rotation.x = q.kf[i]; P.an[i].rotation.x = q.hf[i] - q.kf[i] + (q.lean ? 0 : 0);
+      P.sh[i].rotation.set(-q.sf[i], 0, (i ? -1 : 1) * q.sa[i]); P.el[i].rotation.x = -q.ef[i];
+    }
+  }
+
+  /* ---------------- choreography: one member after another ---------------- */
+  const INTRO = .04, FINALE = .88, SEG = (FINALE - INTRO) / N;
+  const STRIDE = 1.45, walkLen = WALK.getLength(), arrive = WALK.getPointAt(1), front = V(BENCH.x, 0, BENCH.z + .55), seat = V(BENCH.x, 0, BENCH.z + .02);
+  const endYaw = (() => { const tg = WALK.getTangentAt(.999); return Math.atan2(tg.x, tg.z); })();
+  const LEFT = Math.ceil(N / 2), RIGHT = N - LEFT, LINE_Z = BENCH.z + .62;
+  const slotOf = i => i < LEFT ? V(BENCH.x - 1.5 - (LEFT - 1 - i) * .72, 0, LINE_Z) : V(BENCH.x + 2.15 + (RIGHT - 1 - (i - LEFT)) * .72, 0, LINE_Z);
+  const localT = (p, i) => (p - INTRO - i * SEG) / SEG;
+  const angTo = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d; };
+
+  // returns { visible, pos, yaw, pose } for member i at member-local time t (scroll only)
+  function memberState(i, t) {
+    const P = people[i];
+    if (t < 0) return { visible: false };
+    if (t < .32) { // walk in along the path
+      const u = seg(t, 0, .32), d = u * walkLen, pt = WALK.getPointAt(u), tg = WALK.getTangentAt(Math.min(u, .999));
+      return { visible: true, pos: pt, yaw: Math.atan2(tg.x, tg.z), pose: mix(walkPose(d / (STRIDE * P.k) * Math.PI * 2), POSE0, smooth(seg(t, .29, .32))) };
+    }
+    if (t < .38) { // turn around in front of the bench, two short steps back
+      const u = smooth(seg(t, .32, .38));
+      return { visible: true, pos: arrive.clone().lerp(front, u), yaw: lerp(endYaw, angTo(endYaw, 0), u), pose: walkPose(u * Math.PI * 2, .35 * Math.sin(Math.PI * u)) };
+    }
+    if (t < .82) { // sit, the orange, the reaction, looking up
+      const s = smooth(seg(t, .38, .48)), q = sitPose(s);
+      const hit = smooth(seg(t, .56, .585)) * (1 - smooth(seg(t, .6, .66)));
+      const hand = smooth(seg(t, .57, .61)) * (1 - smooth(seg(t, .66, .71)));
+      const look = smooth(seg(t, .66, .72)) * (1 - smooth(seg(t, .8, .82)) * .2);
+      q.nod += .28 * hit - .62 * look; q.tilt = .12 * hit; q.chest = -.1 * look; q.lean -= .1 * look;
+      q.sf[1] = lerp(q.sf[1], 2.55, hand); q.sa[1] = lerp(q.sa[1], .3, hand); q.ef[1] = lerp(q.ef[1], 2.05, hand);
+      q.sf[0] = lerp(q.sf[0], .2, look); q.ef[0] = lerp(q.ef[0], .5, look);
+      return { visible: true, pos: front.clone().lerp(seat, s), yaw: 0, pose: q };
+    }
+    if (t < .9) { // stand up
+      const s = 1 - smooth(seg(t, .82, .9)), q = sitPose(s), l = .8 * s; q.nod -= .62 * l; q.chest = -.1 * l; q.lean -= .1 * l; q.sf[0] = lerp(q.sf[0], .2, l); q.ef[0] = lerp(q.ef[0], .5, l);
+      return { visible: true, pos: front.clone().lerp(seat, s), yaw: 0, pose: q };
+    }
+    const slot = slotOf(i);
+    if (t < 1) { // walk to a place in the line beside the bench, then face the courtyard
+      const u = seg(t, .9, .985), d = front.distanceTo(slot) * u, dir = Math.atan2(slot.x - front.x, slot.z - front.z), turnIn = smooth(seg(t, .02 + .9, .93)), face = smooth(seg(t, .975, 1));
+      const yaw = lerp(lerp(0, dir, turnIn), angTo(dir, 0), face);
+      return { visible: true, pos: front.clone().lerp(slot, u), yaw, pose: mix(walkPose(d / (STRIDE * P.k) * Math.PI * 2, smooth(seg(t, .9, .92))), POSE0, face) };
+    }
+    return { visible: true, pos: slot, yaw: 0, pose: POSE0 };
+  }
+  function poseMember(i, p) {
+    const st = memberState(i, localT(p, i)), P = people[i];
+    P.root.visible = st.visible; if (!st.visible) { P.root.position.copy(WALK.getPointAt(0)); P.root.rotation.y = 0; applyPose(P, POSE0); return st; }
+    P.root.position.copy(st.pos); P.root.rotation.y = st.yaw; applyPose(P, st.pose); return st;
+  }
+  // where each member's orange touches the head (pose at the moment of contact)
+  const contact = people.map((P, i) => { const t = .559; const st = memberState(i, t); P.root.position.copy(st.pos); P.root.rotation.y = st.yaw; applyPose(P, st.pose); P.root.updateMatrixWorld(true); return P.head.localToWorld(V(0, .22, .01)); });
+
+  /* ---------------- oranges: one per member, regrowing on the same twig ---------------- */
+  const fruits = people.map(() => { const f = mesh(new THREE.SphereGeometry(.095, 28, 20), M.orange, HANG.x, HANG.y, HANG.z); const st = new THREE.Mesh(new THREE.CylinderGeometry(.008, .01, .05, 6), M.stem); st.position.y = .11; f.add(st); f.userData.stem = st; return f; });
+  function poseFruits(p) {
+    fruits.forEach((f, i) => {
+      const t = localT(p, i), prev = i ? localT(p, i - 1) : 1, C = contact[i], K = crateSlot(i);
+      const grow = i ? smooth(seg(prev, .5, .62)) : 1;
+      f.visible = grow > .001; f.userData.stem.visible = t < .48;
+      let pos = HANG.clone(), spin = 0;
+      if (t < .48) { const sway = Math.sin(t * 60) * .01 * seg(t, .4, .48); pos.x += sway; pos.z += sway * .6; f.scale.setScalar(Math.max(.001, grow)); }
+      else if (t < .56) { const u = seg(t, .48, .56); pos.set(lerp(HANG.x, C.x, u), lerp(HANG.y, C.y, u * u), lerp(HANG.z, C.z, u)); spin = u * 2; f.scale.setScalar(1); }
+      else if (t < .68) { const u = seg(t, .56, .68), e = 1 - Math.pow(1 - u, 1.4); pos = C.clone().lerp(K, e); pos.y = lerp(C.y, K.y, u) + Math.sin(u * Math.PI) * .42; spin = 2 + u * 10; f.scale.setScalar(1); }
+      else { pos = K; spin = 12 + i; f.scale.setScalar(1); }
+      f.position.copy(pos); f.rotation.set(spin, spin * .4 + i, 0);
+    });
+  }
+
+  /* ---------------- camera: shots blended by member-local time ---------------- */
   const camPos = V(0, 0, 0), camTgt = V(0, 0, 0);
-  function poseCamera(p) {
-    const u = keyU(p); camPos.copy(camCurve.getPoint(u)); camTgt.copy(tgtCurve.getPoint(u));
-    // during the walk the camera keeps the character's head framed
-    const follow = (1 - seg(p, .2, .3)) * .65;
-    if (follow > 0) { const a = anchorAt(p).pos; camTgt.lerp(V(a.x, 1.35, a.z), follow); camPos.x += (a.x - camPos.x) * follow * .12; camPos.z += (a.z - camPos.z) * follow * .12; }
-    camera.position.copy(camPos); camera.lookAt(camTgt);
+  const portrait = () => camera.aspect < .9;
+  function fitDistance(halfW) { const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect); return halfW / Math.tan(hf); }
+  const SHOT = {
+    intro: () => [V(-21, 3.4, 23), V(-6, 1.7, 4)],
+    group: () => { const tg = V((slotOf(0).x + slotOf(LEFT < N ? LEFT : 0).x) / 2, 1.0, BENCH.z + .3), d = Math.max(6.5, fitDistance(N * .48 + 1.2)); return [tg.clone().add(V(0, .22 * d, d)), tg]; },
+    follow: st => { const n = V(.74, 0, .67).multiplyScalar(portrait() ? 5.4 : 4.2), dir = V(Math.sin(st.yaw), 0, Math.cos(st.yaw)); return [st.pos.clone().add(n).add(V(0, 1.55, 0)), st.pos.clone().addScaledVector(dir, 1.3).add(V(0, 1.15, 0))]; },
+    sit: () => portrait() ? [V(3.05, 1.7, .6), V(3, .95, -4.1)] : [V(3.6, 1.55, -.2), V(3, 1, -4.1)],
+    close: i => { const c = contact[i]; return portrait() ? [V(3.1, 1.55, -1.2), V(3, (c.y + HANG.y) / 2 - .35, -4.1)] : [V(3.25, 1.45, -1.55), V(3.02, (c.y + HANG.y) / 2 - .5, -4.1)]; },
+    profile: i => { const c = contact[i]; return portrait() ? [V(3.15, 1.45, -1.35), V(3.0, c.y - .55, -4.1)] : [V(2.15, 1.4, -1.65), V(3.95, c.y - .3, -4.15)]; }
+  };
+  function memberShots(i, t, st) {
+    const first = i === 0 ? SHOT.intro() : SHOT.group(), f = SHOT.follow(st.visible ? st : { pos: WALK.getPointAt(0), yaw: 0 });
+    const keys = [[0, first], [.08, f], [.29, f], [.42, SHOT.sit()], [.5, SHOT.close(i)], [.66, SHOT.close(i)], [.72, SHOT.profile(i)], [.84, SHOT.profile(i)], [.95, SHOT.group()]];
+    for (let k = 0; k < keys.length - 1; k++) if (t <= keys[k + 1][0]) { const u = smooth(seg(t, keys[k][0], keys[k + 1][0])); return [keys[k][1][0].clone().lerp(keys[k + 1][1][0], u), keys[k][1][1].clone().lerp(keys[k + 1][1][1], u)]; }
+    return SHOT.group();
+  }
+  function poseCamera(p, states) {
+    let shot;
+    if (p < INTRO) shot = SHOT.intro();
+    else if (p >= FINALE) { const g = SHOT.group(), u = smooth(seg(p, FINALE, .93)), tight = [g[0].clone().lerp(g[1], .08), g[1].clone().add(V(0, -.12, 0))]; shot = [g[0].lerp(tight[0], u), g[1].lerp(tight[1], u)]; }
+    else { const i = Math.min(N - 1, Math.floor((p - INTRO) / SEG)); shot = memberShots(i, localT(p, i), states[i]); }
+    camPos.copy(shot[0]); camTgt.copy(shot[1]); camera.position.copy(camPos); camera.lookAt(camTgt);
   }
 
   /* ---------------- HTML overlays driven by the same p ---------------- */
-  const tmp = V(0, 0, 0);
+  const card = section.querySelector(".tx-member");
+  let shownMember = -1;
+  function showMember(i) {
+    if (i === shownMember || !card) return; shownMember = i;
+    const d = cards[i].dataset;
+    card.querySelector(".tx-member-idx").textContent = `${d.index} / ${String(N).padStart(2, "0")}`;
+    card.querySelector(".tx-member-status").textContent = d.placeholder === "true" ? "Awaiting verification" : "Project contributor";
+    card.querySelector("h3").textContent = d.name; card.querySelector(".tx-member-role").textContent = d.role; card.querySelector(".tx-member-text").textContent = d.contrib;
+    const img = card.querySelector("img"), ph = card.querySelector(".tx-ph");
+    if (d.photo) { img.src = d.photo; img.hidden = false; ph.hidden = true; } else { img.removeAttribute("src"); img.hidden = true; ph.hidden = false; ph.querySelector("b").textContent = d.index; }
+    card.dataset.member = String(i);
+  }
   function poseOverlay(p) {
-    if (api.mode === "static") { ui.flash.style.display = "none"; ui.reveal.style.opacity = "1"; ui.reveal.inert = false; ui.reveal.classList.add("is-live"); ui.cards.forEach(c => { c.style.opacity = "1"; c.style.transform = "none"; }); return; }
-    ui.intro.style.opacity = String(1 - seg(p, .01, .06)); ui.intro.style.visibility = p > .07 ? "hidden" : "";
-    const stage = p < .25 ? 0 : p < .45 ? 1 : p < .65 ? 2 : p < .8 ? 3 : 4;
-    ui.stages.forEach((li, i) => li.classList.toggle("is-on", i === stage));
-    if (api.stage !== stage) { api.stage = stage; if (ui.live) ui.live.textContent = ui.stages[stage]?.textContent || ""; }
-    const stagesBox = ui.stages[0]?.parentElement; if (stagesBox) stagesBox.style.opacity = String(1 - smooth(seg(p, .84, .9)));
+    if (api.mode === "static") { ui.reveal.style.opacity = "1"; ui.reveal.inert = false; ui.reveal.classList.add("is-live"); if (card) card.hidden = true; return; }
+    ui.intro.style.opacity = String(1 - seg(p, .005, .035)); ui.intro.style.visibility = p > .04 ? "hidden" : "";
+    const i = p < INTRO ? -1 : p >= FINALE ? N : Math.floor((p - INTRO) / SEG);
+    ui.stages.forEach((li, k) => { li.classList.toggle("is-on", k === i); li.classList.toggle("is-done", k < i); });
+    if (api.stage !== i) { api.stage = i; if (ui.live) ui.live.textContent = i < 0 ? "" : i >= N ? "The whole team" : `Team member ${i + 1} of ${N}`; }
     if (ui.bar) ui.bar.style.transform = `scaleX(${p})`;
-    // transition: an orange disc grows from where the orange fell (the "idea" in the tree) and fills the frame
-    tmp.copy(HANG).project(camera);
-    const fx = (tmp.x * .5 + .5) * 100, fy = (-tmp.y * .5 + .5) * 100, grow = smooth(seg(p, .8, .88));
-    ui.flash.style.clipPath = `circle(${(grow * 150).toFixed(2)}% at ${fx.toFixed(1)}% ${fy.toFixed(1)}%)`;
-    ui.flash.style.opacity = String(1 - smooth(seg(p, .9, .97)) * .08);
-    const rv = seg(p, .86, .92);
-    ui.reveal.style.opacity = String(smooth(rv)); ui.reveal.style.transform = `translateY(${((1 - smooth(rv)) * 26).toFixed(2)}px)`;
-    const live = p > .9; ui.reveal.classList.toggle("is-live", live); ui.reveal.inert = !live;
-    ui.cards.forEach((c, i) => { const t = smooth(seg(p, .9 + i * .012, .94 + i * .012)); c.style.opacity = String(t); c.style.transform = `translateY(${((1 - t) * 34).toFixed(2)}px)`; });
+    const stagesBox = ui.stages[0]?.parentElement; if (stagesBox) stagesBox.style.opacity = String(1 - smooth(seg(p, .9, .94)));
+    // the member's profile pops up while they look up at the tree
+    let cv = 0;
+    if (i >= 0 && i < N) { const t = localT(p, i); cv = smooth(seg(t, .68, .73)) * (1 - smooth(seg(t, .84, .88))); if (cv > 0) showMember(i); }
+    if (card) { card.style.opacity = String(cv); card.style.transform = `translateY(${((1 - cv) * 18).toFixed(2)}px) scale(${(.96 + cv * .04).toFixed(4)})`; card.inert = cv < .6; card.classList.toggle("is-live", cv >= .6); }
+    // finale: the whole team side by side, then the heading and the team row
+    const rv = smooth(seg(p, .93, .97));
+    ui.reveal.style.opacity = String(rv); ui.reveal.style.transform = `translateY(${((1 - rv) * 20).toFixed(2)}px)`;
+    const live = p > .96; ui.reveal.classList.toggle("is-live", live); ui.reveal.inert = !live;
+    ui.cards.forEach((c, k) => { const t = smooth(seg(p, .95 + k * .005, .975 + k * .005)); c.style.opacity = String(t); c.style.transform = `translateY(${((1 - t) * 24).toFixed(2)}px)`; });
   }
 
   /* ---------------- frame = f(p) ---------------- */
@@ -415,7 +490,8 @@ function init(section) {
     const p = api.p;
     if (!force && !dirty && p === lastP) return;
     lastP = p; dirty = false;
-    contactPoint(); poseCharacter(p); poseFruit(p); poseCamera(p); poseOverlay(p);
+    const states = people.map((_, i) => poseMember(i, p));
+    poseFruits(p); poseCamera(p, states); poseOverlay(p);
     renderer.shadowMap.needsUpdate = true;
     renderer.render(scene, camera); api.frames++;
   }
@@ -429,7 +505,7 @@ function init(section) {
   function scrollProgress() { const r = section.getBoundingClientRect(), span = section.offsetHeight - innerHeight; return span > 0 ? -r.top / span : 0; }
 
   if (reduced) {
-    section.classList.add("is-static"); api.p = .76; resize(); draw(true);
+    section.classList.add("is-static"); api.p = 1; resize(); draw(true);
   } else if (window.gsap && window.ScrollTrigger) {
     gsap.registerPlugin(ScrollTrigger);
     const st = ScrollTrigger.create({ trigger: section, start: "top top", end: "bottom bottom", onUpdate: s => setProgress(s.progress), onRefresh: s => setProgress(s.progress) });
@@ -442,10 +518,17 @@ function init(section) {
     api.sync = () => { setProgress(scrollProgress()); draw(); };
     resize(); setProgress(scrollProgress());
   }
-  api.state = () => ({ p: api.p, stage: api.stage, camera: camera.position.toArray().map(v => +v.toFixed(4)), target: camTgt.toArray().map(v => +v.toFixed(4)), fruit: fruit.position.toArray().map(v => +v.toFixed(4)), anchor: char.group.position.toArray().map(v => +v.toFixed(4)), yaw: +char.group.rotation.y.toFixed(4), reveal: +ui.reveal.style.opacity, character: api.character });
+  const r4 = v => +v.toFixed(4);
+  api.timeline = { intro: INTRO, finale: FINALE, segment: SEG, members: N };
+  api.state = () => ({
+    p: api.p, stage: api.stage, camera: camera.position.toArray().map(r4), target: camTgt.toArray().map(r4),
+    people: people.map(P => ({ v: P.root.visible, pos: P.root.position.toArray().map(r4), yaw: r4(P.root.rotation.y), hipY: r4(P.hips.position.y * P.k), knee: r4(P.kn[0].rotation.x), head: r4(P.head.rotation.x) })),
+    fruits: fruits.map(f => f.visible ? f.position.toArray().map(r4) : null), contact: contact.map(c => c.toArray().map(r4)),
+    card: card ? { op: +card.style.opacity, member: +card.style.opacity > 0 ? card.dataset.member : null } : null, reveal: +ui.reveal.style.opacity
+  });
   api.ready = true;
-  loadCharacter();
   wireCards();
+  card?.querySelector(".tx-member-open")?.addEventListener("click", () => openProfile(cards[+card.dataset.member]));
 }
 
 /* ---------------- team cards + profile dialog ---------------- */
@@ -454,15 +537,16 @@ function wireCards() {
   if (!dlg) return;
   let opener = null;
   const set = (sel, v) => { const el = dlg.querySelector(sel); if (el) el.textContent = v; };
-  document.querySelectorAll(".tx-card").forEach(card => card.addEventListener("click", () => {
-    const d = card.dataset; opener = card;
+  openProfile = (card, from) => {
+    const d = card.dataset; opener = from || document.activeElement;
     set(".tx-dlg-name", d.name); set(".tx-dlg-role", d.role); set(".tx-dlg-text", d.contrib); set(".tx-dlg-status", d.placeholder === "true" ? "Profile awaiting verification" : "Project contributor");
     const img = dlg.querySelector(".tx-dlg-photo img"), ph = dlg.querySelector(".tx-dlg-photo .tx-ph");
     if (d.photo) { img.src = d.photo; img.alt = d.name; img.hidden = false; ph.hidden = true; } else { img.removeAttribute("src"); img.hidden = true; ph.hidden = false; ph.querySelector("b").textContent = d.index; }
     const links = dlg.querySelector(".tx-dlg-links"); links.replaceChildren();
     [["GitHub", d.github], ["LinkedIn", d.linkedin]].forEach(([n, u]) => { if (!u) return; const a = document.createElement("a"); a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = n + " ↗"; a.setAttribute("aria-label", `${d.name} on ${n} (opens a new tab)`); links.append(a); });
     dlg.showModal();
-  }));
+  };
+  document.querySelectorAll(".tx-card").forEach(card => card.addEventListener("click", () => openProfile(card, card)));
   dlg.addEventListener("click", e => { if (e.target === dlg || e.target.closest("[data-tx-close]")) dlg.close(); });
-  dlg.addEventListener("close", () => { opener?.focus({ preventScroll: true }); });
+  dlg.addEventListener("close", () => { opener?.focus?.({ preventScroll: true }); });
 }
