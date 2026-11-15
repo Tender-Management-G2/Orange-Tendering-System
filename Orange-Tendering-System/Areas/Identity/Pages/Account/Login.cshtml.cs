@@ -88,7 +88,9 @@ public class LoginModel(
 
         if (user.MustChangePassword)
             return RedirectToPage("./FirstLoginPasswordChange");
-        if (isSupplier && supplierStatus == SupplierStatus.Pending)
+        // Password sign-in is for supplier setup only. Protected supplier routes
+        // require a fresh face or passkey session in SupplierApprovalGate.
+        if (isSupplier)
             return RedirectToPage("./PendingApproval");
         if (ReturnUrl != null)
             return LocalRedirect(ReturnUrl);

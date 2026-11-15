@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">From Paper to Signal — G1 supplemental keyframes</title>
+  <desc id="desc">Editable technical studies for two connected company categories, a rooted portrait frame, a login outline, a supplier method selector, and an abstract camera reveal. These are art proposals, not working authentication.</desc>
+  <defs>
+    <style>
+      .head{font:700 27px Arial,sans-serif;fill:#242321}.sub{font:14px Arial,sans-serif;fill:#776a5d}.label{font:700 17px Arial,sans-serif}.note{font:13px Arial,sans-serif}.num{font:700 12px Arial,sans-serif;fill:#ff7900}.line{fill:none;stroke:#242321;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.score{fill:none;stroke:#b6a898;stroke-width:1.5;stroke-dasharray:4 4}.orange{fill:#ff7900}.paper{fill:#fffdf9;stroke:#242321;stroke-width:2;stroke-linejoin:round}.shadow{fill:#d6c9b8;stroke:#242321;stroke-width:2;stroke-linejoin:round}.darkline{fill:none;stroke:#f8f5ef;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.darknote{font:13px Arial,sans-serif;fill:#bbb5ad}.darklabel{font:700 17px Arial,sans-serif;fill:#f8f5ef}
+    </style>
+  </defs>
+  <rect width="1200" height="720" rx="16" fill="#f8f5ef"/>
+  <text id="heading" x="36" y="48" class="head">G1 / CONTINUITY STUDIES</text>
+  <text x="36" y="74" class="sub">Technical art proposal · editable paths · fixed roots and orange markers · no verification claims</text>
+
+  <g id="r06-it-category" transform="translate(36 102)">
+    <rect width="364" height="278" rx="12" fill="#fffdf9" stroke="#d6c9b8"/>
+    <text x="18" y="27" class="num">R06 · CATEGORY A</text>
+    <g id="it-shared-paper-base" transform="translate(42 48)">
+      <path d="M16 110 116 148 280 94 178 56Z" fill="#f0e3d1" stroke="#242321" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M16 110v8l100 38 164-54v-8" class="shadow"/>
+      <path id="it-crease-anchors" d="M55 125 218 72M116 148 178 56" class="score"/>
+      <rect id="it-registration-marker" x="111" y="143" width="9" height="9" class="orange"/>
+      <g id="it-server-fold-left">
+        <path d="M58 117V43l54 19v74Z" class="paper"/><path d="M112 62 127 54v74l-15 8Z" class="shadow"/>
+        <path d="M69 59 100 70M69 72 100 83M69 85 100 96M69 98 100 109M69 111 100 122" class="line"/>
+        <circle cx="75" cy="63" r="2.5" class="orange"/><circle cx="75" cy="76" r="2.5" class="orange"/>
+      </g>
+      <g id="it-server-fold-right">
+        <path d="M157 128V53l55-19v74Z" class="paper"/><path d="M212 34 227 43v73l-15-8Z" class="shadow"/>
+        <path d="M168 67 202 55M168 80 202 68M168 93 202 81M168 106 202 94" class="line"/>
+        <circle cx="194" cy="59" r="2.5" class="orange"/><circle cx="194" cy="72" r="2.5" class="orange"/>
+      </g>
+    </g>
+    <text x="18" y="239" class="label">IT &amp; Electronics</text>
+    <text x="18" y="260" class="note" fill="#776a5d">Two equipment leaves hinge from one base.</text>
+  </g>
+
+  <g id="r06-telecom-category" transform="translate(418 102)">
+    <rect width="364" height="278" rx="12" fill="#fffdf9" stroke="#d6c9b8"/>
+    <text x="18" y="27" class="num">R06 · CATEGORY B</text>
+    <g id="telecom-shared-paper-base" transform="translate(42 48)">
+      <path d="M16 110 116 148 280 94 178 56Z" fill="#f0e3d1" stroke="#242321" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M16 110v8l100 38 164-54v-8" class="shadow"/>
+      <path id="telecom-crease-anchors" d="M55 125 218 72M116 148 178 56" class="score"/>
+      <rect id="telecom-registration-marker" x="111" y="143" width="9" height="9" class="orange"/>
+      <g id="telecom-cabinet-fold"><path d="M45 118V78l51 18v41Z" class="paper"/><path d="M96 96 113 87v42l-17 8Z" class="shadow"/><path d="M55 94 86 105M55 106 86 117M55 118 86 129" class="line"/></g>
+      <g id="telecom-mast-fold"><path d="M184 125 216 8l32 96M194 88h44M202 60h30M209 34h15M184 125l54-64M248 104l-46-44" class="line"/><circle cx="216" cy="8" r="7" class="orange"/><path d="M200 6q-13 15 0 29M232 6q13 15 0 29" fill="none" stroke="#ff7900" stroke-width="2"/></g>
+    </g>
+    <text x="18" y="239" class="label">Telecommunications</text>
+    <text x="18" y="260" class="note" fill="#776a5d">Cabinet and mast rise from shared creases.</text>
+  </g>
+
+  <g id="r08-portrait-frame" transform="translate(800 102)">
+    <rect width="364" height="278" rx="12" fill="#fffdf9" stroke="#d6c9b8"/>
+    <text x="18" y="27" class="num">R08 · FACE FRAME</text>
+    <g id="portrait-rooted-pocket" transform="translate(68 43)">
+      <path d="M28 148 116 178 230 142 144 111Z" fill="#f0e3d1" stroke="#242321" stroke-width="2"/>
+      <path d="M28 148v7l88 30 114-36v-7" class="shadow"/>
+      <rect x="111" y="173" width="9" height="9" class="orange"/>
+      <path id="portrait-frame-hinge" d="M106 126V26l91-26v100l-91 26Z" class="paper"/>
+      <path d="M118 108V37l67-20v70l-67 21Z" class="line"/>
+      <path id="portrait-fold-score" d="m106 26 46 34 45-60M106 126l46-66 45 40" class="score"/>
+      <path d="m134 78 17-37 18 26-17 30Z" fill="#f0e3d1" stroke="#242321" stroke-width="1.5"/>
+      <path d="M55 150v-38l61 21 61-18v38l-61 22Z" class="paper"/>
+      <path d="M55 112 116 133l61-18" class="score"/>
+    </g>
+    <text x="18" y="239" class="label">Portrait leaf and pocket</text>
+    <text x="18" y="260" class="note" fill="#776a5d">Frame remains hinged to the dossier.</text>
+  </g>
+
+  <g id="l00-planar-hardware" transform="translate(36 398)">
+    <rect width="364" height="278" rx="12" fill="#232323" stroke="#504b45"/>
+    <text x="18" y="27" class="num">L00 · IDLE</text>
+    <g id="signal-planar-outline" transform="translate(59 54)">
+      <path d="M40 20h114l16 16v112H40Z" class="darkline"/>
+      <path d="M50 32h97l11 11v92H50Z" class="darkline"/>
+      <path d="M77 51v68M105 51v68M133 51v68M57 74h94M57 98h94" class="darkline"/>
+      <path d="M170 89c50-4 75 24 55 49-19 23-55 11-53 35" fill="none" stroke="#ff7900" stroke-width="4" stroke-linecap="round"/>
+      <rect x="43" y="140" width="8" height="8" class="orange"/>
+    </g>
+    <text x="18" y="239" class="darklabel">SIM, core, one fiber</text>
+    <text x="18" y="260" class="darknote">Flat technical drawing; hardware is still sealed.</text>
+  </g>
+
+  <g id="l03-supplier-methods" transform="translate(418 398)">
+    <rect width="364" height="278" rx="12" fill="#232323" stroke="#504b45"/>
+    <text x="18" y="27" class="num">L03 · SUPPLIER METHOD</text>
+    <g id="signal-one-core" transform="translate(21 48)">
+      <path d="M23 31h126l18 18v111H23Z" fill="#373737" stroke="#f8f5ef" stroke-width="2"/>
+      <path d="M36 43h99l18 18v84H36Z" class="darkline"/>
+      <circle cx="94" cy="95" r="42" class="darkline"/>
+      <g id="aperture-blades" fill="#55514d" stroke="#f8f5ef" stroke-width="1.5"><path d="M94 95 94 53 129 69Z"/><path d="M94 95 129 69 136 110Z"/><path d="M94 95 136 110 108 135Z"/><path d="M94 95 108 135 67 126Z"/><path d="M94 95 67 126 53 87Z"/><path d="M94 95 53 87 94 53Z"/></g>
+      <path d="M167 98c37-4 52 22 40 42-11 19-37 12-36 36" fill="none" stroke="#ff7900" stroke-width="4"/>
+      <rect x="26" y="151" width="8" height="8" class="orange"/>
+    </g>
+    <g id="method-controls-outside-scene" transform="translate(241 81)">
+      <rect width="104" height="35" rx="5" fill="#ff7900"/><text x="11" y="23" font-family="Arial" font-size="13" font-weight="700" fill="#151515">Face</text>
+      <rect y="48" width="104" height="47" rx="5" fill="#313131" stroke="#6e6760"/><text x="11" y="67" font-family="Arial" font-size="12" fill="#bbb5ad">Fingerprint</text><text x="11" y="83" font-family="Arial" font-size="11" fill="#bbb5ad">Coming soon</text>
+    </g>
+    <text x="18" y="239" class="darklabel">Methods after role check</text>
+    <text x="18" y="260" class="darknote">Controls live outside the scene; no success state.</text>
+  </g>
+
+  <g id="l04-abstract-camera-reveal" transform="translate(800 398)">
+    <rect width="364" height="278" rx="12" fill="#232323" stroke="#504b45"/>
+    <text x="18" y="27" class="num">L04 · CAMERA REVEAL</text>
+    <g id="signal-camera-core" transform="translate(72 43)">
+      <path d="M18 29h138l15 15v128H18Z" fill="#373737" stroke="#f8f5ef" stroke-width="2"/>
+      <path d="M30 41h115l14 14v104H30Z" class="darkline"/>
+      <circle cx="95" cy="101" r="48" fill="#242321" stroke="#f8f5ef" stroke-width="2"/>
+      <circle cx="95" cy="91" r="15" class="darkline"/>
+      <path d="M64 125q31-35 62 0" class="darkline"/>
+      <path d="M95 53 126 62M143 85l-12 33M112 146l-37-2M48 116l-2-35M65 60l30-7" class="darkline"/>
+      <path d="M171 104c43-5 58 21 45 42-11 19-39 10-37 32" fill="none" stroke="#ff7900" stroke-width="4"/>
+      <rect x="21" y="162" width="8" height="8" class="orange"/>
+    </g>
+    <text x="18" y="239" class="darklabel">Abstract preview only</text>
+    <text x="18" y="260" class="darknote">Live video requires permission and ready stream.</text>
+  </g>
+</svg>

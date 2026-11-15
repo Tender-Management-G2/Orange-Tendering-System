@@ -1,0 +1,26 @@
+[
+  {
+    "name": "paper-playback",
+    "duration": 13.56,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "signal-playback",
+    "duration": 9.44,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "paper-orbit",
+    "duration": 4.04,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "paper-categories",
+    "duration": 4.96,
+    "width": 1440,
+    "height": 900
+  }
+]
