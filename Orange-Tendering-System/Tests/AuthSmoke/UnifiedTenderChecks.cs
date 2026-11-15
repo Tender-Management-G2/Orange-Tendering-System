@@ -135,6 +135,15 @@ public static class UnifiedTenderChecks
         Check(review.StatusCode == HttpStatusCode.Redirect, "accept request from details");
         var legacy = await officerClient.GetAsync("/SourcingOfficer/Tenders");
         Check(legacy.Headers.Location?.ToString() == "/SourcingOfficer/Workflow", "legacy tender list redirects to canonical page");
+        var workflowHtml = await officerClient.GetStringAsync("/SourcingOfficer/Workflow?request=" + request.Id);
+        bool OffersSeat(string field, string userId)
+        {
+            var select = Regex.Match(workflowHtml, "<select[^>]*id=\"" + field + "\"[^>]*>(.*?)</select>", RegexOptions.Singleline);
+            return select.Success && select.Groups[1].Value.Contains("value=\"" + userId + "\"", StringComparison.Ordinal);
+        }
+        Check(OffersSeat("SourcingManagerId", manager.Id) && OffersSeat("DepartmentRepresentativeId", evaluator.Id) &&
+              OffersSeat("FinancialRepresentativeId", financial.Id) && OffersSeat("TechnicalRepresentativeId", technical.Id),
+            "tender form offers active users for all four evaluation seats");
         var createToken = await Token(officerClient, "/SourcingOfficer/Workflow");
         var legacyWrite = await officerClient.PostAsync("/SourcingOfficer/Tenders/Create", new FormUrlEncodedContent(new Dictionary<string, string>
         { ["__RequestVerificationToken"] = createToken }));
@@ -148,9 +157,11 @@ public static class UnifiedTenderChecks
             SourcingManagerId = manager.Id, DepartmentRepresentativeId = evaluator.Id, FinancialRepresentativeId = financial.Id, TechnicalRepresentativeId = technical.Id,
             EstimatedValue = 1000, Currency = "JOD" };
         var id = await flow.Create(input, Principal(officer));
-        Check(await db.CommitteeMembers.CountAsync(m => m.TenderId == id && m.CommitteeType == CommitteeType.Evaluation) == 4 &&
-              await db.CommitteeMembers.CountAsync(m => m.TenderId == id && m.CommitteeType == CommitteeType.Top) == 4,
-            "canonical creation applies both saved four-person committees");
+        var assignedEvaluation = await db.CommitteeMembers.Where(m => m.TenderId == id && m.CommitteeType == CommitteeType.Evaluation)
+            .Select(m => m.UserId).ToListAsync();
+        Check(assignedEvaluation.Count == 4 && assignedEvaluation.ToHashSet().SetEquals(new[] { manager.Id, evaluator.Id, financial.Id, technical.Id }) &&
+              !await db.CommitteeMembers.AnyAsync(m => m.TenderId == id && m.CommitteeType == CommitteeType.Top),
+            "canonical creation saves the selected evaluation members and defers Top Committee assignment");
         var duplicateRejected = false;
         try { await flow.Create(input, Principal(officer)); } catch (WorkflowException e) { duplicateRejected = e.Message.Contains("already has a tender"); }
         Check(duplicateRejected && await db.Tenders.CountAsync() == 1, "duplicate tender rejected on server");

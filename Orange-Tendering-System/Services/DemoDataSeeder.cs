@@ -192,6 +192,14 @@ public static class DemoDataSeeder
         for (var i = 1; i <= 4; i++)
         {
             var email = $"committee{i}@orange-demo.local";
+            var jobRole = i switch
+            {
+                1 => SystemRoles.DepartmentRepresentative,
+                2 => SystemRoles.Finance,
+                3 => SystemRoles.Technical,
+                _ => SystemRoles.EvaluationCommittee
+            };
+            var allowedRoles = SystemRoles.AccountRoles(jobRole);
             var account = await users.FindByEmailAsync(email);
             if (account == null)
             {
@@ -207,7 +215,7 @@ public static class DemoDataSeeder
                     throw new InvalidOperationException($"Demo evaluator creation failed for {email}: {string.Join(", ", created.Errors.Select(e => e.Code))}");
             }
             if (account.FullName != $"Demo Evaluator {i}" || account.SupplierId != null ||
-                (await users.GetRolesAsync(account)).Any(role => role != SystemRoles.EvaluationCommittee))
+                (await users.GetRolesAsync(account)).Any(role => !allowedRoles.Contains(role)))
                 throw new InvalidOperationException($"Demo evaluator email {email} belongs to another account.");
             if (i == 1 && account.DepartmentId != demoDepartmentId)
             {
@@ -215,10 +223,11 @@ public static class DemoDataSeeder
                 var updated = await users.UpdateAsync(account);
                 if (!updated.Succeeded) throw new InvalidOperationException($"Could not assign demo department to {email}.");
             }
-            if (!await users.IsInRoleAsync(account, SystemRoles.EvaluationCommittee))
+            foreach (var role in allowedRoles)
             {
-                var assigned = await users.AddToRoleAsync(account, SystemRoles.EvaluationCommittee);
-                if (!assigned.Succeeded) throw new InvalidOperationException($"Could not assign Evaluation Committee role to {email}.");
+                if (await users.IsInRoleAsync(account, role)) continue;
+                var assigned = await users.AddToRoleAsync(account, role);
+                if (!assigned.Succeeded) throw new InvalidOperationException($"Could not assign {role} role to {email}.");
             }
         }
 
