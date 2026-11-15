@@ -76,6 +76,37 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
                 </li>
             }
         </ul>
+        @* Gallery hall behind the entrance: one card per homepage section, mapped onto the 3D wall screens *@
+        @{
+            var hqStations = new (string id, string title, string text)[] {
+                ("platform", "Inside the platform", "A dedicated workspace for each of the seven roles, from the Sourcing Officer to the Top Committee."),
+                ("how-it-works", "How it works", "Nine stages, one governed path: from purchase request to award and closure."),
+                ("roles", "Seven roles", "Everyone has a seat, no one has every key. See each role's responsibilities and connections."),
+                ("clarifications", "Governed communication", "Five clarification channels between the people directly involved, and nothing else."),
+                ("suppliers", "Supplier participation", "Register, get verified, receive invitations and submit sealed offers. Your offer stays yours."),
+                ("evaluation", "Weighted evaluation", "Weights agreed first, scores computed openly. Try the live weighted-score demo."),
+                ("analysis", "Compliance & AI", "Every bid is screened for compliance and analysed with Ollama. AI informs, people decide."),
+                ("reports", "Reports & signatures", "One unified Orange report, four committee signatures, and a fixed notification order."),
+                ("governance", "Security & governance", "Role-based access, supplier isolation, audit trail and locked weights."),
+                ("about", "About Orange Sourcing", "Paperwork, scattered emails and spreadsheets replaced by one platform."),
+                ("analytics", "Live from the system", "Public aggregate figures read directly from the platform database, never invented."),
+                ("contact", "Contact & get started", "Supplier registration, employee sign-in and the contact page.")
+            };
+            var si = 0;
+        }
+        <div class="hq3-gallery" id="hq3-gallery">
+            @foreach (var hs in hqStations)
+            {
+                si++;
+                <article class="hq3-gcard" aria-hidden="true">
+                    <span class="hq3-gnum">@si.ToString("00") <i>/ 12</i></span>
+                    <h3>@hs.title</h3>
+                    <p>@hs.text</p>
+                    <a href="#@hs.id" tabindex="-1">Open this section <span aria-hidden="true">&darr;</span></a>
+                </article>
+            }
+        </div>
+        <div class="hq3-flash" id="hq3-flash" aria-hidden="true"></div>
         <div class="hq-shade" id="hq-shade" aria-hidden="true"></div>
 
         <div class="hq-copy" id="hq-copy">

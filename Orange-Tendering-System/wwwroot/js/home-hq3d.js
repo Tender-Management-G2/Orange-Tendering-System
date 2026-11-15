@@ -204,7 +204,20 @@ function init() {
   podium.add(new THREE.Mesh(new THREE.TubeGeometry(sweep, 120, .09, 6, false), led(.9)));
   // podium sign, entrance doors and canopy
   const psign = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 5.8), M.sign); psign.position.set(6.2, 7.3, PD / 2 + .08); podium.add(psign);
-  const doors = new THREE.Mesh(new THREE.PlaneGeometry(9, 3.6), M.door); doors.position.set(-3.5, 1.9, PD / 2 - .6); podium.add(doors);
+  // automatic sliding entrance: two framed glass leaves part as the visitor arrives (door.open 0..1)
+  const lobbyGlow = new THREE.Mesh(new THREE.PlaneGeometry(10, 4.4), M.door); lobbyGlow.position.set(-3.5, 2.2, PD / 2 - 3); podium.add(lobbyGlow);
+  const header = new THREE.Mesh(new THREE.BoxGeometry(5.6, .38, .34), M.slab); header.position.set(-3.5, 3.78, PD / 2 + .3); podium.add(header);
+  [-6.25, -.75].forEach(x => { const post = new THREE.Mesh(new THREE.BoxGeometry(.2, 3.6, .34), M.mullion); post.position.set(x, 1.8, PD / 2 + .3); podium.add(post); });
+  const sensorMat = led(.5), sensor = new THREE.Mesh(new THREE.BoxGeometry(1.4, .1, .1), sensorMat); sensor.position.set(-3.5, 3.52, PD / 2 + .5); podium.add(sensor);
+  const leafMat = new THREE.MeshPhysicalMaterial({ color: 0x8fa6b6, roughness: .03, metalness: .2, transparent: true, opacity: .34, envMapIntensity: .6, depthWrite: false });
+  const leaves = [-1, 1].map(sgn => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 3.4, .06), leafMat));
+    [[0, 1.66, 2.5, .08], [0, -1.66, 2.5, .08]].forEach(([x, y, w, h]) => { const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, .1), M.mullion); f.position.set(x, y, 0); g.add(f); });
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(.08, 3.4, .1), M.mullion); edge.position.x = sgn * 1.21; g.add(edge);
+    g.position.set(-3.5 + sgn * 1.25, 1.72, PD / 2 + .36); g.userData = { base: g.position.x, sgn }; podium.add(g); return g;
+  });
+  const door = { open: 0 };
   // podium roof terraces (planters and shrubs along the edges)
   shrubs(podium, new THREE.Vector3(-34, 0, 14.6), new THREE.Vector3(-18, 0, 14.6), POD_H, 16);
   shrubs(podium, new THREE.Vector3(18, 0, 13), new THREE.Vector3(27, 0, 10), POD_H, 10);
@@ -246,6 +259,41 @@ function init() {
   // per-floor attach points for the live lines (left facade corner, right facade)
   const ATTACH = { f1: [[-17.2, 13, 10], [17.2, 13, -3]], f2: [[-17.2, 17.2, 10], [17.2, 17.2, -3]], f3: [[-17.2, 21.4, 10], [17.2, 21.4, -3]], f4: [[-17.2, 25.6, 10], [17.2, 25.6, -3]], roof: [[-17.2, 31, 10], [17.2, 31, -3]] };
 
+  /* ---------------- the gallery hall behind the door: one lit screen per homepage section ---------------- */
+  const GZ = -700, N_ST = 12, STEP = 11, HALL_W = 16, HALL_H = 8, HALL_L = (N_ST + 2) * STEP + 20;
+  const gallery = new THREE.Group(); gallery.position.set(0, 0, GZ); gallery.visible = false; scene.add(gallery);
+  {
+    const zc = -HALL_L / 2 + 12;
+    const gfloor = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, HALL_L), new THREE.MeshStandardMaterial({ color: 0x0e0c0b, roughness: .1, metalness: .75, envMapIntensity: .3 }));
+    gfloor.rotation.x = -Math.PI / 2; gfloor.position.z = zc; gallery.add(gfloor);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: .55, metalness: .2, envMapIntensity: .2 });
+    [-1, 1].forEach(sd => { const wl = new THREE.Mesh(new THREE.PlaneGeometry(HALL_L, HALL_H), wallMat); wl.rotation.y = -sd * Math.PI / 2; wl.position.set(sd * HALL_W / 2, HALL_H / 2, zc); gallery.add(wl); });
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, HALL_L), new THREE.MeshStandardMaterial({ color: 0x0c0a09, roughness: .8 })); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, HALL_H, zc); gallery.add(ceil);
+    const strip = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd2a0).multiplyScalar(1.5), toneMapped: false });
+    [-4.5, 0, 4.5].forEach(x => { const b = new THREE.Mesh(new THREE.BoxGeometry(.18, .05, HALL_L - 6), strip); b.position.set(x, HALL_H - .05, zc); gallery.add(b); });
+    [-1, 1].forEach(sd => { const b = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, HALL_L - 6), led(.9)); b.position.set(sd * (HALL_W / 2 - .05), .04, zc); gallery.add(b); const t2 = b.clone(); t2.position.y = HALL_H - .3; gallery.add(t2); });
+    // only two real lights in the hall (keeps shaders within mobile GPU uniform limits); the strips are emissive
+    [0, 1].forEach(i => { const l = new THREE.PointLight(0xffb070, 160, 90, 1.6); l.position.set(0, HALL_H - 1, -i * 70 - 30); gallery.add(l); });
+    // portal at the end of the hall into the platform sections
+    const pz = -(N_ST + 1) * STEP - 8;
+    const glowPlane = new THREE.Mesh(new THREE.PlaneGeometry(9, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb46a).multiplyScalar(1.6), toneMapped: false })); glowPlane.position.set(0, 3, pz); gallery.add(glowPlane);
+    [[0, 6.1, 9.6, .25], [0, -.1, 9.6, .25], [-4.7, 3, .25, 6.4], [4.7, 3, .25, 6.4]].forEach(([x, y, w, h]) => { const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, .3), led(1.2)); f.position.set(x, y, pz + .1); gallery.add(f); });
+  }
+  // section screens on alternating walls; the HTML cards are mapped onto these quads
+  const SCR_W = 7.5, SCR_H = 4.4;
+  const screens = [];
+  for (let i = 0; i < N_ST; i++) {
+    const sd = i % 2 ? 1 : -1, z = -(i + 1) * STEP, x = sd * (HALL_W / 2 - .12);
+    const g = new THREE.Group(); g.position.set(x, 2.9, z); g.rotation.y = -sd * Math.PI / 2; gallery.add(g);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(SCR_W, SCR_H), new THREE.MeshBasicMaterial({ color: 0x150d07 })); g.add(scr);
+    const fmat = led(.7);
+    [[0, SCR_H / 2 + .08, SCR_W + .3, .1], [0, -SCR_H / 2 - .08, SCR_W + .3, .1], [-SCR_W / 2 - .08, 0, .1, SCR_H + .3], [SCR_W / 2 + .08, 0, .1, SCR_H + .3]].forEach(([fx, fy, w, h]) => { const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, .08), fmat); f.position.set(fx, fy, .02); g.add(f); });
+    const wash = new THREE.Mesh(new THREE.PlaneGeometry(SCR_W * 1.6, 3), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false })); wash.rotation.x = -Math.PI / 2; wash.position.set(0, -2.86, 1.6); g.add(wash);
+    // corners (top-left, top-right, bottom-right, bottom-left) in the screen's local space
+    const corners = [[-SCR_W / 2, SCR_H / 2], [SCR_W / 2, SCR_H / 2], [SCR_W / 2, -SCR_H / 2], [-SCR_W / 2, -SCR_H / 2]].map(([a, b]) => new THREE.Vector3(a, b, .05));
+    screens.push({ g, sd, z, x, corners, fmat });
+  }
+
   /* ---------------- environment: plaza, trees, people, skyline ---------------- */
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), M.ground); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
   [[-3, .02, 26, 34, 16, .32], [20, .02, 24, 24, 12, .18], [-30, .02, 21, 22, 10, .16]].forEach(([x, y, z, w, d, o]) => {
@@ -286,16 +334,31 @@ function init() {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   // 0..4: assembly (reference three-quarter -> dolly -> orbit + rise -> close to the facade -> reference hero view)
   // 4..6: orbit to the opposite three-quarter view, then fly toward the entrance
-  const CAM = new THREE.CatmullRomCurve3([V(40, 15, 104), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(34, 10, 84), V(-44, 16, 70), V(-3, 3.2, 30)], false, "centripetal");
-  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(2, 17, 0), V(-2, 16, 0), V(-3, 2.6, 16)], false, "centripetal");
-  const camState = { t: 0 }; let override = null;
+  const CAM = new THREE.CatmullRomCurve3([V(40, 15, 104), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(34, 10, 84), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
+  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(2, 17, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
+  const camState = { t: 0, walk: 0, gal: 0 }; let override = null, inGallery = false;
+  const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);
+  // gallery walk: dwell in front of each screen (zero speed at every station), turn toward it, move on
+  function galleryCamera(gal) {
+    const sN = gal * (N_ST + 1), i = Math.floor(sN), f = sN - i, eased = i + f - Math.sin(2 * Math.PI * f) / (2 * Math.PI) * .9;
+    const zc = 7.5 - eased * STEP;
+    let focus = 0, fx = 0, fz = 0, fs = 0;
+    screens.forEach(sc => { const d = zc - (sc.z + 7.5), w = Math.exp(-(d * d) / (2 * 4.2 * 4.2)); if (w > focus) { focus = w; fx = sc.x; fz = sc.z; fs = sc.sd; } });
+    const pos = V(-fs * focus * 3.4, 2.1, zc + GZ);
+    const fwd = V(0, 1.9, zc - 14 + GZ), scr = V(fx, 2.9, fz + GZ);
+    return [pos, fwd.lerp(scr, focus * .92)];
+  }
   const VIEWS = { reference: [V(34, 10, 84), V(2, 17, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
   function applyCamera() {
     const W = stage.clientWidth, H = stage.clientHeight; camera.aspect = W / H;
     camera.fov = W / H < 1 ? 52 : W / H < 1.4 ? 42 : 34;
     let p, q;
     if (override) { [p, q] = VIEWS[override]; }
-    else { p = CAM.getPoint(camState.t); q = TGT.getPoint(camState.t); }
+    else if (inGallery) { [p, q] = galleryCamera(camState.gal); }
+    else {
+      p = CAM.getPoint(camState.t); q = TGT.getPoint(camState.t);
+      if (camState.walk > 0) { p = p.clone().lerp(DOOR_IN, camState.walk); q = q.clone().lerp(DOOR_T0, camState.walk).lerp(DOOR_T1, camState.walk * .6); }
+    }
     if (W / H < 1) { p = p.clone().sub(q).multiplyScalar(1.15).add(q); }
     camera.position.copy(p); camera.lookAt(q); camera.updateProjectionMatrix();
   }
@@ -320,15 +383,17 @@ function init() {
   let panelFade = 1;
   function applyPanels(t) {
     const W = stage.clientWidth, H = stage.clientHeight;
+    // Read layout before changing any panel styles to avoid repeated synchronous layouts.
+    const sizes = panels.map(pn => ({ width: pn.el.offsetWidth, height: pn.el.offsetHeight }));
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-    for (const pn of panels) {
+    for (const [index, pn] of panels.entries()) {
       const k = STAGE_OF_FLOOR[pn.floor], grow = S.g[k], show = clamp((S.g[k] + (k > 0 ? S.g[k - 1] : 1) * .25 - .05) * 2.2, 0, 1) * panelFade;
       const fp = parts.find(p => p.name === pn.floor);
       const a = ATTACH[pn.floor][pn.side];
       w2.set(a[0], a[1], a[2]);
       if (fp) { w2.y += fp.pivot.position.y - fp.finalY; w2.x += fp.pivot.position.x; w2.z += fp.pivot.position.z; }
       const A = project(pn.anchor), B = project(w2);
-      const r = pn.el.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+      const r = sizes[index];
       const left = pn.side === 0 ? A.x - r.width : A.x;
       pn.el.style.transform = `translate3d(${left.toFixed(1)}px,${(A.y - r.height / 2).toFixed(1)}px,0)`;
       pn.el.style.opacity = (A.ok ? show : 0).toFixed(3);
@@ -345,6 +410,32 @@ function init() {
     }
   }
 
+  /* ---------------- section cards mapped onto the gallery screens (CSS matrix3d homography) ---------------- */
+  const cardEls = Array.prototype.slice.call(document.querySelectorAll("#hq3-gallery .hq3-gcard"));
+  const CW = 750, CH = 440;
+  function adj(m) { return [m[4] * m[8] - m[5] * m[7], m[2] * m[7] - m[1] * m[8], m[1] * m[5] - m[2] * m[4], m[5] * m[6] - m[3] * m[8], m[0] * m[8] - m[2] * m[6], m[2] * m[3] - m[0] * m[5], m[3] * m[7] - m[4] * m[6], m[1] * m[6] - m[0] * m[7], m[0] * m[4] - m[1] * m[3]]; }
+  function mmul(a, b) { const c = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let s2 = 0; for (let k = 0; k < 3; k++) s2 += a[3 * i + k] * b[3 * k + j]; c[3 * i + j] = s2; } return c; }
+  function mvec(m, v) { return [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]]; }
+  function basis(p) { const m = [p[0], p[2], p[4], p[1], p[3], p[5], 1, 1, 1], v = mvec(adj(m), [p[6], p[7], 1]); return mmul(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]); }
+  function quad(dst) { const t = mmul(basis(dst), adj(basis([0, 0, CW, 0, CW, CH, 0, CH]))); for (let i = 0; i < 9; i++) t[i] /= t[8]; return "matrix3d(" + [t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].map(n => +n.toFixed(6)).join(",") + ")"; }
+  const cv = new THREE.Vector3(), cc = new THREE.Vector3();
+  function applyCards() {
+    cardEls.forEach((el, i) => {
+      const sc = screens[i];
+      if (!inGallery || !sc) { el.style.opacity = "0"; el.style.visibility = "hidden"; return; }
+      sc.g.updateMatrixWorld(true);
+      const pts = [], W = stage.clientWidth, H = stage.clientHeight; let ok = true;
+      for (const c of sc.corners) { cv.copy(c).applyMatrix4(sc.g.matrixWorld); cv.project(camera); if (cv.z > 1 || cv.z < -1) ok = false; pts.push((cv.x * .5 + .5) * W, (-cv.y * .5 + .5) * H); }
+      cc.set(0, 0, 0).applyMatrix4(sc.g.matrixWorld);
+      const o = ok ? clamp(1.25 - cc.distanceTo(camera.position) / 34, 0, 1) : 0;
+      el.style.visibility = o > .01 ? "visible" : "hidden";
+      el.style.opacity = o.toFixed(3);
+      el.style.pointerEvents = o > .6 ? "auto" : "none";
+      if (ok) el.style.transform = quad(pts);
+      sc.fmat.color.copy(ORANGE).multiplyScalar(1.4 + 2 * o);
+    });
+  }
+
   /* ---------------- render loop ---------------- */
   function resize() {
     const W = stage.clientWidth, H = stage.clientHeight;
@@ -357,20 +448,50 @@ function init() {
   function frame() {
     const t = clock.getElapsedTime();
     applyParts(t);
+    leaves.forEach(l => { l.position.x = l.userData.base + l.userData.sgn * 2.45 * door.open; });
+    sensorMat.color.copy(ORANGE).multiplyScalar(1 + door.open * 3);
+    const gm = !override && camState.walk >= .72;
+    if (gm !== inGallery) { inGallery = gm; gallery.visible = gm; building.visible = !gm; }
     ledMats.forEach(m => m.color.copy(ORANGE).multiplyScalar(2.2 * m.userData.k * (1 + S.glow * .6 * (.6 + .4 * Math.sin(t * 2.4)))));
     applyCamera();
     if (composer) composer.render(); else renderer.render(scene, camera);
     applyPanels(t);
+    applyCards();
   }
-  function loop() { raf = 0; if (!visible) return; frame(); raf = requestAnimationFrame(loop); }
-  new IntersectionObserver(es => { visible = es[0].isIntersecting; if (visible && !raf) loop(); }).observe(stage);
-  addEventListener("resize", () => { resize(); frame(); });
-  resize(); loop();
+  let lastFrame = -Infinity;
+  function loop(now) {
+    raf = 0;
+    if (!visible || document.hidden) return;
+    // High-refresh displays need not run the scene's JS and DOM updates at 144/240 Hz.
+    if (now - lastFrame >= 1000 / 60 - .5) { frame(); lastFrame = now; }
+    raf = requestAnimationFrame(loop);
+  }
+  function resume() {
+    if (visible && !document.hidden && !raf) {
+      lastFrame = -Infinity;
+      raf = requestAnimationFrame(loop);
+    } else if ((!visible || document.hidden) && raf) {
+      cancelAnimationFrame(raf); raf = 0;
+    }
+  }
+  new IntersectionObserver(es => { visible = es[0].isIntersecting; resume(); }).observe(stage);
+  document.addEventListener("visibilitychange", resume);
+  addEventListener("resize", () => { resize(); if (visible && !document.hidden) frame(); });
+  resize(); resume();
   root.classList.add("hq3-live");
 
   /* ---------------- verification hooks (read-only, used by the Playwright QA) ---------------- */
   const order = ["f1", "f2", "f3", "f4", "tf", "roof"];
   window.__hq3 = {
+    get graphics() {
+      const gl = renderer.getContext(), debug = gl.getExtension("WEBGL_debug_renderer_info");
+      return {
+        renderer: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+        powerPreference: gl.getContextAttributes()?.powerPreference,
+        drawCalls: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles
+      };
+    },
     get assembly() { return assembled(); },
     get trigger() { return st ? { start: st.start, end: st.end } : null; },
     get camera() { return { pos: camera.position.toArray().map(n => +n.toFixed(2)), dir: camera.getWorldDirection(new THREE.Vector3()).toArray().map(n => +n.toFixed(3)) }; },
@@ -393,6 +514,8 @@ function init() {
       return out;
     },
     setView(name) { override = name || null; frame(); },
+    get door() { return +door.open.toFixed(4); },
+    get inGallery() { return inGallery; },
     // completes the scroll scrub immediately (software-rendered QA browsers draw only a few frames per second)
     sync() { if (st) { ScrollTrigger.update(); const tw = st.getTween && st.getTween(); if (tw) tw.progress(1); st.animation.progress(st.progress); } frame(); },
     frame
@@ -423,8 +546,15 @@ function init() {
     tl.to(S, { glow: 1, duration: 5, ease: "power2.out" }, 66);
     const pf = { v: 1 }; tl.fromTo(pf, { v: 1 }, { v: 0, duration: 4, immediateRender: false, onUpdate() { panelFade = pf.v; } }, 86);
     tl.to(".hq-stagebar, #hq3-cap", { autoAlpha: 0, duration: 3 }, 86);
-    tl.to(fade, { opacity: 1, duration: 2.5 }, 97.5);
-    tl.to({}, { duration: .01 }, 100);
+    // the automatic doors open, the camera walks through a warm flash into the gallery hall
+    tl.fromTo(door, { open: 0 }, { open: 1, duration: 6, ease: "power2.inOut", immediateRender: false }, 92);
+    tl.fromTo(camState, { walk: 0 }, { walk: 1, duration: 9, ease: "power1.in", immediateRender: false }, 97);
+    tl.fromTo("#hq3-flash", { opacity: 0 }, { opacity: 1, duration: 3, ease: "power2.in", immediateRender: false }, 100.6)
+      .to("#hq3-flash", { opacity: 0, duration: 4.5, ease: "power2.out" }, 103.6);
+    // inside: one station per homepage section, then the portal into the platform sections
+    tl.fromTo(camState, { gal: 0 }, { gal: 1, duration: 86, ease: "none", immediateRender: false }, 108);
+    tl.to(fade, { opacity: 1, duration: 3 }, 196.5);
+    tl.to({}, { duration: .01 }, 200);
     tl.eventCallback("onUpdate", () => {
       const time = tl.time(), pct = clamp(time / 70 * 100, 0, 100); let idx = 0;
       STAGES.forEach((s, i) => { if (pct >= s[0]) idx = i; });
@@ -440,7 +570,7 @@ function init() {
   const mm = gsap.matchMedia();
   mm.add({ wide: "(min-width:1100px)", mid: "(min-width:700px) and (max-width:1099px)", small: "(max-width:699px)" }, ctx => {
     const c = ctx.conditions, tl = build();
-    st = ScrollTrigger.create({ trigger: section, start: "top top", end: () => "+=" + Math.round(innerHeight * (c.wide ? 7 : c.mid ? 4.2 : 3.2)), pin: true, scrub: c.wide ? 1 : .7, anticipatePin: 1, animation: tl, invalidateOnRefresh: true });
+    st = ScrollTrigger.create({ trigger: section, start: "top top", end: () => "+=" + Math.round(innerHeight * (c.wide ? 15 : c.mid ? 9 : 7)), pin: true, scrub: c.wide ? 1 : .7, anticipatePin: 1, animation: tl, invalidateOnRefresh: true });
     const see = [...document.querySelectorAll("[data-see-action]")];
     function onSee(e) {
       e.preventDefault();
