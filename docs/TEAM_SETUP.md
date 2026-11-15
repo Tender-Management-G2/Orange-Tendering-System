@@ -1,5 +1,17 @@
 # Team setup: local SQL Server and EF Core
 
+## Everyday team workflow (WorkV2)
+
+1. `git pull origin WorkV2` in `Orange-Tendering-System-WorkV2` (see `AGENTS.md`).
+2. Open `Orange-Tendering-System.slnx` in Visual Studio and run the **https** profile (https://localhost:7182).
+3. Startup creates/migrates the local `OrangeTenderingTeamDev` database on your own SQL Server (your existing connection
+   settings are kept) and provisions the ten team accounts. Sign in with **Other User** and any account listed in
+   `Orange-Tendering-System/DEMO-DATA.md`; password `OrangeDemo2026!`.
+
+No SQL, account creation, password resets or extra environment variables are needed. Your existing
+`OrangeTenderingSystem` database is untouched; open it with the profile
+"https (existing OrangeTenderingSystem database)". The sections below are only for first-time SQL Server setup and migrations.
+
 Run these commands in PowerShell. Each developer uses their own local database. The checked-in EF Core migrations create the schema; no SQL backup or SSMS script is needed.
 
 ## Prerequisites
@@ -50,7 +62,7 @@ Run these commands in PowerShell. Each developer uses their own local database. 
    SELECT name FROM sys.tables ORDER BY name;
    ```
 
-   Expect five migration rows and 30 tables, including the seven `AspNet*` tables. Re-running `dotnet ef database update` should report that the database is already up to date.
+   Expect all checked-in migrations to appear in the history, including the merged snapshot reconciliation, and the Identity tables including `AspNetUserPasskeys`. Re-running `dotnet ef database update` should report that the database is already up to date.
 
 5. Launch the MVC app:
 
@@ -91,8 +103,8 @@ dotnet run --launch-profile https
 
 ## Authentication setup on Ahmad branch
 
-Apply `20261113091517_AddAuthenticationState` only to your verified local database. It adds three `AspNetUsers` columns and keeps the 30-table schema. Development defaults to `Smtp:Mode=LocalInbox`: run `node Tools/DevMail/server.js` from the web project directory and read test OTP mail at `http://127.0.0.1:8025`. For delivery to a real Gmail inbox, set `Smtp:Mode=Smtp` and Gmail sender credentials in the web project's Visual Studio User Secrets, then restart the app. See [the exact Gmail setup and delivery test](../Orange-Tendering-System/Tools/DevMail/README.md). Never commit credentials or OTPs.
+Apply pending migrations only to your verified local database. Development defaults to `Smtp:Mode=LocalInbox`: run `node Tools/DevMail/server.js` from the web project directory and read test OTP and employee welcome mail at `http://127.0.0.1:8025`. For delivery to a real Gmail inbox, set `Smtp:Mode=Smtp` and Gmail sender credentials in the web project's Visual Studio User Secrets, then restart the app. See [the exact Gmail setup and delivery test](../Orange-Tendering-System/Tools/DevMail/README.md). Never commit credentials or OTPs.
 
 For a brand-new local installation only, optionally set `BootstrapAdmin:Email`, `BootstrapAdmin:Password`, and `BootstrapAdmin:FullName` at runtime. The Admin account requires a password change at first sign-in. Never commit those values. Real SMTP must support STARTTLS; the Development inbox accepts unauthenticated email only on loopback. Supplier documents are stored under the application's ignored `App_Data/SupplierDocuments` directory outside `wwwroot`; back this directory up and protect it in deployment. The app needs write permission there.
 
-Use the HTTPS launch profile for sign-in because Identity cookies require HTTPS. If the local development certificate is missing, run `dotnet dev-certs https --trust`. The first Admin and Supplier onboarding require the migration and SQL Server; supplier OTP requires the running local Development inbox or a configured SMTP provider. Rjoub's Admin supplier review UI is still a scaffold, so company approval is not available through that UI yet.
+Use the HTTPS launch profile for sign-in because Identity cookies require HTTPS. If the local development certificate is missing, run `dotnet dev-certs https --trust`. The first Admin and Supplier onboarding require the migration and SQL Server; supplier OTP and employee welcome mail require the running local Development inbox or a configured SMTP provider. Admin supplier review and approval are available at `/Admin/Suppliers`.

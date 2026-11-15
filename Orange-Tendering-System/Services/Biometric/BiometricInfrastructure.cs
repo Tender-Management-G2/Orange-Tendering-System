@@ -66,6 +66,25 @@ public class ChallengeStore(IMemoryCache cache, IOptions<BiometricOptions> optio
         }
     }
 
+    /// <summary>Reads a live entry without burning it (a step that spans several requests); null when unknown, expired, or issued for another purpose.</summary>
+    public ChallengeEntry? Peek(string? token, string purpose) =>
+        !string.IsNullOrEmpty(token) && cache.TryGetValue(Key(token), out ChallengeEntry? entry) && entry is not null &&
+        entry.Purpose == purpose && entry.ExpiresAt > DateTime.UtcNow
+            ? entry
+            : null;
+
+    /// <summary>Ends an entry of the given purpose early; entries issued for another purpose are left alone.</summary>
+    public void Remove(string? token, string purpose)
+    {
+        lock (consumeLock)
+        {
+        if (Peek(token, purpose) is not null)
+        {
+            cache.Remove(Key(token!));
+        }
+        }
+    }
+
     private static string Key(string token) => "bio:challenge:" + token;
 }
 

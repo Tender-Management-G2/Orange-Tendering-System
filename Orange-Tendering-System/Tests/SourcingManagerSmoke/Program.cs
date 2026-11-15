@@ -126,11 +126,11 @@ TenderReport Report(int version, string content) => new()
     Status = ReportStatus.Submitted, CreatedByUserId = officer.Id, CreatedAt = DateTime.UtcNow, SubmittedAt = DateTime.UtcNow
 };
 
-ReportsController ManagerController(ApplicationDbContext context, string userId)
+ManagerReportsController ManagerController(ApplicationDbContext context, string userId)
 {
     var http = new DefaultHttpContext();
     http.User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId) }, "SmokeTest"));
-    return new ReportsController(context)
+    return new ManagerReportsController(context)
     {
         ControllerContext = new ControllerContext { HttpContext = http },
         TempData = new TempDataDictionary(http, new NullTempDataProvider())

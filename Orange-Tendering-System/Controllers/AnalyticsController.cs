@@ -9,7 +9,7 @@ using Orange_Tendering_System.Services;
 namespace Orange_Tendering_System.Controllers
 {
     [Authorize(Roles = SystemRoles.Admin + "," + SystemRoles.SourcingOfficer + "," + SystemRoles.SourcingManager + "," + SystemRoles.TopCommittee)]
-    public class AnalyticsController(ReportingService reports, ReportExport export) : Controller
+    public class AnalyticsController(ReportingService reports, ReportExport export, AdminService admin, TenderWorkflowService workflow) : Controller
     {
         // Who may open which report. Admin takes no part in evaluations; management statistics belong to the Top Committee.
         public static readonly Dictionary<string, string[]> Audience = new()
@@ -24,7 +24,20 @@ namespace Orange_Tendering_System.Controllers
 
         private bool Allowed(string key) => Audience.TryGetValue(key, out var roles) && roles.Any(User.IsInRole);
 
-        public IActionResult Index() => View(ReportingService.Catalog.Where(c => Allowed(c.Key)).ToList());
+        public async Task<IActionResult> Index()
+        {
+            if (User.IsInRole(SystemRoles.Admin))
+            {
+                var model = await admin.GetBusinessOverviewAsync();
+                var evaluation = await workflow.StandingCommittee("Evaluation", User);
+                var top = await workflow.StandingCommittee("Top", User);
+                model.EvaluationReadySeats = evaluation.Slots.Count(x => x.SelectedId != null && x.Candidates.Any(c => c.Value == x.SelectedId));
+                model.TopReadySeats = top.Slots.Count(x => x.SelectedId != null && x.Candidates.Any(c => c.Value == x.SelectedId));
+                return View("AdminOverview", model);
+            }
+
+            return View(ReportingService.Catalog.Where(c => Allowed(c.Key)).ToList());
+        }
 
         public Task<IActionResult> PurchaseRequests() => Show("purchase-requests");
         public Task<IActionResult> Tenders() => Show("tenders");

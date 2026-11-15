@@ -1,0 +1,6 @@
+---
+name: orange-paper-genesis
+description: Build and review continuous paper-folding supplier registration motion from planar drawing to actual 3D pop-up architecture, category changes, documents and camera face enrollment.
+---
+# Registration motion workflow
+Read `design/MOTION_SPEC.md`, `design/ART_DIRECTION.md`, `design/ASSET_MANIFEST.md` and `design/QA_GATES.md` at repository root. Apply shots R00–R11. Use one scene root with stable anchors; SVG/GSAP for planar drawing or orthographic planar WebGL; hand off to real geometry only on matched silhouettes. For walls/roof, animate hinge pivot rotation, not scale-up or disconnected overlays. Keep base fixed across all 11 category kits. Use actual meshes and expose orbit/wireframe QA in isolated dev lab. Capture intermediate frames, reverse and interrupted states. Connect only sanitized form state and confirmed backend events in production. Camera opens after user action and secure permission; stop tracks on cancel/dispose; a photo is not a verified identity. No fake registration/enrollment. No raw biometrics or secrets in logs or design files. Fingerprint disabled. Keep email verification and pending approval policy intact. First build a standalone proof and stop at G2 until user approves; do not touch real auth routes in first phase.

@@ -1,0 +1,49 @@
+@model string
+@{
+    var pending = ViewData["RequestMotionPending"] is true;
+    var fresh = ViewData["RequestMotionFresh"] is true;
+    var status = ViewData["RequestMotionStatus"]?.ToString() ?? "Recorded";
+    var heading = pending ? "Submitting your request" : status == "Draft" ? "Draft saved" : status == "Submitted" ? "Request submitted" : "Request recorded";
+    var description = pending ? "Your request is being saved. Please wait for confirmation."
+        : status == "Draft" ? $"PR-{Model} is saved as a draft and can be submitted when ready."
+        : status == "Submitted" ? $"PR-{Model} is with the Sourcing Officer for review."
+        : $"PR-{Model} is recorded. Current status: {status}.";
+}
+<section class="dr-motion @(pending ? "dr-motion--pending" : fresh ? "dr-motion--confirmed dr-motion--fresh" : "dr-motion--confirmed")"
+         data-request-motion-pending="@(pending ? "true" : null)"
+         role="status" aria-live="polite" aria-atomic="true" hidden="@pending">
+    <div class="dr-motion-copy">
+        <span class="dr-motion-eyebrow">ORANGE SOURCING <span aria-hidden="true">/</span> PURCHASE REQUEST</span>
+        <h2 id="request-motion-title">@heading</h2>
+        <p id="request-motion-description">@description</p>
+    </div>
+    <div class="dr-motion-stages" aria-hidden="true">
+        <div class="dr-motion-step">
+            <span class="dr-motion-icon dr-motion-icon--processing">
+                <svg viewBox="0 0 80 80"><circle class="dr-motion-arc" cx="40" cy="40" r="27" pathLength="100"/><circle cx="40" cy="40" r="5" fill="currentColor"/></svg>
+            </span>
+            <span>Processing</span>
+        </div>
+        <span class="dr-motion-arrow">→</span>
+        <div class="dr-motion-step">
+            <span class="dr-motion-icon dr-motion-icon--assembling">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="31"/><path d="M40 40V9M40 40l27-15M40 40l27 15M40 40v31M40 40 13 55M40 40 13 25"/></svg>
+            </span>
+            <span>Assembling</span>
+        </div>
+        <span class="dr-motion-arrow">→</span>
+        <div class="dr-motion-step">
+            <span class="dr-motion-icon dr-motion-icon--success">
+                <svg viewBox="0 0 80 88"><path class="dr-motion-leaf" d="M43 8c3-9 12-11 22-8-4 8-11 12-22 8Z"/><circle cx="40" cy="47" r="33"/><path class="dr-motion-highlight" d="M18 35c5-10 12-15 22-16"/><path class="dr-motion-check" d="m25 48 11 11 20-23"/></svg>
+            </span>
+            <span>Success</span>
+        </div>
+        <span class="dr-motion-arrow">→</span>
+        <div class="dr-motion-step">
+            <span class="dr-motion-icon dr-motion-icon--complete">
+                <svg viewBox="0 0 80 80"><rect x="5" y="5" width="70" height="70" rx="13"/><path d="m23 41 14 14 23-27"/></svg>
+            </span>
+            <span>Complete</span>
+        </div>
+    </div>
+</section>

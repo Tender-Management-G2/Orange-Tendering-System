@@ -81,7 +81,7 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
     [HttpPost] public Task<IActionResult> ReviewAi(int id, int analysisId) => Execute(id, () => Workflow.ReviewAi(id, analysisId, User));
     [HttpPost] public Task<IActionResult> RegenerateReport(int id) => Execute(id, () => Workflow.RegenerateReport(id, User));
     [HttpPost] public Task<IActionResult> Forward(int id) => Execute(id, () => Workflow.Forward(id, User));
-    [HttpPost] public Task<IActionResult> AssignTop(int id, string[] memberIds) => Execute(id, () => Workflow.AssignTop(id, memberIds, User));
+    [HttpPost] public Task<IActionResult> AssignTop(int id, Dictionary<TopExecutivePosition, string> executives) => Execute(id, () => Workflow.AssignTop(id, executives, User));
     [HttpPost] public Task<IActionResult> Award(int id) => Execute(id, () => Workflow.Award(id, User));
     [HttpPost, RequestSizeLimit(21 * 1024 * 1024)] public Task<IActionResult> Upload(int id, IFormFile file, CancellationToken ct) => Execute(id, () => Documents.Upload(id, null, file, User, ct));
 }

@@ -1,57 +1,51 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Services;
 
-/// <summary>Development-only data for walking the sourcing workflow. Never invoked in Production.</summary>
+/// <summary>
+/// Optional demo fixtures (DemoData:Enabled) for walking the sourcing workflow: approved demo suppliers, purchase requests,
+/// tenders, offers and reports. Development and the local team database only (Program.cs); never in Production.
+/// Internal people are NOT created here: every fixture uses the canonical team accounts of <see cref="TeamAccountSeeder"/>
+/// (officer, department, Sourcing Manager and the three evaluators, Top Committee). Databases seeded by earlier versions keep
+/// their historical rows and accounts; only new fixture rows use the team accounts.
+/// </summary>
 public static class DemoDataSeeder
 {
-    public const string Password = "OrangeDemo2026!";
+    public const string Password = TeamAccountSeeder.Password;
+
+    /// <summary>The canonical team accounts the fixtures are attached to.</summary>
+    private sealed record Team(ApplicationUser Officer, ApplicationUser Requester, ApplicationUser Manager, int DepartmentId, IReadOnlyList<ApplicationUser> Committee);
+
+    private static async Task<Team> TeamAsync(ApplicationDbContext db, UserManager<ApplicationUser> users)
+    {
+        async Task<ApplicationUser> One(string role)
+        {
+            var email = TeamAccountSeeder.Find(role).Email;
+            return await users.FindByEmailAsync(email)
+                ?? throw new InvalidOperationException($"Demo data needs the team account {email}; team account provisioning must run first.");
+        }
+        var departmentId = await db.Departments.Where(d => d.Name == TeamAccountSeeder.DepartmentName).Select(d => d.Id).SingleAsync();
+        var manager = await One(SystemRoles.SourcingManager);
+        // Same order as AddCommittee: Sourcing Manager, Department Representative, Financial, Technical.
+        var committee = new[] { manager, await One(SystemRoles.DepartmentRepresentative), await One(SystemRoles.Finance), await One(SystemRoles.Technical) };
+        return new Team(await One(SystemRoles.SourcingOfficer), await One(SystemRoles.RequestingDepartment), manager, departmentId, committee);
+    }
 
     public static async Task SeedAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        if (await db.Departments.AnyAsync(d => d.Name == "DEMO - Information Technology"))
+        var team = await TeamAsync(db, users);
+        if (await db.Departments.AnyAsync(d => d.Name == "DEMO - Information Technology") ||
+            await db.Tenders.AnyAsync(t => t.Title.StartsWith("DEMO Tender - ")))
         {
-            var existingDepartment = await db.Departments
-                .SingleAsync(d => d.Name == "DEMO - Information Technology");
-            var departmentRepresentative = await EnsureDepartmentRepresentativeAccountAsync(users, existingDepartment.Id);
-            var existingTopCommitteeUsers = await EnsureTopCommitteeAccountsAsync(users);
-            var topCommitteeTender = await db.Tenders
-                .Include(tender => tender.CommitteeMembers)
-                .SingleOrDefaultAsync(tender => tender.Title == "DEMO Tender - Wi-Fi equipment report approved");
-            if (topCommitteeTender != null)
-            {
-                foreach (var member in existingTopCommitteeUsers)
-                {
-                    if (!topCommitteeTender.CommitteeMembers.Any(existing => existing.UserId == member.Id))
-                    {
-                        topCommitteeTender.CommitteeMembers.Add(new CommitteeMember
-                        {
-                            UserId = member.Id,
-                            CommitteeType = CommitteeType.Top,
-                            AssignedAt = DateTime.UtcNow
-                        });
-                    }
-                }
-            }
-
-            var departmentSeats = await db.CommitteeMembers
-                .Include(member => member.Tender)
-                .Where(member => member.CommitteeType == CommitteeType.Evaluation
-                    && member.Responsibility == CommitteeResponsibility.DepartmentRepresentative
-                    && member.Tender.Title.StartsWith("DEMO"))
-                .ToListAsync();
-            foreach (var seat in departmentSeats)
-            {
-                seat.UserId = departmentRepresentative.Id;
-            }
-
+            await EnsureDemoSuppliersAsync(db, users);
             // Add newly introduced demo pieces to an existing sample database as well.
             var demoRounds = await db.TenderRounds.Include(r => r.Tender)
                 .Where(r => r.Tender.Title.StartsWith("DEMO") && r.Status == TenderRoundStatus.Open && r.Tender.Status == TenderStatus.Bidding)
@@ -64,7 +58,8 @@ public static class DemoDataSeeder
             }
             await db.SaveChangesAsync();
 
-            var existingOfficer = await users.FindByEmailAsync("officer@orange-demo.local");
+            // New fixture rows go to the active team officer; historical rows keep their original people.
+            var existingOfficer = team.Officer;
             var existingSupplier = await users.FindByEmailAsync("supplier3@orange-demo.local");
             var existingBid = await db.Bids.Include(b => b.TenderInvitation).ThenInclude(i => i.TenderRound).ThenInclude(r => r.Tender)
                 .SingleOrDefaultAsync(b => b.TenderInvitation.TenderRound.Tender.Title == "DEMO Tender - Laptops ready for committee" && b.ComplianceStatus == ComplianceStatus.NonCompliant);
@@ -75,40 +70,26 @@ public static class DemoDataSeeder
                 if (demoSupplier != null) demoSupplier.Category = demoCategories[i - 1];
             }
             await db.SaveChangesAsync();
-            if (existingOfficer != null && existingSupplier != null && existingBid != null && !await db.Clarifications.AnyAsync(c => c.BidId == existingBid.Id && c.Subject == "DEMO - Warranty document question"))
+            if (existingSupplier != null && existingBid != null && !await db.Clarifications.AnyAsync(c => c.BidId == existingBid.Id && c.Subject == "DEMO - Warranty document question"))
             {
                 db.Clarifications.Add(new Clarification { BidId = existingBid.Id, FromUserId = existingSupplier.Id, ToUserId = existingOfficer.Id, Subject = "DEMO - Warranty document question", Status = ClarificationStatus.Open, CreatedAt = DateTime.UtcNow.AddHours(-2), Messages = { new ClarificationMessage { SenderUserId = existingSupplier.Id, Message = "I uploaded the warranty document. Could you confirm it is the required form?", SentAt = DateTime.UtcNow.AddHours(-2) } } });
                 db.Notifications.Add(new Notification { UserId = existingOfficer.Id, Title = "Supplier clarification", Message = "A supplier sent a message about a submitted offer.", Link = "/Clarifications", CreatedAt = DateTime.UtcNow.AddHours(-2) });
                 await db.SaveChangesAsync();
             }
-            if (existingOfficer != null)
-            {
-                var demoSuppliers = await db.Suppliers.Where(s => s.CompanyName.StartsWith("DEMO Supplier "))
-                    .OrderBy(s => s.CompanyName).Take(4).ToListAsync();
-                var demoCommittee = new List<ApplicationUser>();
-                for (var i = 1; i <= 4; i++)
-                {
-                    var member = await users.FindByEmailAsync($"committee{i}@orange-demo.local");
-                    if (member != null) demoCommittee.Add(member);
-                }
-                await EnsureThreeAttemptExceptionDemoAsync(db, existingOfficer, demoSuppliers, demoCommittee);
-            }
+            var demoSuppliers = await db.Suppliers.Where(s => s.CompanyName.StartsWith("DEMO Supplier "))
+                .OrderBy(s => s.CompanyName).Take(4).ToListAsync();
+            await EnsureThreeAttemptExceptionDemoAsync(db, team, demoSuppliers);
             return;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync();
         var now = DateTime.UtcNow;
-        var department = new Department { Name = "DEMO - Information Technology", Description = "Development sample data", IsActive = true };
-        db.Departments.Add(department);
-        await db.SaveChangesAsync();
-
-        var officer = await CreateUser("officer@orange-demo.local", "Demo Sourcing Officer", SystemRoles.SourcingOfficer, department.Id);
-        var requester = await CreateUser("requester@orange-demo.local", "Demo Requester", SystemRoles.RequestingDepartment, department.Id);
-        var manager = await CreateUser("manager@orange-demo.local", "Demo Sourcing Manager", SystemRoles.SourcingManager, null);
-        var committeeUsers = new List<ApplicationUser>();
-        for (var i = 1; i <= 4; i++) committeeUsers.Add(await CreateUser($"committee{i}@orange-demo.local", $"Demo Evaluator {i}", SystemRoles.EvaluationCommittee, null));
-        committeeUsers[1] = await EnsureDepartmentRepresentativeAccountAsync(users, department.Id);
-        var topCommitteeUsers = await EnsureTopCommitteeAccountsAsync(users);
+        // Requests belong to the team department; the team officer, manager and evaluators handle them.
+        var department = await db.Departments.SingleAsync(d => d.Id == team.DepartmentId);
+        var officer = team.Officer;
+        var requester = team.Requester;
+        var manager = team.Manager;
+        var committeeUsers = team.Committee;
 
         var supplierUsers = new List<(Supplier Supplier, ApplicationUser User)>();
         for (var i = 1; i <= 4; i++)
@@ -167,7 +148,6 @@ public static class DemoDataSeeder
         AddCommittee(returnedTender, committeeUsers, now);
         AddCommittee(rejectedTender, committeeUsers, now);
         AddCommittee(acceptedTender, committeeUsers, now);
-        AddTopCommittee(acceptedTender, topCommitteeUsers, now);
         AddCommittee(committeeReadyTender, committeeUsers, now);
         await db.SaveChangesAsync();
         AddEvaluationReport(evalTender, committeeUsers[0].Id, manager.Id, now, ReportStatus.Submitted, "Committee report submitted; ready for officer review.");
@@ -197,9 +177,11 @@ public static class DemoDataSeeder
         db.Clarifications.Add(clarificationThread);
         db.Notifications.Add(new Notification { UserId = officer.Id, Title = "Supplier clarification", Message = "A supplier sent a message about a submitted offer.", Link = "/Clarifications", CreatedAt = now.AddHours(-2) });
         await db.SaveChangesAsync();
-        await EnsureThreeAttemptExceptionDemoAsync(db, officer, supplierUsers.Select(x => x.Supplier).ToList(), committeeUsers);
+        await EnsureThreeAttemptExceptionDemoAsync(db, team, supplierUsers.Select(x => x.Supplier).ToList());
         await transaction.CommitAsync();
+        await EnsureDemoSuppliersAsync(db, users);
 
+        // Demo supplier users only; internal people are the team accounts.
         async Task<ApplicationUser> CreateUser(string email, string name, string role, int? departmentId, int? supplierId = null)
         {
             var user = await users.FindByEmailAsync(email);
@@ -218,13 +200,72 @@ public static class DemoDataSeeder
         }
     }
 
-    private static async Task EnsureThreeAttemptExceptionDemoAsync(
-        ApplicationDbContext db,
-        ApplicationUser officer,
-        IReadOnlyList<Supplier> suppliers,
-        IReadOnlyList<ApplicationUser> committeeUsers)
+    /// <summary>The ten approved demo suppliers and their supplier accounts (fixtures, not team accounts).</summary>
+    private static async Task EnsureDemoSuppliersAsync(ApplicationDbContext db, UserManager<ApplicationUser> users)
     {
-        if (!officer.DepartmentId.HasValue || suppliers.Count < 2 || committeeUsers.Count < 4) return;
+        // The original four suppliers are used by the prebuilt tender scenarios. Add the
+        // remaining six without changing invitations, bids, or supplier review decisions.
+        var categories = new[]
+        {
+            SupplierCategories.InformationTechnology, SupplierCategories.OfficeSupplies,
+            SupplierCategories.Furniture, SupplierCategories.ProfessionalServices,
+            SupplierCategories.Construction, SupplierCategories.Transport,
+            SupplierCategories.Medical, SupplierCategories.Food,
+            SupplierCategories.Facilities, SupplierCategories.Telecommunications
+        };
+        for (var i = 1; i <= 10; i++)
+        {
+            var email = $"supplier{i}@orange-demo.local";
+            var registration = $"DEMO-REG-{i:000}";
+            var supplier = await db.Suppliers.SingleOrDefaultAsync(s => s.RegistrationNumber == registration);
+            if (supplier == null)
+            {
+                supplier = new Supplier
+                {
+                    CompanyName = $"DEMO Supplier {i}", RegistrationNumber = registration,
+                    TaxNumber = $"DEMO-TAX-{i:000}", Email = email,
+                    Phone = $"+9627900000{i:00}", Address = "Amman, Jordan",
+                    Category = categories[i - 1], Status = SupplierStatus.Approved,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.Suppliers.Add(supplier);
+                await db.SaveChangesAsync();
+            }
+            if (supplier.Email != email)
+                throw new InvalidOperationException($"Demo registration number {registration} belongs to a different email.");
+
+            var account = await users.FindByEmailAsync(email);
+            if (account == null)
+            {
+                account = new ApplicationUser
+                {
+                    UserName = email, Email = email, EmailConfirmed = true,
+                    FullName = $"Demo Supplier User {i}", SupplierId = supplier.Id,
+                    IsActive = true, MustChangePassword = false
+                };
+                var created = await users.CreateAsync(account, Password);
+                if (!created.Succeeded)
+                    throw new InvalidOperationException($"Demo supplier account creation failed for {email}: {string.Join(", ", created.Errors.Select(e => e.Code))}");
+            }
+            if (account.SupplierId != supplier.Id)
+                throw new InvalidOperationException($"Demo supplier email {email} belongs to another account.");
+            if (!account.FullName.StartsWith("Demo Supplier User ", StringComparison.Ordinal) ||
+                (await users.GetRolesAsync(account)).Any(role => role != SystemRoles.Supplier))
+                throw new InvalidOperationException($"Demo supplier email {email} belongs to a non-demo account.");
+            if (!await users.IsInRoleAsync(account, SystemRoles.Supplier))
+            {
+                var assigned = await users.AddToRoleAsync(account, SystemRoles.Supplier);
+                if (!assigned.Succeeded) throw new InvalidOperationException($"Could not assign Supplier role to {email}.");
+            }
+        }
+
+    }
+
+    private static async Task EnsureThreeAttemptExceptionDemoAsync(ApplicationDbContext db, Team team, IReadOnlyList<Supplier> suppliers)
+    {
+        var officer = team.Officer;
+        var committeeUsers = team.Committee;
+        if (suppliers.Count < 2) return;
 
         const string tenderTitle = "DEMO Tender - Limited supplier response (3 attempts)";
         var existingTender = await db.Tenders.AsNoTracking().AnyAsync(t => t.Title == tenderTitle);
@@ -233,8 +274,8 @@ public static class DemoDataSeeder
         var now = DateTime.UtcNow;
         var request = new PurchaseRequest
         {
-            DepartmentId = officer.DepartmentId.Value,
-            CreatedByUserId = officer.Id,
+            DepartmentId = team.DepartmentId,
+            CreatedByUserId = team.Requester.Id,
             Title = "DEMO - Limited supplier response request",
             Justification = "Test the three-attempt exception when only two suppliers submit offers per attempt.",
             Priority = RequestPriority.High,
@@ -328,110 +369,6 @@ public static class DemoDataSeeder
     {
         var seats = new[] { CommitteeResponsibility.SourcingManager, CommitteeResponsibility.DepartmentRepresentative, CommitteeResponsibility.FinancialRepresentative, CommitteeResponsibility.TechnicalRepresentative };
         for (var i = 0; i < seats.Length; i++) tender.CommitteeMembers.Add(new CommitteeMember { UserId = users[i].Id, CommitteeType = CommitteeType.Evaluation, Responsibility = seats[i], AssignedAt = now.AddDays(-10) });
-    }
-
-    private static void AddTopCommittee(Tender tender, IReadOnlyList<ApplicationUser> users, DateTime now)
-    {
-        foreach (var user in users)
-        {
-            tender.CommitteeMembers.Add(new CommitteeMember
-            {
-                UserId = user.Id,
-                CommitteeType = CommitteeType.Top,
-                AssignedAt = now.AddDays(-1)
-            });
-        }
-    }
-
-    private static async Task<List<ApplicationUser>> EnsureTopCommitteeAccountsAsync(UserManager<ApplicationUser> users)
-    {
-        var accounts = new[]
-        {
-            ("ceo@orange-demo.local", "Demo CEO — Chief Executive Officer"),
-            ("cfo@orange-demo.local", "Demo CFO — Chief Financial Officer"),
-            ("coo@orange-demo.local", "Demo COO — Chief Operating Officer"),
-            ("cpo@orange-demo.local", "Demo CPO — Chief Procurement Officer")
-        };
-        var result = new List<ApplicationUser>();
-        foreach (var (email, fullName) in accounts)
-        {
-            var user = await users.FindByEmailAsync(email);
-            if (user == null)
-            {
-                user = new ApplicationUser
-                {
-                    UserName = email,
-                    Email = email,
-                    EmailConfirmed = true,
-                    FullName = fullName,
-                    IsActive = true,
-                    MustChangePassword = false
-                };
-                var created = await users.CreateAsync(user, Password);
-                if (!created.Succeeded)
-                {
-                    throw new InvalidOperationException($"Top Committee demo account creation failed for {email}: {string.Join(", ", created.Errors.Select(error => error.Code))}");
-                }
-            }
-            if (!await users.IsInRoleAsync(user, SystemRoles.TopCommittee))
-            {
-                var assigned = await users.AddToRoleAsync(user, SystemRoles.TopCommittee);
-                if (!assigned.Succeeded)
-                {
-                    throw new InvalidOperationException($"Could not assign the Top Committee role to {email}.");
-                }
-            }
-            result.Add(user);
-        }
-        return result;
-    }
-
-    private static async Task<ApplicationUser> EnsureDepartmentRepresentativeAccountAsync(
-        UserManager<ApplicationUser> users,
-        int departmentId)
-    {
-        const string email = "department.representative@orange-demo.local";
-        var user = await users.FindByEmailAsync(email);
-        if (user == null)
-        {
-            user = new ApplicationUser
-            {
-                UserName = email,
-                Email = email,
-                EmailConfirmed = true,
-                FullName = "Demo Department Representative",
-                DepartmentId = departmentId,
-                IsActive = true,
-                MustChangePassword = false
-            };
-            var created = await users.CreateAsync(user, Password);
-            if (!created.Succeeded)
-            {
-                throw new InvalidOperationException($"Department Representative demo account creation failed: {string.Join(", ", created.Errors.Select(error => error.Code))}");
-            }
-        }
-        else
-        {
-            user.FullName = "Demo Department Representative";
-            user.DepartmentId = departmentId;
-            user.IsActive = true;
-            user.MustChangePassword = false;
-            var updated = await users.UpdateAsync(user);
-            if (!updated.Succeeded)
-            {
-                throw new InvalidOperationException($"Department Representative demo account update failed: {string.Join(", ", updated.Errors.Select(error => error.Code))}");
-            }
-        }
-
-        if (!await users.IsInRoleAsync(user, SystemRoles.EvaluationCommittee))
-        {
-            var assigned = await users.AddToRoleAsync(user, SystemRoles.EvaluationCommittee);
-            if (!assigned.Succeeded)
-            {
-                throw new InvalidOperationException("Could not assign the Evaluation Committee role to the Department Representative demo account.");
-            }
-        }
-        return user;
     }
 
     private static void AddEvaluationReport(Tender tender, string creatorId, string managerId, DateTime now, ReportStatus status, string comment)

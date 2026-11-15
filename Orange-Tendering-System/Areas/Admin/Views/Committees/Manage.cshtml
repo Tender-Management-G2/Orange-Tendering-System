@@ -1,0 +1,79 @@
+@model AdminCommitteeManageViewModel
+@{
+    ViewData["Title"] = "Manage Committees";
+    ViewData["WorkspaceSection"] = "Committees";
+    ViewData["Description"] = $"Tender #{Model.TenderId} · {Model.TenderTitle} · {Model.Status}";
+    var returnUrl = Url.Action("Manage", "Committees", new { area = "Admin", id = Model.TenderId })!;
+    AdminCommitteeSeatInput Seat(string field, string title, string hint, string role, string? selected,
+        List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> options, bool locked) => new(field, title, hint, role, selected, options, returnUrl, locked);
+}
+<partial name="_PageHeader" />
+@if (TempData["SuccessMessage"] is string success)
+{
+    <p class="pg-note" role="status">@success</p>
+}
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
+<nav class="pg-actions" aria-label="Committee navigation">
+    <a href="#evaluation-committee" class="pg-btn">Evaluation Committee</a>
+    <a href="#top-committee" class="pg-btn">Top Committee</a>
+    <a asp-area="Admin" asp-controller="Committees" asp-action="Assignments" class="pg-btn">Back to Tenders</a>
+</nav>
+
+<section id="evaluation-committee" class="ws-panel pg-panel admin-committee-panel">
+    <div class="pg-panel-head"><div><h2>Evaluation Committee</h2><p>Four distinct members · Two technical, one manager and one financial representative</p></div><span class="pg-status">@(Model.EvaluationLocked ? "Locked" : "Editable")</span></div>
+    @if (Model.HasLegacyEvaluationSeat)
+    {
+        <p class="pg-hint">This tender has a legacy Department Representative seat. Existing history is preserved. If editable, select Technical Member 2 to use the new composition.</p>
+    }
+    @if (Model.EvaluationLocked)
+    {
+        <p class="pg-hint">Evaluation membership is read only once weight preparation or evaluation has started, or the tender has left Draft.</p>
+    }
+    <form asp-area="Admin" asp-controller="Committees" asp-action="Save" asp-route-id="@Model.TenderId" method="post" class="pg-form" data-committee-form>
+        <input type="hidden" name="TenderId" value="@Model.TenderId" />
+        <input type="hidden" name="Version" value="@Model.Version" />
+        <input type="hidden" name="CommitteeType" value="Evaluation" />
+        <div class="admin-committee-grid">
+            <partial name="_CommitteeSeat" model='Seat("MemberOneId", "Sourcing Manager", "Manager seat and report review authority.", SystemRoles.SourcingManager, Model.SourcingManagerId, Model.Managers, Model.EvaluationLocked)' />
+            <partial name="_CommitteeSeat" model='Seat("MemberTwoId", "Technical Member 1", "First technical representative.", SystemRoles.EvaluationCommittee, Model.TechnicalOneId, Model.Evaluators, Model.EvaluationLocked)' />
+            <partial name="_CommitteeSeat" model='Seat("MemberThreeId", "Technical Member 2", "Second technical representative; must be a different person.", SystemRoles.EvaluationCommittee, Model.TechnicalTwoId, Model.Evaluators, Model.EvaluationLocked)' />
+            <partial name="_CommitteeSeat" model='Seat("MemberFourId", "Financial Representative", "Financial seat within the evaluation committee.", SystemRoles.EvaluationCommittee, Model.FinancialId, Model.Evaluators, Model.EvaluationLocked)' />
+        </div>
+        @if (!Model.EvaluationLocked) { <button type="submit" class="pg-btn pg-btn-primary">Save Evaluation Committee</button> }
+    </form>
+</section>
+
+<section id="top-committee" class="ws-panel pg-panel admin-committee-panel">
+    <div class="pg-panel-head"><div><h2>Top Committee</h2><p>Four distinct members · One CEO and three committee members</p></div><span class="pg-status">@(Model.TopLocked ? "Locked" : "Editable")</span></div>
+    <p class="pg-hint">All four accounts use the Top Committee role. CEO is the member's responsibility within this tender; each member retains one vote.</p>
+    @if (Model.TopLocked) { <p class="pg-hint">Membership is read only after Top Committee voting/signing has started or the tender has closed.</p> }
+    <form asp-area="Admin" asp-controller="Committees" asp-action="Save" asp-route-id="@Model.TenderId" method="post" class="pg-form" data-committee-form>
+        <input type="hidden" name="TenderId" value="@Model.TenderId" />
+        <input type="hidden" name="Version" value="@Model.Version" />
+        <input type="hidden" name="CommitteeType" value="Top" />
+        <div class="admin-committee-grid">
+            <partial name="_CommitteeSeat" model='Seat("TopMemberOne", "CEO", "Chief Executive Officer seat.", SystemRoles.TopCommittee, Model.CeoId, Model.TopMembers, Model.TopLocked)' />
+            <partial name="_CommitteeSeat" model='Seat("TopMemberTwo", "Committee Member 1", "Top Committee decision and voting authority.", SystemRoles.TopCommittee, Model.TopMemberOneId, Model.TopMembers, Model.TopLocked)' />
+            <partial name="_CommitteeSeat" model='Seat("TopMemberThree", "Committee Member 2", "Top Committee decision and voting authority.", SystemRoles.TopCommittee, Model.TopMemberTwoId, Model.TopMembers, Model.TopLocked)' />
+            <partial name="_CommitteeSeat" model='Seat("TopMemberFour", "Committee Member 3", "Top Committee decision and voting authority.", SystemRoles.TopCommittee, Model.TopMemberThreeId, Model.TopMembers, Model.TopLocked)' />
+        </div>
+        @if (!Model.TopLocked) { <button type="submit" class="pg-btn pg-btn-primary">Save Top Committee</button> }
+    </form>
+</section>
+
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Current saved assignments</h2></div>
+    <div class="pg-table-wrap"><table class="pg-table" data-no-enhance>
+        <thead><tr><th>Committee</th><th>Seat</th><th>Name</th><th>Email</th><th>Account</th></tr></thead>
+        <tbody>
+            @if (Model.CurrentSeats.Count == 0) { <tr><td colspan="5">No committee members assigned yet.</td></tr> }
+            @foreach (var member in Model.CurrentSeats)
+            {
+                <tr data-search-item><td>@member.Committee</td><td>@member.Seat</td><td>@member.Name</td><td>@member.Email</td><td>@(member.Active ? "Active" : "Inactive")</td></tr>
+            }
+        </tbody>
+    </table></div>
+</section>
+@section Scripts {
+    <script src="~/js/admin-committees.js" asp-append-version="true"></script>
+}

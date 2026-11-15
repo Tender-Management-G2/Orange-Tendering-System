@@ -1,0 +1,164 @@
+{
+  "capturedAt": "2026-11-14T13:52:33.769Z",
+  "browser": "Microsoft Edge",
+  "version": "157.0.4341.60",
+  "url": "http://127.0.0.1:4173",
+  "files": [
+    "paper-desktop-000.png",
+    "paper-desktop-025.png",
+    "paper-desktop-050.png",
+    "paper-desktop-075.png",
+    "paper-desktop-100.png",
+    "signal-desktop-000.png",
+    "signal-desktop-025.png",
+    "signal-desktop-050.png",
+    "signal-desktop-075.png",
+    "signal-desktop-100.png",
+    "paper-mobile-000.png",
+    "paper-mobile-025.png",
+    "paper-mobile-050.png",
+    "paper-mobile-075.png",
+    "paper-mobile-100.png",
+    "signal-mobile-000.png",
+    "signal-mobile-025.png",
+    "signal-mobile-050.png",
+    "signal-mobile-075.png",
+    "signal-mobile-100.png",
+    "paper-telecom-category.png",
+    "paper-construction-category.png",
+    "paper-wireframe.png",
+    "paper-orbit.png",
+    "paper-playback.webm",
+    "signal-playback.webm",
+    "paper-orbit.webm",
+    "paper-categories.webm"
+  ],
+  "metrics": [
+    {
+      "mode": "paper",
+      "viewport": [
+        953,
+        650
+      ],
+      "rafFps": 166,
+      "pixelRatio": 1,
+      "calls": 181,
+      "triangles": 1769,
+      "points": 0,
+      "lines": 181
+    },
+    {
+      "mode": "signal",
+      "viewport": [
+        953,
+        650
+      ],
+      "rafFps": 166,
+      "pixelRatio": 1,
+      "calls": 246,
+      "triangles": 10311,
+      "points": 0,
+      "lines": 44
+    },
+    {
+      "mode": "paper",
+      "viewport": [
+        364,
+        385
+      ],
+      "rafFps": 166,
+      "pixelRatio": 1,
+      "calls": 174,
+      "triangles": 1721,
+      "points": 0,
+      "lines": 169
+    },
+    {
+      "mode": "signal",
+      "viewport": [
+        364,
+        385
+      ],
+      "rafFps": 166,
+      "pixelRatio": 1,
+      "calls": 246,
+      "triangles": 10311,
+      "points": 0,
+      "lines": 44
+    }
+  ],
+  "checks": {
+    "desktopPageErrors": [],
+    "desktopUserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "desktopWebGLRenderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x00009A60) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "desktopFingerprintDisabled": true,
+    "mobilePageErrors": [],
+    "mobileUserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "mobileWebGLRenderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x00009A60) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "mobileFingerprintDisabled": true,
+    "orbit": {
+      "mode": "paper",
+      "progress": 0.83,
+      "category": "Construction & Maintenance",
+      "categoryMix": 1,
+      "playing": false,
+      "reducedMotion": false,
+      "orbit": true,
+      "wireframe": false,
+      "errors": []
+    },
+    "wireframeEnabled": true,
+    "reverseProgress": 0.7420347826086976,
+    "rapidModeSwitch": {
+      "mode": "signal",
+      "progress": 0,
+      "category": "Construction & Maintenance",
+      "categoryMix": 1,
+      "playing": false,
+      "reducedMotion": false,
+      "orbit": false,
+      "wireframe": false,
+      "errors": []
+    },
+    "reducedMotionInitiallyChecked": true,
+    "reducedMotionEndpoint": {
+      "mode": "paper",
+      "progress": 1,
+      "category": "IT & Electronics",
+      "categoryMix": 1,
+      "playing": false,
+      "reducedMotion": true,
+      "orbit": false,
+      "wireframe": false
+    },
+    "webglFallbackVisible": true,
+    "paperPlayback": {
+      "state": {
+        "mode": "paper",
+        "progress": 1,
+        "category": "IT & Electronics",
+        "categoryMix": 1,
+        "playing": false,
+        "reducedMotion": false,
+        "orbit": false,
+        "wireframe": false
+      },
+      "errors": []
+    },
+    "signalPlayback": {
+      "state": {
+        "mode": "signal",
+        "progress": 1,
+        "category": "IT & Electronics",
+        "categoryMix": 1,
+        "playing": false,
+        "reducedMotion": false,
+        "orbit": false,
+        "wireframe": false
+      },
+      "errors": []
+    },
+    "orbitRecordingErrors": [],
+    "categoriesRecordingErrors": []
+  }
+}

@@ -56,6 +56,10 @@ bell (SignalR), modal host and table kit (wwwroot/js/orange-ui.js).
     {
         <link rel="stylesheet" href="~/css/sourcing-officer.css" asp-append-version="true" />
     }
+    @if (string.Equals(workspace?.Role, Orange_Tendering_System.Models.SystemRoles.SourcingManager, StringComparison.OrdinalIgnoreCase))
+    {
+        <link rel="stylesheet" href="~/css/sourcing-manager.css" asp-append-version="true" />
+    }
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="ws-shell ws-internal" data-workspace-role="@(workspace?.Role ?? "Signed-in user")">
@@ -96,6 +100,10 @@ bell (SignalR), modal host and table kit (wwwroot/js/orange-ui.js).
     <partial name="_JQueryScripts" />
     <script src="~/js/orange-ui.js" asp-append-version="true"></script>
     <script src="~/js/ai-chat.js" asp-append-version="true"></script>
+    @if (string.Equals(workspace?.Role, Orange_Tendering_System.Models.SystemRoles.SourcingManager, StringComparison.OrdinalIgnoreCase))
+    {
+        <script src="~/js/sourcing-manager-filters.js" asp-append-version="true"></script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

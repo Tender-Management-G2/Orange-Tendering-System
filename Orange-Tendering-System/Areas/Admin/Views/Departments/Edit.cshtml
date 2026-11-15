@@ -1,30 +1,8 @@
+
 @*
-===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Rjoub
 PAGE: Edit Department
-
-DEVELOPER OWNER: Rjoub
-MODULE: Administration
-TRELLO TASK: Department Management
-TRELLO URL: https://trello.com/c/KHRsEmzE
-
-PURPOSE:
-Form to rename, describe or deactivate a department.
-
-BUSINESS ACCESS:
-Admin
-
-ROUTE: /Admin/Departments/Edit/{id?}
-
-FUTURE IMPLEMENTATION:
-- Load by id; POST Edit; audit changes.
-
-DEPENDENCIES:
-Departments, PurchaseRequests, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
 *@
 
 @model EditDepartmentViewModel
@@ -32,7 +10,8 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 @{
     ViewData["Title"] = "Edit Department";
     ViewData["WorkspaceSection"] = "Departments";
-    ViewData["Description"] = "Update department information and status.";
+    ViewData["Description"] =
+        "Update department information and employee assignments.";
 }
 
 <partial name="_PageHeader" />
@@ -74,28 +53,75 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                 </small>
             </div>
 
-            <!-- Department Description -->
+            <!-- Description -->
             <div class="pg-field pg-field-wide">
+
                 <label asp-for="Description"></label>
 
                 <textarea asp-for="Description"
                           class="form-control"
-                          rows="4"
-                          maxlength="500"
-                          placeholder="Enter department description"></textarea>
+                          rows="2"
+                          maxlength="160"
+                          placeholder="Brief description (up to 160 characters)"></textarea>
 
                 <span asp-validation-for="Description"
                       class="text-danger"></span>
             </div>
 
-            <!-- Department Status -->
-            <label class="pg-check">
-                <input asp-for="IsActive" />
-                Active
-            </label>
+            <!-- Status -->
+            <div class="pg-field pg-field-wide">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Department
+                </label>
+            </div>
 
         </div>
 
+        <!-- ==================================
+             EMPLOYEE MANAGEMENT
+        =================================== -->
+
+        <div class="pg-field pg-field-wide">
+
+            <h3>Department Employees</h3>
+
+            <p class="pg-hint">
+                Selected employees belong to this department.
+                Add available employees or deselect existing
+                employees to remove their department assignment.
+            </p>
+
+            @if (Model.AvailableEmployees.Any())
+            {
+                <details class="department-employee-dropdown">
+                    <summary>Select Department Employees</summary>
+                    <div class="department-employee-options">
+                        @foreach (var employee in Model.AvailableEmployees)
+                        {
+                            <label class="department-employee-option">
+                                <input type="checkbox" name="SelectedEmployeeIds" value="@employee.Value"
+                                       checked="@(Model.SelectedEmployeeIds.Contains(employee.Value))" />
+                                <span>@employee.Text</span>
+                            </label>
+                        }
+                    </div>
+                </details>
+                <small class="pg-hint">Select multiple employees. Deactivating this department releases all employees without deleting their accounts.</small>
+            }
+            else
+            {
+                <p class="pg-hint">
+                    No employees are currently available.
+                </p>
+            }
+
+            <span asp-validation-for="SelectedEmployeeIds"
+                  class="text-danger"></span>
+
+        </div>
+
+        <!-- ACTIONS -->
         <div class="pg-actions">
 
             <button type="submit"
@@ -118,24 +144,16 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
 <aside class="pg-note">
     <strong>Keep History</strong>
+
     <p>
         Departments with purchase requests should not
         be deleted. Deactivate them instead to preserve
         historical records.
+
+        Removing an employee from a department does not
+        delete their user account.
     </p>
 </aside>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li>
-            <a asp-area="Admin"
-               asp-controller="Departments"
-               asp-action="Index">
-                Back to Departments
-            </a>
-        </li>
-    </ul>
-</nav>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

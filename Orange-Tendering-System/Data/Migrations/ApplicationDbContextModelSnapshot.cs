@@ -176,6 +176,66 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.AdminMaintenancePlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateOnly?>("CompletedDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ResponsibleTeam")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateOnly>("ScheduledDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "ScheduledDate");
+
+                    b.ToTable("AdminMaintenancePlans");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.AiAnalysis", b =>
                 {
                     b.Property<int>("Id")
@@ -653,6 +713,10 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("ExecutivePosition")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("Responsibility")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
@@ -668,6 +732,10 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("TenderId", "ExecutivePosition")
+                        .IsUnique()
+                        .HasFilter("[ExecutivePosition] IS NOT NULL");
+
                     b.HasIndex("TenderId", "UserId")
                         .IsUnique();
 
@@ -675,7 +743,10 @@ namespace Orange_Tendering_System.Data.Migrations
                         .IsUnique()
                         .HasFilter("[Responsibility] IS NOT NULL");
 
-                    b.ToTable("CommitteeMembers");
+                    b.ToTable("CommitteeMembers", t =>
+                        {
+                            t.HasCheckConstraint("CK_CommitteeMember_ExecutivePosition", "[ExecutivePosition] IS NULL OR ([CommitteeType] = 'Top' AND [ExecutivePosition] IN ('CEO','CFO','CTO','COO'))");
+                        });
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.CommitteeRound", b =>
@@ -752,12 +823,24 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("ElectronicSignatureSvg")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SignatureDocumentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("SignatureReportId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("VotedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CommitteeMemberId");
+
+                    b.HasIndex("SignatureReportId");
 
                     b.HasIndex("CommitteeRoundId", "CommitteeMemberId")
                         .IsUnique();
@@ -806,6 +889,10 @@ namespace Orange_Tendering_System.Data.Migrations
 
                     b.Property<int?>("ClarificationMessageId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
@@ -2573,9 +2660,16 @@ namespace Orange_Tendering_System.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Orange_Tendering_System.Models.Entities.TenderReport", "SignatureReport")
+                        .WithMany()
+                        .HasForeignKey("SignatureReportId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CommitteeMember");
 
                     b.Navigation("CommitteeRound");
+
+                    b.Navigation("SignatureReport");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Document", b =>

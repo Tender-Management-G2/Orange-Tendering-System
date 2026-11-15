@@ -1,0 +1,86 @@
+@using System.Globalization
+@using Orange_Tendering_System.Models.Entities
+@model AdminBusinessViewModel
+@{
+    Layout = "/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = "Business & Maintenance";
+    ViewData["WorkspaceSection"] = "Analytics & Exports";
+    ViewData["Description"] = "A commercial preview, a real maintenance calendar and a focused operations checklist.";
+    var next = Model.NextMaintenance;
+}
+<partial name="_PageHeader" />
+@if (TempData["SuccessMessage"] is string success) { <p class="pg-note" role="status">@success</p> }
+<section class="biz-pulse" aria-label="Maintenance pulse">
+    <div class="biz-next" data-search-item>
+        <span class="biz-eyebrow">SERVICE PULSE · CURRENT PLANS</span>
+        <h2>@(next == null ? "Your service calendar starts here" : "Next maintenance")</h2>
+        @if (next == null)
+        { <p>No maintenance dates recorded. Add the next agreed visit or annual review.</p> }
+        else
+        {
+            <strong class="biz-date">@next.ScheduledDate.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)</strong>
+            <p>@next.Title · @next.ResponsibleTeam</p>
+            <span class="biz-tag">@(next.ScheduledDate < Model.Today ? "Overdue · review this date" : next.ScheduledDate == Model.Today ? "Scheduled for today" : "Upcoming")</span>
+        }
+    </div>
+    <div class="biz-pulse-stats">
+        <div><strong>@Model.OpenCount</strong><span>Open plans</span></div>
+        <div><strong>@Model.OverdueCount</strong><span>Overdue plans</span></div>
+        <div><strong>@Model.CompletedThisYear</strong><span>Completed in @Model.Today.Year</span></div>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel biz-section">
+    <div class="pg-panel-head"><div><span class="biz-eyebrow">COMMERCIAL CONCEPT</span><h2>Business model preview</h2></div><span class="biz-tag">Static example · USD</span></div>
+    <p class="pg-hint">An illustrative first-year sale of one system licence with annual care. These figures are examples, not actual sales, expenses or profit.</p>
+    <div class="biz-example-grid">
+        <article data-search-item><span>System licence · Example</span><strong>@Model.SampleLicense.ToString("N0")</strong><small>One-time delivery</small></article>
+        <article data-search-item><span>Annual care · Example</span><strong>@Model.SampleAnnualCare.ToString("N0")</strong><small>Support and planned maintenance</small></article>
+        <article data-search-item><span>Operating costs · Example</span><strong>@Model.SampleOperatingCosts.ToString("N0")</strong><small>Illustrative hosting and service costs</small></article>
+    </div>
+    <div class="biz-equation"><span>Sample revenue <strong>@Model.SampleRevenue.ToString("N0") USD</strong></span><span>−</span><span>Sample costs <strong>@Model.SampleOperatingCosts.ToString("N0") USD</strong></span><span>=</span><span class="biz-example-result">Sample balance <strong>@Model.SampleBalance.ToString("N0") USD</strong></span></div>
+</section>
+
+<section class="ws-panel pg-panel biz-section">
+    <div class="pg-panel-head"><div><span class="biz-eyebrow">PLAN · COORDINATE · COMPLETE</span><h2>Maintenance calendar</h2><p>Agreed dates and progress recorded by Admin.</p></div>
+        <a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Maintenance" asp-action="Create" data-modal="center">+ Schedule Maintenance</a>
+    </div>
+    @if (Model.Maintenance.Count == 0)
+    {
+        <div class="biz-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v5M17 3v5M3 11h18M8 16h3" /></svg><h3>No maintenance records yet</h3><p>Schedule an annual review, security update, backup check or platform care visit.</p></div>
+    }
+    else
+    {
+        <ol class="biz-timeline">
+            @foreach (var item in Model.Maintenance)
+            {
+                <li class="biz-maintenance" data-search-item>
+                    <div class="biz-calendar-date"><strong>@item.ScheduledDate.Day</strong><span>@item.ScheduledDate.ToString("MMM yyyy", CultureInfo.InvariantCulture)</span></div>
+                    <div class="biz-maintenance-detail"><h3>@item.Title</h3><p>@item.Category · @item.ResponsibleTeam · @item.DurationMinutes min</p>
+                        @if (!string.IsNullOrWhiteSpace(item.Notes)) { <p class="pg-hint">@item.Notes</p> }
+                        @if (item.CompletedDate.HasValue) { <small>Completed @item.CompletedDate.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)</small> }
+                    </div>
+                    <div class="biz-maintenance-actions"><span class="biz-tag">@(item.Open && item.ScheduledDate < Model.Today ? "Overdue" : item.StatusLabel)</span><a class="pg-btn" asp-area="Admin" asp-controller="Maintenance" asp-action="Edit" asp-route-id="@item.Id" data-modal="center">Update</a></div>
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+<div class="biz-two-columns">
+    <section class="ws-panel pg-panel biz-section">
+        <div class="pg-panel-head"><div><span class="biz-eyebrow">ACTION QUEUE · CURRENT STATUS</span><h2>Operational follow-up</h2><p>Current work to review, without repeating the audit trail.</p></div></div>
+        <div class="biz-followups">
+            <a asp-area="Admin" asp-controller="Suppliers" asp-action="Index" data-search-item><div><strong>Supplier applications</strong><small>@(Model.PendingSuppliers == 0 ? "No applications waiting for approval" : "Applications ready for Admin review")</small></div><span>@Model.PendingSuppliers →</span></a>
+            <a asp-area="Admin" asp-controller="Users" asp-action="Index" asp-route-roleFilter="@SystemRoles.DepartmentRepresentative" data-search-item><div><strong>Unassigned representatives</strong><small>Active Department Representatives without a department</small></div><span>@Model.UnassignedRepresentatives →</span></a>
+            <a asp-area="Admin" asp-controller="Committees" asp-action="Members" asp-route-committee="Evaluation" data-search-item><div><strong>Evaluation Committee</strong><small>@(Model.EvaluationReadySeats == 4 ? "All saved seats have active, matching accounts" : "Complete missing seats or review changed accounts")</small></div><span>@Model.EvaluationReadySeats / 4 →</span></a>
+            <a asp-area="Admin" asp-controller="Committees" asp-action="Members" asp-route-committee="Top" data-search-item><div><strong>Top Committee</strong><small>@(Model.TopReadySeats == 4 ? "All saved seats have active, matching accounts" : "Complete missing seats or review changed accounts")</small></div><span>@Model.TopReadySeats / 4 →</span></a>
+        </div>
+    </section>
+    <section class="ws-panel pg-panel biz-section">
+        <div class="pg-panel-head"><div><span class="biz-eyebrow">SERVICE REFERENCE</span><h2>Annual care scope</h2><p>Suggested topics to agree with the technical team.</p></div></div>
+        <ul class="biz-care-list"><li><strong>Backup & recovery</strong><span>Confirm backup availability and restoration checks.</span></li><li><strong>Security & access</strong><span>Review updates and account access with the responsible teams.</span></li><li><strong>Platform health</strong><span>Review performance, storage and core user journeys.</span></li><li><strong>Completion review</strong><span>Record the agreed work, outcome and completion date.</span></li></ul>
+        <p class="pg-hint">The calendar records plans and reported completion; it does not execute technical maintenance automatically.</p>
+    </section>
+</div>
+<p class="pg-hint">Loaded @Model.LoadedAt.ToString("dd MMM yyyy · HH:mm", CultureInfo.InvariantCulture) · Amman time. Operational figures refresh when the page reloads.</p>

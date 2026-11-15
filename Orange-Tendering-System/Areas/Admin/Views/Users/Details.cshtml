@@ -42,6 +42,15 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
 <partial name="_PageHeader" />
 
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success" role="status">@successMessage</div>
+}
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
 <!-- User Information -->
 <section class="ws-panel pg-panel">
 
@@ -95,6 +104,20 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
             <dt>Email Confirmed</dt>
             <dd>@(Model.EmailConfirmed ? "Yes" : "No")</dd>
         </div>
+
+        @if (Model.CanResendSetupLink)
+        {
+            <div>
+                <dt>Password setup</dt>
+                <dd>
+                    <form asp-area="Admin" asp-controller="Users" asp-action="ResendSetupLink" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button type="submit" class="pg-btn">Email a new setup link</button>
+                    </form>
+                </dd>
+            </div>
+        }
 
         <div>
             <dt>Locked Out Until</dt>

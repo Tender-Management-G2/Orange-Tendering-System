@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f5ef">
+  <title>From Paper to Signal — Motion Lab</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="shared.css">
+  <script type="importmap">
+    {"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}
+  </script>
+  <script type="module" src="main.js"></script>
+</head>
+<body data-journey="paper">
+  <div class="lab-shell">
+    <header class="masthead">
+      <div class="brand"><span class="brand-square" aria-hidden="true"></span><span>ORANGE <b>/ MOTION LAB</b></span></div>
+      <div class="lab-stamp"><span class="stamp-dot" aria-hidden="true"></span> FICTIONAL MOTION STUDY <span class="stamp-separator">·</span> NO AUTHENTICATION</div>
+    </header>
+    <main>
+      <div class="intro">
+        <div>
+          <p class="eyebrow" id="journey-kicker">01 / PAPER GENESIS</p>
+          <h1 id="journey-title">An identity built from one sheet.</h1>
+          <p class="lede" id="journey-description">A continuous paper object becomes a miniature company, then opens a mechanical paper iris.</p>
+        </div>
+        <div class="journey-tabs" role="tablist" aria-label="Motion journeys">
+          <button id="paper-tab" role="tab" aria-selected="true" type="button">Paper Genesis</button>
+          <button id="signal-tab" role="tab" aria-selected="false" type="button">Orange Signal</button>
+        </div>
+      </div>
+      <div class="workbench">
+        <section class="stage" aria-labelledby="stage-heading">
+          <div class="stage-top"><span id="stage-heading">LIVE SCENE / PROCEDURAL GEOMETRY</span><span id="stage-state">R00 · OUTLINED SHEET</span></div>
+          <div class="viewport" id="viewport">
+            <canvas id="scene" aria-label="Interactive 3D paper and telecom motion study"></canvas>
+            <div class="webgl-fallback" id="webgl-fallback" hidden>WebGL is unavailable. The motion study needs a browser with WebGL enabled.</div>
+            <div class="scene-label">G2 / ISOLATED DESIGN LAB</div>
+            <div class="orbit-hint" id="orbit-hint" hidden>Drag to orbit · Scroll to zoom · Reset view to resume the authored camera</div>
+          </div>
+          <div class="stage-bottom"><span id="stage-material">MATTE PAPER / INK / ORANGE MARK</span><span>NO CAMERA OR BIOMETRIC DATA</span></div>
+        </section>
+        <section class="auth-preview" aria-labelledby="form-title">
+          <div class="auth-top"><span>THE HUMAN SIDE</span><span>02 / LIVE FORM STUDY</span></div>
+          <div class="auth-content">
+            <div class="form-mark" aria-hidden="true"></div>
+            <p class="auth-eyebrow" id="form-kicker">PAPER GENESIS / REGISTRATION</p>
+            <h2 id="form-title">Create your company identity.</h2>
+            <p class="auth-intro" id="form-intro">Your details give shape to the illustration beside you.</p>
+            <form id="registration-preview" class="preview-form" autocomplete="off" novalidate>
+              <label for="reg-contact">Contact name</label><input id="reg-contact" type="text" placeholder="Your full name" autocomplete="off">
+              <label for="reg-email">Work email</label><input id="reg-email" type="email" placeholder="name@company.com" autocomplete="off">
+              <label for="reg-password">Password</label><input id="reg-password" type="password" placeholder="Create a password" autocomplete="new-password">
+              <label for="reg-company">Company name</label><input id="reg-company" type="text" placeholder="Registered company name" autocomplete="off">
+              <label for="reg-category">Supplier category</label>
+              <select id="reg-category" aria-label="Registration supplier category"><option value="">Select a category</option></select>
+              <button class="form-action" id="reg-iris" type="button">Preview paper identity iris <span aria-hidden="true">↗</span></button>
+            </form>
+            <form id="login-preview" class="preview-form" autocomplete="off" novalidate hidden>
+              <label for="login-email">Email address</label><input id="login-email" type="email" placeholder="name@company.com" autocomplete="off">
+              <label for="login-password">Password</label><input id="login-password" type="password" placeholder="Your password" autocomplete="off">
+              <button class="form-action" id="login-continue" type="button">Continue in visual demo <span aria-hidden="true">↗</span></button>
+              <div class="demo-methods" id="login-stage" hidden>
+                <p class="auth-eyebrow">SUPPLIER METHOD / DEMONSTRATION</p>
+                <button id="login-face" type="button">Optical identity <span aria-hidden="true">↗</span></button>
+                <button id="login-fingerprint" type="button" disabled aria-disabled="true">Touch identity <small>Coming soon</small></button>
+              </div>
+              <p class="employee-stage" id="employee-stage" hidden>Employee route preview: supplier biometrics are omitted. No account access is granted.</p>
+            </form>
+            <p class="form-disclaimer" id="form-disclaimer">Isolated visual study. Nothing entered here is submitted or authenticated.</p>
+          </div>
+        </section>
+        <aside class="inspector" aria-label="Development controls">
+          <div class="inspector-heading"><span>DEVELOPMENT PANEL</span><span id="frame-readout">— FPS</span></div>
+          <div class="control-section">
+            <div class="row-between"><label for="timeline">Sequence progress</label><output id="progress-value" for="timeline">0%</output></div>
+            <input id="timeline" type="range" min="0" max="100" value="0" step="0.1" aria-label="Scrub sequence progress">
+            <div class="range-labels"><span>FLAT</span><span>HINGE</span><span>DEPTH</span><span>REVEAL</span></div>
+            <div class="transport"><button id="play" type="button" class="primary">▶ Play</button><button id="reverse" type="button">↶ Reverse</button><button id="restart" type="button">Restart</button></div>
+          </div>
+          <div class="control-section">
+            <div class="row-between"><span class="label">Inspect a shot</span><span class="micro">RESTARTS ITS TRANSFORM</span></div>
+            <div class="shots" id="shots"></div>
+          </div>
+          <div class="control-section" id="priority-section">
+            <div class="row-between"><span class="label">Directed studies</span><span class="micro">COMPLETE CAMERA MOVE</span></div>
+            <div class="shots priority-shots"><button type="button" data-range="a">A / Card and sleeve</button><button type="button" data-range="b">B / Pop-up building</button><button type="button" data-range="c">C / Paper iris</button></div>
+            <label class="micro playback-speed" for="playback-speed">Playback speed</label>
+            <select id="playback-speed" aria-label="Playback speed"><option value="1">Normal · 1×</option><option value="0.4">Study · 0.4×</option></select>
+          </div>
+          <div class="control-section" id="category-section">
+            <label for="category" class="label">Supplier environment</label>
+            <select id="category" aria-label="Supplier category">
+              <option>IT &amp; Electronics</option>
+              <option>Office Supplies</option>
+              <option>Furniture &amp; Fixtures</option>
+              <option>Construction &amp; Maintenance</option>
+              <option>Transport &amp; Logistics</option>
+              <option>Professional Services</option>
+              <option>Medical &amp; Safety</option>
+              <option>Food &amp; Hospitality</option>
+              <option>Cleaning &amp; Facilities</option>
+              <option>Telecommunications</option>
+              <option>Other</option>
+            </select>
+            <p class="help">Category leaves fold down before the next kit rises. The sheet and camera stay fixed.</p>
+          </div>
+          <div class="control-section" id="method-section" hidden>
+            <span class="label">Credential result storyboard</span>
+            <label class="micro playback-speed" for="demo-role">Demo role</label>
+            <select id="demo-role" aria-label="Demo role"><option value="supplier">Supplier</option><option value="employee">Internal employee</option></select>
+            <div class="method-buttons"><button type="button" id="face-method">Replay optical iris</button><button type="button" disabled aria-disabled="true">Fingerprint / Coming soon</button></div>
+            <button type="button" id="signal-pulse-preview" class="preview-pulse">Preview post-auth signal · demo only</button>
+            <p class="help">Visual demonstration only. No credentials, camera permission, verification, or application access.</p>
+          </div>
+          <div class="control-section">
+            <span class="label">Studio evaluation</span>
+            <label class="micro playback-speed" for="light-rig">Lighting</label>
+            <select id="light-rig" aria-label="Lighting rig"><option value="studio">Soft studio</option><option value="raking">Raking light</option><option value="flat">Flat reference</option></select>
+            <label class="micro playback-speed" for="material-mode">Material</label>
+            <select id="material-mode" aria-label="Material view"><option value="authored">Authored materials</option><option value="clay">Neutral clay</option></select>
+            <label class="shadow-switch"><input id="shadows" type="checkbox" checked><span>Cast shadows</span></label>
+          </div>
+          <div class="control-section switches">
+            <label><input id="orbit" type="checkbox"><span>Orbit inspection</span></label>
+            <button type="button" id="reset-view" class="text-button">Reset view</button>
+            <label><input id="wireframe" type="checkbox"><span>Wireframe proof</span></label>
+            <label><input id="reduced-motion" type="checkbox"><span>Reduced motion endpoint</span></label>
+          </div>
+          <div class="inspector-foot">Synthetic states only · Scene objects are named and continuous · Production routes are disconnected</div>
+        </aside>
+      </div>
+      <div class="annotation"><span class="annotation-mark" aria-hidden="true"></span><p id="annotation-text">At rest the source is planar. The scored sheet, attached card leaf, and orange registration mark share one coordinate system.</p></div>
+    </main>
+  </div>
+</body>
+</html>

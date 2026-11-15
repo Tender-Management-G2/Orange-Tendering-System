@@ -53,6 +53,11 @@ public partial class TenderWorkflowService
             CanForward = current && stage == ReportReviewStage.OfficerHandoff && officer,
             CanReturn = current && (stage == ReportReviewStage.CommitteeReview && evaluator || stage == ReportReviewStage.OfficerHandoff && officer || stage == ReportReviewStage.ManagerReview && manager || stage == ReportReviewStage.TopReview && top),
             RequireCertificate = reportSigningOptions.Value.RequireCertificateBacked };
+        if (top)
+        {
+            var executives = await db.CommitteeMembers.Where(m => m.TenderId == tender.Id && m.CommitteeType == CommitteeType.Top).ToListAsync();
+            result.TopExecutiveTitles = executives.ToDictionary(m => m.UserId, m => m.ExecutiveTitle);
+        }
         result.Signatures = await db.Set<ReportSignature>().Where(x => x.TenderReportId == reportId).OrderBy(x => x.SignedAt).ToListAsync();
         result.Revisions = await db.Set<ReportRevision>().Where(x => x.TenderReport.TenderRoundId == report.TenderRoundId).OrderBy(x => x.Id).ToListAsync();
         result.Versions = await db.TenderReports.AsNoTracking().Where(x => x.TenderRoundId == report.TenderRoundId && x.ReportType == report.ReportType)

@@ -27,7 +27,7 @@
     string SupplierName(int sid) => supplierNames.TryGetValue(sid, out var n) ? n : "Supplier #" + sid;
     string BidSupplier(int bidId) { var b = Model.Bids.FirstOrDefault(x => x.Id == bidId); return b == null ? "Offer #" + bidId : SupplierName(b.TenderInvitation.SupplierId); }
     decimal Price(Bid b) => b.Items.Sum(x => x.Quantity * x.UnitPrice) + b.OtherCost + b.ShippingCost + b.InstallationCost + b.MaintenanceCost + b.TaxAmount;
-    string Role(CommitteeResponsibility? r) => r switch { CommitteeResponsibility.SourcingManager => "Sourcing Manager", CommitteeResponsibility.DepartmentRepresentative => "Department", CommitteeResponsibility.FinancialRepresentative => "Financial", CommitteeResponsibility.TechnicalRepresentative => "Technical", _ => "Member" };
+    string Role(CommitteeResponsibility? r) => r switch { CommitteeResponsibility.SourcingManager => "Sourcing Manager", CommitteeResponsibility.DepartmentRepresentative => "Department", CommitteeResponsibility.FinancialRepresentative => "Financial", CommitteeResponsibility.TechnicalRepresentative => "Technical 1", CommitteeResponsibility.TechnicalRepresentative2 => "Technical 2", CommitteeResponsibility.ChiefExecutiveOfficer => "CEO", _ => "Member" };
 
     var evalMembers = Model.Tender.CommitteeMembers.Where(x => x.CommitteeType == CommitteeType.Evaluation).OrderBy(x => x.Responsibility).ToList();
     var matrixBids = (s?.EligibleBids.Select(x => x.BidId) ?? Model.Scores.Select(x => x.BidId)).Distinct().ToList();
@@ -65,6 +65,11 @@
     catch { requirementRows.Clear(); }
 
     var allAnswered = round != null && round.Invitations.Count > 0 && round.Invitations.All(i => i.Status == InvitationStatus.Declined || Model.Bids.Any(b => b.TenderInvitationId == i.Id && b.Status == BidStatus.Submitted));
+    var waitingInvitations = round?.Invitations.Where(i => i.Status != InvitationStatus.Declined
+        && !Model.Bids.Any(b => b.TenderInvitationId == i.Id && b.Status == BidStatus.Submitted)).ToList() ?? [];
+    var submittedSupplierCount = Model.Bids.Where(b => b.Status == BidStatus.Submitted)
+        .Select(b => b.TenderInvitation.SupplierId).Distinct().Count();
+    var canCloseBidding = round?.Status == TenderRoundStatus.Open && (submittedSupplierCount >= 3 || round.Deadline <= Model.UtcNow || allAnswered);
 
     // The signed report: shown, downloaded, signed, decided on and forwarded inside the popup (the same server actions as the old review page).
     Orange_Tendering_System.ViewModels.ReportReviewModel? rv = null;
@@ -81,6 +86,17 @@
     {
         if (status == TenderStatus.Awarded) return ("Tender awarded", "The official award is recorded and the tender is closed.", "good");
         if (status is TenderStatus.Rejected or TenderStatus.Cancelled) return ("Tender closed", "This tender is closed. Its history stays available below.", "muted");
+        if (Model.IsOfficer && status == TenderStatus.Bidding && w == null)
+            return ("Tender setup needs review", "This existing tender has no configured weight round. Its history has been preserved. Complete a reviewed setup correction before inviting suppliers; the Tender page is now the only creation path.", "wait");
+        if (Model.IsSupplier && status == TenderStatus.Bidding)
+        {
+            if (round?.Status != TenderRoundStatus.Open || !round.Deadline.HasValue || round.Deadline <= Model.UtcNow)
+                return ("Bidding is closed", "Offers cannot be prepared or submitted after bidding closes. Your existing offers remain available below.", "wait");
+            if (w?.State != WeightState.Approved)
+                return ("Waiting for approved evaluation weights", "The Officer must complete the committee weight proposals and Sourcing Manager approval before offers can be prepared. Please check again later.", "wait");
+            if (round.OpensAt > Model.UtcNow)
+                return ("Bidding opens soon", "The opening time has not been reached yet. Check the tender dates below before preparing your offer.", "wait");
+        }
         if (w == null && status == TenderStatus.Draft) return Model.IsOfficer ? ("Send the tender to the committee", "The four committee members each propose the Financial / Technical split. The average becomes the evaluation weights.", "action") : ("Waiting for the Officer", "The Sourcing Officer has not sent the tender to the committee yet.", "wait");
         if (w != null && w.State == WeightState.Proposals)
         {
@@ -93,10 +109,11 @@
         if (status == TenderStatus.Bidding)
         {
             if (round?.Status == TenderRoundStatus.Open)
-                return Model.IsOfficer ? (allAnswered ? ("All offers are in", $"{Model.Bids.Count(x => x.Status == BidStatus.Submitted)} offer(s) received and nobody is still pending. Close bidding to move on. The system checks the offers automatically, then you schedule the evaluation.", "action")
+                return Model.IsOfficer ? (submittedSupplierCount >= 3 ? ("Ready to close bidding", $"Offers from {submittedSupplierCount} distinct suppliers were received. You may close bidding now without waiting for the remaining invitations.", "action")
+                        : allAnswered ? ("All suppliers have answered", "Every invited supplier submitted an offer or declined. You may close bidding and review the received offers.", "action")
                         : round.Invitations.Count == 0 ? ("Invite suppliers", "Choose the suppliers who may bid, or invite all approved suppliers with one click.", "action")
                         : round.Deadline <= Model.UtcNow ? ("Close bidding", $"The deadline passed. {Model.Bids.Count(x => x.Status == BidStatus.Submitted)} offer(s) were submitted.", "action")
-                        : ($"Waiting for offers: {Model.Bids.Count(x => x.Status == BidStatus.Submitted)} of {round.Invitations.Count} received", "The invited suppliers accept and send their offers from their own portal. When the deadline passes, come back here to close bidding.", "wait"))
+                        : ($"Waiting for offers: {submittedSupplierCount} received", "You can close bidding once three distinct suppliers submit, once all invited suppliers submit or decline, or after the deadline.", "wait"))
                     : Model.IsSupplier ? ("Submit your offer", "Accept the invitation, then prepare and submit your offer before the deadline.", "action")
                     : ("Bidding is open", "Suppliers are sending their offers.", "wait");
             return Model.IsOfficer ? ("Prepare the evaluation", "The system already checked the offers. Continue, run the AI analysis, then schedule the committee evaluation.", "action") : ("Bidding is closed", "The Officer is checking the offers and preparing the evaluation.", "wait");
@@ -107,8 +124,8 @@
                 return Model.IsEvaluator ? (s.ReportSentAt == null ? ("Report is being prepared", "The Sourcing Officer will send you the report to review and sign.", "wait") : ("Review and sign the report", "The Officer sent you the report. Open it, check the ranking and sign it.", "action"))
                     : Model.IsOfficer ? (s.ReportSentAt == null ? ("Send the report to the committee", "The system generated the report. Check it, then send it to the four members so they can sign.", "action") : ("Waiting for the committee to sign", "When all four members have signed it, you forward it to the Sourcing Manager.", "wait"))
                     : ("Report ready", "The committee is reviewing and signing the report.", "wait");
-            if (Model.IsEvaluator && !submitted && s.State == SessionState.Scheduled)
-                return Model.UtcNow >= s.StartsAt && Model.UtcNow < s.EndsAt ? ("Score the offers", "Give each supplier a financial and a technical score from 0 to 100. You submit once and cannot edit.", "action") : ("Evaluation is not open", "The scoring form is open only between the start and end time below.", "wait");
+            if (Model.IsEvaluator && !submitted && (s.State == SessionState.Scheduled || TenderWorkflowService.EvaluationOpen(s, Model.UtcNow)))
+                return TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? ("Score the offers", "Give each supplier a financial and a technical score from 0 to 100. You can submit after the meeting ends, once only.", "action") : ("Evaluation is not open", "Scoring opens at the meeting start and remains available until your final submission.", "wait");
             if (Model.IsOfficer && s.State == SessionState.Scheduled && s.Submissions.Count == 4) return ("End the evaluation", "All four evaluations are in. The system calculates the ranking and generates the report automatically.", "action");
             if (s.State == SessionState.Scheduled && Model.UtcNow < s.StartsAt) return ("Waiting for the meeting to start", "Scoring opens by itself at the start time shown below. Then the four members score the offers.", "wait");
             return ($"Committee evaluation: {s.Submissions.Count} of 4 submitted", submitted ? "Your evaluation is recorded and cannot be edited." : "Scoring is in progress.", "wait");
@@ -124,7 +141,9 @@
     // Suppliers that can still be invited in the current round.
     var invitedIds = round?.Invitations.Select(x => x.SupplierId).ToHashSet() ?? [];
     var approvedSuppliers = Model.IsOfficer && round?.Status == TenderRoundStatus.Open
-        ? await Records.Suppliers.AsNoTracking().Where(x => x.Status == SupplierStatus.Approved).OrderBy(x => x.CompanyName).Select(x => new { x.Id, x.CompanyName, x.Category }).ToListAsync()
+        ? await Records.Suppliers.AsNoTracking().Where(x => x.Status == SupplierStatus.Approved
+            && Records.Users.Any(u => u.SupplierId == x.Id && u.IsActive && u.EmailConfirmed))
+            .OrderBy(x => x.CompanyName).Select(x => new { x.Id, x.CompanyName, x.Category }).ToListAsync()
         : null;
     var inviteable = approvedSuppliers?.Where(x => !invitedIds.Contains(x.Id)).ToList();
     var topUsers = Model.IsOfficer && s != null && Model.FinalPolicyConfigured && !Model.Tender.CommitteeMembers.Any(x => x.CommitteeType == CommitteeType.Top)
@@ -166,6 +185,38 @@
         </div>
 
         @* ============ ACTIONS: only what this person can do right now ============ *@
+        @if (Model.IsOfficer && status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open)
+        {
+            <div class="wp-actions">
+                <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post" class="wp-form" data-close-bidding>
+                    <h4>Close offer submissions</h4>
+                    <p>@round.Invitations.Count invited · @round.Invitations.Count(i => i.Status == InvitationStatus.Accepted) accepted invitations · @submittedSupplierCount submitted offers · @Model.Bids.Count(b => b.Status == BidStatus.Draft) drafts · @round.Invitations.Count(i => i.Status == InvitationStatus.Declined) declined</p>
+                    <button class="wp-primary" disabled="@(!canCloseBidding)">Close bidding &amp; continue <span aria-hidden="true">&rarr;</span></button>
+                    @if (canCloseBidding)
+                    {
+                        <small>@(submittedSupplierCount >= 3 ? "At least three distinct suppliers submitted offers. You may close bidding now without waiting for other invitations." : round.Deadline <= Model.UtcNow ? "The deadline has passed. You can close bidding and continue to compliance review." : "Every invited supplier has submitted an offer or declined. You can close bidding now.")</small>
+                    }
+                    else
+                    {
+                        <p class="wp-hint" role="status">@submittedSupplierCount of 3 distinct supplier offers received. Waiting for @waitingInvitations.Count invited supplier(s) to submit an offer or decline. Drafts and accepted invitations do not count as submitted offers.</p>
+                        <small>@(round.Deadline.HasValue ? $"You may also close bidding after the deadline: {round.Deadline.Value.ToLocalTime():d MMM yyyy HH:mm}." : "No deadline is configured. Every invited supplier must submit an offer or decline before bidding can close.")</small>
+                    }
+                    <h5>All invited suppliers</h5>
+                    <ul>
+                        @foreach (var invitation in round.Invitations.OrderBy(i => SupplierName(i.SupplierId)))
+                        {
+                            var offer = Model.Bids.FirstOrDefault(b => b.TenderInvitationId == invitation.Id);
+                            var progress = invitation.Status == InvitationStatus.Declined ? "Declined invitation"
+                                : offer?.Status == BidStatus.Submitted ? "Submitted offer"
+                                : offer?.Status == BidStatus.Draft ? "Draft offer"
+                                : invitation.Status == InvitationStatus.Accepted ? "Accepted invitation — no offer yet"
+                                : "Invitation pending";
+                            <li>@SupplierName(invitation.SupplierId) — @progress</li>
+                        }
+                    </ul>
+                </form>
+            </div>
+        }
         @if (Model.IsOfficer && status == TenderStatus.Draft && w == null)
         {
             <div class="wp-actions">
@@ -186,26 +237,28 @@
         }
         @if (Model.CanApproveWeights && w != null && w.State == WeightState.AwaitingApproval)
         {
-            <div class="wp-actions"><form asp-area="EvaluationCommittee" asp-controller="WeightApprovals" asp-action="Approve" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Approve and lock the weights</button></form></div>
+            <div class="wp-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ApproveWeights" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Approve and lock the weights</button></form></div>
         }
         @if (Model.IsOfficer && status == TenderStatus.Draft && w?.State == WeightState.Approved)
         {
             <div class="wp-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post" class="wp-form wp-inline"><label>Quick pick<select class="wp-preset" data-preset="deadline"><option value="">Choose&hellip;</option><option value="3">In 3 days</option><option value="7">In 1 week</option><option value="14">In 2 weeks</option><option value="30">In 1 month</option></select></label><label>Bidding deadline<input type="datetime-local" data-utc name="deadline" required /></label><button class="wp-primary">Open bidding</button></form></div>
         }
-        @if (Model.IsOfficer && status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open)
+        @if (Model.IsOfficer && status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open && w?.State == WeightState.Approved)
         {
             <div class="wp-actions">
                 @if (approvedSuppliers is { Count: > 0 })
                 {
                     <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form wp-picker" data-picker>
-                        <div class="wp-pick-cats"><label>Supplier category<select data-cat-filter><option value="">All categories (@approvedSuppliers.Count)</option>@foreach (var cat in approvedSuppliers.GroupBy(x => x.Category).OrderBy(x => x.Key)) { <option value="@cat.Key">@cat.Key (@cat.Count())</option> }</select></label></div>
+                        <div class="wp-cols">
+                            <label>Search suppliers<input type="search" data-supplier-search placeholder="Company name" /></label>
+                            <label>Category<select data-supplier-category><option value="">All categories (@approvedSuppliers.Count)</option>@foreach (var category in SupplierCategories.All) { <option value="@category">@category (@approvedSuppliers.Count(x => x.Category == category))</option> }</select></label>
+                        </div>
                         <div class="wp-pick-head"><label class="wp-check"><input type="checkbox" data-select-all @(inviteable is { Count: > 0 } ? null : "disabled") /> Select all</label><span class="wp-pick-count" data-count>0 selected</span></div>
-                        <ul class="wp-pick">@foreach (var sp in approvedSuppliers) { var done = invitedIds.Contains(sp.Id); <li class="@(done ? "is-invited" : null)" data-cat="@sp.Category"><label class="wp-check"><input type="checkbox" name="supplierIds" value="@sp.Id" @(done ? "checked disabled" : null) /><span>@sp.CompanyName<small class="wp-pick-cat">@sp.Category</small></span>@if (done) { <em>Invited</em> }</label></li> }</ul>
+                        <ul class="wp-pick">@foreach (var sp in approvedSuppliers) { var done = invitedIds.Contains(sp.Id); <li class="@(done ? "is-invited" : null)" data-supplier-name="@sp.CompanyName.ToLowerInvariant()" data-supplier-category="@sp.Category"><label class="wp-check"><input type="checkbox" name="supplierIds" value="@sp.Id" @(done ? "checked disabled" : null) /><span>@sp.CompanyName <small>@sp.Category</small></span>@if (done) { <em>Invited</em> }</label></li> }</ul>
                         <button class="wp-primary" data-pick-btn disabled>Invite selected</button>
                         <small>Each invited supplier gets a notification, accepts, and sends an offer from their own portal.</small>
                     </form>
                 }
-                @if (round.Deadline <= Model.UtcNow || allAnswered) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Close bidding &amp; continue <span aria-hidden="true">&rarr;</span></button><small>@(round.Deadline <= Model.UtcNow ? "The deadline has passed." : "Every invited supplier has answered, so there is nothing left to wait for.")</small></form> }
                 <details class="wp-opt"><summary>Invite a company that is not registered</summary>
                     <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteExternal" asp-route-id="@id" method="post" class="wp-form"><div class="wp-cols"><label>Company<input name="companyName" maxlength="200" required /></label><label>Email<input name="email" type="email" maxlength="256" required /></label><label>Phone (optional)<input name="phone" maxlength="40" /></label></div><button>Send invitation</button><small>They receive a registration invitation first; an offer still needs an approved registration.</small></form></details>
             </div>
@@ -220,7 +273,9 @@
                     {
                         <form asp-area="Supplier" asp-controller="Workflow" asp-action="Respond" asp-route-id="@id" method="post" class="wp-form wp-inline"><input type="hidden" name="invitationId" value="@invitation.Id" /><button name="accept" value="true" class="wp-primary">Accept the invitation</button><button name="accept" value="false" class="wp-ghost">Decline</button></form>
                     }
-                    else if (invitation.Status == InvitationStatus.Accepted && Model.Bids.All(x => x.TenderInvitationId != invitation.Id) && round?.Status == TenderRoundStatus.Open && round.Deadline > Model.UtcNow)
+                    else if (invitation.Status == InvitationStatus.Accepted && Model.Bids.All(x => x.TenderInvitationId != invitation.Id) && status == TenderStatus.Bidding
+                        && w?.State == WeightState.Approved && round?.Status == TenderRoundStatus.Open && round.Deadline > Model.UtcNow
+                        && (!round.OpensAt.HasValue || round.OpensAt <= Model.UtcNow))
                     {
                         <a class="wp-primary wp-link" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Create" asp-route-id="@invitation.Id">Prepare my offer <span aria-hidden="true">&rarr;</span></a>
                     }
@@ -269,7 +324,7 @@
                             <div class="wp-cols"><label>AI analysis<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">Analysis #@ai.Id</option> }</select></label><label>Quick start<select class="wp-preset" data-preset="start"><option value="">Choose&hellip;</option><option value="15m">In 15 minutes</option><option value="1h">In 1 hour</option><option value="t10">Tomorrow 10:00</option><option value="d2">In 2 days 10:00</option></select></label><label>Duration<select class="wp-preset" data-preset="duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="90">90 minutes</option><option value="120">2 hours</option><option value="180">3 hours</option></select></label></div><div class="wp-cols"><label>Starts<input name="StartsAt" type="datetime-local" data-utc required /></label><label>Ends<input name="EndsAt" type="datetime-local" data-utc required /></label></div>
                             <label class="wp-check"><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> Create the video meeting automatically</label>
                             <details class="wp-opt"><summary>Use my own Zoom link instead</summary><label>Zoom link<input name="MeetingUrl" type="url" placeholder="https://zoom.us/j/..." /></label></details>
-                            <button class="wp-primary">Schedule and invite the committee</button><small>Scoring opens and closes automatically at these times. The four members get the invitation, the meeting link and the offers.</small></form>
+                            <button class="wp-primary">Schedule and invite the committee</button><small>The times schedule the meeting. Scoring stays available afterwards until each member submits. The four members get the invitation, the meeting link and the offers.</small></form>
                     }
                 </section>
                 <div class="wp-wnav"><button type="button" class="wp-ghost" data-wback>&larr; Back</button><span class="wp-wnote" data-wnote></span><button type="button" class="wp-primary" data-wnext>Next <span aria-hidden="true">&rarr;</span></button></div>
@@ -279,7 +334,7 @@
         {
             <div class="wp-actions"><form asp-area="SourcingManager" asp-controller="Workflow" asp-action="DecideProceed" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="decisionId" value="@pendingRequest.Id" /><p class="wp-text">@pendingRequest.Justification</p><label>Your comment<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Approved: the offers received are sufficient.</option><option>Approved: the purchase is time critical.</option><option>Rejected: please re-tender.</option></select><textarea name="comment" maxlength="2000" required rows="2"></textarea></label><button name="approve" value="true" class="wp-primary">Approve</button><button name="approve" value="false" class="wp-ghost">Reject</button></form></div>
         }
-        @if (Model.IsEvaluator && !submitted && s != null && s.State == SessionState.Scheduled && Model.UtcNow >= s.StartsAt && Model.UtcNow < s.EndsAt)
+        @if (Model.IsEvaluator && !submitted && s != null && TenderWorkflowService.EvaluationOpen(s, Model.UtcNow))
         {
             var scoreIndex = 0;
             <div class="wp-actions">
@@ -314,9 +369,9 @@
         @if (rv != null)
         {
             var mySigned = rv.Signatures.Any(x => x.UserId == rv.UserId && x.Stage == (rv.CanVoteTop ? ReportSigningStage.Top : ReportSigningStage.Evaluation));
-            var pdfUrl = Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id });
+            var pdfUrl = Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id });
             <div class="wp-actions wp-report">
-                <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@pdfUrl">Preview it here</button></div>
+                <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@pdfUrl">Preview it here</button></div>
                 <div class="wp-preview" hidden></div>
                 @if (s?.State == SessionState.ReportDraft && s.ReportSentAt != null)
                 {
@@ -347,7 +402,7 @@
                 }
                 @if (rv.CanVoteTop && !mySigned)
                 {
-                    <form asp-area="TopCommittee" asp-controller="Reports" asp-action="Vote" asp-route-id="@rv.Report.Id" method="post" class="wp-form wp-sign"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" />
+                    <form asp-area="TopCommittee" asp-controller="SignedReports" asp-action="Vote" asp-route-id="@rv.Report.Id" method="post" class="wp-form wp-sign"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" />
                         <div class="wp-cols"><label>Your vote<select name="decision"><option>Approve</option><option>Reject</option></select></label><label>Why?<textarea name="comment" maxlength="2000" required rows="2"></textarea></label></div>
                         <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
                         <label class="wp-check"><input type="checkbox" name="confirmed" value="true" required /> I reviewed the report. My vote is my signature.</label>
@@ -371,7 +426,6 @@
         {
             <div class="wp-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Award" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Record the official award</button><small>The server checks every required approval first.</small></form></div>
         }
-        @if (!Model.WeightPolicyConfigured && w != null && w.State != WeightState.Approved && !Model.IsSupplier) { <p class="wp-hint wp-warn">Weight approval authority is not configured yet. Bidding stays blocked until an administrator sets it.</p> }
         @if (Model.IsTop && !Model.FinalPolicyConfigured && s != null) { <p class="wp-hint wp-warn">The final approval policy is not configured yet, so award is blocked.</p> }
     </section>
 
@@ -442,15 +496,15 @@
                 <span class="wp-dot">@(StageState(4) == "done" ? "\u2713" : "4")</span>
                 <div class="wp-stage-body">
                     <header><h4>Committee evaluation</h4><span class="wp-sum">@(s == null ? "Not scheduled yet" : $"{s.Submissions.Count} of 4 submitted")</span></header>
-                    @if (s == null) { <p class="wp-empty">The Officer schedules a meeting and a scoring window. Each member scores every supplier once, independently.</p> }
+                    @if (s == null) { <p class="wp-empty">The Officer schedules a meeting. Scoring opens at its start and remains available after its end. Each member scores every supplier once, independently.</p> }
                     else
                     {
                             var startIso = DateTime.SpecifyKind(s.StartsAt, DateTimeKind.Utc).ToString("O");
                             var endIso = DateTime.SpecifyKind(s.EndsAt, DateTimeKind.Utc).ToString("O");
                             var roomState = Model.UtcNow < s.StartsAt ? "before" : (Model.UtcNow < s.EndsAt && s.State == SessionState.Scheduled ? "open" : "closed");
                             var doneCount = s.Invitations.Count(x => x.SubmittedAt != null);
-                        <div class="wp-clock wp-clock-@roomState" data-countdown data-start="@startIso" data-end="@endIso" data-state="@roomState" data-final="@(s.State != SessionState.Scheduled ? "1" : null)">
-                            <div class="wp-clock-main"><small data-clock-label>@(roomState == "before" ? "Meeting and scoring start in" : roomState == "open" ? "Scoring is open, it closes in" : "Scoring is closed")</small><strong data-clock>--:--:--</strong></div>
+                        <div class="wp-clock wp-clock-@roomState" data-countdown data-start="@startIso" data-end="@endIso" data-state="@roomState" data-final="@(s.State != SessionState.Scheduled && !TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? "1" : null)">
+                            <div class="wp-clock-main"><small data-clock-label>@(roomState == "before" ? "Meeting and scoring start in" : roomState == "open" ? "Meeting ends in" : TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? "Meeting ended; evaluation remains open" : "Scoring is closed")</small><strong data-clock>--:--:--</strong></div>
                             <div class="wp-clock-times"><span>Starts <time data-local="@startIso">@s.StartsAt.ToString("u")</time></span><span>Ends <time data-local="@endIso">@s.EndsAt.ToString("u")</time></span></div>
                             @if (!string.IsNullOrWhiteSpace(s.MeetingUrl) && s.State == SessionState.Scheduled) { <a class="wp-primary wp-link wp-join@(roomState == "before" ? " is-locked" : null)" data-no-modal data-join="/Meetings/Join/@id" @(roomState == "before" ? Html.Raw("aria-disabled=\"true\" tabindex=\"-1\"") : Html.Raw("href=\"/Meetings/Join/" + id + "\""))><span data-join-label>@Html.Raw(roomState == "before" ? "&#128274; Opens when the meeting starts" : "&#127909; Join the meeting")</span></a> }
                         </div>
@@ -487,13 +541,13 @@
                     }
                     @if (Model.Scores.Count > 0 && matrixBids.Count > 0)
                         {
-                            @if (s.State == SessionState.Scheduled) { <p class="wp-hint">Each member's scores stay private until the evaluation ends, so nobody is influenced by anyone else. Your own scores are always visible to you.</p> }
+                            @if (s?.State == SessionState.Scheduled) { <p class="wp-hint">Each member's scores stay private until the evaluation ends, so nobody is influenced by anyone else. Your own scores are always visible to you.</p> }
                             <div class="wp-table wp-matrix"><table class="wp-sortable"><thead><tr><th>Member</th><th>Role</th>@foreach (var bidId in matrixBids) { <th data-num>@BidSupplier(bidId)</th> }</tr></thead><tbody>
                             @foreach (var m in evalMembers)
                             {
                                 <tr><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td>
                                 @foreach (var bidId in matrixBids) { var f = Cell(m.Id, bidId, CriterionType.Financial); var t = Cell(m.Id, bidId, CriterionType.Technical); var ws = Weighted(m.Id, bidId);
-                                    <td data-v="@(ws?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "")">@if (f == null) { <span class="wp-dim">@(s.Invitations.Any(x => x.CommitteeMemberId == m.Id && x.SubmittedAt != null) ? "✓ Submitted, hidden until the evaluation ends" : "Waiting")</span> } else { <b>@(ws?.ToString("0.00") ?? "\u2014")</b><small>@f.Value.ToString("0.##") / @t?.ToString("0.##")</small> }</td> }
+                                    <td data-v="@(ws?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "")">@if (f == null) { <span class="wp-dim">@(s?.Invitations.Any(x => x.CommitteeMemberId == m.Id && x.SubmittedAt != null) == true ? "✓ Submitted, hidden until the evaluation ends" : "Waiting")</span> } else { <b>@(ws?.ToString("0.00") ?? "\u2014")</b><small>@f.Value.ToString("0.##") / @t?.ToString("0.##")</small> }</td> }
                                 </tr>
                             }
                             @if (Model.Ranking.Count > 0)
@@ -538,7 +592,7 @@
                 @if (rv != null)
                 {
                     <div class="wp-report">
-                        <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id })">Preview it here</button></div>
+                        <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id })">Preview it here</button></div>
                         <div class="wp-preview" hidden></div>
                     </div>
                 }

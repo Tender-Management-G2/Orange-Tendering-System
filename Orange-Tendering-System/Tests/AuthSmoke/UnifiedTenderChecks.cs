@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -16,6 +17,7 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services;
+using Orange_Tendering_System.Services.Biometric;
 using Orange_Tendering_System.ViewModels;
 
 // Real SQL Server + Identity requests. Isolated test data never enters the user's working database.
@@ -25,7 +27,8 @@ public static class UnifiedTenderChecks
     {
         var root = Environment.GetEnvironmentVariable("AUTH_PROJECT_ROOT") ?? throw new InvalidOperationException("AUTH_PROJECT_ROOT required");
         var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
-        var connection = $"Server=localhost;Database=OrangeAuthCheck_Unified_{suffix};Trusted_Connection=True;TrustServerCertificate=True";
+        var server = Environment.GetEnvironmentVariable("AUTH_TEST_SERVER") ?? "localhost";
+        var connection = $"Server={server};Database=OrangeAuthCheck_Unified_{suffix};Trusted_Connection=True;TrustServerCertificate=True";
         Environment.SetEnvironmentVariable("ConnectionStrings__Default Connection", connection);
         Environment.SetEnvironmentVariable("DemoData__Enabled", "false");
         var password = "Ut!9" + suffix + suffix;
@@ -38,7 +41,25 @@ public static class UnifiedTenderChecks
                 ["DemoData:Enabled"] = "false", ["Logging:LogLevel:Default"] = "Error",
                 ["TenderApprovalPolicy:Version"] = "UNIFIED-CHECK", ["TenderApprovalPolicy:WeightApproverRoles:0"] = SystemRoles.SourcingManager
             }));
-            b.ConfigureTestServices(s => s.RemoveAll<IHostedService>()); // Never dispatch queued test invitations to SMTP.
+            b.ConfigureTestServices(s =>
+            {
+                s.RemoveAll<IHostedService>(); // Never dispatch queued test invitations to SMTP.
+                // This tender-only fixture marks its synthetic supplier cookies as biometric.
+                // AuthSmoke separately exercises real face and passkey enrollment and sign-in.
+                s.PostConfigure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, options =>
+                {
+                    var validate = options.Events.OnValidatePrincipal;
+                    options.Events.OnValidatePrincipal = async context =>
+                    {
+                        if (validate != null) await validate(context);
+                        if (context.Principal?.IsInRole(SystemRoles.Supplier) == true &&
+                            context.Principal.Identity is ClaimsIdentity identity &&
+                            !identity.HasClaim(c => c.Type == BiometricSignInService.AuthenticationMethodClaim))
+                            identity.AddClaim(new Claim(BiometricSignInService.AuthenticationMethodClaim,
+                                BiometricSignInService.FaceMethod));
+                    };
+                });
+            });
         });
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -52,16 +73,33 @@ public static class UnifiedTenderChecks
             var u = new ApplicationUser { UserName = name + "@unified.test", Email = name + "@unified.test", FullName = name,
                 EmailConfirmed = true, IsActive = true, DepartmentId = supplierId.HasValue ? null : department.Id, SupplierId = supplierId };
             Check((await users.CreateAsync(u, password)).Succeeded, "create " + name);
-            Check((await users.AddToRoleAsync(u, role)).Succeeded, "role " + name);
+            Check((await users.AddToRolesAsync(u, SystemRoles.AccountRoles(role))).Succeeded, "role " + name);
             return u;
         }
         ClaimsPrincipal Principal(ApplicationUser u) => new(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, u.Id)], "Check"));
         var officer = await User("officer", SystemRoles.SourcingOfficer);
+        var admin = await User("admin", SystemRoles.Admin);
         var requester = await User("requester", SystemRoles.RequestingDepartment);
         var manager = await User("manager", SystemRoles.SourcingManager);
-        var evaluator = await User("department", SystemRoles.EvaluationCommittee);
-        var financial = await User("financial", SystemRoles.EvaluationCommittee);
-        var technical = await User("technical", SystemRoles.EvaluationCommittee);
+        var evaluator = await User("department", SystemRoles.DepartmentRepresentative);
+        var financial = await User("financial", SystemRoles.Finance);
+        var technical = await User("technical", SystemRoles.Technical);
+        var ceo = await User("ceo", SystemRoles.ChiefExecutiveOfficer);
+        var cfo = await User("cfo", SystemRoles.ChiefFinancialOfficer);
+        var cto = await User("cto", SystemRoles.ChiefTechnologyOfficer);
+        var coo = await User("coo", SystemRoles.ChiefOperationsOfficer);
+        var evaluationRoster = await flow.StandingCommittee("Evaluation", Principal(admin));
+        await flow.SaveStandingCommittee(new StandingCommitteeInput
+        {
+            Committee = "Evaluation", Version = evaluationRoster.Version, MemberOneId = manager.Id,
+            MemberTwoId = technical.Id, MemberThreeId = financial.Id, MemberFourId = evaluator.Id
+        }, Principal(admin));
+        var topRoster = await flow.StandingCommittee("Top", Principal(admin));
+        await flow.SaveStandingCommittee(new StandingCommitteeInput
+        {
+            Committee = "Top", Version = topRoster.Version, MemberOneId = ceo.Id,
+            MemberTwoId = cfo.Id, MemberThreeId = cto.Id, MemberFourId = coo.Id
+        }, Principal(admin));
         var supplier = new Supplier { CompanyName = "Private supplier", RegistrationNumber = suffix, Email = "supplier@unified.test", Status = SupplierStatus.Approved };
         var competitor = new Supplier { CompanyName = "COMPETITOR_SECRET_NAME", RegistrationNumber = suffix + "X", Email = "competitor@unified.test", Status = SupplierStatus.Approved };
         db.AddRange(supplier, competitor); await db.SaveChangesAsync();
@@ -97,6 +135,15 @@ public static class UnifiedTenderChecks
         Check(review.StatusCode == HttpStatusCode.Redirect, "accept request from details");
         var legacy = await officerClient.GetAsync("/SourcingOfficer/Tenders");
         Check(legacy.Headers.Location?.ToString() == "/SourcingOfficer/Workflow", "legacy tender list redirects to canonical page");
+        var workflowHtml = await officerClient.GetStringAsync("/SourcingOfficer/Workflow?request=" + request.Id);
+        bool OffersSeat(string field, string userId)
+        {
+            var select = Regex.Match(workflowHtml, "<select[^>]*id=\"" + field + "\"[^>]*>(.*?)</select>", RegexOptions.Singleline);
+            return select.Success && select.Groups[1].Value.Contains("value=\"" + userId + "\"", StringComparison.Ordinal);
+        }
+        Check(OffersSeat("SourcingManagerId", manager.Id) && OffersSeat("DepartmentRepresentativeId", evaluator.Id) &&
+              OffersSeat("FinancialRepresentativeId", financial.Id) && OffersSeat("TechnicalRepresentativeId", technical.Id),
+            "tender form offers active users for all four evaluation seats");
         var createToken = await Token(officerClient, "/SourcingOfficer/Workflow");
         var legacyWrite = await officerClient.PostAsync("/SourcingOfficer/Tenders/Create", new FormUrlEncodedContent(new Dictionary<string, string>
         { ["__RequestVerificationToken"] = createToken }));
@@ -110,13 +157,20 @@ public static class UnifiedTenderChecks
             SourcingManagerId = manager.Id, DepartmentRepresentativeId = evaluator.Id, FinancialRepresentativeId = financial.Id, TechnicalRepresentativeId = technical.Id,
             EstimatedValue = 1000, Currency = "JOD" };
         var id = await flow.Create(input, Principal(officer));
-        Check(await db.CommitteeMembers.CountAsync(m => m.TenderId == id) == 4, "canonical creation assigns four distinct seats");
+        var assignedEvaluation = await db.CommitteeMembers.Where(m => m.TenderId == id && m.CommitteeType == CommitteeType.Evaluation)
+            .Select(m => m.UserId).ToListAsync();
+        Check(assignedEvaluation.Count == 4 && assignedEvaluation.ToHashSet().SetEquals(new[] { manager.Id, evaluator.Id, financial.Id, technical.Id }) &&
+              !await db.CommitteeMembers.AnyAsync(m => m.TenderId == id && m.CommitteeType == CommitteeType.Top),
+            "canonical creation saves the selected evaluation members and defers Top Committee assignment");
         var duplicateRejected = false;
         try { await flow.Create(input, Principal(officer)); } catch (WorkflowException e) { duplicateRejected = e.Message.Contains("already has a tender"); }
         Check(duplicateRejected && await db.Tenders.CountAsync() == 1, "duplicate tender rejected on server");
         await flow.RequestWeights(id, Principal(officer));
         foreach (var member in new[] { manager, evaluator, financial, technical }) await flow.Propose(id, 40, 60, Principal(member));
-        await flow.ApproveWeights(id, Principal(manager));
+        var managerApprovalRejected = false;
+        try { await flow.ApproveWeights(id, Principal(manager)); } catch (WorkflowException) { managerApprovalRejected = true; }
+        Check(managerApprovalRejected, "the manager cannot approve weights assigned to the Sourcing Officer");
+        await flow.ApproveWeights(id, Principal(officer));
         await flow.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(3), Principal(officer));
         await flow.Invite(id, supplier.Id, Principal(officer));
         await flow.Invite(id, competitor.Id, Principal(officer));
@@ -237,7 +291,7 @@ public static class UnifiedTenderChecks
         // In particular, signing by Technical must not prevent the remaining three members.
         var round = await db.TenderRounds.SingleAsync(x => x.TenderId == id);
         var weightRound = await db.Set<WeightRound>().SingleAsync(x => x.TenderId == id);
-        var seats = await db.CommitteeMembers.Where(x => x.TenderId == id).ToListAsync();
+        var seats = await db.CommitteeMembers.Where(x => x.TenderId == id && x.CommitteeType == CommitteeType.Evaluation).ToListAsync();
         var committeeRound = new CommitteeRound { TenderRoundId = round.Id, CommitteeType = CommitteeType.Evaluation, RoundNumber = 1,
             StartedAt = DateTime.UtcNow.AddHours(-2), FinancialWeight = weightRound.ApprovedFinancial, TechnicalWeight = weightRound.ApprovedTechnical };
         committeeRound.Criteria.Add(new EvaluationCriterion { Name = "Financial", Type = CriterionType.Financial, MaxScore = 100, Weight = weightRound.ApprovedFinancial });
@@ -276,6 +330,11 @@ public static class UnifiedTenderChecks
         Check(session.State == SessionState.ReportDraft && session.ReportId != null, "complete post-meeting evaluations automatically generate the report");
         var reportId = session.ReportId!.Value;
         var hash = session.Report!.PdfSha256!;
+        Check(!(await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee,
+            "committee signing stays closed until the Officer sends the report");
+        await flow.SendReportToCommittee(id, Principal(officer));
+        Check((await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee,
+            "Officer sending the report opens committee signing");
         var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=").Concat(new byte[250]).ToArray();
         foreach (var signer in new[] { technical, financial, evaluator, manager })
         {
