@@ -240,12 +240,8 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         if (await Users.IsInRoleAsync(user, SystemRoles.TopCommittee))
         {
             var details = await Committee.Load(user.Id, roundId);
-            if (details?.Round is not { Status: CommitteeRoundStatus.Approved, TenderReport: not null } || details.SignedCount != 4 ||
-                details.ValidVotes.Any(v => v.Decision != VoteDecision.Approve || v.SignatureReportId != details.Round.TenderReportId ||
-                    v.SignatureDocumentHash != details.OriginalSummaryPdf?.ContentHash || string.IsNullOrWhiteSpace(v.ElectronicSignatureSvg)) ||
-                details.FinalSignedSummaryPdf is not { } memberDocument)
-                return NotFound();
-            document = memberDocument;
+            if (details?.FinalSignedPdfReady != true) return NotFound();
+            document = details.FinalSignedSummaryPdf!;
         }
         else if (await Users.IsInRoleAsync(user, SystemRoles.SourcingManager))
         {
@@ -282,13 +278,10 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
     {
         var user = await ActiveUser();
         if (user is null) return Forbid();
-        var round = await Committee.AssignedRounds(user.Id).Include(r => r.TenderRound).Include(r => r.TenderReport)
-            .Include(r => r.Votes).ThenInclude(v => v.CommitteeMember).ThenInclude(m => m.User)
-            .SingleOrDefaultAsync(r => r.Id == roundId);
-        if (round?.TenderReport is not { ReportType: ReportType.ExecutiveSummary } report) return NotFound();
-        var members = await Db.CommitteeMembers.Include(m => m.User).Where(m => m.TenderId == round.TenderRound.TenderId &&
-            (m.CommitteeType == CommitteeType.Top || m.CommitteeType == TopCommitteeCompatibility.LegacyTop))
-            .OrderBy(m => m.AssignedAt).ThenBy(m => m.Id).ToListAsync();
+        var details = await Committee.Load(user.Id, roundId);
+        if (details?.Round.TenderReport is not { ReportType: ReportType.ExecutiveSummary } report) return NotFound();
+        var round = details.Round;
+        var members = details.TopMembers.OrderBy(m => m.AssignedAt).ThenBy(m => m.Id).ToList();
         Response.Headers.CacheControl = "no-store";
         var result = members.Select(member =>
         {
@@ -300,7 +293,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
                 signatureSvgBase64 = string.IsNullOrWhiteSpace(signature?.ElectronicSignatureSvg) ? null :
                     Convert.ToBase64String(Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg)) };
         }).ToList();
-        return Json(new { signedCount = result.Count(m => m.signed), roundStatus = round.Status.ToString(), members = result });
+        return Json(new { signedCount = result.Count(m => m.signed), roundStatus = round.Status.ToString(), finalSignedPdfReady = details.FinalSignedPdfReady, members = result });
     }
 
     private string ReportStorageRoot => Path.Combine(environment.ContentRootPath, "Areas", "TopCommittee", "App_Data", "Reports");

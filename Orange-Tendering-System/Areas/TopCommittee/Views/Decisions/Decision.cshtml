@@ -2,7 +2,7 @@
 @{
  ViewData["Title"]=$"T-{Model.Tender.Id} — Committee Decision"; ViewData["WorkspaceSection"]="Voting";
  var report=Model.Round.TenderReport;
- var finalSignedReady=Model.FinalSignedSummaryPdf is not null && Model.SignedCount==4 && Model.Round.Status==CommitteeRoundStatus.Approved;
+ var finalSignedReady=Model.FinalSignedPdfReady;
  var paragraphs=System.Text.RegularExpressions.Regex.Split(report?.Content??"",@"(?:\r?\n){2,}").Where(p=>!string.IsNullOrWhiteSpace(p)).ToList();
 }
 <div class="tc-decision" data-signature-progress-url="@Url.Action("SignatureProgress", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })" data-final-pdf-url="@Url.Action("FinalSignedPdf", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })">
@@ -32,7 +32,7 @@
  <article class="dc-signature-card" data-member-id="@member.Id"><strong>@member.User.FullName</strong><span class="@(signature is not null?"dc-signature-signed":"dc-signature-pending")" data-signature-state>@(signature is not null?"Signed & approved":"Awaiting signature")</span>@if(signature is not null && !string.IsNullOrWhiteSpace(signature.ElectronicSignatureSvg)){<img class="dc-signature-ink" data-signature-ink alt="Electronic signature by @member.User.FullName" src="data:image/svg+xml;base64,@Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(signature.ElectronicSignatureSvg))" />}<time data-signature-at datetime="@(signature?.VotedAt.ToString("O"))">@(signature is not null?CommitteeDisplay.Date(signature.VotedAt):"—")</time></article>
 }
 </div></section>
-<section class="dc-card dc-report-file" data-final-signed-pdf style="@(finalSignedReady?"":"display:none")"><header class="dc-card-title"><partial name="_ReviewIcon" model='"report"' /><h2>Executive Summary PDF</h2></header><a class="dc-submit dc-pdf-download" asp-action="FinalSignedPdf" asp-route-roundId="@Model.Round.Id">Download Final Signed PDF</a></section>
+<section class="dc-card dc-report-file" data-final-signed-pdf hidden="@(!finalSignedReady)"><header class="dc-card-title"><partial name="_ReviewIcon" model='"report"' /><h2>Executive Summary PDF</h2></header><a class="dc-submit dc-pdf-download" asp-action="FinalSignedPdf" asp-route-roundId="@Model.Round.Id">Download Final Signed PDF</a></section>
 <section class="dc-card dc-record"><header class="dc-card-title"><span class="dc-check-icon" aria-hidden="true">✓</span><h2>Sign &amp; Approve Report</h2></header>
 @if(Model.CanVote)
 {
@@ -167,13 +167,13 @@ else{<p class="dc-readonly">Signing is not available for this report.</p>}
                     time.before(ink);
                 }
             }
-            if (data.signedCount === 4 && data.roundStatus === 'Approved') {
-                const final = root.querySelector('[data-final-signed-pdf]');
-                if (final) final.style.display = '';
-            }
+            const final = root.querySelector('[data-final-signed-pdf]');
+            if (final) final.hidden = data.finalSignedPdfReady !== true;
         } catch { }
         finally { active = false; }
     };
+    refresh();
+    document.addEventListener('visibilitychange', refresh);
     setInterval(refresh, 5000);
 })();
 </script>

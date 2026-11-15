@@ -52,6 +52,13 @@ public sealed class RoundDetails
     public int SignedCount => ValidVotes.Count(v => v.Decision == VoteDecision.Approve &&
         v.SignatureReportId == Round.TenderReportId && !string.IsNullOrWhiteSpace(v.SignatureDocumentHash) &&
         !string.IsNullOrWhiteSpace(v.ElectronicSignatureSvg));
+    public bool FinalSignedPdfReady => Round.Status == CommitteeRoundStatus.Approved &&
+        Round.TenderReport is { ReportType: ReportType.ExecutiveSummary, Status: ReportStatus.Accepted } &&
+        TopMembers.Count == 4 && TopMembers.Select(m => m.UserId).Distinct().Count() == 4 &&
+        ValidVotes.Count == 4 && ValidVotes.Select(v => v.CommitteeMemberId).Distinct().Count() == 4 &&
+        SignedCount == 4 && !string.IsNullOrWhiteSpace(OriginalSummaryPdf?.ContentHash) &&
+        ValidVotes.All(v => v.SignatureDocumentHash == OriginalSummaryPdf.ContentHash) &&
+        FinalSignedSummaryPdf is not null;
     public bool CanVote => Blockers.Count == 0 && (MyVote is null ||
         (MyVote.Decision == VoteDecision.Approve && string.IsNullOrWhiteSpace(MyVote.ElectronicSignatureSvg)));
     public bool CanClarify => IsLatest && Round.Status == CommitteeRoundStatus.InProgress &&
