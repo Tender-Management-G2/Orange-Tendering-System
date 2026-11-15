@@ -12,7 +12,6 @@ counts from SQL Server (no names, prices or documents). Everything else is illus
 Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
 ===========================================================
 *@
-@inject IWebHostEnvironment HostEnv
 @{
     Layout = "_HomeLayout";
     ViewData["Title"] = "Orange | From Request to Award. One Connected System.";
@@ -43,30 +42,40 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
     </defs>
 </svg>
 
-@* ============ 01-03  ORANGE HQ HERO: the approved headquarters image, cut into floors (Tools/HeroLayers).
-     Centred; starts exploded under a wide low camera, assembles on scroll into the exact approved view (wwwroot/js/home-hq.js) ============ *@
+@* ============ 01-03  ORANGE HQ: procedural 3D reconstruction (wwwroot/js/home-hq3d.js, Three.js).
+     Real geometry assembles on scroll under a moving 3D camera; panels are interactive HTML anchored in 3D. ============ *@
 @{
-    var heroManifest = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(HostEnv.WebRootPath, "assets", "hero", "manifest.json")));
-    var heroZ = new[] { "f5", "f4", "f3", "f2", "roof", "card" };
+    var hqPanels = new (string side, string floor, string icon, string name, string desc)[] {
+        ("left", "f1", "i-pr", "Purchase Requests", "Departments submit items, quantities, specifications, priority and target date. Each request is reviewed and approved, returned or rejected."),
+        ("right", "f1", "i-tender", "Tender Management", "The Sourcing Officer turns an approved request into a tender with terms, dates and committee-approved weights."),
+        ("left", "f2", "i-suppliers", "Supplier Management", "Suppliers register with official documents. An Admin verifies each account before it can take part."),
+        ("right", "f2", "i-bids", "Bidding", "Invited suppliers submit prices, technical details and documents before the deadline. Each supplier sees only its own offer."),
+        ("left", "f3", "i-compliance", "Compliance", "Mandatory documents and requirements are checked and marked Compliant, Non-Compliant or Pending Clarification."),
+        ("right", "f3", "i-ai", "AI Analysis", "Ollama-assisted analysis compares prices, delivery and missing items. It is advisory only: people decide."),
+        ("left", "f4", "i-committee", "Technical & Financial Evaluation", "A four-member committee scores every offer; member scores are weighted and averaged into a recommendation."),
+        ("right", "f4", "i-report", "Reports", "One unified Orange-branded report with scores, observations and the recommendation, signed by the four members."),
+        ("left", "roof", "i-approve", "Approvals", "The Sourcing Manager approves, rejects or returns the report; the Top Committee decides when policy requires."),
+        ("right", "roof", "i-award", "Award & Closure", "The decision reaches the Sourcing Officer, who notifies suppliers. The tender closes with a complete audit trail."),
+    };
+    var pi = 0;
 }
 <section class="hq" id="home" aria-labelledby="hc-h1">
-    <div class="hq-stage" id="hq-stage">
-        <img class="hq-backdrop" src="~/assets/hero/backdrop.webp" alt="" aria-hidden="true" decoding="async" />
-        <div class="hq-world" id="hq-world" aria-hidden="true">
-            <img class="hq-plate" src="~/assets/hero/plate@1x.webp" srcset="@Url.Content("~/assets/hero/plate@1x.webp") 1x, @Url.Content("~/assets/hero/plate@2x.webp") 2x" width="1448" height="1086" alt="" fetchpriority="high" decoding="async" />
-            <svg class="hq-wires" id="hq-wires" viewBox="0 0 1448 1086" focusable="false">
-                <defs><filter id="hq-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.4" /></filter></defs>
-            </svg>
-            @foreach (var name in heroZ)
+    <div class="hq-stage hq3" id="hq-stage">
+        <canvas class="hq3-canvas" id="hq3-canvas" role="img" aria-label="3D model of the Orange headquarters assembling floor by floor"></canvas>
+        <svg class="hq3-lines" id="hq3-lines" aria-hidden="true" focusable="false"></svg>
+        <ul class="hq3-panels" id="hq3-panels" aria-label="Procurement capabilities">
+            @foreach (var p in hqPanels)
             {
-                var l = heroManifest.RootElement.GetProperty("layers").EnumerateArray().First(e => e.GetProperty("name").GetString() == name);
-                <img class="hq-layer" data-layer="@name" src="@Url.Content($"~/assets/hero/{name}@1x.webp")" srcset="@Url.Content($"~/assets/hero/{name}@1x.webp") 1x, @Url.Content($"~/assets/hero/{name}@2x.webp") 2x"
-                     style="left:@(l.GetProperty("x").GetInt32())px;top:@(l.GetProperty("y").GetInt32())px;width:@(l.GetProperty("w").GetInt32())px;height:@(l.GetProperty("h").GetInt32())px" alt="" decoding="async" />
+                pi++;
+                <li class="hq3-panel hq3-@p.side" data-side="@p.side" data-floor="@p.floor" data-stage="@pi">
+                    <button type="button" aria-expanded="false" aria-controls="hq3-d@(pi)">
+                        <span class="hq3-ic" aria-hidden="true"><svg><use href="#@p.icon" /></svg></span>
+                        <span class="hq3-name">@p.name</span>
+                    </button>
+                    <p class="hq3-desc" id="hq3-d@(pi)">@p.desc</p>
+                </li>
             }
-            <i class="hq-glow hq-glow-roof"></i>
-            <i class="hq-glow hq-glow-base"></i>
-            <i class="hq-ring"></i>
-        </div>
+        </ul>
         <div class="hq-shade" id="hq-shade" aria-hidden="true"></div>
 
         <div class="hq-copy" id="hq-copy">
@@ -93,6 +102,7 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
             <div class="hq-label" id="hq-label"><b>00</b><span>Scroll to assemble the headquarters</span></div>
             <div class="hq-progress"><i id="hq-progress"></i></div>
         </div>
+        <div class="hq3-cap" id="hq3-cap" aria-live="polite"></div>
         <div class="hq-fade" id="hq-fade" aria-hidden="true"></div>
     </div>
 </section>

@@ -17,7 +17,7 @@
     <title>@(ViewData["Title"] ?? "Orange Sourcing & Tender Management System")</title>
     <link rel="icon" href="~/favicon.ico" />
     <script>
-        /* Before first paint: mark JS/animation support. home-hq.js and home-cinema.js re-check. */
+        /* Before first paint: mark JS/animation support. home-hq3d.js and home-cinema.js re-check. */
         (function (r) {
             r.classList.add("hc-js");
             if (!matchMedia("(prefers-reduced-motion: reduce)").matches) r.classList.add("hc-anim");
@@ -27,6 +27,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="~/css/home-cinema.css" asp-append-version="true" />
+    @* Emitted raw: the .NET importmap tag helper would replace this map with its own. *@
+    @Html.Raw("<script type=\"importmap\">{ \"imports\": { \"three\": \"" + Url.Content("~/js/vendor/three/build/three.module.min.js") + "\" } }</script>")
 </head>
 <body class="hc">
     <a class="hc-skip" href="#main-content">Skip to content</a>
@@ -110,6 +112,6 @@
         })();
     </script>
     <script src="~/js/home-cinema.js" asp-append-version="true"></script>
-    <script src="~/js/home-hq.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/home-hq3d.js" asp-append-version="true"></script>
 </body>
 </html>
