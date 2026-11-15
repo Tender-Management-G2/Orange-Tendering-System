@@ -1,7 +1,7 @@
 @*
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Team Page — scroll-controlled courtyard experience
+PAGE: Team Page — "The Minds Behind Orange"
 
 DEVELOPER OWNER: Tariq
 MODULE: Public Site
@@ -9,28 +9,21 @@ TRELLO TASK: Team Page
 TRELLO URL: https://trello.com/c/P1gL4sPq
 
 PURPOSE:
-A pinned, scroll-synchronised Three.js scene in the Orange HQ
-courtyard (wwwroot/js/team-scene.js) that ends on the team
-cards. Members come from wwwroot/data/team.json.
+Pinned, scroll-driven innovation room (wwwroot/js/team-scene.js):
+a miniature Orange HQ in the centre, the seven team cards above it.
+Each scroll stage focuses one member, draws an Orange connection
+line to their section of the building and shows their details in
+the right-hand panel; the finale connects all seven.
 
 BUSINESS ACCESS:
 Anonymous
 
 ROUTE: /team
 
-SEQUENCE:
-One segment per member in team.json order: walk in, sit on the
-bench, the orange falls, profile card, then take a place in the
-line beside the bench. Finale: the whole team side by side.
-
-FUTURE IMPLEMENTATION:
-- Replace the placeholder entries in team.json with the verified
-  team members (names, roles, photos, links); set placeholder =
-  false for verified profiles.
-
-DEPENDENCIES:
-wwwroot/data/team.json, TeamMemberViewModel, Three.js (vendored),
-GSAP ScrollTrigger (CDN with local fallback).
+DATA:
+wwwroot/data/team.json; photos in wwwroot/images/team/ (names
+from the supplied photo filenames). Roles and contributions stay
+marked as pending until the team confirms them.
 
 STATUS:
 STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
@@ -44,45 +37,34 @@ STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
   <section class="tx" id="tx" style="--tx-n:@Model.Count" aria-labelledby="tx-title">
     <div class="tx-sticky">
       <canvas class="tx-canvas" aria-hidden="true"></canvas>
-      <div class="tx-shade" aria-hidden="true"></div>
-      <div class="tx-intro">
+      <div class="tx-vignette" aria-hidden="true"></div>
+      <svg class="tx-links" aria-hidden="true">
+        <defs>
+          <linearGradient id="tx-line-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb066" /><stop offset="1" stop-color="#ff7900" /></linearGradient>
+        </defs>
+        @for (var i = 0; i < Model.Count; i++) { <path class="tx-link-glow" /> <path class="tx-link" /> <circle class="tx-link-dot" r="5" /> }
+      </svg>
+
+      <div class="tx-head">
         <span class="tx-eyebrow">OUR TEAM</span>
-        <h1 id="tx-title">The people behind<br /><em>the system.</em></h1>
-        <p>@Model.Count people, one bench and one orange tree. Scroll to meet the team one by one; stop to pause, scroll back to rewind.</p>
-        <span class="tx-hint" aria-hidden="true">Scroll <i></i></span>
+        <h1 id="tx-title">The Minds Behind <em>Orange</em></h1>
+        <p>Seven Minds. One Connected Vision.</p>
       </div>
-      <ol class="tx-stages" aria-hidden="true">
-        @for (var i = 0; i < Model.Count; i++) { <li>@((i + 1).ToString("00"))</li> }
-        <li class="tx-stage-all">Team</li>
-      </ol>
-      <span class="tx-live sr-only" role="status" aria-live="polite"></span>
-      <div class="tx-progress" aria-hidden="true"><i></i></div>
-      <aside class="tx-member" aria-live="polite" aria-label="Team member profile" inert>
-        <div class="tx-member-photo"><img alt="" hidden /><span class="tx-ph" aria-hidden="true"><b></b><small>Portrait pending</small></span></div>
-        <div class="tx-member-copy">
-          <span class="tx-member-idx"></span>
-          <span class="tx-member-status"></span>
-          <h3></h3>
-          <p class="tx-member-role"></p>
-          <p class="tx-member-text"></p>
-          <button type="button" class="tx-member-open" aria-haspopup="dialog" aria-controls="tx-dialog">View full profile <span aria-hidden="true">&rarr;</span></button>
-        </div>
+
+      <aside class="tx-journey" aria-label="Team journey">
+        <h2>Team Journey</h2>
+        <ol>
+          <li><b>Welcome</b><span>Enter the Orange experience</span></li>
+          <li><b>Meet the Team</b><span>Discover the seven minds behind the system</span></li>
+          <li><b>Their Contributions</b><span>See how each member connects to Orange</span></li>
+          <li><b>One Connected Team</b><span>A unified vision in action</span></li>
+        </ol>
       </aside>
-      <div class="tx-reveal" id="team-reveal" inert>
-        <div class="tx-reveal-head">
-          <span class="tx-brand" aria-hidden="true"><span>orange</span></span>
-          <div>
-            <span class="tx-eyebrow">OUR TEAM</span>
-            <h2>Great Ideas Start with<br /><em>Great People.</em></h2>
-            @if (Model.Any(m => m.Placeholder))
-            {
-              <p class="tx-note">Profiles marked as awaiting verification are placeholders; the verified team details will replace them.</p>
-            }
-          </div>
-        </div>
-        @if (Model.Count > 0)
-        {
-          <ul class="tx-cards" aria-label="Team members">
+
+      @if (Model.Count > 0)
+      {
+        <div class="tx-row-wrap">
+          <ul class="tx-row" aria-label="Team members">
             @for (var i = 0; i < Model.Count; i++)
             {
               var m = Model[i];
@@ -93,32 +75,52 @@ STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
                         data-photo="@photo" data-placeholder="@(m.Placeholder ? "true" : "false")"
                         data-github="@(TeamMemberViewModel.ProfileUrl(m.GitHub) ?? "")" data-linkedin="@(TeamMemberViewModel.ProfileUrl(m.LinkedIn) ?? "")">
                   <span class="tx-card-photo">
-                    @if (photo != "") { <img src="@photo" alt="" loading="lazy" width="400" height="500" /> }
-                    else { <span class="tx-ph" aria-hidden="true"><b>@((i + 1).ToString("00"))</b><small>Portrait pending</small></span> }
+                    @if (photo != "") { <img src="@photo" alt="" width="320" height="400" decoding="async" /> }
+                    else { <span class="tx-ph" aria-hidden="true"><b>@((i + 1).ToString("00"))</b></span> }
                   </span>
-                  <span class="tx-card-body">
-                    <span class="tx-card-status">@(m.Placeholder ? "Awaiting verification" : "Project contributor")</span>
-                    <strong>@m.FullName</strong>
-                    <span class="tx-card-role">@m.Role</span>
-                    <span class="tx-card-more">View profile <span aria-hidden="true">&rarr;</span></span>
-                  </span>
+                  <span class="tx-card-body"><strong>@m.FullName</strong><span>@m.Role</span></span>
+                  <span class="sr-only">, view profile</span>
                 </button>
               </li>
             }
           </ul>
+        </div>
+      }
+
+      <aside class="tx-info" aria-live="polite" aria-label="Selected team member">
+        <div class="tx-info-head">
+          <span class="tx-info-photo"><img alt="" hidden /></span>
+          <div><h3></h3><p class="tx-info-role"></p></div>
+        </div>
+        <span class="tx-info-label">Contribution</span>
+        <ul class="tx-info-list"></ul>
+        <p class="tx-info-section"></p>
+        <button type="button" class="tx-info-open" aria-haspopup="dialog" aria-controls="tx-dialog">View profile <span aria-hidden="true">&rarr;</span></button>
+      </aside>
+
+      <div class="tx-steps" role="group" aria-label="Go to a team member">
+        @for (var i = 0; i < Model.Count; i++)
+        {
+          var first = Model[i].FullName.Split(' ')[0];
+          <button type="button" data-step="@i" aria-label="Go to @Model[i].FullName"><span aria-hidden="true">@((i + 1).ToString("00"))</span><em>@first</em></button>
         }
       </div>
+
+      <div class="tx-finale" aria-hidden="true"><span>Seven Minds.</span> <em>One Connected Vision.</em></div>
+      <span class="tx-live sr-only" role="status" aria-live="polite"></span>
+      <div class="tx-progress" aria-hidden="true"><i></i></div>
     </div>
   </section>
+
   <dialog class="tx-dialog" id="tx-dialog" aria-labelledby="tx-dlg-name">
     <div class="tx-dlg">
       <button type="button" class="tx-dlg-close" data-tx-close aria-label="Close profile">&times;</button>
-      <div class="tx-dlg-photo"><img alt="" hidden /><span class="tx-ph" aria-hidden="true"><b></b><small>Portrait pending</small></span></div>
+      <div class="tx-dlg-photo"><img alt="" hidden /><span class="tx-ph" aria-hidden="true"><b></b></span></div>
       <div class="tx-dlg-copy">
         <span class="tx-dlg-status tx-eyebrow"></span>
         <h2 class="tx-dlg-name" id="tx-dlg-name"></h2>
         <p class="tx-dlg-role"></p>
-        <span class="tx-eyebrow tx-dlg-label">Responsibilities &amp; contributions</span>
+        <span class="tx-eyebrow tx-dlg-label">Contribution</span>
         <p class="tx-dlg-text"></p>
         <div class="tx-dlg-links"></div>
       </div>
