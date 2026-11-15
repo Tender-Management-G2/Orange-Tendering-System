@@ -276,7 +276,7 @@ function init() {
   ATTACH.roof = [[3.5 - (TW + 14) / 2 + 2, POD_H + 4 * FH + TOP_H + .6, 6], [3.5 + (TW + 14) / 2 - 2, POD_H + 4 * FH + TOP_H + .6, 6]];
 
   /* ---------------- interior: the curved Orange corridor behind the entrance ----------------
-     Left: curved wall with the five module tiles. Right: glass meeting rooms. Reflective floor, orange light lines,
+     Left: curved wall with the seven module tiles. Right: glass meeting rooms. Reflective floor, orange light lines,
      the corridor straightens at its end where the overview video wall is. Built away from the HQ (GZ); the entry
      flash carries the cut. */
   const GZ = -700, HALF = 5.5, CH_ = 6.5;
@@ -334,7 +334,7 @@ function init() {
     [0, 1].forEach(i => { const f = frameAt(.25 + i * .45); const l = new THREE.PointLight(0xffb070, 140, 70, 1.6); l.position.copy(f.p).setY(CH_ - 1); gallery.add(l); });
   }
   // module stations (corridor positions) and the end video wall
-  const STATIONS = [.16, .30, .44, .58, .72];
+  const STATIONS = [.1, .19, .28, .37, .46, .55, .66]; // seven modules along the curve
   const U_STOPS = [.02, ...STATIONS, .9];
   const tiles = [], rooms = [];
   STATIONS.forEach((u, k) => {
@@ -420,6 +420,8 @@ function init() {
   // 4..6: orbit to the opposite three-quarter view, then fly toward the entrance
   const CAM = new THREE.CatmullRomCurve3([V(14, 12, 112), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(0, 6, 92), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
   const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 21.2, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
+  // scroll timeline (0..TL_END): assembly 0..70, orbit and entrance 70..108, corridor GAL0..GAL0+GAL_LEN
+  const GAL0 = 108, GAL_LEN = 120, TL_END = GAL0 + GAL_LEN + 6;
   const camState = { t: 0, walk: 0, gal: 0 }; let override = null, inGallery = false;
   const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);
   // corridor walk: the camera follows the curve, dwells at each module (zero speed at every stop) and turns
@@ -434,7 +436,7 @@ function init() {
     let tgt = path.getPointAt(Math.min(1, u + .09)).addScaledVector(fr.right, -1.2).setY(1.85);
     let best = 0; station = -1;
     STATIONS.forEach((su, k) => { const w = Math.exp(-((u - su) * (u - su)) / (2 * .028 * .028)); if (w > best) { best = w; if (w > .5) station = k; } tgt = tgt.lerp(rooms[k].screen.clone().setY(2.1), w * .22); });
-    const wEnd = Math.exp(-((u - .9) * (u - .9)) / (2 * .05 * .05)); if (wEnd > .5) station = 5;
+    const wEnd = Math.exp(-((u - .9) * (u - .9)) / (2 * .05 * .05)); if (wEnd > .5) station = STATIONS.length;
     tgt.lerp(vg.position.clone(), wEnd * .9);
     pos.add(gallery.position); tgt.add(gallery.position);
     return [pos, tgt];
@@ -528,15 +530,15 @@ function init() {
     if (videoEl) mapQuad(videoEl, videoWall.g, videoWall.corners, 1300, 600, 60);
     if (uiEl) uiEl.classList.toggle("is-on", inGallery);
     stepEls.forEach((b, k) => { b.classList.toggle("is-on", station === k); b.classList.toggle("is-done", station > k); });
-    const show = inGallery && station >= 0 && station < 5 && dismissed !== station ? station : -1;
+    const show = inGallery && station >= 0 && station < STATIONS.length && dismissed !== station ? station : -1;
     if (show !== shownStation) { shownStation = show; if (infoEl) { infoEl.classList.toggle("is-on", show >= 0); infoBlocks.forEach((b, k) => { b.hidden = k !== show; }); } }
     if (station !== dismissed && dismissed >= 0 && station !== -1) dismissed = -1;
   }
   function goStation(k) {
     if (!st) return;
-    const gal = (k + 1) / (U_STOPS.length - 1), time = 108 + 86 * gal;
+    const gal = (k + 1) / (U_STOPS.length - 1), time = GAL0 + GAL_LEN * gal;
     dismissed = -1;
-    window.scrollTo({ top: st.start + (st.end - st.start) * time / 200, behavior: reduce ? "auto" : "smooth" });
+    window.scrollTo({ top: st.start + (st.end - st.start) * time / TL_END, behavior: reduce ? "auto" : "smooth" });
   }
   tileEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
   stepEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
@@ -644,6 +646,8 @@ function init() {
     get door() { return +door.open.toFixed(4); },
     get inGallery() { return inGallery; },
     get station() { return station; },
+    get stations() { return STATIONS.length; },
+    timeline: { gal0: GAL0, galLen: GAL_LEN, end: TL_END },
     goStation(k) { goStation(k); },
     // completes the scroll scrub immediately (software-rendered QA browsers draw only a few frames per second)
     sync() { if (st) { ScrollTrigger.update(); const tw = st.getTween && st.getTween(); if (tw) tw.progress(1); st.animation.progress(st.progress); } frame(); },
@@ -681,9 +685,9 @@ function init() {
     tl.fromTo("#hq3-flash", { opacity: 0 }, { opacity: 1, duration: 3, ease: "power2.in", immediateRender: false }, 100.6)
       .to("#hq3-flash", { opacity: 0, duration: 4.5, ease: "power2.out" }, 103.6);
     // inside: one station per homepage section, then the portal into the platform sections
-    tl.fromTo(camState, { gal: 0 }, { gal: 1, duration: 86, ease: "none", immediateRender: false }, 108);
-    tl.to(fade, { opacity: 1, duration: 3 }, 196.5);
-    tl.to({}, { duration: .01 }, 200);
+    tl.fromTo(camState, { gal: 0 }, { gal: 1, duration: GAL_LEN, ease: "none", immediateRender: false }, GAL0);
+    tl.to(fade, { opacity: 1, duration: 3 }, TL_END - 3.5);
+    tl.to({}, { duration: .01 }, TL_END);
     tl.eventCallback("onUpdate", () => {
       const time = tl.time(), pct = clamp(time / 70 * 100, 0, 100); let idx = 0;
       STAGES.forEach((s, i) => { if (pct >= s[0]) idx = i; });
@@ -699,7 +703,7 @@ function init() {
   const mm = gsap.matchMedia();
   mm.add({ wide: "(min-width:1100px)", mid: "(min-width:700px) and (max-width:1099px)", small: "(max-width:699px)" }, ctx => {
     const c = ctx.conditions, tl = build();
-    st = ScrollTrigger.create({ trigger: section, start: "top top", end: () => "+=" + Math.round(innerHeight * (c.wide ? 15 : c.mid ? 9 : 7)), pin: true, scrub: c.wide ? 1 : .7, anticipatePin: 1, animation: tl, invalidateOnRefresh: true });
+    st = ScrollTrigger.create({ trigger: section, start: "top top", end: () => "+=" + Math.round(innerHeight * (c.wide ? 15 : c.mid ? 9 : 7) * TL_END / 200), pin: true, scrub: c.wide ? 1 : .7, anticipatePin: 1, animation: tl, invalidateOnRefresh: true });
     const see = [...document.querySelectorAll("[data-see-action]")];
     function onSee(e) {
       e.preventDefault();

@@ -77,15 +77,31 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
                 </li>
             }
         </ul>
-        @* Curved corridor behind the entrance: five module tiles on the wall, an info card for the selected module,
-           a module timeline, and the overview video wall at the end (plays only if wwwroot/media/company-overview.mp4 exists). *@
+        @* Curved corridor behind the entrance: seven module tiles on the wall; reaching a tile opens its popup.
+           A module timeline runs along the bottom, and the overview video wall stands at the end
+           (it plays only if wwwroot/media/company-overview.mp4 exists). *@
         @{
-            var hqModules = new (string icon, string name, string anchor, string text, string[] items)[] {
-                ("i-pr", "Sourcing", "how-it-works", "Requesting departments raise purchase requests that are reviewed and turned into sourcing activity.", new[] { "Submit purchase requests with items and specifications", "Review: approve, return for changes or reject", "Track every request's status", "Clarify details with the Sourcing Officer" }),
-                ("i-tender", "Tender Management", "platform", "Manage the full tender lifecycle with transparency, compliance and collaboration.", new[] { "Create tenders with terms and dates", "Committee proposes weights, the Officer approves them", "Invite suppliers and open bidding", "Track submissions until the deadline" }),
-                ("i-suppliers", "Supplier Management", "suppliers", "Suppliers register, get verified and take part in tenders through their own portal.", new[] { "Registration with official documents", "Admin verification before activation", "Accept or decline invitations", "Each supplier sees only its own offers" }),
-                ("i-committee", "Evaluation & Scoring", "evaluation", "Offers are screened, analysed and scored openly against the approved weights.", new[] { "Compliance screening of every offer", "Ollama-assisted analysis, advisory only", "Four-member weighted scoring", "Ranked recommendation, not an automatic award" }),
-                ("i-report", "Reporting", "reports", "One unified report carries the decision through signatures and approvals.", new[] { "Unified Orange-branded PDF report", "Signed by the four committee members", "Sourcing Manager and Top Committee decisions", "The Sourcing Officer notifies suppliers" })
+            var hqModules = new (string icon, string name, string kicker, string anchor, string text, string[] items)[] {
+                ("i-pr", "Sourcing", "Where every purchase starts", "how-it-works",
+                    "Departments raise purchase requests; the Sourcing Officer reviews each one and turns approved requests into tenders.",
+                    new[] { "Purchase requests with items, quantities and specifications", "Approve, return for changes or reject, with a reason", "Live status for the requesting department", "Clarifications between the department and the Sourcing Officer" }),
+                ("i-tender", "Tender Management", "One lifecycle, fully traceable", "platform",
+                    "The Sourcing Officer builds the tender, the committee agrees its weights, and bidding opens on a fixed schedule.",
+                    new[] { "Tender terms, documents, opening date and deadline", "Weights proposed by the committee and approved before bidding", "Supplier invitations and supplier questions", "Submissions tracked round by round until the deadline" }),
+                ("i-suppliers", "Supplier Management", "A verified supplier base", "suppliers",
+                    "Suppliers register with their official documents and join tenders through their own portal once an administrator verifies them.",
+                    new[] { "Registration with commercial documents", "Administrator verification before activation", "Accept or decline each tender invitation", "Every supplier sees only its own offers and messages" }),
+                ("i-committee", "Evaluation & Scoring", "Four independent evaluations", "evaluation",
+                    "Offers that pass compliance screening are scored separately by each of the four committee members.",
+                    new[] { "Compliance screening of every offer", "Financial and technical score out of 100 per offer", "Each member scores independently", "Scores are recalculated on the server, never taken from the browser" }),
+                ("i-ai", "AI Analysis", "Assistance, not a decision", "analysis",
+                    "A locally hosted Ollama model reads the offers and their documents and prepares an evidence-based briefing for the reviewers.",
+                    new[] { "Financial, technical and delivery comparison", "Missing information, strengths and weaknesses", "Every claim cites its offer, document and uncertainty", "May suggest a compliant supplier, clearly marked advisory", "Never sets weights or scores, and never approves or awards" }),
+                ("i-weights", "Weights Calculation", "How the final score is built", "evaluation",
+                    "", new string[0]),
+                ("i-report", "Reporting", "From ranking to decision", "reports",
+                    "One report carries the ranking through signatures and approvals to the final decision.",
+                    new[] { "Unified Orange-branded PDF report", "Signed by all four committee members", "Sourcing Manager and, when policy requires, Top Committee decisions", "The Sourcing Officer notifies the suppliers of the outcome" })
             };
         }
         <div class="hq3-corridor-ui" id="hq3-corridor-ui">
@@ -99,22 +115,44 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
                 <video data-src="@Url.Content("~/media/company-overview.mp4")" data-available="@(System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, "media", "company-overview.mp4")) ? "true" : "false")" controls playsinline preload="none" aria-label="Orange company overview video"></video>
                 <div class="hq3-video-title"><span class="hq3-video-logo">orange</span><h3>Orange<br />Company Overview</h3><p>Sourcing &amp; Tender Management System</p></div>
             </div>
-            <aside class="hq3-info" id="hq3-info" aria-live="polite">
+            <aside class="hq3-info" id="hq3-info" aria-live="polite" aria-label="Module details">
                 <button type="button" class="hq3-info-close" id="hq3-info-close" aria-label="Close module details">&times;</button>
-                @foreach (var m in hqModules)
+                @for (var mi = 0; mi < hqModules.Length; mi++)
                 {
-                    <div class="hq3-mod" hidden>
+                    var m = hqModules[mi];
+                    <div class="hq3-mod@(m.icon == "i-weights" ? " hq3-mod-calc" : "")" hidden>
+                        <div class="hq3-mod-head">
+                            <span class="hq3-mod-ic" aria-hidden="true"><svg><use href="#@m.icon" /></svg></span>
+                            <div><span class="hq3-mod-num">@((mi + 1).ToString("00")) / @hqModules.Length.ToString("00")</span><span class="hq3-mod-kicker">@m.kicker</span></div>
+                        </div>
                         <h3>@m.name</h3>
-                        <p>@m.text</p>
-                        <ul>@foreach (var it in m.items) { <li>@it</li> }</ul>
-                        <a class="hq-cta" href="#@m.anchor">Explore Module <span aria-hidden="true">&rarr;</span></a>
+                        @if (m.icon == "i-weights")
+                        {
+                            <ol class="hq3-calc">
+                                <li><b>Agree the weights</b><span>Each of the four committee members proposes a Financial % and a Technical %; each proposal must total exactly 100%.</span></li>
+                                <li><b>Average and approve</b><span>The four proposals are averaged, approved by the authorised approver and locked before scoring.</span></li>
+                                <li><b>Score each offer</b><span>Every member gives each offer a Financial and a Technical score out of 100.</span></li>
+                                <li><b>Combine</b><span class="hq3-formula">Member score = (Financial &times; W<sub>F</sub> + Technical &times; W<sub>T</sub>) &divide; 100</span></li>
+                                <li><b>Average and rank</b><span>Final score = average of the four member scores. Offers are ranked from highest to lowest; ties are flagged, never broken silently.</span></li>
+                            </ol>
+                            <div class="hq3-example" aria-label="Worked example">
+                                <span>Example &middot; weights 40% / 60%</span>
+                                <p>Financial 80, Technical 90 &rarr; (80 &times; 40 + 90 &times; 60) &divide; 100 = <b>86</b></p>
+                            </div>
+                        }
+                        else
+                        {
+                            <p>@m.text</p>
+                            <ul>@foreach (var it in m.items) { <li>@it</li> }</ul>
+                        }
+                        <a class="hq-cta" href="#@m.anchor">Explore @m.name <span aria-hidden="true">&rarr;</span></a>
                     </div>
                 }
             </aside>
             <nav class="hq3-steps" id="hq3-steps" aria-label="Corridor modules">
                 @foreach (var m in hqModules)
                 {
-                    <button type="button"><span aria-hidden="true"><svg><use href="#@m.icon" /></svg></span>@m.name</button>
+                    <button type="button" aria-label="Go to @m.name"><span aria-hidden="true"><svg><use href="#@m.icon" /></svg></span><em>@m.name</em></button>
                 }
             </nav>
         </div>
