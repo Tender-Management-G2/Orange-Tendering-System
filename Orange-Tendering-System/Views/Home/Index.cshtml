@@ -1,567 +1,626 @@
 @*
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Home / Landing Page
+PAGE: Home / Landing Page (cinematic, scroll-driven)
 
-DEVELOPER OWNER: Tariq
-MODULE: Public Site & Shared Layout
-TRELLO TASK: Home / Landing Page
-TRELLO URL: https://trello.com/c/QMrx8dA6
+CONCEPT: "From Chaos to Control - The Art of Connected Procurement"
+ROUTE: /      ACCESS: Anonymous
+LAYOUT: _HomeLayout (only this page). Styles: wwwroot/css/home-cinema.css. Script: wwwroot/js/home-cinema.js.
 
-PURPOSE:
-Public landing page from the supplied layout: hero, workflow
-animation, role explorers and calls to action.
-
-BUSINESS ACCESS:
-Anonymous
-
-ROUTE: /
-
-FUTURE IMPLEMENTATION:
-- Replace clearly labelled demo explorers with real content
-  when available.
-- Bind the procurement overview to real, non-confidential,
-  role-filtered statistics.
-
-DEPENDENCIES:
-None (static).
-
-STATUS:
-PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
+DATA: The only dynamic content is ViewBag.Stats from HomeController.Index, which are aggregate
+counts from SQL Server (no names, prices or documents). Everything else is illustrative and labelled so.
+Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
 ===========================================================
 *@
-@{ ViewData["Title"] = "Orange | Sourcing & Tender Management System"; }
-<main id="home">
-      <section class="showcase" aria-label="Orange procurement platform">
-        <div
-          class="building"
-          role="img"
-          aria-label="Orange office building at dusk with orange illuminated architecture"
-        ></div>
-        <div class="ambient"></div>
-        <div class="hero">
-          <h1>
-            <span>Orange</span><strong>Sourcing & Tender</strong
-            ><span>Management System</span>
-          </h1>
-          <p>
-            Unified Platform for Sourcing &amp; Tender Management.<br
-              class="desktop"
-            />
-            Streamline procurement, manage<br
-              class="desktop"
-            />
-            tenders, evaluate bids, and build trusted supplier partnerships.
-          </p>
-          <div class="hero-actions">
-            <a class="primary"  asp-area="Identity" asp-page="/Account/Register">
-              Get Started <span>→</span></a><button class="overview" data-dialog="overview">
-              <span class="play">▶</span>Watch Overview
-            </button>
-          </div>
-        </div>
-        <svg
-          class="back-wave"
-          viewBox="0 0 1672 370"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
-              <stop stop-color="#ff8500" stop-opacity=".5" />
-              <stop offset="1" stop-color="#ff6000" stop-opacity="0" />
-            </linearGradient>
-            <filter id="glow"><feGaussianBlur stdDeviation="5" /></filter>
-          </defs>
-          <path
-            d="M0 290C230 440 340 160 650 215S930 270 1150 144 1400 25 1510 100 1610 159 1672 180L1672 230C1470 180 1460 90 1310 130S1040 320 800 260 450 170 300 300 100 370 0 330Z"
-            fill="url(#ribbon)"
-          />
-          <path
-            d="M0 290C230 440 340 160 650 215S930 270 1150 144 1400 25 1510 100 1610 159 1672 180"
-            fill="none"
-            stroke="#ff7900"
-            stroke-width="3"
-            opacity=".7"
-          />
-        </svg>
-        <section
-          id="workflow"
-          class="workflow"
-          aria-label="Six stages of the tender workflow"
-        >
-          <div class="stage-list"></div>
-          <svg
-            class="track"
-            viewBox="0 0 1672 240"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <defs>
-              <filter
-                id="lineGlow"
-                x="-50%"
-                y="-300%"
-                width="200%"
-                height="700%"
-              >
-                <feGaussianBlur stdDeviation="5" />
-              </filter>
-              <filter
-                id="pulseGlow"
-                x="-200%"
-                y="-200%"
-                width="500%"
-                height="500%"
-              >
-                <feGaussianBlur stdDeviation="9" />
-              </filter>
-            </defs>
-            <defs>
-              <path
-                id="route"
-                d="M-30 105C80 135 138 190 232 171S372 158 487 165 615 145 736 145 875 155 979 151 1115 134 1237 131 1400 130 1498 145 1620 169 1705 130"
-              />
-            </defs>
-            <use href="#route" class="route-glow" />
-            <use href="#route" class="route-base" />
-            <path class="pulse-tail" />
-            <g class="nodes"></g>
-            <circle class="pulse-halo" r="19" />
-            <circle class="pulse" r="5" />
-          </svg>
-        </section>
-        <div class="pagination" aria-label="Workflow animation controls">
-          <button
-            class="active"
-            aria-label="Play workflow"
-            title="Play workflow"
-          ></button><button aria-label="Pause workflow" title="Pause workflow"></button><button
-            aria-label="Restart workflow"
-            title="Restart workflow"
-          ></button>
-        </div>
-        <section class="features" aria-label="Platform features"></section>
-        <svg
-          class="footer-wave"
-          viewBox="0 0 1672 110"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="bottom">
-              <stop stop-color="#ff7900" />
-              <stop offset=".4" stop-color="#421d0b" />
-              <stop offset=".65" stop-color="#1c100b" />
-              <stop offset="1" stop-color="#ff6800" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M0 42C160 165 220 28 418 43S790 136 1034 90 1420-5 1672 45V110H0Z"
-            fill="url(#bottom)"
-          />
-          <path
-            d="M0 42C160 165 220 28 418 43S790 136 1034 90 1420-5 1672 45"
-            fill="none"
-            stroke="#ff7900"
-            stroke-opacity=".7"
-            stroke-width="1.5"
-          />
-          <path
-            d="M0 63C170 165 250 45 455 66S820 150 1100 116 1430-9 1672 44V110H0Z"
-            fill="url(#bottom)"
-            opacity=".5"
-          />
-        </svg>
-      </section>
-      <section
-        id="story"
-        class="section story-section"
-        aria-labelledby="story-title"
-      >
-        <div class="section-heading reveal">
-          <div>
-            <span class="eyebrow">01 / THE PROCUREMENT JOURNEY</span>
-            <h2 id="story-title">
-              From intent to impact.<br /><span>Connected at every step.</span>
-            </h2>
-          </div>
-          <p>
-            Six purposeful stages. One clear path to a confident procurement
-            decision.
-          </p>
-        </div>
-        <div class="story-grid">
-          <div class="story-sticky">
-            <div class="orbit-visual" aria-hidden="true">
-              <svg viewBox="0 0 400 400">
-                <circle class="orbit-base" cx="200" cy="200" r="165" />
-                <circle
-                  class="orbit-progress"
-                  cx="200"
-                  cy="200"
-                  r="165"
-                  pathLength="1"
-                />
-                <circle cx="200" cy="200" r="125" />
-                <path d="M25 200h70m210 0h70M200 25v70m0 210v70" /></svg
-              ><span class="story-count">01</span
-              ><span class="orbit-label">PURCHASE REQUEST</span
-              ><span class="orbit-dot"></span>
-            </div>
-            <p class="sticky-caption">
-              A clear process.<br /><strong>A shared direction.</strong>
-            </p>
-          </div>
-          <div class="story-steps"></div>
-        </div>
-      </section>
-      <section
-        id="evaluation"
-        class="section evaluation-section"
-        aria-labelledby="evaluation-title"
-      >
-        <div class="section-heading reveal">
-          <div>
-            <span class="eyebrow">02 / INTELLIGENT EVALUATION</span>
-            <h2 id="evaluation-title">
-              More clarity.<br /><span>Better-informed decisions.</span>
-            </h2>
-          </div>
-          <p>
-            Compare technical merit and financial value side by side. Give your
-            committee a clear, consolidated view.
-          </p>
-        </div>
-        <div class="evaluation-console glass reveal">
-          <div class="console-bar">
-            <div>
-              <span class="status-dot"></span> Evaluation workspace
-              <span class="console-id">/ IT infrastructure tender</span>
-            </div>
-            <span class="demo-badge">ILLUSTRATIVE DEMO · SAMPLE DATA</span>
-          </div>
-          <div class="evaluation-layout">
-            <div class="comparison">
-              <div class="panel-title">
-                <h3>Supplier comparison</h3>
-                <span>03 sample bids</span>
-              </div>
-              <div class="weight-control">
-                <label for="technical-weight"
-                  >Technical weight
-                  <strong id="technical-value">60%</strong></label
-                ><input
-                  type="range"
-                  id="technical-weight"
-                  min="10"
-                  max="90"
-                  value="60"
-                  step="5"
-                /><span
-                  >Financial weight
-                  <strong id="financial-value">40%</strong></span
-                >
-              </div>
-              <p class="formula">
-                Weighted score = (technical × technical weight) + (financial ×
-                financial weight)
-              </p>
-              <div class="table-scroll">
-                <table>
-                  <caption class="sr-only">
-                    Illustrative supplier scores, recalculated as weights change
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Supplier</th>
-                      <th scope="col">Technical</th>
-                      <th scope="col">Financial</th>
-                      <th scope="col">Weighted</th>
-                      <th scope="col">Rank</th>
-                    </tr>
-                  </thead>
-                  <tbody id="bid-table"></tbody>
-                </table>
-              </div>
-              <div class="chart-legend">
-                <span><i></i>Technical contribution</span
-                ><span><i></i>Financial contribution</span>
-              </div>
-              <div
-                id="score-chart"
-                class="score-chart"
-                aria-label="Weighted score comparison"
-              ></div>
-              <p id="rank-summary" class="sr-only" aria-live="polite"></p>
-            </div>
-            <aside class="insights-panel">
-              <div class="ai-mark">
-                <svg aria-hidden="true"><use href="#ai" /></svg
-                ><span>Ollama insights<small>CONCEPTUAL INTERFACE</small></span>
-              </div>
-              <span class="small-label">RECOMMENDATION SUPPORT</span>
-              <h3>Turn comparison into context.</h3>
-              <p id="ai-insight"></p>
-              <div class="human-decision">
-                <svg aria-hidden="true"><use href="#people" /></svg>
-                <div>
-                  <strong>Human committee decision</strong>
-                  <p>
-                    AI supports review. Authorized committees validate evidence,
-                    approve scores, and make award decisions.
-                  </p>
-                </div>
-              </div>
-              <button class="text-button" id="report-open">
-                View consolidated sample report <span>↗</span>
-              </button>
-              <p class="fineprint">
-                Sample scores and explanatory insights are computed locally for
-                this demo. No model is being called.
-              </p>
-            </aside>
-          </div>
-        </div>
-      </section>
-      <section
-        id="roles"
-        class="section roles-section explorer-section"
-        aria-label="Role Explorer"
-      >
-        <div class="section-heading reveal">
-          <div>
-            <span class="eyebrow">03 / GOVERNED BY DESIGN</span>
-            <h2>Clear roles.<br /><span>Confident collaboration.</span></h2>
-          </div>
-          <p>
-            Explore who does what, where they participate, and how
-            responsibilities stay distinct.
-          </p>
-        </div>
-        <div class="explorer-shell glass reveal">
-          <div class="explorer-toolbar">
-            <span
-              ><svg aria-hidden="true"><use href="#shield" /></svg> Role
-              Explorer</span
-            ><span class="quiet-tag">7 SYSTEM ROLES</span>
-          </div>
-          <div class="role-layout">
-            <div class="role-selector">
-              <span class="micro-label">CHOOSE A ROLE</span>
-              <div
-                class="role-tabs"
-                role="tablist"
-                aria-label="System roles"
-                aria-orientation="vertical"
-              ></div>
-            </div>
-            <div
-              class="role-panel"
-              id="role-panel"
-              role="tabpanel"
-              tabindex="0"
-            ></div>
-          </div>
-        </div>
-        <div class="access-notes reveal">
-          <div>
-            <svg aria-hidden="true"><use href="#shield" /></svg
-            ><span
-              ><strong>Role-scoped access</strong
-              ><small>Responsibilities define each workspace.</small></span
-            >
-          </div>
-          <div>
-            <svg aria-hidden="true"><use href="#user" /></svg
-            ><span
-              ><strong>Supplier isolation</strong
-              ><small>Each supplier’s own records only.</small></span
-            >
-          </div>
-          <div class="integration-note">
-            <span class="status-dot"></span
-            ><span>Identity roles are configured. Procurement workflow authorization remains implementation work.</span>
-          </div>
-        </div>
-      </section>
-      <section
-        id="clarifications"
-        class="section clarification-section explorer-section"
-        aria-label="Communication Explorer"
-      >
-        <div class="section-heading reveal">
-          <div>
-            <span class="eyebrow">04 / CLARIFICATIONS & INQUIRIES</span>
-            <h2>The right people.<br /><span>The right conversation.</span></h2>
-          </div>
-          <p>
-            Five authorized connections. Every clarification stays linked to its
-            procurement context.
-          </p>
-        </div>
-        <div class="communication-layout reveal">
-          <div class="connection-directory">
-            <div class="directory-heading">
-              <h3>Communication Explorer</h3>
-              <p>Select a connection to explore.</p>
-            </div>
-            <div
-              class="relationship-list"
-              aria-label="Authorized communication relationships"
-            ></div>
-            <div class="directory-note">
-              ↔ Bidirectional · Stage-restricted access
-            </div>
-          </div>
-          <div class="clarification-console glass">
-            <div class="console-bar">
-              <span
-                ><svg aria-hidden="true"><use href="#chat" /></svg> Conversation
-                preview</span
-              ><span class="demo-badge">ILLUSTRATIVE DEMO</span>
-            </div>
-            <div class="thread-panel">
-              <div class="thread-heading">
-                <div>
-                  <span class="small-label" id="thread-context"></span>
-                  <h3 id="thread-title"></h3>
-                </div>
-                <span id="thread-status" class="status-badge"></span>
-              </div>
-              <div class="participants" id="thread-participants"></div>
-              <div class="thread-messages"></div>
-              <div
-                class="status-switch"
-                role="group"
-                aria-label="Preview clarification status"
-              >
-                <span>Explore a status</span
-                ><button data-status="Pending" aria-pressed="false">
-                  Pending</button><button data-status="Answered" aria-pressed="true">
-                  Answered</button><button data-status="Resolved" aria-pressed="false">
-                  Resolved
-                </button>
-              </div>
-              <div class="thread-foot">
-                <span
-                  ><svg aria-hidden="true"><use href="#shield" /></svg>
-                  Authorized participants only</span
-                ><span>Demo · No messages sent</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      <section
-        id="analytics"
-        class="section analytics-section"
-        aria-label="Procurement Visibility"
-      >
-        <div class="section-heading reveal">
-          <div>
-            <span class="eyebrow">05 / PROCUREMENT VISIBILITY</span>
-            <h2>One view.<br /><span>A clearer perspective.</span></h2>
-          </div>
-          <p>
-            A dedicated view of tenders, suppliers, and procurement progress.
-            Ready for verified system data.
-          </p>
-        </div>
-        @* TODO (Tariq, with Admin/Top Committee owners): bind non-confidential, role-filtered statistics from the database.
-           The ZIP's insights script was not copied because its API endpoint does not exist in this project. *@
-        <div class="dashboard-shell glass reveal">
-          <div class="dashboard-toolbar">
-            <div>
-              <svg aria-hidden="true"><use href="#bars" /></svg
-              ><span
-                ><strong>Procurement overview</strong
-                ><small>System-wide visibility</small></span
-              >
-            </div>
-            <span class="connection-state is-live"><i></i>Live system data</span>
-          </div>
-          <div class="dashboard-body">
-            @{
-              var st = (PublicStats)ViewBag.Stats;
-              var total = Math.Max(1, st.Bidding + st.Evaluation + st.Approvals + st.Closed);
-              var a1 = st.Bidding * 360.0 / total; var a2 = a1 + st.Evaluation * 360.0 / total; var a3 = a2 + st.Approvals * 360.0 / total;
-              string D(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-              var donut = st.Bidding + st.Evaluation + st.Approvals + st.Closed == 0 ? "conic-gradient(#ffffff22 0 360deg)" : $"conic-gradient(#ff8a00 0 {D(a1)}deg,#098fff {D(a1)}deg {D(a2)}deg,#00bf81 {D(a2)}deg {D(a3)}deg,#c6cbd2 {D(a3)}deg 360deg)";
-              var peak = Math.Max(1, st.Monthly.Max(x => x.Value));
-            }
-            <div class="metric-grid">
-              <article class="metric">
-                <div class="metric-top"><svg aria-hidden="true"><use href="#layers" /></svg><span class="metric-state">LIVE</span></div>
-                <span>Active Tenders</span><strong>@st.ActiveTenders</strong><small>Tenders currently in progress</small>
-              </article>
-              <article class="metric">
-                <div class="metric-top"><svg aria-hidden="true"><use href="#people" /></svg><span class="metric-state">LIVE</span></div>
-                <span>Approved Suppliers</span><strong>@st.ApprovedSuppliers</strong><small>Verified and approved by Admin</small>
-              </article>
-              <article class="metric">
-                <div class="metric-top"><svg aria-hidden="true"><use href="#check" /></svg><span class="metric-state">LIVE</span></div>
-                <span>Completed Purchase Requests</span><strong>@st.CompletedRequests</strong><small>Accepted and moved on to sourcing</small>
-              </article>
-            </div>
-            <div class="analytics-grid">
-              <article class="analytics-panel">
-                <div class="panel-title"><h3>Tender Status Distribution</h3><span class="quiet-tag">LIFECYCLE</span></div>
-                <div class="distribution-empty">
-                  <div class="live-donut" aria-hidden="true" style="--donut:@donut"><span>@(st.Bidding + st.Evaluation + st.Approvals + st.Closed)<small>Tenders</small></span></div>
-                  <div class="distribution-legend">
-                    <span><i style="background:#ff8a00"></i>Bidding<b>@st.Bidding</b></span><span><i style="background:#098fff"></i>Evaluation<b>@st.Evaluation</b></span><span><i style="background:#00bf81"></i>Approvals<b>@st.Approvals</b></span><span><i style="background:#c6cbd2"></i>Closed<b>@st.Closed</b></span>
-                  </div>
-                </div>
-                <p class="chart-caption">Calculated from the tender records in the system (counts only).</p>
-              </article>
-              <article class="analytics-panel">
-                <div class="panel-title"><h3>Procurement Activity</h3><span class="quiet-tag">TENDERS CREATED</span></div>
-                <div class="home-bars" role="img" aria-label="Tenders created per month">
-                  @foreach (var m in st.Monthly) { <div><i style="height:@(Math.Max(4, m.Value * 100 / peak))%"></i><b>@m.Value</b><span>@m.Key</span></div> }
-                </div>
-                <p class="chart-caption">Tenders created in the last six months.</p>
-              </article>
-            </div>
-            
-          </div>
-        </div>
-      </section>
-      <section id="about" class="home-editorial-previews section" aria-labelledby="home-preview-title">
-        <div class="section-heading reveal"><div><span class="eyebrow">06 / BEYOND THE PLATFORM</span><h2 id="home-preview-title">A clear purpose.<br /><span>A human perspective.</span></h2></div><p>Discover the project, the people behind it, and a place for your next question.</p></div>
-        <div class="home-preview-list">
-          <a class="home-preview reveal" asp-controller="Home" asp-action="About"><span class="home-preview-index">01 / ABOUT US</span><h3>Built for<br />a clearer journey.</h3><p>The purpose, principles, and defined workflow behind the platform.</p><span class="home-preview-link">Discover the platform <b aria-hidden="true">↗</b></span></a>
-          <a class="home-preview reveal" asp-controller="Home" asp-action="Team"><span class="home-preview-index">02 / OUR TEAM</span><h3>Different minds.<br />One vision.</h3><p>An editorial introduction to the people behind the system.</p><span class="home-preview-link">Meet the team <b aria-hidden="true">↗</b></span></a>
-          <a id="contact" class="home-preview reveal" asp-controller="Home" asp-action="Contact"><span class="home-preview-index">03 / CONTACT US</span><h3>Start a better<br />conversation.</h3><p>Questions about the project, supplier onboarding, or platform support.</p><span class="home-preview-link">Get in touch <b aria-hidden="true">↗</b></span></a>
-        </div>
-      </section>
-      <section id="suppliers" class="final-cta">
-        <svg
-          class="closing-waves"
-          viewBox="0 0 1600 500"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path d="M-100 410C250 100 500 600 900 350S1400 200 1700 410" />
-          <path d="M-100 440C250 130 500 630 900 380S1400 230 1700 440" />
-          <path d="M-100 470C250 160 500 660 900 410S1400 260 1700 470" />
-        </svg>
-        <div class="reveal">
-          <span class="eyebrow">CONNECTED SOURCING. CONFIDENT DECISIONS.</span>
-          <h2>Your Next Procurement<br />Journey Starts Here.</h2>
-          <p>One platform to connect your teams, suppliers, and decisions.</p>
-          <div class="final-actions">
-            <a class="primary"  asp-area="Identity" asp-page="/Account/Login">
-              Sign In <span>→</span></a><a class="overview"  asp-area="Identity" asp-page="/Account/Register">
-              Supplier Registration <span>↗</span>
-            </a>
-          </div>
-          <span class="cta-note"
-            >Employee sign-in · Supplier registration requires approval</span
-          >
-        </div>
-      </section>
-      
-    </main>
+@inject IWebHostEnvironment HostEnv
+@{
+    Layout = "_HomeLayout";
+    ViewData["Title"] = "Orange | From Request to Award. One Connected System.";
+    var st = ViewBag.Stats as PublicStats;
+    var hasData = st is not null && (st.ActiveTenders + st.ApprovedSuppliers + st.CompletedRequests + st.Closed + st.Bidding + st.Evaluation + st.Approvals) > 0;
+}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+        <symbol id="i-pr" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></symbol>
+        <symbol id="i-tender" viewBox="0 0 24 24"><path d="M4 9l12-5v16L4 15z"/><path d="M4 9v6M19 9.5a3 3 0 010 5"/></symbol>
+        <symbol id="i-suppliers" viewBox="0 0 24 24"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6M8 11h2M14 11h2"/></symbol>
+        <symbol id="i-bids" viewBox="0 0 24 24"><path d="M3 12l9-9h8v8l-9 9z"/><circle cx="16" cy="8" r="1.4"/></symbol>
+        <symbol id="i-compliance" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 5-5"/></symbol>
+        <symbol id="i-ai" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4M10 12h4"/></symbol>
+        <symbol id="i-committee" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M15.5 14.4c3 .2 5.5 1.7 5.5 5.6"/></symbol>
+        <symbol id="i-weights" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+        <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 17v-4M12 17v-7M15 17v-2"/></symbol>
+        <symbol id="i-sign" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3M4 22h16"/></symbol>
+        <symbol id="i-approve" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+        <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5.5"/><path d="M8.5 13.5L7 21l5-3 5 3-1.5-7.5"/></symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-log" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
+        <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4z"/><path d="M10 21h4"/></symbol>
+        <symbol id="i-face" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3"/><circle cx="12" cy="12" r="3.5"/></symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3"/></symbol>
+    </defs>
+</svg>
 
-@section Scripts {<script src="~/js/app.js" asp-append-version="true"></script><script src="~/js/sections.js" asp-append-version="true"></script>}
+@* ============ 01-03  ORANGE HQ: procedural 3D reconstruction (wwwroot/js/home-hq3d.js, Three.js).
+     Real geometry assembles on scroll under a moving 3D camera; panels are interactive HTML anchored in 3D. ============ *@
+@{
+    var hqPanels = new (string side, string floor, string icon, string name, string desc)[] {
+        ("left", "f1", "i-pr", "Purchase Requests", "Departments submit items, quantities, specifications, priority and target date. Each request is reviewed and approved, returned or rejected."),
+        ("right", "f1", "i-tender", "Tender Management", "The Sourcing Officer turns an approved request into a tender with terms, dates and committee-approved weights."),
+        ("left", "f2", "i-suppliers", "Supplier Management", "Suppliers register with official documents. An Admin verifies each account before it can take part."),
+        ("right", "f2", "i-bids", "Bidding", "Invited suppliers submit prices, technical details and documents before the deadline. Each supplier sees only its own offer."),
+        ("left", "f3", "i-compliance", "Compliance", "Mandatory documents and requirements are checked and marked Compliant, Non-Compliant or Pending Clarification."),
+        ("right", "f3", "i-ai", "AI Analysis", "Ollama-assisted analysis compares prices, delivery and missing items. It is advisory only: people decide."),
+        ("left", "f4", "i-committee", "Technical & Financial Evaluation", "A four-member committee scores every offer; member scores are weighted and averaged into a recommendation."),
+        ("right", "f4", "i-report", "Reports", "One unified Orange-branded report with scores, observations and the recommendation, signed by the four members."),
+        ("left", "roof", "i-approve", "Approvals", "The Sourcing Manager approves, rejects or returns the report; the Top Committee decides when policy requires."),
+        ("right", "roof", "i-award", "Award & Closure", "The decision reaches the Sourcing Officer, who notifies suppliers. The tender closes with a complete audit trail."),
+    };
+    var pi = 0;
+}
+<section class="hq" id="home" aria-labelledby="hc-h1">
+    <div class="hq-stage hq3" id="hq-stage">
+        <canvas class="hq3-canvas" id="hq3-canvas" role="img" aria-label="3D model of the Orange headquarters assembling floor by floor"></canvas>
+        <svg class="hq3-lines" id="hq3-lines" aria-hidden="true" focusable="false"></svg>
+        <ul class="hq3-panels" id="hq3-panels" aria-label="Procurement capabilities">
+            @foreach (var p in hqPanels)
+            {
+                pi++;
+                <li class="hq3-panel hq3-@p.side" data-side="@p.side" data-floor="@p.floor" data-stage="@pi">
+                    <button type="button" aria-expanded="false" aria-controls="hq3-d@(pi)">
+                        <span class="hq3-ic" aria-hidden="true"><svg><use href="#@p.icon" /></svg></span>
+                        <span class="hq3-name">@p.name</span>
+                    </button>
+                    <p class="hq3-desc" id="hq3-d@(pi)">@p.desc</p>
+                </li>
+            }
+        </ul>
+        @* Curved corridor behind the entrance: seven module tiles on the wall; reaching a tile opens its popup.
+           A module timeline runs along the bottom, and the overview video wall stands at the end
+           (it plays only if wwwroot/media/company-overview.mp4 exists). *@
+        @{
+            var hqModules = new (string icon, string name, string kicker, string anchor, string text, string[] items)[] {
+                ("i-pr", "Sourcing", "Where every purchase starts", "how-it-works",
+                    "Departments raise purchase requests; the Sourcing Officer reviews each one and turns approved requests into tenders.",
+                    new[] { "Purchase requests with items, quantities and specifications", "Approve, return for changes or reject, with a reason", "Live status for the requesting department", "Clarifications between the department and the Sourcing Officer" }),
+                ("i-tender", "Tender Management", "One lifecycle, fully traceable", "platform",
+                    "The Sourcing Officer builds the tender, the committee agrees its weights, and bidding opens on a fixed schedule.",
+                    new[] { "Tender terms, documents, opening date and deadline", "Weights proposed by the committee and approved before bidding", "Supplier invitations and supplier questions", "Submissions tracked round by round until the deadline" }),
+                ("i-suppliers", "Supplier Management", "A verified supplier base", "suppliers",
+                    "Suppliers register with their official documents and join tenders through their own portal once an administrator verifies them.",
+                    new[] { "Registration with commercial documents", "Administrator verification before activation", "Accept or decline each tender invitation", "Every supplier sees only its own offers and messages" }),
+                ("i-committee", "Evaluation & Scoring", "Four independent evaluations", "evaluation",
+                    "Offers that pass compliance screening are scored separately by each of the four committee members.",
+                    new[] { "Compliance screening of every offer", "Financial and technical score out of 100 per offer", "Each member scores independently", "Scores are recalculated on the server, never taken from the browser" }),
+                ("i-ai", "AI Analysis", "Assistance, not a decision", "analysis",
+                    "A locally hosted Ollama model reads the offers and their documents and prepares an evidence-based briefing for the reviewers.",
+                    new[] { "Financial, technical and delivery comparison", "Missing information, strengths and weaknesses", "Every claim cites its offer, document and uncertainty", "May suggest a compliant supplier, clearly marked advisory", "Never sets weights or scores, and never approves or awards" }),
+                ("i-weights", "Weights Calculation", "How the final score is built", "evaluation",
+                    "", new string[0]),
+                ("i-report", "Reporting", "From ranking to decision", "reports",
+                    "One report carries the ranking through signatures and approvals to the final decision.",
+                    new[] { "Unified Orange-branded PDF report", "Signed by all four committee members", "Sourcing Manager and, when policy requires, Top Committee decisions", "The Sourcing Officer notifies the suppliers of the outcome" })
+            };
+        }
+        <div class="hq3-corridor-ui" id="hq3-corridor-ui">
+            <div class="hq3-tiles" id="hq3-tiles">
+                @foreach (var m in hqModules)
+                {
+                    <button type="button" class="hq3-tile" aria-label="Show @m.name"><span class="hq3-tile-ic" aria-hidden="true"><svg><use href="#@m.icon" /></svg></span><b>@m.name</b><i aria-hidden="true">&rarr;</i></button>
+                }
+            </div>
+            <div class="hq3-video" id="hq3-video">
+                <video data-src="@Url.Content("~/media/company-overview.mp4")" data-available="@(System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, "media", "company-overview.mp4")) ? "true" : "false")" controls playsinline preload="none" aria-label="Orange company overview video"></video>
+                <div class="hq3-video-title"><span class="hq3-video-logo">orange</span><h3>Orange<br />Company Overview</h3><p>Sourcing &amp; Tender Management System</p></div>
+            </div>
+            <aside class="hq3-info" id="hq3-info" aria-live="polite" aria-label="Module details">
+                <button type="button" class="hq3-info-close" id="hq3-info-close" aria-label="Close module details">&times;</button>
+                @for (var mi = 0; mi < hqModules.Length; mi++)
+                {
+                    var m = hqModules[mi];
+                    <div class="hq3-mod@(m.icon == "i-weights" ? " hq3-mod-calc" : "")" hidden>
+                        <div class="hq3-mod-head">
+                            <span class="hq3-mod-ic" aria-hidden="true"><svg><use href="#@m.icon" /></svg></span>
+                            <div><span class="hq3-mod-num">@((mi + 1).ToString("00")) / @hqModules.Length.ToString("00")</span><span class="hq3-mod-kicker">@m.kicker</span></div>
+                        </div>
+                        <h3>@m.name</h3>
+                        @if (m.icon == "i-weights")
+                        {
+                            <ol class="hq3-calc">
+                                <li><b>Agree the weights</b><span>Each of the four committee members proposes a Financial % and a Technical %; each proposal must total exactly 100%.</span></li>
+                                <li><b>Average and approve</b><span>The four proposals are averaged, approved by the authorised approver and locked before scoring.</span></li>
+                                <li><b>Score each offer</b><span>Every member gives each offer a Financial and a Technical score out of 100.</span></li>
+                                <li><b>Combine</b><span class="hq3-formula">Member score = (Financial &times; W<sub>F</sub> + Technical &times; W<sub>T</sub>) &divide; 100</span></li>
+                                <li><b>Average and rank</b><span>Final score = average of the four member scores. Offers are ranked from highest to lowest; ties are flagged, never broken silently.</span></li>
+                            </ol>
+                            <div class="hq3-example" aria-label="Worked example">
+                                <span>Example &middot; weights 40% / 60%</span>
+                                <p>Financial 80, Technical 90 &rarr; (80 &times; 40 + 90 &times; 60) &divide; 100 = <b>86</b></p>
+                            </div>
+                        }
+                        else
+                        {
+                            <p>@m.text</p>
+                            <ul>@foreach (var it in m.items) { <li>@it</li> }</ul>
+                        }
+                        <a class="hq-cta" href="#@m.anchor">Explore @m.name <span aria-hidden="true">&rarr;</span></a>
+                    </div>
+                }
+            </aside>
+            <nav class="hq3-steps" id="hq3-steps" aria-label="Corridor modules">
+                @foreach (var m in hqModules)
+                {
+                    <button type="button" aria-label="Go to @m.name"><span aria-hidden="true"><svg><use href="#@m.icon" /></svg></span><em>@m.name</em></button>
+                }
+            </nav>
+        </div>
+        <div class="hq3-flash" id="hq3-flash" aria-hidden="true"></div>
+        <div class="hq-shade" id="hq-shade" aria-hidden="true"></div>
+
+        <div class="hq-copy" id="hq-copy">
+            <p class="hq-eyebrow">Sourcing &amp; Tender Management</p>
+            <h1 id="hc-h1">From Procurement Complexity to <em>One Unified Platform</em></h1>
+            <p class="hq-lead">Orange's intelligent sourcing and tender management platform connects suppliers, evaluations, approvals and procurement workflows in one secure digital experience.</p>
+            <div class="hq-actions">
+                <a class="hq-cta" href="#how-it-works">Explore the Platform <span aria-hidden="true">&rarr;</span></a>
+                <a class="hq-play" href="#platform" data-see-action><span class="hq-play-i" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span>See It in Action</a>
+            </div>
+            <p class="hq-account">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a asp-area="" asp-controller="Workspace" asp-action="Index">Open My Workspace &rarr;</a>
+                }
+                else
+                {
+                    <a asp-area="Identity" asp-page="/Account/Login">Login</a><span aria-hidden="true">/</span><a asp-area="Identity" asp-page="/Account/Register">Supplier Registration</a>
+                }
+            </p>
+        </div>
+
+        <div class="hq-stagebar" aria-hidden="true">
+            <div class="hq-label" id="hq-label"><b>00</b><span>Scroll to assemble the headquarters</span></div>
+            <div class="hq-progress"><i id="hq-progress"></i></div>
+        </div>
+        <div class="hq3-cap" id="hq3-cap" aria-live="polite"></div>
+        <div class="hq-fade" id="hq-fade" aria-hidden="true"></div>
+        @* Cinematic intro (welcome, connection, reveal), scrubbed by scroll ahead of the floor assembly; see home-hq3d.js. *@
+        <div class="hq-intro" id="hq-intro">
+            <canvas class="hq-intro-fx" aria-hidden="true"></canvas>
+            <div class="hq-intro-logo" aria-hidden="true"><span>orange</span></div>
+            <div class="hq-intro-s1">
+                <p class="hq-intro-title">Welcome to a New Era of Procurement.</p>
+                <p class="hq-intro-sub">One Platform. Endless Possibilities.</p>
+            </div>
+            <div class="hq-intro-s2" aria-hidden="true">
+                <p><b>Every Great Connection</b><span>Starts Somewhere.</span></p>
+                <i></i>
+            </div>
+            <div class="hq-intro-hint" aria-hidden="true">
+                <span class="hq-intro-mouse"><i></i></span>
+                <span>Scroll to begin the experience</span>
+                <svg viewBox="0 0 24 24"><path d="M5 9l7 7 7-7" /></svg>
+            </div>
+            <button type="button" class="hq-skip">Skip intro <span aria-hidden="true">&rarr;</span></button>
+        </div>
+    </div>
+</section>
+
+@* ============ 09  WORKSPACES ============ *@
+<section class="hc-sec hc-sec-alt" id="platform" aria-labelledby="hc-ws-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Inside the platform</p>
+            <h2 id="hc-ws-h">A workspace for <em>each role.</em></h2>
+            <p class="hc-lead">Navigation below follows the real workspaces. Contents are blurred placeholders, not live data.</p>
+        </div>
+        <p class="hc-banner hc-reveal">Demo representation of the interface. Sign in to use the real workspaces.</p>
+        <div class="hc-ws hc-reveal" id="hc-ws">
+            <div class="hc-ws-tabs" role="tablist" aria-label="Workspace previews">
+                <button type="button" role="tab" id="wt-officer" aria-controls="wp-officer" data-ws="officer">Sourcing Officer Workspace</button>
+                <button type="button" role="tab" id="wt-supplier" aria-controls="wp-supplier" data-ws="supplier">Supplier Portal</button>
+                <button type="button" role="tab" id="wt-committee" aria-controls="wp-committee" data-ws="committee">Evaluation Committee Workspace</button>
+                <button type="button" role="tab" id="wt-manager" aria-controls="wp-manager" data-ws="manager">Manager Review</button>
+                <button type="button" role="tab" id="wt-top" aria-controls="wp-top" data-ws="top">Top Committee Decisions</button>
+            </div>
+            @{
+                var ws = new (string id, string title, string[] nav, string active, string heading, string[] cards)[] {
+                    ("officer","Sourcing Officer",new[]{"Dashboard","Requests","Tenders","Received Bids","Reports","Final Decisions","Clarifications"},"Tenders","Tenders",new[]{"Draft tenders","Bidding","Under evaluation"}),
+                    ("supplier","Supplier Portal",new[]{"Dashboard","Invitations","Weighted Tenders","My Offers","Documents","Profile","Clarifications"},"My Offers","My Offers",new[]{"Submitted offers","Documents","Invitations"}),
+                    ("committee","Evaluation Committee",new[]{"Dashboard","Assigned Evaluations"},"Assigned Evaluations","Assigned Evaluations",new[]{"Weight proposal","Technical scores","Financial scores"}),
+                    ("manager","Sourcing Manager",new[]{"Dashboard","Pending Reports","Final Decisions","Decision History","Analytics & Exports"},"Pending Reports","Pending Reports",new[]{"Approve","Reject","Return with comments"}),
+                    ("top","Top Committee",new[]{"Dashboard","Evaluation Summary","Voting","Decision History","Management Statistics","Analytics & Exports"},"Voting","Voting",new[]{"Consolidated report","Manager recommendation","Decision and notes"})
+                };
+            }
+            @foreach (var w in ws)
+            {
+                <div class="hc-ws-panel" id="wp-@w.id" role="tabpanel" aria-labelledby="wt-@w.id" tabindex="0" hidden>
+                    <div class="hc-app">
+                        <aside><b class="hc-app-brand">orange</b><small>@w.title</small>
+                            @foreach (var item in w.nav) { <span class="@(item == w.active ? "on" : null)">@item</span> }
+                        </aside>
+                        <section><h4>@w.heading</h4>
+                            <div class="hc-app-cards">
+                                @foreach (var c in w.cards) { <div><small>@c</small><i></i><i></i></div> }
+                            </div>
+                            <div class="hc-app-table"><i></i><i></i><i></i><i></i></div>
+                        </section>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+
+@* ============ HOW IT WORKS: NINE STAGES ============ *@
+<section class="hc-steps-sec" id="how-it-works" aria-labelledby="hc-steps-h">
+    <div class="hc-wrap">
+        <p class="hc-eyebrow"><span></span>How it works</p>
+        <h2 id="hc-steps-h">Nine stages. One governed path.</h2>
+        <ol class="hc-steps" id="hc-steps">
+            <li data-stage="1"><span class="hc-step-n">01</span><div><h3>Purchase Request</h3><p>A requesting department states what it needs: items, quantities, specifications, priority and target date. The request is reviewed and approved, returned for changes or rejected.</p><ul class="hc-chips"><li>Purchase Request</li></ul></div></li>
+            <li data-stage="2"><span class="hc-step-n">02</span><div><h3>Tender Creation</h3><p>The Sourcing Officer turns an approved request into a tender with terms and dates. The four committee members propose financial and technical weights, and the Officer approves their average before bidding opens.</p><ul class="hc-chips"><li>Tender</li></ul></div></li>
+            <li data-stage="3"><span class="hc-step-n">03</span><div><h3>Supplier Invitations &amp; Bidding</h3><p>Selected suppliers are invited and submit prices, technical details and documents before the deadline. Each supplier sees only its own offer.</p><ul class="hc-chips"><li>Suppliers</li><li>Bids</li></ul></div></li>
+            <li data-stage="4"><span class="hc-step-n">04</span><div><h3>Compliance &amp; AI Analysis</h3><p>Mandatory documents and requirements are checked and marked Compliant, Non-Compliant or Pending Clarification. Ollama-assisted analysis adds advisory insight; people decide.</p><ul class="hc-chips"><li>Compliance</li><li>AI Analysis</li></ul></div></li>
+            <li data-stage="5"><span class="hc-step-n">05</span><div><h3>Technical &amp; Financial Evaluation</h3><p>A four-member Evaluation Committee scores every offer against the technical and financial criteria and records its observations.</p><ul class="hc-chips"><li>Evaluation Committee</li></ul></div></li>
+            <li data-stage="6"><span class="hc-step-n">06</span><div><h3>Weighted Scoring &amp; Results</h3><p>Each member's scores are combined with the approved weights, and the final supplier score is the average of the four member scores. Scores are recommendations, not automatic awards.</p><ul class="hc-chips"><li>Financial &amp; Technical Weights</li></ul></div></li>
+            <li data-stage="7"><span class="hc-step-n">07</span><div><h3>Reports &amp; Signatures</h3><p>One unified Orange-branded report carries scores, observations and the recommendation. The four committee members sign it.</p><ul class="hc-chips"><li>Unified Report</li><li>Signatures</li></ul></div></li>
+            <li data-stage="8"><span class="hc-step-n">08</span><div><h3>Manager &amp; Top Committee Approvals</h3><p>The Sourcing Manager approves, rejects or returns the report with comments. When policy requires it, the Top Committee takes the final collective decision.</p><ul class="hc-chips"><li>Approvals</li></ul></div></li>
+            <li data-stage="9"><span class="hc-step-n">09</span><div><h3>Award &amp; Closure</h3><p>The decision is relayed to the Sourcing Officer, who notifies suppliers. The tender closes with a complete audit trail.</p><ul class="hc-chips"><li>Final Award</li></ul></div></li>
+        </ol>
+        <p class="hc-more"><a class="hc-btn hc-btn-ghost" asp-area="" asp-controller="Home" asp-action="HowItWorks">Read the full workflow <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+</section>
+
+
+@* ============ 03  ROLES NETWORK ============ *@
+<section class="hc-sec" id="roles" aria-labelledby="hc-roles-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Seven roles</p>
+            <h2 id="hc-roles-h">Everyone has a seat. <em>No one has every key.</em></h2>
+            <p class="hc-lead">Select a role to see its responsibilities and the only connections it is authorised to have. Access is role-based and enforced on the server.</p>
+        </div>
+        <div class="hc-roles hc-reveal" id="hc-roles">
+            <div class="hc-role-pick" role="tablist" aria-label="System roles" aria-orientation="vertical">
+                <button type="button" role="tab" id="rt-admin" aria-controls="rp-admin" data-role="admin">Admin</button>
+                <button type="button" role="tab" id="rt-dept" aria-controls="rp-dept" data-role="dept">Requesting Department</button>
+                <button type="button" role="tab" id="rt-officer" aria-controls="rp-officer" data-role="officer">Sourcing Officer</button>
+                <button type="button" role="tab" id="rt-supplier" aria-controls="rp-supplier" data-role="supplier">Supplier</button>
+                <button type="button" role="tab" id="rt-committee" aria-controls="rp-committee" data-role="committee">Technical &amp; Financial Evaluation Committee</button>
+                <button type="button" role="tab" id="rt-manager" aria-controls="rp-manager" data-role="manager">Sourcing Manager</button>
+                <button type="button" role="tab" id="rt-top" aria-controls="rp-top" data-role="top">Top Committee</button>
+            </div>
+            <div class="hc-net" aria-hidden="true">
+                <svg viewBox="0 0 800 560" class="hc-net-lines" focusable="false">
+                    <g fill="none" stroke-linecap="round">
+                        <path class="adm" data-a="admin" data-b="dept" d="M110 80 Q 40 190 100 300"/>
+                        <path class="adm" data-a="admin" data-b="officer" d="M110 80 Q 200 150 360 300"/>
+                        <path class="adm" data-a="admin" data-b="supplier" d="M110 80 Q 20 330 360 500"/>
+                        <path class="adm" data-a="admin" data-b="committee" d="M110 80 Q 420 130 620 400"/>
+                        <path class="adm" data-a="admin" data-b="manager" d="M110 80 Q 460 70 700 250"/>
+                        <path class="adm" data-a="admin" data-b="top" d="M110 80 Q 340 40 600 90"/>
+                        <path class="ch" data-a="dept" data-b="officer" d="M100 300 L360 300"/>
+                        <path class="ch" data-a="officer" data-b="supplier" d="M360 300 L360 500"/>
+                        <path class="ch" data-a="officer" data-b="committee" d="M360 300 L620 400"/>
+                        <path class="ch" data-a="committee" data-b="manager" d="M620 400 L700 250"/>
+                        <path class="ch" data-a="manager" data-b="top" d="M700 250 L600 90"/>
+                    </g>
+                </svg>
+                <button type="button" class="hc-node" data-role="admin" style="--nx:13.75%;--ny:14.3%" tabindex="-1"><i>AD</i><span>Admin</span></button>
+                <button type="button" class="hc-node" data-role="dept" style="--nx:12.5%;--ny:53.6%" tabindex="-1"><i>RD</i><span>Requesting Department</span></button>
+                <button type="button" class="hc-node hc-node-lg" data-role="officer" style="--nx:45%;--ny:53.6%" tabindex="-1"><i>SO</i><span>Sourcing Officer</span></button>
+                <button type="button" class="hc-node" data-role="supplier" style="--nx:45%;--ny:89.3%" tabindex="-1"><i>SU</i><span>Supplier</span></button>
+                <button type="button" class="hc-node" data-role="committee" style="--nx:77.5%;--ny:71.4%" tabindex="-1"><i>EC</i><span>Evaluation Committee</span></button>
+                <button type="button" class="hc-node" data-role="manager" style="--nx:87.5%;--ny:44.6%" tabindex="-1"><i>SM</i><span>Sourcing Manager</span></button>
+                <button type="button" class="hc-node" data-role="top" style="--nx:75%;--ny:16.1%" tabindex="-1"><i>TC</i><span>Top Committee</span></button>
+                <p class="hc-legend"><i class="l-ch"></i>Authorised channel <i class="l-adm"></i>Administration only</p>
+            </div>
+            <div class="hc-panels" aria-live="polite">
+                <div class="hc-panel" id="rp-admin" role="tabpanel" aria-labelledby="rt-admin" tabindex="0" hidden>
+                    <h3>Admin</h3><p class="hc-sum">Configures the system, accounts and master data. Not involved in technical or financial evaluations.</p>
+                    <ul><li>Dashboard of users, suppliers, departments, requests and tenders.</li><li>Creates, edits, enables or disables accounts and sets roles.</li><li>Reviews supplier registrations, legal documents, tax numbers and licences, then sets Pending, Approved, Rejected or Suspended with a reason.</li></ul>
+                    <p class="hc-conn"><b>Connections:</b> administrative only (accounts, departments, supplier verification). No tender communication channel.</p>
+                </div>
+                <div class="hc-panel" id="rp-dept" role="tabpanel" aria-labelledby="rt-dept" tabindex="0" hidden>
+                    <h3>Requesting Department</h3><p class="hc-sum">The internal teams that need products or services, such as IT or HR.</p>
+                    <ul><li>Creates purchase requests with reason, priority, target date, items, quantities and specifications.</li><li>Tracks request history and review notes.</li><li>A Department Representative is one of the four Evaluation Committee members.</li></ul>
+                    <p class="hc-conn"><b>Connections:</b> Sourcing Officer (clarification channel).</p>
+                </div>
+                <div class="hc-panel" id="rp-officer" role="tabpanel" aria-labelledby="rt-officer" tabindex="0" hidden>
+                    <h3>Sourcing Officer</h3><p class="hc-sum">Manages the tender lifecycle from approved request to supplier notification.</p>
+                    <ul><li>Creates tenders, sets dates and terms, selects and invites suppliers.</li><li>Approves the committee's averaged weights before bidding opens.</li><li>Reviews and compares offers and runs the compliance check.</li><li>Tracks the evaluation, sends the unified report for signing and notifies suppliers of the final decision.</li></ul>
+                    <p class="hc-conn"><b>Connections:</b> Requesting Department, Supplier, Evaluation Committee.</p>
+                </div>
+                <div class="hc-panel" id="rp-supplier" role="tabpanel" aria-labelledby="rt-supplier" tabindex="0" hidden>
+                    <h3>Supplier</h3><p class="hc-sum">An external vendor taking part in tenders. Suppliers cannot see competing offers.</p>
+                    <ul><li>Registers with company details and official documents; an Admin verifies the account before activation.</li><li>Views invitations and accepts or declines participation.</li><li>Submits pricing, delivery time, technical details and documents, and tracks its own offers.</li></ul>
+                    <p class="hc-conn"><b>Connections:</b> Sourcing Officer only (missing documents and offer clarifications).</p>
+                </div>
+                <div class="hc-panel" id="rp-committee" role="tabpanel" aria-labelledby="rt-committee" tabindex="0" hidden>
+                    <h3>Technical &amp; Financial Evaluation Committee</h3><p class="hc-sum">Four members: the Sourcing Manager, a Department Representative, a Financial Representative and a Technical Representative.</p>
+                    <ul><li>Each member proposes financial and technical weights; the Officer approves their average.</li><li>Scores every offer technically and financially and documents observations and non-compliance.</li><li>Produces one unified report with the final result and a substantiated recommendation, signed by the four members.</li></ul>
+                    <p class="hc-conn"><b>Connections:</b> Sourcing Officer, Sourcing Manager.</p>
+                </div>
+                <div class="hc-panel" id="rp-manager" role="tabpanel" aria-labelledby="rt-manager" tabindex="0" hidden>
+                    <h3>Sourcing Manager</h3><p class="hc-sum">Sits on the Evaluation Committee, and separately reviews the finished report.</p>
+                    <ul><li>As a committee member, scores and signs like the other three members.</li><li>In the separate report-approval responsibility, approves, rejects or returns the unified report with comments.</li><li>Forwards the tender to the Top Committee when policy requires.</li></ul>
+                    <p class="hc-conn"><b>Connections:</b> Evaluation Committee, Top Committee.</p>
+                </div>
+                <div class="hc-panel" id="rp-top" role="tabpanel" aria-labelledby="rt-top" tabindex="0" hidden>
+                    <h3>Top Committee</h3><p class="hc-sum">A separate four-member body: the final authority for high-value or critical tenders.</p>
+                    <ul><li>Reviews requisitions, bids, the consolidated report and the Sourcing Manager's recommendation, including AI analysis where available.</li><li>Selects a supplier or asks for further details, recording notes and justification.</li><li>Keeps access to past tenders and their decisions.</li></ul>
+                    <p class="hc-conn"><b>Connections:</b> Sourcing Manager.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+@* ============ 04  GOVERNED COMMUNICATION ============ *@
+<section class="hc-sec hc-sec-alt" id="clarifications" aria-labelledby="hc-comm-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Governed communication</p>
+            <h2 id="hc-comm-h">Five channels. <em>Nothing else.</em></h2>
+            <p class="hc-lead">Clarification requests are limited to the people directly involved in the process. Illustrative view only; no real messages are shown.</p>
+        </div>
+        <div class="hc-comm hc-reveal" id="hc-comm">
+            <div class="hc-chain" aria-hidden="true">
+                <div class="hc-cn" data-n="dept" style="grid-area:1/1">Requesting<br>Department</div>
+                <i class="hc-cl" data-c="1" style="grid-area:1/2"></i>
+                <div class="hc-cn" data-n="officer" style="grid-area:1/3">Sourcing<br>Officer</div>
+                <i class="hc-cl" data-c="3" style="grid-area:1/4"></i>
+                <div class="hc-cn" data-n="committee" style="grid-area:1/5">Evaluation<br>Committee</div>
+                <i class="hc-cl" data-c="4" style="grid-area:1/6"></i>
+                <div class="hc-cn" data-n="manager" style="grid-area:1/7">Sourcing<br>Manager</div>
+                <i class="hc-cl" data-c="5" style="grid-area:1/8"></i>
+                <div class="hc-cn" data-n="top" style="grid-area:1/9">Top<br>Committee</div>
+                <i class="hc-cl hc-cl-v" data-c="2" style="grid-area:2/3"></i>
+                <div class="hc-cn" data-n="supplier" style="grid-area:3/3">Supplier</div>
+            </div>
+            <div class="hc-chan-list" role="list">
+                <button type="button" role="listitem" class="hc-chan" data-c="1" data-a="dept" data-b="officer" data-purpose="Clarify purchase requests: specifications, quantities and required changes."><span>Requesting Department</span><b aria-hidden="true">&harr;</b><span>Sourcing Officer</span></button>
+                <button type="button" role="listitem" class="hc-chan" data-c="2" data-a="officer" data-b="supplier" data-purpose="Request missing documents or clarification about a submitted offer, and receive the response."><span>Sourcing Officer</span><b aria-hidden="true">&harr;</b><span>Supplier</span></button>
+                <button type="button" role="listitem" class="hc-chan" data-c="3" data-a="officer" data-b="committee" data-purpose="Clarify submitted offers, documents and evaluation results."><span>Sourcing Officer</span><b aria-hidden="true">&harr;</b><span>Evaluation Committee</span></button>
+                <button type="button" role="listitem" class="hc-chan" data-c="4" data-a="committee" data-b="manager" data-purpose="Discuss evaluation results, the combined evaluation report and recommendations."><span>Evaluation Committee</span><b aria-hidden="true">&harr;</b><span>Sourcing Manager</span></button>
+                <button type="button" role="listitem" class="hc-chan" data-c="5" data-a="manager" data-b="top" data-purpose="Clarify reports, recommendations and final decisions."><span>Sourcing Manager</span><b aria-hidden="true">&harr;</b><span>Top Committee</span></button>
+            </div>
+            <div class="hc-chan-detail" aria-live="polite">
+                <p class="hc-tag">Illustrative</p>
+                <h3 id="hc-chan-title">Select a channel</h3>
+                <p id="hc-chan-purpose">Hover, focus or select a channel to see what it exists for.</p>
+                <div class="hc-states" id="hc-states" role="group" aria-label="Clarification status (illustrative)">
+                    <button type="button" data-s="0" aria-pressed="true">Pending</button>
+                    <button type="button" data-s="1" aria-pressed="false">Answered</button>
+                    <button type="button" data-s="2" aria-pressed="false">Resolved</button>
+                </div>
+                <p class="hc-note" id="hc-state-note">Pending: a clarification request was sent and is waiting for a response.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+@* ============ SUPPLIER PARTICIPATION ============ *@
+<section class="hc-sec" id="suppliers" aria-labelledby="hc-sup-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Supplier participation</p>
+            <h2 id="hc-sup-h">A fair seat at every tender. <em>Your offer stays yours.</em></h2>
+            <p class="hc-lead">External suppliers take part through their own portal. Competing suppliers never see each other's offers.</p>
+        </div>
+        <ol class="hc-path">
+            <li class="hc-reveal"><span>01</span><h3>Register</h3><p>Submit company details, tax and registration numbers, contact information and official documents.</p></li>
+            <li class="hc-reveal"><span>02</span><h3>Admin verification</h3><p>An Admin reviews the application and sets it to Approved, Rejected, Suspended or Pending with a reason.</p></li>
+            <li class="hc-reveal"><span>03</span><h3>Invitations</h3><p>Invited suppliers accept or decline participation in a tender.</p></li>
+            <li class="hc-reveal"><span>04</span><h3>Submit an offer</h3><p>Enter pricing, delivery time and technical details, and upload documents before the deadline.</p></li>
+            <li class="hc-reveal"><span>05</span><h3>Clarifications</h3><p>The Sourcing Officer may request missing documents or clarification; the supplier answers in the same channel.</p></li>
+            <li class="hc-reveal"><span>06</span><h3>Decision</h3><p>After approval, the Sourcing Officer notifies suppliers of the outcome. Suppliers can track their own offers.</p></li>
+        </ol>
+        <p class="hc-actions hc-reveal">
+            @if (User.Identity?.IsAuthenticated != true)
+            {
+                <a class="hc-btn hc-btn-solid" asp-area="Identity" asp-page="/Account/Register">Supplier Registration</a>
+            }
+        </p>
+    </div>
+</section>
+
+@* ============ 05  WEIGHTED EVALUATION DEMO ============ *@
+<section class="hc-sec hc-sec-alt" id="evaluation" aria-labelledby="hc-eval-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Weighted evaluation</p>
+            <h2 id="hc-eval-h">Weights agreed first. <em>Scores computed openly.</em></h2>
+            <p class="hc-lead">Four members propose weights, the Sourcing Officer approves their average, then every member scores each supplier. Move the sliders to see the live result.</p>
+        </div>
+        <p class="hc-banner hc-reveal">Illustrative values only. Nothing here is real data and no supplier is named.</p>
+        <noscript><p class="hc-banner">The interactive demo needs JavaScript.</p></noscript>
+        <div class="hc-eval hc-reveal" id="hc-eval">
+            <div class="hc-eval-col">
+                <h3><span>1</span>Committee weight proposals</h3>
+                <div id="hc-props" class="hc-props"></div>
+                <div class="hc-avg" aria-live="polite">
+                    <div><small>Average of proposals</small><strong id="hc-avg-txt">50% / 50%</strong></div>
+                    <div><small>Approved by the Sourcing Officer</small><strong id="hc-appr-txt">50% / 50%</strong></div>
+                </div>
+                <div class="hc-wbar" aria-hidden="true"><i id="hc-wbar-f"></i><i id="hc-wbar-t"></i></div>
+                <p class="hc-note"><b class="o">Financial</b> and <b class="g">Technical</b> approved weights always total 100%.</p>
+            </div>
+            <div class="hc-eval-col">
+                <h3><span>2</span>Member scores</h3>
+                <div class="hc-sup-tabs" role="tablist" aria-label="Supplier to score (illustrative)" id="hc-sup-tabs"></div>
+                <div id="hc-scores" class="hc-scores"></div>
+            </div>
+            <div class="hc-eval-col">
+                <h3><span>3</span>Live result</h3>
+                <div id="hc-rank" class="hc-rank" aria-live="polite"></div>
+                <div class="hc-formula">
+                    <code>MemberScore = (Financial &times; FinancialWeight + Technical &times; TechnicalWeight) / 100</code>
+                    <code>FinalSupplierScore = average of the four member scores</code>
+                </div>
+                <p class="hc-note">Scores are recommendations for the committee and managers. They are not an automatic award.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+@* ============ 06  AI + COMPLIANCE ============ *@
+<section class="hc-sec" id="analysis" aria-labelledby="hc-ai-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Compliance &amp; AI</p>
+            <h2 id="hc-ai-h">AI Informs. <em>People Decide.</em></h2>
+            <p class="hc-lead">Every bid passes a compliance screening and an advisory analysis. Neither one awards anything.</p>
+        </div>
+        <p class="hc-banner hc-reveal">Illustrative walkthrough. No live data and no live AI call is made from this page.</p>
+        <div class="hc-split hc-reveal" id="hc-split">
+            <div class="hc-doc" id="hc-doc" aria-hidden="true"><i></i><i></i><i></i><b>BID</b></div>
+            <article class="hc-pane">
+                <header><span class="hc-ic"><svg aria-hidden="true"><use href="#i-compliance"/></svg></span><div><h3>Compliance screening</h3><small>Mandatory requirements, checked by people</small></div></header>
+                <ul class="hc-checks">
+                    <li data-st="ok"><span>Mandatory documents</span><em>Compliant</em></li>
+                    <li data-st="ok"><span>Technical requirements</span><em>Compliant</em></li>
+                    <li data-st="wait"><span>Eligibility evidence</span><em>Pending Clarification</em></li>
+                    <li data-st="bad"><span>Offer validity period</span><em>Non-Compliant</em></li>
+                </ul>
+                <p class="hc-note">Non-compliance must be logged with a clear reason.</p>
+            </article>
+            <article class="hc-pane hc-pane-ai">
+                <header><span class="hc-ic"><svg aria-hidden="true"><use href="#i-ai"/></svg></span><div><h3>Ollama-assisted bid analysis</h3><small>Advisory insights for reviewers</small></div></header>
+                <div class="hc-ai-grid">
+                    <div><small>Price comparison</small><div class="hc-mini"><i style="--w:92%"></i><i style="--w:74%"></i><i style="--w:61%"></i></div></div>
+                    <div><small>Delivery observations</small><p>Delivery times differ between offers and are flagged for reviewers.</p></div>
+                    <div><small>Missing requirements</small><p>Lists documents or specifications it could not find.</p></div>
+                    <div><small>Advisory insight</small><p>Highlights strengths and weaknesses for the committee to weigh.</p></div>
+                </div>
+                <p class="hc-note">The output is an assistant tool and never replaces a committee decision.</p>
+            </article>
+            <p class="hc-ai-msg" id="hc-ai-msg">AI Informs. People Decide.</p>
+        </div>
+    </div>
+</section>
+
+
+@* ============ 07  REPORTS ============ *@
+<section class="hc-sec hc-sec-alt" id="reports" aria-labelledby="hc-rep-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Reports &amp; signatures</p>
+            <h2 id="hc-rep-h">One report. <em>Four signatures.</em></h2>
+            <p class="hc-lead">Evaluation data assembles into a single Orange-branded PDF. The decision then travels up the chain, and back down in a fixed order.</p>
+        </div>
+        <div class="hc-rep" id="hc-rep">
+            <div class="hc-pdf" aria-label="Illustrative unified report">
+                <div class="hc-pdf-top"><b>orange</b><span>Unified Evaluation Report</span></div>
+                <div class="hc-pdf-body">
+                    <div class="hc-frag" data-f="1"><small>Tender summary</small><i></i><i></i></div>
+                    <div class="hc-frag" data-f="2"><small>Approved weights</small><i class="w"></i></div>
+                    <div class="hc-frag" data-f="3"><small>Supplier scores</small><span class="hc-bars"><i style="--w:88%"></i><i style="--w:72%"></i><i style="--w:55%"></i></span></div>
+                    <div class="hc-frag" data-f="4"><small>Recommendation</small><i></i><i></i></div>
+                    <div class="hc-sigs" data-f="5"><span><u></u>Signature 1</span><span><u></u>Signature 2</span><span><u></u>Signature 3</span><span><u></u>Signature 4</span></div>
+                </div>
+                <p class="hc-pdf-note">Illustrative layout</p>
+            </div>
+            <ol class="hc-tl" id="hc-tl">
+                <li>Evaluation completed</li>
+                <li>Scores consolidated</li>
+                <li>Report generated</li>
+                <li>Four committee signatures</li>
+                <li>Sourcing Manager decision</li>
+                <li>Top Committee approval <small>when applicable</small></li>
+                <li>Final decision relayed to the Sourcing Officer</li>
+                <li>Sourcing Officer notifies suppliers</li>
+            </ol>
+        </div>
+        <div class="hc-notify hc-reveal" id="hc-notify">
+            <h3>Notification order</h3>
+            <ol>
+                <li>Top Committee</li><li>Sourcing Manager</li><li>Sourcing Officer</li><li>Suppliers</li>
+            </ol>
+            <p><b>Approval does not notify suppliers by itself.</b> The Sourcing Officer receives the final decision and then notifies suppliers.</p>
+        </div>
+    </div>
+</section>
+
+
+<section class="hc-sec" id="governance" aria-labelledby="hc-gov-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Security &amp; governance</p>
+            <h2 id="hc-gov-h">Control is built in, <em>not bolted on.</em></h2>
+        </div>
+        <div class="hc-grid3">
+            <article class="hc-reveal"><svg aria-hidden="true"><use href="#i-lock"/></svg><h3>Role-based access</h3><p>Each user only reaches the pages and actions their role allows, enforced on the server.</p></article>
+            <article class="hc-reveal"><svg aria-hidden="true"><use href="#i-eye"/></svg><h3>Supplier isolation</h3><p>Suppliers see only their own offers and records, never a competitor's.</p></article>
+            <article class="hc-reveal"><svg aria-hidden="true"><use href="#i-log"/></svg><h3>Audit trail</h3><p>Offers, scores, signatures and approvals are logged for later review.</p></article>
+            <article class="hc-reveal"><svg aria-hidden="true"><use href="#i-weights"/></svg><h3>Locked weights</h3><p>Evaluation weights are approved before bidding opens, so the rules cannot shift after offers arrive.</p></article>
+            <article class="hc-reveal"><svg aria-hidden="true"><use href="#i-face"/></svg><h3>Biometric sign-in</h3><p>Face and fingerprint verification can be linked to a registered account.</p></article>
+            <article class="hc-reveal"><svg aria-hidden="true"><use href="#i-ai"/></svg><h3>Human decisions</h3><p>AI analysis is advisory. Awards are decided by committees and managers.</p></article>
+        </div>
+    </div>
+</section>
+
+
+<section class="hc-sec hc-sec-alt" id="about" aria-labelledby="hc-about-h">
+    <div class="hc-wrap hc-two">
+        <div class="hc-reveal">
+            <p class="hc-eyebrow"><span></span>About Orange Sourcing</p>
+            <h2 id="hc-about-h">Paperwork, scattered emails and spreadsheets <em>replaced by one platform.</em></h2>
+        </div>
+        <div class="hc-reveal">
+            <p class="hc-lead">The Sourcing &amp; Tender Management System keeps purchase requests, tenders, supplier offers, documents, evaluations, decisions, notifications and reports in one central place, so every step is traceable and every comparison is fair.</p>
+            <p class="hc-actions"><a class="hc-btn hc-btn-ghost" asp-area="" asp-controller="Home" asp-action="About">About the platform</a><a class="hc-btn hc-btn-text" asp-area="" asp-controller="Home" asp-action="Team">Meet the team <span aria-hidden="true">&rarr;</span></a></p>
+        </div>
+    </div>
+</section>
+
+
+<section class="hc-sec" id="analytics" aria-labelledby="hc-stats-h">
+    <div class="hc-wrap">
+        <div class="hc-head hc-reveal">
+            <p class="hc-eyebrow"><span></span>Live from the system</p>
+            <h2 id="hc-stats-h">Public figures, <em>never invented.</em></h2>
+            <p class="hc-lead">Aggregate counts read directly from the platform database. No names, prices or documents are exposed.</p>
+        </div>
+        @if (hasData)
+        {
+            <dl class="hc-stats hc-reveal">
+                <div><dt>Active tenders</dt><dd>@st!.ActiveTenders</dd></div>
+                <div><dt>Approved suppliers</dt><dd>@st.ApprovedSuppliers</dd></div>
+                <div><dt>Completed purchase requests</dt><dd>@st.CompletedRequests</dd></div>
+                <div><dt>Closed tenders</dt><dd>@st.Closed</dd></div>
+            </dl>
+        }
+        else
+        {
+            <p class="hc-empty hc-reveal">No tenders, suppliers or requests have been recorded yet, so there is nothing to report. Figures appear here automatically as the platform is used.</p>
+        }
+    </div>
+</section>
+
+
+<section class="hc-cta" id="contact" aria-labelledby="hc-contact-h">
+    <div class="hc-wrap">
+        <p class="hc-eyebrow hc-eyebrow-c"><span></span>Contact &amp; get started</p>
+        <h2 id="hc-contact-h">Ready to join the journey?</h2>
+        <p class="hc-lead">Suppliers register and are verified by an Admin before activation. Employees sign in with accounts created by an Admin. For general inquiries, onboarding or support, use the contact page.</p>
+        <p class="hc-actions hc-actions-c">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a class="hc-btn hc-btn-solid" asp-area="" asp-controller="Workspace" asp-action="Index">Open My Workspace</a>
+            }
+            else
+            {
+                <a class="hc-btn hc-btn-solid" asp-area="Identity" asp-page="/Account/Register">Supplier Registration</a>
+                <a class="hc-btn hc-btn-ghost" asp-area="Identity" asp-page="/Account/Login">Login</a>
+            }
+            <a class="hc-btn hc-btn-text" asp-area="" asp-controller="Home" asp-action="Contact">Contact us <span aria-hidden="true">&rarr;</span></a>
+        </p>
+    </div>
+</section>
