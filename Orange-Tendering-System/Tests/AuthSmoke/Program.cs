@@ -22,6 +22,7 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
+if (args.Contains("--notification-checks")) { await NotificationChecks.Run(); return; }
 if (args.Contains("--top-decision-checks")) { await TopDecisionChecks.Run(); return; }
 if (args.Contains("--retender-checks")) { await RetenderChecks.Run(); return; }
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }

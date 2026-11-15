@@ -186,6 +186,15 @@ public class LoginModel(
             }
         }
 
+        // An approved supplier without enrolled biometrics still needs the same signed
+        // method claim as the configured password-only continuation. The password was
+        // verified above; never relax the supplier workspace gate or approval checks.
+        if (isSupplier && supplierStatus == SupplierStatus.Approved && biometricOptions.Value.SupplierPasswordOnly)
+        {
+            if (!await biometric.SignInAsync(user, BiometricSignInService.PasswordStepMethod, HttpContext.Connection.RemoteIpAddress?.ToString())) return null;
+            return new Accepted(await DestinationAsync(user, isSupplier), null);
+        }
+
         await signIn.SignInAsync(user, Input.RememberMe);
         logger.LogInformation("Identity sign-in succeeded for user {UserId}.", user.Id);
         db.AuditLogs.Add(new AuditLog

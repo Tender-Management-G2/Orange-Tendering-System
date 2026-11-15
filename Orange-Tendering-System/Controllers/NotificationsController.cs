@@ -13,6 +13,7 @@ namespace Orange_Tendering_System.Controllers
 {
     [Authorize]
     [AutoValidateAntiforgeryToken]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public class NotificationsController(TenderWorkflowService workflow, ApplicationDbContext db) : Controller
     {
         public async Task<IActionResult> Index() => View(await workflow.Notifications(User));
