@@ -6,6 +6,10 @@
     // Face recognition runs in the browser; the camera image never leaves the device, only 128-number
     // descriptors are sent. face-api.js 1.7.13 and its models are served locally from wwwroot/lib/face-api.
     var FACE_BASE = '/lib/face-api';
+    var activeStreams = new Set();
+    window.addEventListener('pagehide', function () {
+        activeStreams.forEach(function (stream) { stopCamera(stream); });
+    });
 
     // ---------- Small helpers ----------
 
@@ -194,8 +198,15 @@
                 audio: false
             });
         } catch (e) {
-            throw new Error('The camera is not available. Allow camera access and try again.');
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                throw new Error('Camera access was denied. Allow this site to use the camera, then try again.');
+            }
+            if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+                throw new Error('No camera was found. Connect a camera, then try again.');
+            }
+            throw new Error('The camera is not available. Check that another app is not using it, then try again.');
         }
+        activeStreams.add(stream);
         video.srcObject = stream;
         try { await video.play(); }
         catch (e) { stopCamera(stream, video); throw new Error('The camera preview could not start. Try again.'); }
@@ -206,7 +217,7 @@
     }
 
     function stopCamera(stream, video) {
-        if (stream) { stream.getTracks().forEach(function (track) { track.stop(); }); }
+        if (stream) { stream.getTracks().forEach(function (track) { track.stop(); }); activeStreams.delete(stream); }
         if (video) { video.srcObject = null; }
     }
 
@@ -282,6 +293,7 @@
     }
 
     async function runFace(options, challengeUrl, submitUrl, extra, challengeBody) {
+        if (options.onState) { options.onState('requesting'); }
         options.setStatus('Starting the camera...');
         // The token first: a wrong enrollment password fails before the camera opens.
         var challenge = await post(challengeUrl, challengeBody);
@@ -294,11 +306,16 @@
         }
         var stream = await cameraStarting;
         if (options.onCamera) { options.onCamera(true); }
+        if (options.onState) { options.onState('camera'); }
         try {
             options.setStatus('Looking for your face...');
+            if (options.onState) { options.onState('capturing'); }
             var evidence = await capture(options.video, options.setHint, options.onDetect);
             options.setStatus('Checking...');
-            return await post(submitUrl, Object.assign({ token: challenge.token }, evidence, extra));
+            if (options.onState) { options.onState('processing'); }
+            var result = await post(submitUrl, Object.assign({ token: challenge.token }, evidence, extra));
+            if (result && result.succeeded && options.onState) { options.onState('confirmed'); }
+            return result;
         } finally {
             stopCamera(stream, options.video);
             if (options.onCamera) { options.onCamera(false); }
@@ -337,7 +354,12 @@
             buttons.forEach(function (b) { if (b) { b.disabled = isBusy || b.hasAttribute('data-bio-disabled'); } });
         }
 
-        var faceOptions = { video: video, setStatus: setStatus, setHint: setHint };
+        var scene = document.querySelector('.ld-scene[data-scene="face"], .ld-scene[data-scene="login"]');
+        var faceOptions = { video: video, setStatus: setStatus, setHint: setHint,
+            onCamera: function (active) { if (scene && panel) { panel.classList.toggle('bio-hidden', !active); } },
+            onState: function (state) {
+                if (scene) { scene.dispatchEvent(new CustomEvent('dossier:face-state', { detail: { state: state } })); }
+            } };
         var allButtons = Array.prototype.slice.call(root.querySelectorAll('button'));
 
         async function guarded(action, successMessage) {
@@ -346,13 +368,16 @@
                 var result = await action();
                 if (result && result.redirect) {
                     setStatus('Signed in. Redirecting...', 'success');
-                    window.location.href = result.redirect;
+                    var delay = scene && scene.dataset.faceState === 'confirmed' &&
+                        !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1450 : 0;
+                    window.setTimeout(function () { window.location.href = result.redirect; }, delay);
                     return;
                 }
                 setStatus(successMessage, 'success');
                 return result;
             } catch (e) {
                 setStatus(e.message, 'danger');
+                if (scene) { faceOptions.onState('failed'); }
             } finally {
                 if (panel) { panel.classList.add('bio-hidden'); }
                 busy(allButtons, false);
@@ -370,10 +395,10 @@
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) {
             faceLoginButton.addEventListener('click', function () {
-                var emailBox = $('Input_Email');
+                var emailBox = $('faceEmail') || $('Input_Email');
                 var email = ((emailBox && emailBox.value) || '').trim();
-                if (!email) { setStatus('Enter your email above first.', 'danger'); return; }
-                if (panel) { panel.classList.remove('bio-hidden'); }
+                if (!email) { setStatus('Enter your supplier email first.', 'danger'); return; }
+                if (panel && !scene) { panel.classList.remove('bio-hidden'); }
                 guarded(function () { return faceLogin(faceOptions, email, returnUrl); }, 'Signed in.');
             });
         }
@@ -406,11 +431,16 @@
                 var password = ($('bioPassword') || {}).value || '';
                 if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
                 var replaceBox = $('faceReplace');
-                if (panel) { panel.classList.remove('bio-hidden'); }
+                if (panel && !scene) { panel.classList.remove('bio-hidden'); }
                 guarded(function () { return faceEnroll(faceOptions, replaceBox ? replaceBox.checked : true, password); }, 'Face registered successfully.').then(function (ok) {
                     // The registration step moves on to its confirmation; the settings page just reloads.
                     var next = root.getAttribute('data-enrolled-url');
-                    if (ok) { if (next) { window.location.href = next; } else { window.location.reload(); } }
+                    if (ok) {
+                        if (next) {
+                            var delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1750;
+                            window.setTimeout(function () { window.location.href = next; }, delay);
+                        } else { window.location.reload(); }
+                    }
                 });
             });
         }
@@ -563,7 +593,7 @@
         initFaceDemo();
         initPasskeyDemo();
         if ($('btnFaceEnroll') || $('face-demo-root')) { preloadFace(); }
-        var supplierEmail = $('Input_Email');
+        var supplierEmail = $('faceEmail');
         if (supplierEmail) { supplierEmail.addEventListener('focus', preloadFace, { once: true }); }
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) { faceLoginButton.addEventListener('pointerenter', preloadFace, { once: true }); }

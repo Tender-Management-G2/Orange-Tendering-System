@@ -30,6 +30,11 @@ FEATURES:
 
 <partial name="_PageHeader" />
 
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success" role="status">@successMessage</div>
+}
+
 <style>
     .admin-user-stats {
         display: grid;
@@ -247,7 +252,8 @@ FEATURES:
         <a class="pg-btn pg-btn-primary"
            asp-area="Admin"
            asp-controller="Users"
-           asp-action="Create">
+           asp-action="Create"
+           data-no-modal>
             Create User
         </a>
 

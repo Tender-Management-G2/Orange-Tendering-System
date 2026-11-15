@@ -1,107 +1,57 @@
 @page
 @model LoginModel
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Sign In (ASP.NET Core Identity login)
-
-DEVELOPER OWNER: Ahmad
-MODULE: Authentication & Biometrics
-TRELLO TASK: User Login & Role Redirect
-  (also hosts the entry points for "Fingerprint Registration &
-  Login" and "Face Registration & Recognition Login")
-TRELLO URL: https://trello.com/c/WoTewqHd
-
-PURPOSE:
-The ONE sign-in page of the system: employees, pending suppliers and approved suppliers all start here with their email.
-
-BUSINESS ACCESS:
-Anonymous visitors.
-
-BIOMETRIC SIGN-IN:
-- Face recognition (email + live camera challenge) and fingerprint
-  (WebAuthn passkey, demo) are wired to BiometricsController and
-  wwwroot/js/biometric.js. They issue the same Identity cookie.
-- An Approved supplier who has enrolled face/passkey cannot use the
-  password form (Login.cshtml.cs); pending suppliers can, to reach
-  Pending Approval and finish face setup.
-
-DEPENDENCIES:
-AspNetUsers, ApplicationUser, Supplier, SignInManager,
-Biometrics pages, AuditLogs.
-
-STATUS:
-Identity sign-in, role redirect, account-state checks, and lockout are implemented.
-Biometric sign-in is implemented (see Controllers/BiometricsController.cs).
-
-IMPORTANT:
-Do not add a second authentication system next to Identity.
-===========================================================
-*@
 @{
-    ViewData["Title"] = "Sign In";
+    ViewData["Title"] = "Sign in — The Living Dossier";
 }
-<section class="section auth-section">
-    <div class="glass login-shell">
-        <aside class="login-brand" aria-hidden="true">
-            <span class="logo">orange<span>&reg;</span></span>
-            <h2>Sourcing &amp; Tender Management</h2>
-            <p>One workspace from purchase request to award.</p>
-            <ul>
-                <li>Every role signs in here</li>
-                <li>Suppliers can use face recognition or a fingerprint / passkey</li>
-                <li>Your actions are recorded in the audit trail</li>
-            </ul>
-        </aside>
-
-        <div class="login-main auth-card">
-            <span class="eyebrow">YOUR PROCUREMENT WORKSPACE</span>
-            <h1>Sign in</h1>
-            <p class="login-lead">Enter your account email. Employees sign in with a password; approved suppliers can also use face recognition or a fingerprint / passkey.</p>
-
-            <form id="account" method="post" novalidate>
-                <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-                <label asp-for="Input.Email">Email</label>
-                <input asp-for="Input.Email" type="email" autocomplete="username" autofocus aria-required="true" placeholder="name@company.com" />
-                <span asp-validation-for="Input.Email" class="field-error"></span>
-                <label asp-for="Input.Password">Password</label>
-                <input asp-for="Input.Password" autocomplete="current-password" aria-required="true" />
-                <span asp-validation-for="Input.Password" class="field-error"></span>
-                <div class="login-row">
-                    <label class="auth-check"><input asp-for="Input.RememberMe" /> @Html.DisplayNameFor(m => m.Input.RememberMe)</label>
-                    <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
-                </div>
-                <button id="login-submit" type="submit" class="primary">Sign in</button>
-            </form>
-
-            @* Biometric sign-in for supplier companies (Ahmad): same email box as above; BiometricsController verifies the live face
-               (or the WebAuthn passkey) and issues the same Identity cookie. *@
-            <div class="login-or"><span>or sign in as a supplier with</span></div>
-            <div class="login-bio" id="bio-root" data-return-url="@Model.ReturnUrl">
-                <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
-                <div class="login-bio-buttons">
-                    <button type="button" id="btnFaceLogin">Login with Face Recognition</button>
-                    <button type="button" id="btnPasskeyLogin">Login with Fingerprint / Passkey</button>
-                </div>
-                <div id="facePanel" class="bio-face-panel bio-hidden">
-                    <video id="faceVideo" playsinline muted autoplay></video>
-                    <div id="faceHint" class="bio-face-hint"></div>
-                </div>
-                <small>Face recognition uses the email typed above. The camera picture stays on this device; only face measurements are checked. A passkey uses your device's own fingerprint, face unlock or PIN.</small>
+<section class="ld-shell ld-shell--login">
+    <div class="ld-interface">
+        <div class="ld-brand"><span class="ld-brand-symbol">◈</span><div><strong>Sourcing &amp; Tender Management</strong><small>THE LIVING DOSSIER</small></div></div>
+        <div class="ld-intro">
+            <span class="ld-kicker">Welcome back</span>
+            <h1>Open your dossier.</h1>
+            <p>Choose the sign-in method for your account.</p>
+        </div>
+        <div class="ld-login-option" id="bio-root" data-return-url="@Model.ReturnUrl">
+            @Html.AntiForgeryToken()
+            <span class="ld-option-number">01 / SUPPLIER</span>
+            <h2>Recognize your identity</h2>
+            <p>Approved suppliers can sign in with their enrolled face or a registered device passkey.</p>
+            <div class="ld-fields"><div class="ld-wide"><label for="faceEmail">Supplier email</label><input id="faceEmail" type="email" autocomplete="username" /></div></div>
+            <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
+            <div class="ld-login-actions">
+                <button type="button" id="btnFaceLogin" class="primary">Open with face recognition →</button>
+                <button type="button" id="btnPasskeyLogin" class="ld-secondary">Use a device passkey</button>
             </div>
-
-            <p class="login-foot">
-                New supplier? <a class="auth-link" asp-page="./Register">Register your company</a>
-                &middot; <a class="auth-link" id="resend-confirmation" asp-page="./VerifyEmail">Verify your email</a>
-            </p>
+            <div id="faceHint" class="ld-face-hint" role="status" aria-live="polite">Your camera opens only after you choose face recognition.</div>
+            <small class="ld-login-note">The camera image remains on your device. This academic face matching system has no spoof or liveness protection.</small>
+        </div>
+        <form id="account" method="post" class="ld-login-option">
+            <span class="ld-option-number">02 / EMPLOYEE &amp; SUPPLIER SETUP</span>
+            <h2>Continue with a password</h2>
+            <p>Employees use their password. Suppliers awaiting setup or approval can return to their application here.</p>
+            <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+            <div class="ld-fields">
+                <div class="ld-wide"><label asp-for="Input.Email">Email</label><input asp-for="Input.Email" autocomplete="username" aria-required="true" /><span asp-validation-for="Input.Email" class="field-error"></span></div>
+                <div class="ld-wide"><label asp-for="Input.Password">Password</label><input asp-for="Input.Password" autocomplete="current-password" aria-required="true" /><span asp-validation-for="Input.Password" class="field-error"></span></div>
+            </div>
+            <label class="ld-remember"><input asp-for="Input.RememberMe" /> @Html.DisplayNameFor(m => m.Input.RememberMe)</label>
+            <div class="ld-actions"><button id="login-submit" type="submit" class="primary">Sign in →</button></div>
+        </form>
+        <div class="ld-footer-links">
+            <a id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
+            <a asp-page="./Register">Register as a supplier</a>
+            <a id="resend-confirmation" asp-page="./VerifyEmail">Verify supplier email</a>
         </div>
     </div>
+    <aside class="ld-visual" aria-label="An origami identity above an open company dossier"><partial name="_LivingDossier" model='"login"' /></aside>
 </section>
-
 @section Styles {
     <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/living-dossier.css" asp-append-version="true" />
 }
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
+    <script src="~/js/living-dossier-motion.js" asp-append-version="true"></script>
     <script src="~/js/biometric.js" asp-append-version="true"></script>
 }

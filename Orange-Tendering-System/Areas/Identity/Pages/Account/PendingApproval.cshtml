@@ -1,78 +1,63 @@
 @page
 @model PendingApprovalModel
-@*
-    Supplier registration steps 3 and 4 (after Register and Verify Email, which signs the supplier in):
-    - No face enrolled yet: "Face registration" step (BiometricsController.FaceEnrollChallenge/FaceEnroll,
-      allowed for pending suppliers by SupplierApprovalGate). Success returns here with ?faceRegistered=true.
-    - Face enrolled: registration complete, waiting for administrator approval.
-*@
 @{
     var faceDone = Model.FaceTemplateCount > 0;
-    var setupDone = faceDone && Model.PasskeyCount > 0;
-    var title = setupDone ? (Model.CompanyApproved ? "Registration Complete" : "Pending Approval") : faceDone ? "Fingerprint / Passkey Registration" : "Face Registration";
-    ViewData["Title"] = title;
+    var passkeyDone = Model.PasskeyCount > 0;
+    ViewData["Title"] = faceDone ? (Model.CompanyApproved ? "Supplier dossier — Sign in with biometrics" : "Supplier dossier — Pending approval") : "Face enrollment — The Living Dossier";
 }
-<section class="section auth-section">
-    <div class="glass auth-card">
-        <span class="eyebrow">SUPPLIER ONBOARDING</span>
-        <h1>@title</h1>
-        <partial name="_RegistrationSteps" model="@(setupDone ? 5 : faceDone ? 4 : 3)" />
-
-        @if (Model.JustRegistered)
-        {
-            <div class="bio-status bio-status--success" role="status">Face registered successfully. Complete fingerprint / passkey registration next.</div>
-        }
-        @if (setupDone)
-        {
-            <p role="status">Fingerprint / Passkey Registered Successfully. Your email, face and passkey setup are complete. Company approval is a separate administrator decision.</p>
-            <p>Once your company is approved, choose face recognition or fingerprint / passkey on the sign-in page. Tender invitations and bids become available after approval.</p>
-        }
-        else
-        {
-            <p role="status">Your email is verified. Register your face, then register a fingerprint / passkey. After company approval, either method can be used to sign in.</p>
-        }
-
-        <div id="bio-root" data-return-url="" data-enrolled-url="/Identity/Account/PendingApproval?faceRegistered=true">
-            @Html.AntiForgeryToken()
-            <fieldset class="auth-fieldset">
-                <legend>@(faceDone ? "Register my face again (if sign-in does not recognise you)" : "Face registration")</legend>
-                <p>@(faceDone ? "✓ Face registered (" + Model.FaceTemplateCount + " encrypted samples)." : "1. Enter your password  2. Click Register Face  3. Allow the camera and look at it for 5 seconds — your face is captured automatically.")</p>
-                <label for="bioPassword">Current password</label>
-                <input id="bioPassword" type="password" autocomplete="current-password" />
-                <small>Re-checked so only you can link a face to this account.</small>
-                <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
-                <button id="btnFaceEnroll" type="button" class="@(faceDone ? "overview" : "primary")">@(faceDone ? "Register face again" : "Register Face")</button>
-                <div id="facePanel" class="bio-face-panel bio-hidden">
-                    <video id="faceVideo" playsinline muted autoplay></video>
-                    <div id="faceHint" class="bio-face-hint"></div>
-                </div>
-                <small>The camera picture stays on this device; only face measurements are sent.</small>
-            </fieldset>
-
-            @if (faceDone)
-            {
-                <fieldset class="auth-fieldset">
-                    <legend>Fingerprint / Passkey Registration</legend>
-                    <p>@(Model.PasskeyCount > 0 ? "✓ " + Model.PasskeyCount + " device(s) registered." : "No device registered.")</p>
-                    <label for="passkeyLabel">Device name</label>
-                    <input id="passkeyLabel" type="text" maxlength="60" placeholder="My phone" />
-                    <button id="btnPasskeyRegister" type="button" class="overview">Register Fingerprint / Passkey</button>
-                    <small>Uses the current password from the section above. Your browser may offer this computer or a phone (QR code).</small>
-                </fieldset>
-            }
+<section class="ld-shell ld-shell--face">
+    <div class="ld-interface" id="bio-root" data-return-url="" data-cinematic-face="true" data-face-complete="@(faceDone ? "true" : "false")" data-enrolled-url="/Identity/Account/PendingApproval?faceRegistered=true">
+        @Html.AntiForgeryToken()
+        <div class="ld-brand"><span class="ld-brand-symbol">◈</span><div><strong>Supplier registration</strong><small>THE LIVING DOSSIER</small></div></div>
+        <div class="ld-intro">
+            <span class="ld-kicker">Identity · final setup</span>
+            <h1>@(faceDone ? "Your identity has a place." : "Let's bring your identity to life.")</h1>
+            <p>@(faceDone ? (Model.CompanyApproved ? "Your face samples are linked to your account. Sign out, then use face recognition or a device passkey to enter your supplier workspace." : "Your face samples are linked to your account. Your company is still awaiting administrator review.") : "Use your camera to add your face to your company dossier.")</p>
         </div>
-
-        <a class="auth-link" asp-area="" asp-controller="Home" asp-action="Index">Return to homepage</a>
-        <a class="auth-link" asp-page="./Login">Sign in with face or fingerprint / passkey</a>
-        <form asp-page="./Logout" method="post">
-            <button type="submit" class="overview">Sign out</button>
-        </form>
+        <ol class="ld-progress" aria-label="Registration progress">
+            <li class="is-done"><span>01</span> Company dossier</li>
+            <li class="is-done"><span>02</span> Verify email</li>
+            <li class="@(faceDone ? "is-done" : "is-current")"><span>03</span> Face enrollment</li>
+            <li class="@(faceDone ? "is-current" : "")"><span>04</span> @(Model.CompanyApproved ? "Biometric sign-in" : "Pending approval")</li>
+        </ol>
+        @if (faceDone)
+        {
+            <div class="ld-face-success" role="status">✓ Face samples registered for this account.</div>
+        }
+        <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
+        <div class="ld-face-controls">
+            <label for="bioPassword">Current password</label>
+            <input id="bioPassword" type="password" autocomplete="current-password" />
+            <small>Your password is checked before the camera opens.</small>
+            <button id="btnFaceEnroll" type="button" class="primary">@(faceDone ? "Replace face samples" : "Start face enrollment")</button>
+            <div id="faceHint" class="ld-face-hint" role="status" aria-live="polite">Position your face inside the frame. Use a well-lit environment and keep one person in view.</div>
+        </div>
+        <p class="ld-privacy">Your camera image stays on this device. Face measurements are sent to this application and stored encrypted. This academic implementation does not have spoof or liveness protection, so it should not be treated as production-grade biometric proof.</p>
+        @if (faceDone)
+        {
+            <div class="ld-face-passkey">
+                <h2>Device passkey <small>Optional setup</small></h2>
+                <p>Use your device's available authenticator for another sign-in method. A fingerprint is offered only if your device supports it.</p>
+                <label for="passkeyLabel">Device name</label>
+                <input id="passkeyLabel" type="text" maxlength="60" placeholder="My device" />
+                <button id="btnPasskeyRegister" type="button">@(passkeyDone ? "Add another device passkey" : "Register a device passkey")</button>
+                <small>@(passkeyDone ? Model.PasskeyCount + " passkey(s) registered." : "No device passkey registered.") This uses the password above.</small>
+                <small>Fingerprint-specific enrollment — Coming Soon. A device passkey may use a fingerprint when your authenticator offers it.</small>
+            </div>
+        }
+        <div class="ld-footer-links"><a asp-area="" asp-controller="Home" asp-action="Index">Return to homepage</a><a asp-page="./Login">Go to sign in</a></div>
+        <form asp-page="./Logout" method="post"><button type="submit" class="ld-secondary">Sign out</button></form>
     </div>
+    <aside class="ld-visual" aria-label="Paper portrait and company dossier">
+        <partial name="_LivingDossier" model='"face"' />
+    </aside>
 </section>
-
 @section Styles {
     <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/living-dossier.css" asp-append-version="true" />
 }
 @section Scripts {
+    <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
+    <script src="~/js/living-dossier-motion.js" asp-append-version="true"></script>
     <script src="~/js/biometric.js" asp-append-version="true"></script>
 }

@@ -257,15 +257,15 @@ static class BiometricChecks
         var pendingLogin = await PasswordLogin(pending);
         check(pendingLogin.Headers.Location?.ToString().Contains("PendingApproval") == true, "pending supplier password sign-in lands on Pending Approval");
         var pendingPage = await (await pending.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
-        check(pendingPage.Contains("id=\"btnFaceEnroll\"") && pendingPage.Contains("<h1>Face Registration</h1>") &&
-              pendingPage.Contains("aria-current=\"step\">Face registration"), "after email verification the registration shows the Face Registration step");
+        check(pendingPage.Contains("id=\"btnFaceEnroll\"") && pendingPage.Contains("bring your identity to life.") &&
+              pendingPage.Contains("data-scene=\"face\""), "after email verification the registration shows the face enrollment step");
         var csrf = Csrf(pendingPage);
         var face = RandomFace(3);
         var enrolled = await Post(pending, csrf, "/Biometrics/FaceEnroll", FaceBody(await FaceChallenge(pending, csrf, "/Biometrics/FaceEnrollChallenge", new { password }), face, null));
         check(enrolled.StatusCode == HttpStatusCode.OK, "pending supplier enrolls a face during registration");
         var completed = await (await pending.GetAsync("/Identity/Account/PendingApproval?faceRegistered=true")).Content.ReadAsStringAsync();
-        check(completed.Contains("Face registered successfully") && completed.Contains("<h1>Fingerprint / Passkey Registration</h1>") && completed.Contains("id=\"btnPasskeyRegister\""),
-            "after face registration the supplier reaches Passkey Registration");
+        check(completed.Contains("Face samples registered for this account.") && completed.Contains("Device passkey") && completed.Contains("id=\"btnPasskeyRegister\""),
+            "after face registration the supplier sees backend-confirmed status and passkey setup");
         check((await pending.GetAsync("/Biometrics/Face")).Headers.Location?.ToString().Contains("PendingApproval") == true,
             "other biometric pages stay closed to a pending supplier");
         check((await pending.GetAsync("/Supplier")).Headers.Location?.ToString().Contains("PendingApproval") == true,
@@ -275,14 +275,14 @@ static class BiometricChecks
         using var resumed = newClient();
         await PasswordLogin(resumed);
         var resumedPage = await (await resumed.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
-        check(resumedPage.Contains("<h1>Fingerprint / Passkey Registration</h1>"), "interrupted enrollment resumes at passkey step without replacing the face");
+        check(resumedPage.Contains("Your identity has a place."), "interrupted enrollment resumes with the face samples intact");
         using var phoneKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var phoneId = RandomNumberGenerator.GetBytes(32);
         var creation = await (await Post(pending, csrf, "/Biometrics/PasskeyRegisterOptions", new { password })).Content.ReadFromJsonAsync<JsonElement>();
         check((await Post(pending, csrf, "/Biometrics/PasskeyRegister", Attestation("", creation.GetProperty("challenge").GetString()!, phoneId, phoneKey))).StatusCode == HttpStatusCode.OK,
             "pending supplier registers a real signed-credential passkey on the same account");
         var allDone = await (await pending.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
-        check(allDone.Contains("<h1>Pending Approval</h1>") && allDone.Contains("Fingerprint / Passkey Registered Successfully"), "both enrollment steps complete before pending approval confirmation");
+        check(allDone.Contains("Your company is still awaiting administrator review.") && allDone.Contains("passkey(s) registered."), "both enrollment steps complete before pending approval confirmation");
         using (var scope = services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
