@@ -66,7 +66,7 @@ using var supplier = Client(factory);
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    Check(await db.Roles.CountAsync() == 7, "seven roles seeded");
+    Check(await db.Roles.CountAsync() == SystemRoles.All.Length, "all configured roles seeded");
     var initial = await db.Users.SingleAsync(u => u.Email == adminEmail);
     Check(initial.MustChangePassword && initial.EmailConfirmed, "initial Admin requires password change");
 }
@@ -453,23 +453,54 @@ using (var scope = factory.Services.CreateScope())
 var formCreatedEmail = $"form-created-{suffix}@example.test";
 var formCreatedTemporaryPassword = "G!g7" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 var createUserToken = await Token(admin, "/Admin/Users/Create");
+var createUserPage = await (await admin.GetAsync("/Admin/Users/Create")).Content.ReadAsStringAsync();
+Check(createUserPage.Contains("name=\"Password\"") && createUserPage.Contains("data-password-generate"),
+    "Admin Create User shows the temporary password field");
 var createdFromForm = await admin.PostAsync("/Admin/Users/Create", Form(new()
 {
     ["FullName"] = "Form Created Evaluator", ["Email"] = formCreatedEmail,
-    ["Role"] = SystemRoles.EvaluationCommittee, ["IsActive"] = "false",
+    ["Role"] = SystemRoles.Technical, ["IsActive"] = "true",
     ["Password"] = formCreatedTemporaryPassword,
     ["__RequestVerificationToken"] = createUserToken
 }));
 Check(createdFromForm.StatusCode == HttpStatusCode.Redirect &&
       mail.Messages.Any(m => m.To == formCreatedEmail && m.Subject.Contains("Welcome")),
     "Admin Create User form sends welcome email to entered address");
+using (var firstLogin = Client(factory))
+{
+    var firstToken = await Token(firstLogin, "/Identity/Account/Login");
+    var first = await firstLogin.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = formCreatedEmail, ["Input.Password"] = formCreatedTemporaryPassword,
+        ["__RequestVerificationToken"] = firstToken
+    }));
+    Check(first.Headers.Location?.ToString().Contains("FirstLoginPasswordChange") == true,
+        "Admin-entered temporary password signs the employee in to the password change step");
+    Check((await firstLogin.GetAsync("/EvaluationCommittee")).Headers.Location?.ToString().Contains("FirstLoginPasswordChange") == true,
+        "temporary password cannot open the workspace");
+    var replacement = "P!p9" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+    var firstChangeToken = await Token(firstLogin, "/Identity/Account/FirstLoginPasswordChange");
+    var firstChanged = await firstLogin.PostAsync("/Identity/Account/FirstLoginPasswordChange", Form(new()
+    {
+        ["Input.CurrentPassword"] = formCreatedTemporaryPassword, ["Input.NewPassword"] = replacement,
+        ["Input.ConfirmPassword"] = replacement, ["__RequestVerificationToken"] = firstChangeToken
+    }));
+    Check(firstChanged.StatusCode == HttpStatusCode.Redirect &&
+          (await firstLogin.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.OK,
+        "employee changes the temporary password before workspace access");
+    using var scope = factory.Services.CreateScope();
+    var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var account = (await users.FindByEmailAsync(formCreatedEmail))!;
+    Check(!account.MustChangePassword && !await users.CheckPasswordAsync(account, formCreatedTemporaryPassword) &&
+          await users.CheckPasswordAsync(account, replacement), "temporary password is replaced");
+}
 mail.FailNext = true;
 var failedFormEmail = $"form-mail-fail-{suffix}@example.test";
 var failedFormToken = await Token(admin, "/Admin/Users/Create");
 var failedFromForm = await admin.PostAsync("/Admin/Users/Create", Form(new()
 {
     ["FullName"] = "Undelivered Evaluator", ["Email"] = failedFormEmail,
-    ["Role"] = SystemRoles.EvaluationCommittee, ["IsActive"] = "false",
+    ["Role"] = SystemRoles.Technical, ["IsActive"] = "false",
     ["Password"] = "H!h8" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
     ["__RequestVerificationToken"] = failedFormToken
 }));
@@ -599,15 +630,15 @@ using (var scope = factory.Services.CreateScope())
         }, adminId, context);
     Check(created.Succeeded, "Admin Create User saves the employee and sends welcome email");
     var account = await db.Users.SingleAsync(u => u.Email == adminCreatedEmail);
-    Check(!account.EmailConfirmed && account.MustChangePassword &&
+    Check(account.EmailConfirmed && account.MustChangePassword &&
           await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>()
               .CheckPasswordAsync(account, adminCreatedTemporaryPassword),
-        "Admin-created employee has a temporary password but waits for email setup");
+        "Admin-created employee has a usable temporary password and must change it");
 }
 var welcomeEmail = mail.Messages.Last(m => m.To == adminCreatedEmail);
 Check(welcomeEmail.Subject.Contains("Welcome") && welcomeEmail.Body.Contains("sign in") &&
       welcomeEmail.Body.Contains("ActivateEmployee"), "welcome email includes password and login links");
-var welcomeUrl = WebUtility.HtmlDecode(Regex.Match(welcomeEmail.Body, "href=\\\"([^\\\"]+)\\\"").Groups[1].Value);
+var welcomeUrl = WebUtility.HtmlDecode(Regex.Match(welcomeEmail.Body, "href=\\\"([^\\\"]*ActivateEmployee[^\\\"]*)\\\"").Groups[1].Value);
 var welcomeUri = new Uri(welcomeUrl);
 var welcomePassword = "W!w7" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 using (var adminCreated = Client(factory))
@@ -702,7 +733,7 @@ using (var lockedClient = Client(factory))
 
 using var secondFactory = CreateFactory();
 using (var scope = secondFactory.Services.CreateScope())
-    Check(await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Roles.CountAsync() == 7,
+    Check(await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Roles.CountAsync() == SystemRoles.All.Length,
         "role seed is idempotent");
 
 // Exercise every real role dashboard with real Identity cookies and SQL Server rows.

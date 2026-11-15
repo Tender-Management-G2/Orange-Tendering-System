@@ -1052,9 +1052,9 @@ namespace Orange_Tendering_System.Services
                 SupplierId = null,
                 IsActive = model.IsActive,
                 MustChangePassword = true,
-                // The temporary password stays unusable until the employee sets
-                // a private password through the emailed activation link.
-                EmailConfirmed = false
+                // Admin-provisioned employees may use the temporary password once;
+                // FirstLoginGate requires them to replace it before workspace access.
+                EmailConfirmed = true
             };
 
             await using var transaction =
@@ -1124,8 +1124,8 @@ namespace Orange_Tendering_System.Services
                 await _emailSender.SendEmailAsync(email, "Welcome to Orange Tendering",
                     $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
                     "<p>Welcome to Orange Tendering. An administrator has created an account for you.</p>" +
-                    $"<p><a href=\"{HtmlEncoder.Default.Encode(passwordUrl)}\">Set your password</a> to activate your account. This secure link expires in one hour.</p>" +
-                    $"<p>After setting your password, <a href=\"{HtmlEncoder.Default.Encode(loginUrl)}\">sign in to Orange Tendering</a> using this email address.</p>" +
+                    $"<p>Use the temporary password provided by your administrator to <a href=\"{HtmlEncoder.Default.Encode(loginUrl)}\">sign in</a>. You must change it before opening your workspace.</p>" +
+                    $"<p>Alternatively, <a href=\"{HtmlEncoder.Default.Encode(passwordUrl)}\">set a private password</a> using this secure link, which expires in one hour.</p>" +
                     "<p>If you were not expecting this invitation, please contact your administrator.</p>" +
                     "<p>Kind regards,<br>Orange Tendering Team</p>");
                 await _context.SaveChangesAsync();

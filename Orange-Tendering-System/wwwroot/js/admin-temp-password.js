@@ -34,7 +34,7 @@
 
         input.value = characters.join('');
         input.dispatchEvent(new Event('input', { bubbles: true }));
-        status.textContent = 'Temporary password generated. The user will replace it through the emailed link.';
+        status.textContent = 'Temporary password generated. Share it securely; the user will change it at first sign-in.';
     });
 
     toggle.addEventListener('click', () => {
@@ -53,7 +53,7 @@
         try {
             if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
             await navigator.clipboard.writeText(input.value);
-            status.textContent = 'Temporary password copied. Keep it secure; the user will replace it through the emailed link.';
+            status.textContent = 'Temporary password copied. Share it securely; the user will change it at first sign-in.';
         } catch {
             input.type = 'text';
             toggle.textContent = 'Hide';
