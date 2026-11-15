@@ -196,14 +196,8 @@ function init() {
   const pod2 = storey({ w: PW, d: PD, r: [2, 5, 2, 2], h: POD_H / 2, people: 34, desks: 34, ox: POX }); pod2.position.y = POD_H / 2; podium.add(pod2);
   const plinth = prism(plan(PW + 1, PD + 1, [2.5, 5.5, 2.5, 2.5], POX), .3, M.slabUnder); podium.add(plinth);
   // right wing (lower block) and its terrace
-  const rwing = storey({ w: 12, d: 26, r: [.6, 3, .6, .6], h: 8.5, people: 6, desks: 8, ox: 36, oz: -2 }); podium.add(rwing);
-  // curved white sweep on the left wing (the reference's sculptural ribbon)
-  const sweep = new THREE.CatmullRomCurve3([new THREE.Vector3(-41, .4, 13.5), new THREE.Vector3(-36, 2.6, 16.2), new THREE.Vector3(-29, 6.4, 16.6), new THREE.Vector3(-22, 9.8, 16.4), new THREE.Vector3(-17, 11.1, 16.2)]);
-  const band = new THREE.Shape(); band.moveTo(-.18, -.9); band.lineTo(.18, -.9); band.lineTo(.18, .9); band.lineTo(-.18, .9); band.lineTo(-.18, -.9);
-  const ribbon = new THREE.Mesh(new THREE.ExtrudeGeometry(band, { steps: 140, bevelEnabled: false, extrudePath: sweep }), M.slab); ribbon.castShadow = true; podium.add(ribbon);
-  podium.add(new THREE.Mesh(new THREE.TubeGeometry(sweep, 120, .09, 6, false), led(.9)));
   // podium sign, entrance doors and canopy
-  const psign = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 5.8), M.sign); psign.position.set(6.2, 7.3, PD / 2 + .08); podium.add(psign);
+  const psign = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 6.8), M.sign); psign.position.set(7.5, 6.4, PD / 2 + .08); podium.add(psign);
   // automatic sliding entrance: two framed glass leaves part as the visitor arrives (door.open 0..1)
   const lobbyGlow = new THREE.Mesh(new THREE.PlaneGeometry(10, 4.4), M.door); lobbyGlow.position.set(-3.5, 2.2, PD / 2 - 3); podium.add(lobbyGlow);
   const header = new THREE.Mesh(new THREE.BoxGeometry(5.6, .38, .34), M.slab); header.position.set(-3.5, 3.78, PD / 2 + .3); podium.add(header);
@@ -235,21 +229,22 @@ function init() {
   ];
   floorDefs.forEach((f, i) => {
     const s = storey({ w: TW, d: TD, r: TR, h: FH, people: f.people, desks: f.desks, ring: f.ring });
-    if (i === 0) { const rail = new THREE.Mesh(new THREE.ExtrudeGeometry(plan(TW + .3, TD + .3, TR.map(v => v + .15)), { depth: 1.1, bevelEnabled: false, curveSegments: 18 }).rotateX(-Math.PI / 2), [M.hidden, M.rail]); rail.position.y = FH; s.add(rail); shrubs(s, new THREE.Vector3(9, 0, 11.7), new THREE.Vector3(17, 0, 3), FH, 14, .45); }
+    { const rail = new THREE.Mesh(new THREE.ExtrudeGeometry(plan(TW + .3, TD + .3, TR.map(v => v + .15)), { depth: 1.1, bevelEnabled: false, curveSegments: 18 }).rotateX(-Math.PI / 2), [M.hidden, M.rail]); rail.position.y = FH; s.add(rail); shrubs(s, new THREE.Vector3(-16, 0, 11.85), new THREE.Vector3(14, 0, 11.85), FH, 26, .38); shrubs(s, new THREE.Vector3(16.85, 0, 6), new THREE.Vector3(16.85, 0, -10), FH, 14, .38); }
     part(f.name, s, POD_H + i * FH, i, [[.06, -1.6, 1.2], [-.08, 2.2, -1], [.1, -2.4, .6], [-.07, 1.8, -1.4]][i]);
   });
   // top floor: taller, garden terrace with a tree, upper orange sign
   const tf = storey({ w: TW, d: TD, r: TR, h: TOP_H, top: false, people: 14, desks: 16 });
-  const usign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 4.6), M.sign); usign.position.set(1.8, 2.6, TD / 2 - .2); tf.add(usign);
+  const usign = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 4.8), M.sign); usign.position.set(1.5, 2.45, TD / 2 + .1); tf.add(usign);
   tree(tf, -6, 0, 6, .75); shrubs(tf, new THREE.Vector3(-14, 0, 9), new THREE.Vector3(-2, 0, 9), 0, 10, .45);
   part("tf", tf, POD_H + 4 * FH, 4, [.09, -2, 1.6]);
   // roof: thick slab with the cantilevered left overhang, rounded front-right corner and orange edge light
   const roof = new THREE.Group();
-  const roofShape = plan(TW + 9, TD + 3, [3, 8.5, 2, 2], -3.6, .6);
-  const rslab = prism(roofShape, .95, M.slab); rslab.castShadow = true; roof.add(rslab);
-  roof.add(ledLoop(plan(TW + 9.04, TD + 3.04, [3, 8.5, 2, 2], -3.6, .6), .02, 1.2, .09));
-  const parapet = prism(plan(TW - 2, TD - 2, [1, 6, 1, 1]), .5, M.slab); parapet.position.y = .95; roof.add(parapet);
-  part("roof", roof, POD_H + 4 * FH + TOP_H, 5, [-.12, 3.2, -2.2]);
+  const roofShape = plan(TW + 7, TD + 7, [4, 10, 4, 4], 0, .5);
+  const rslab = prism(roofShape, 1.5, M.slab); rslab.castShadow = true; roof.add(rslab);
+  const soffit = prism(plan(TW + 6.6, TD + 6.6, [3.8, 9.8, 3.8, 3.8], 0, .5), .06, M.slabUnder); soffit.position.y = -.03; roof.add(soffit);
+  roof.add(ledLoop(plan(TW + 7.04, TD + 7.04, [4, 10, 4, 4], 0, .5), .05, 1.25, .1));
+  const parapet = prism(plan(TW - 2, TD - 2, [1, 6, 1, 1]), .5, M.slab); parapet.position.y = 1.5; roof.add(parapet);
+  part("roof", roof, POD_H + 4 * FH + TOP_H, 5, [-.1, 2.6, -1.8]);
   // entrance canopy (structural component, lands with the first floor)
   const canopy = new THREE.Group();
   const cslab = prism(plan(13, 4.5, [.3, .3, .3, .3], -3.5, 18.2), .35, M.slab); canopy.add(cslab);
@@ -259,40 +254,94 @@ function init() {
   // per-floor attach points for the live lines (left facade corner, right facade)
   const ATTACH = { f1: [[-17.2, 13, 10], [17.2, 13, -3]], f2: [[-17.2, 17.2, 10], [17.2, 17.2, -3]], f3: [[-17.2, 21.4, 10], [17.2, 21.4, -3]], f4: [[-17.2, 25.6, 10], [17.2, 25.6, -3]], roof: [[-17.2, 31, 10], [17.2, 31, -3]] };
 
-  /* ---------------- the gallery hall behind the door: one lit screen per homepage section ---------------- */
-  const GZ = -700, N_ST = 12, STEP = 11, HALL_W = 16, HALL_H = 8, HALL_L = (N_ST + 2) * STEP + 20;
+  /* ---------------- interior: the curved Orange corridor behind the entrance ----------------
+     Left: curved wall with the five module tiles. Right: glass meeting rooms. Reflective floor, orange light lines,
+     the corridor straightens at its end where the overview video wall is. Built away from the HQ (GZ); the entry
+     flash carries the cut. */
+  const GZ = -700, HALF = 5.5, CH_ = 6.5;
   const gallery = new THREE.Group(); gallery.position.set(0, 0, GZ); gallery.visible = false; scene.add(gallery);
+  const path = new THREE.CatmullRomCurve3([V3(0, 0, 10), V3(0, 0, -6), V3(2, 0, -20), V3(9, 0, -33), V3(20, 0, -42), V3(34, 0, -47), V3(50, 0, -48.5), V3(72, 0, -48.5), V3(88, 0, -48.5)], false, "centripetal");
+  function V3(x, y, z) { return new THREE.Vector3(x, y, z); }
+  function frameAt(u) { const p = path.getPointAt(clamp(u, 0, 1)), t = path.getTangentAt(clamp(u, 0, 1)); return { p, t, left: V3(t.z, 0, -t.x).normalize(), right: V3(-t.z, 0, t.x).normalize() }; }
+  function ribbon(off, y0, y1, mat, n = 180, u0 = 0, u1 = 1) {
+    const pos = [], idx = [];
+    for (let i = 0; i <= n; i++) { const f = frameAt(u0 + (u1 - u0) * i / n), b = f.p.clone().addScaledVector(f.right, off); pos.push(b.x, y0, b.z, b.x, y1, b.z); if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat); gallery.add(m); return m;
+  }
+  function lineAlong(off, y, mat, r = .05, u0 = 0, u1 = 1) {
+    const pts = []; for (let i = 0; i <= 120; i++) { const f = frameAt(u0 + (u1 - u0) * i / 120); pts.push(f.p.clone().addScaledVector(f.right, off).setY(y)); }
+    gallery.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 240, r, 6, false), mat));
+  }
+  const dashTex = canvasTex(512, 300, (g, w, h) => {
+    g.fillStyle = "#120c08"; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(255,121,0,.55)"; g.lineWidth = 3; g.strokeRect(6, 6, w - 12, h - 12);
+    for (let i = 0; i < 7; i++) { const bh = 30 + ((i * 37) % 90); g.fillStyle = "#ff7900"; g.fillRect(40 + i * 34, 250 - bh, 20, bh); }
+    g.beginPath(); g.lineWidth = 16; g.strokeStyle = "#ff7900"; g.arc(400, 150, 58, -1.2, 3.4); g.stroke(); g.beginPath(); g.strokeStyle = "#3a2a1c"; g.arc(400, 150, 58, 3.4, 5.08); g.stroke();
+    g.fillStyle = "rgba(255,255,255,.75)"; for (let i = 0; i < 4; i++) g.fillRect(40, 40 + i * 18, 120 - i * 18, 6);
+  });
+  const MAT = {
+    floor: new THREE.MeshStandardMaterial({ color: 0x14110f, roughness: .08, metalness: .78, envMapIntensity: .45 }),
+    wall: new THREE.MeshStandardMaterial({ color: 0x241a13, roughness: .5, metalness: .25, envMapIntensity: .25, side: THREE.DoubleSide }),
+    ceil: new THREE.MeshStandardMaterial({ color: 0x0f0c0a, roughness: .7, side: THREE.DoubleSide }),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0x2a3540, roughness: .02, metalness: .2, transparent: true, opacity: .2, envMapIntensity: .8, side: THREE.DoubleSide, depthWrite: false }),
+    frame: new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: .35, metalness: .85 }),
+    chair: new THREE.MeshStandardMaterial({ color: 0x8a3f16, roughness: .6 }),
+    table: new THREE.MeshStandardMaterial({ color: 0xd8cfc4, roughness: .3, metalness: .1 }),
+    dash: new THREE.MeshBasicMaterial({ map: dashTex, toneMapped: false }),
+    down: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd9a8).multiplyScalar(1.05), toneMapped: false }),
+  };
   {
-    const zc = -HALL_L / 2 + 12;
-    const gfloor = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, HALL_L), new THREE.MeshStandardMaterial({ color: 0x0e0c0b, roughness: .1, metalness: .75, envMapIntensity: .3 }));
-    gfloor.rotation.x = -Math.PI / 2; gfloor.position.z = zc; gallery.add(gfloor);
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: .55, metalness: .2, envMapIntensity: .2 });
-    [-1, 1].forEach(sd => { const wl = new THREE.Mesh(new THREE.PlaneGeometry(HALL_L, HALL_H), wallMat); wl.rotation.y = -sd * Math.PI / 2; wl.position.set(sd * HALL_W / 2, HALL_H / 2, zc); gallery.add(wl); });
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, HALL_L), new THREE.MeshStandardMaterial({ color: 0x0c0a09, roughness: .8 })); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, HALL_H, zc); gallery.add(ceil);
-    const strip = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd2a0).multiplyScalar(1.5), toneMapped: false });
-    [-4.5, 0, 4.5].forEach(x => { const b = new THREE.Mesh(new THREE.BoxGeometry(.18, .05, HALL_L - 6), strip); b.position.set(x, HALL_H - .05, zc); gallery.add(b); });
-    [-1, 1].forEach(sd => { const b = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, HALL_L - 6), led(.9)); b.position.set(sd * (HALL_W / 2 - .05), .04, zc); gallery.add(b); const t2 = b.clone(); t2.position.y = HALL_H - .3; gallery.add(t2); });
-    // only two real lights in the hall (keeps shaders within mobile GPU uniform limits); the strips are emissive
-    [0, 1].forEach(i => { const l = new THREE.PointLight(0xffb070, 160, 90, 1.6); l.position.set(0, HALL_H - 1, -i * 70 - 30); gallery.add(l); });
-    // portal at the end of the hall into the platform sections
-    const pz = -(N_ST + 1) * STEP - 8;
-    const glowPlane = new THREE.Mesh(new THREE.PlaneGeometry(9, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb46a).multiplyScalar(1.6), toneMapped: false })); glowPlane.position.set(0, 3, pz); gallery.add(glowPlane);
-    [[0, 6.1, 9.6, .25], [0, -.1, 9.6, .25], [-4.7, 3, .25, 6.4], [4.7, 3, .25, 6.4]].forEach(([x, y, w, h]) => { const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, .3), led(1.2)); f.position.set(x, y, pz + .1); gallery.add(f); });
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(220, 160), MAT.floor); fl.rotation.x = -Math.PI / 2; fl.position.set(40, 0, -40); gallery.add(fl);
+    const ce = new THREE.Mesh(new THREE.PlaneGeometry(220, 160), MAT.ceil); ce.rotation.x = Math.PI / 2; ce.position.set(40, CH_, -40); gallery.add(ce);
+    ribbon(-HALF, 0, CH_, MAT.wall);                       // curved section wall (left)
+    ribbon(HALF, 0, CH_, MAT.glass);                       // glass meeting-room front (right)
+    ribbon(HALF + 8, 0, CH_, MAT.wall);                     // back of the meeting rooms
+    lineAlong(-HALF + .05, .04, led(1.1), .045); lineAlong(-HALF + .05, CH_ - .25, led(.9), .05);  // wall light lines
+    lineAlong(-2.4, .02, led(.9), .03, .02, .9); lineAlong(HALF - .2, .03, led(.7), .03);            // curved floor lines
+    lineAlong(-HALF + 1.4, CH_ - .02, led(.7), .08);                                                 // ceiling cove
+    // mullions of the glass rooms, downlights along the ceiling, planters along the wall
+    const mul = [], dl = [], pl = [];
+    for (let i = 0; i <= 60; i++) { const f = frameAt(i / 60); const b = f.p.clone().addScaledVector(f.right, HALF); mul.push(mtx(b.x, CH_ / 2, b.z, Math.atan2(f.t.x, f.t.z), 1, 1, 1)); }
+    for (let i = 0; i <= 44; i++) { const f = frameAt(i / 44); [-1.6, 1.6].forEach(o => { const b = f.p.clone().addScaledVector(f.right, o); dl.push(mtx(b.x, CH_ - .03, b.z, 0, 1, 1, 1)); }); }
+    gallery.add(instanced(new THREE.BoxGeometry(.1, CH_, .14), MAT.frame, mul));
+    gallery.add(instanced(new THREE.CylinderGeometry(.16, .16, .04, 12), MAT.down, dl));
+    for (let i = 0; i < 9; i++) { const f = frameAt(.05 + i * .1); const b = f.p.clone().addScaledVector(f.right, -HALF + .7); pl.push(mtx(b.x, .55, b.z, rnd() * 6, .7, .75, .7)); }
+    gallery.add(instanced(new THREE.IcosahedronGeometry(1, 1), M.leaf, pl));
+    // chevrons on the floor pointing the way in
+    const chev = new THREE.Shape(); chev.moveTo(-.9, 0); chev.lineTo(0, .55); chev.lineTo(.9, 0); chev.lineTo(.9, .25); chev.lineTo(0, .8); chev.lineTo(-.9, .25); chev.lineTo(-.9, 0);
+    for (let i = 0; i < 4; i++) { const f = frameAt(.03 + i * .018), m = new THREE.Mesh(new THREE.ShapeGeometry(chev), led(.8)); m.rotation.x = -Math.PI / 2; m.rotation.z = -Math.atan2(f.t.x, -f.t.z); m.position.copy(f.p).addScaledVector(f.right, -.8).setY(.03); gallery.add(m); }
+    [0, 1].forEach(i => { const f = frameAt(.25 + i * .45); const l = new THREE.PointLight(0xffb070, 140, 70, 1.6); l.position.copy(f.p).setY(CH_ - 1); gallery.add(l); });
   }
-  // section screens on alternating walls; the HTML cards are mapped onto these quads
-  const SCR_W = 7.5, SCR_H = 4.4;
-  const screens = [];
-  for (let i = 0; i < N_ST; i++) {
-    const sd = i % 2 ? 1 : -1, z = -(i + 1) * STEP, x = sd * (HALL_W / 2 - .12);
-    const g = new THREE.Group(); g.position.set(x, 2.9, z); g.rotation.y = -sd * Math.PI / 2; gallery.add(g);
-    const scr = new THREE.Mesh(new THREE.PlaneGeometry(SCR_W, SCR_H), new THREE.MeshBasicMaterial({ color: 0x150d07 })); g.add(scr);
-    const fmat = led(.7);
-    [[0, SCR_H / 2 + .08, SCR_W + .3, .1], [0, -SCR_H / 2 - .08, SCR_W + .3, .1], [-SCR_W / 2 - .08, 0, .1, SCR_H + .3], [SCR_W / 2 + .08, 0, .1, SCR_H + .3]].forEach(([fx, fy, w, h]) => { const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, .08), fmat); f.position.set(fx, fy, .02); g.add(f); });
-    const wash = new THREE.Mesh(new THREE.PlaneGeometry(SCR_W * 1.6, 3), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false })); wash.rotation.x = -Math.PI / 2; wash.position.set(0, -2.86, 1.6); g.add(wash);
-    // corners (top-left, top-right, bottom-right, bottom-left) in the screen's local space
-    const corners = [[-SCR_W / 2, SCR_H / 2], [SCR_W / 2, SCR_H / 2], [SCR_W / 2, -SCR_H / 2], [-SCR_W / 2, -SCR_H / 2]].map(([a, b]) => new THREE.Vector3(a, b, .05));
-    screens.push({ g, sd, z, x, corners, fmat });
-  }
+  // module stations (corridor positions) and the end video wall
+  const STATIONS = [.16, .30, .44, .58, .72];
+  const U_STOPS = [.02, ...STATIONS, .9];
+  const tiles = [], rooms = [];
+  STATIONS.forEach((u, k) => {
+    const f = frameAt(u);
+    // tile on the curved wall
+    const tg = new THREE.Group(); tg.position.copy(f.p).addScaledVector(f.right, -HALF + .08).setY(2.6); tg.lookAt(tg.position.clone().add(f.right)); gallery.add(tg);
+    tg.add(new THREE.Mesh(new THREE.PlaneGeometry(2.6, 4), new THREE.MeshBasicMaterial({ color: 0x1c120a })));
+    const tmat = led(.6);
+    [[0, 2.06, 2.8, .1], [0, -2.06, 2.8, .1], [-1.36, 0, .1, 4.2], [1.36, 0, .1, 4.2]].forEach(([x, y, w, h]) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, .06), tmat); b.position.set(x, y, .02); tg.add(b); });
+    tiles.push({ g: tg, mat: tmat, corners: [[-1.3, 2], [1.3, 2], [1.3, -2], [-1.3, -2]].map(([a, b]) => V3(a, b, .04)) });
+    // meeting room behind the glass on the right
+    const rc = f.p.clone().addScaledVector(f.right, HALF + 4);
+    const room = new THREE.Group(); room.position.copy(rc); room.lookAt(rc.clone().addScaledVector(f.right, -1)); gallery.add(room);
+    const table = new THREE.Mesh(new THREE.BoxGeometry(4.2, .08, 1.6), MAT.table); table.position.set(0, .76, .2); room.add(table);
+    const legs = new THREE.Mesh(new THREE.BoxGeometry(.2, .74, .8), MAT.frame); legs.position.set(0, .37, .2); room.add(legs);
+    const cm = []; [-1.5, -.5, .5, 1.5].forEach(x => { cm.push(mtx(x, .45, -.9, 0)); cm.push(mtx(x, .45, 1.3, Math.PI)); });
+    room.add(instanced(new THREE.BoxGeometry(.6, .9, .55), MAT.chair, cm));
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.6), MAT.dash); dash.position.set(0, 2.5, -3.85); room.add(dash);
+    const ringL = new THREE.Mesh(new THREE.TorusGeometry(1.7, .05, 6, 48), led(.9)); ringL.rotation.x = Math.PI / 2; ringL.position.set(0, CH_ - .6, .2); room.add(ringL);
+    [-4, 4].forEach(x => { const sidePane = new THREE.Mesh(new THREE.PlaneGeometry(8, CH_), MAT.glass); sidePane.rotation.y = Math.PI / 2; sidePane.position.set(x, CH_ / 2, 0); room.add(sidePane); });
+    rooms.push({ g: room, center: rc.clone().setY(2.2), screen: rc.clone().addScaledVector(f.right, 3.85).setY(2.5) }); // corridor-local
+  });
+  const endF = frameAt(1);
+  const vg = new THREE.Group(); vg.position.copy(endF.p).setY(3.2); vg.lookAt(vg.position.clone().addScaledVector(endF.t, -1)); gallery.add(vg);
+  vg.add(new THREE.Mesh(new THREE.PlaneGeometry(13, 6), new THREE.MeshBasicMaterial({ color: 0x0b0806 })));
+  const vmat = led(1);
+  [[0, 3.08, 13.3, .14], [0, -3.08, 13.3, .14], [-6.58, 0, .14, 6.3], [6.58, 0, .14, 6.3]].forEach(([x, y, w, h]) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, .08), vmat); b.position.set(x, y, .03); vg.add(b); });
+  const videoWall = { g: vg, corners: [[-6.5, 3], [6.5, 3], [6.5, -3], [-6.5, -3]].map(([a, b]) => V3(a, b, .05)) };
 
   /* ---------------- environment: plaza, trees, people, skyline ---------------- */
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), M.ground); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
@@ -338,15 +387,22 @@ function init() {
   const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(2, 17, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
   const camState = { t: 0, walk: 0, gal: 0 }; let override = null, inGallery = false;
   const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);
-  // gallery walk: dwell in front of each screen (zero speed at every station), turn toward it, move on
+  // corridor walk: the camera follows the curve, dwells at each module (zero speed at every stop) and turns
+  // toward that module's glass room; at the end it faces the overview video wall
+  let station = -1;
   function galleryCamera(gal) {
-    const sN = gal * (N_ST + 1), i = Math.floor(sN), f = sN - i, eased = i + f - Math.sin(2 * Math.PI * f) / (2 * Math.PI) * .9;
-    const zc = 7.5 - eased * STEP;
-    let focus = 0, fx = 0, fz = 0, fs = 0;
-    screens.forEach(sc => { const d = zc - (sc.z + 7.5), w = Math.exp(-(d * d) / (2 * 4.2 * 4.2)); if (w > focus) { focus = w; fx = sc.x; fz = sc.z; fs = sc.sd; } });
-    const pos = V(-fs * focus * 3.4, 2.1, zc + GZ);
-    const fwd = V(0, 1.9, zc - 14 + GZ), scr = V(fx, 2.9, fz + GZ);
-    return [pos, fwd.lerp(scr, focus * .92)];
+    const seg = U_STOPS.length - 1, sN = clamp(gal, 0, 1) * seg, i = Math.min(seg - 1, Math.floor(sN)), f = sN - i;
+    const e = f - Math.sin(2 * Math.PI * f) / (2 * Math.PI) * .92;
+    const u = U_STOPS[i] + (U_STOPS[i + 1] - U_STOPS[i]) * e;
+    const fr = frameAt(u);
+    const pos = fr.p.clone().addScaledVector(fr.right, 1.6).setY(1.75);
+    let tgt = path.getPointAt(Math.min(1, u + .09)).addScaledVector(fr.right, -1.2).setY(1.85);
+    let best = 0; station = -1;
+    STATIONS.forEach((su, k) => { const w = Math.exp(-((u - su) * (u - su)) / (2 * .028 * .028)); if (w > best) { best = w; if (w > .5) station = k; } tgt = tgt.lerp(rooms[k].screen.clone().setY(2.1), w * .22); });
+    const wEnd = Math.exp(-((u - .9) * (u - .9)) / (2 * .05 * .05)); if (wEnd > .5) station = 5;
+    tgt.lerp(vg.position.clone(), wEnd * .9);
+    pos.add(gallery.position); tgt.add(gallery.position);
+    return [pos, tgt];
   }
   const VIEWS = { reference: [V(34, 10, 84), V(2, 17, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
   function applyCamera() {
@@ -410,31 +466,49 @@ function init() {
     }
   }
 
-  /* ---------------- section cards mapped onto the gallery screens (CSS matrix3d homography) ---------------- */
-  const cardEls = Array.prototype.slice.call(document.querySelectorAll("#hq3-gallery .hq3-gcard"));
-  const CW = 750, CH = 440;
+  /* ---------------- corridor overlays: tiles and video wall mapped onto 3D quads (CSS matrix3d) ---------------- */
   function adj(m) { return [m[4] * m[8] - m[5] * m[7], m[2] * m[7] - m[1] * m[8], m[1] * m[5] - m[2] * m[4], m[5] * m[6] - m[3] * m[8], m[0] * m[8] - m[2] * m[6], m[2] * m[3] - m[0] * m[5], m[3] * m[7] - m[4] * m[6], m[1] * m[6] - m[0] * m[7], m[0] * m[4] - m[1] * m[3]]; }
   function mmul(a, b) { const c = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let s2 = 0; for (let k = 0; k < 3; k++) s2 += a[3 * i + k] * b[3 * k + j]; c[3 * i + j] = s2; } return c; }
   function mvec(m, v) { return [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]]; }
   function basis(p) { const m = [p[0], p[2], p[4], p[1], p[3], p[5], 1, 1, 1], v = mvec(adj(m), [p[6], p[7], 1]); return mmul(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]); }
-  function quad(dst) { const t = mmul(basis(dst), adj(basis([0, 0, CW, 0, CW, CH, 0, CH]))); for (let i = 0; i < 9; i++) t[i] /= t[8]; return "matrix3d(" + [t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].map(n => +n.toFixed(6)).join(",") + ")"; }
+  function quad(dst, w, h) { const t = mmul(basis(dst), adj(basis([0, 0, w, 0, w, h, 0, h]))); for (let i = 0; i < 9; i++) t[i] /= t[8]; return "matrix3d(" + [t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].map(n => +n.toFixed(6)).join(",") + ")"; }
   const cv = new THREE.Vector3(), cc = new THREE.Vector3();
-  function applyCards() {
-    cardEls.forEach((el, i) => {
-      const sc = screens[i];
-      if (!inGallery || !sc) { el.style.opacity = "0"; el.style.visibility = "hidden"; return; }
-      sc.g.updateMatrixWorld(true);
-      const pts = [], W = stage.clientWidth, H = stage.clientHeight; let ok = true;
-      for (const c of sc.corners) { cv.copy(c).applyMatrix4(sc.g.matrixWorld); cv.project(camera); if (cv.z > 1 || cv.z < -1) ok = false; pts.push((cv.x * .5 + .5) * W, (-cv.y * .5 + .5) * H); }
-      cc.set(0, 0, 0).applyMatrix4(sc.g.matrixWorld);
-      const o = ok ? clamp(1.25 - cc.distanceTo(camera.position) / 34, 0, 1) : 0;
-      el.style.visibility = o > .01 ? "visible" : "hidden";
-      el.style.opacity = o.toFixed(3);
-      el.style.pointerEvents = o > .6 ? "auto" : "none";
-      if (ok) el.style.transform = quad(pts);
-      sc.fmat.color.copy(ORANGE).multiplyScalar(1.4 + 2 * o);
-    });
+  function mapQuad(el, obj, corners, w, h, fadeDist) {
+    obj.updateMatrixWorld(true);
+    const pts = [], W = stage.clientWidth, H = stage.clientHeight; let ok = inGallery;
+    for (const c of corners) { cv.copy(c).applyMatrix4(obj.matrixWorld); cv.project(camera); if (cv.z > 1 || cv.z < -1) ok = false; pts.push((cv.x * .5 + .5) * W, (-cv.y * .5 + .5) * H); }
+    cc.set(0, 0, 0).applyMatrix4(obj.matrixWorld);
+    const o = ok ? clamp(1.3 - cc.distanceTo(camera.position) / fadeDist, 0, 1) : 0;
+    el.style.visibility = o > .01 ? "visible" : "hidden"; el.style.opacity = o.toFixed(3); el.style.pointerEvents = o > .5 ? "auto" : "none";
+    if (ok) el.style.transform = quad(pts, w, h);
+    return o;
   }
+  const tileEls = Array.prototype.slice.call(document.querySelectorAll("#hq3-tiles .hq3-tile"));
+  const stepEls = Array.prototype.slice.call(document.querySelectorAll("#hq3-steps button"));
+  const infoEl = document.getElementById("hq3-info"), infoBlocks = infoEl ? Array.prototype.slice.call(infoEl.querySelectorAll(".hq3-mod")) : [];
+  const videoEl = document.getElementById("hq3-video"), uiEl = document.getElementById("hq3-corridor-ui");
+  let dismissed = -1, shownStation = -2;
+  function applyCards() {
+    tileEls.forEach((el, k) => { const o = mapQuad(el, tiles[k].g, tiles[k].corners, 260, 400, 30); tiles[k].mat.color.copy(ORANGE).multiplyScalar(1.2 + (station === k ? 3 : o)); el.classList.toggle("is-on", station === k); });
+    if (videoEl) mapQuad(videoEl, videoWall.g, videoWall.corners, 1300, 600, 60);
+    if (uiEl) uiEl.classList.toggle("is-on", inGallery);
+    stepEls.forEach((b, k) => { b.classList.toggle("is-on", station === k); b.classList.toggle("is-done", station > k); });
+    const show = inGallery && station >= 0 && station < 5 && dismissed !== station ? station : -1;
+    if (show !== shownStation) { shownStation = show; if (infoEl) { infoEl.classList.toggle("is-on", show >= 0); infoBlocks.forEach((b, k) => { b.hidden = k !== show; }); } }
+    if (station !== dismissed && dismissed >= 0 && station !== -1) dismissed = -1;
+  }
+  function goStation(k) {
+    if (!st) return;
+    const gal = (k + 1) / (U_STOPS.length - 1), time = 108 + 86 * gal;
+    dismissed = -1;
+    window.scrollTo({ top: st.start + (st.end - st.start) * time / 200, behavior: reduce ? "auto" : "smooth" });
+  }
+  tileEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
+  stepEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
+  const closeBtn = document.getElementById("hq3-info-close"); if (closeBtn) closeBtn.addEventListener("click", () => { dismissed = station; shownStation = -2; });
+  // the overview video plays only if the project actually ships the file
+  const vid = videoEl && videoEl.querySelector("video");
+  if (vid && vid.dataset.available === "true") { vid.src = vid.dataset.src; videoEl.classList.add("has-video"); } // the server checks the file exists
 
   /* ---------------- render loop ---------------- */
   function resize() {
@@ -516,6 +590,8 @@ function init() {
     setView(name) { override = name || null; frame(); },
     get door() { return +door.open.toFixed(4); },
     get inGallery() { return inGallery; },
+    get station() { return station; },
+    goStation(k) { goStation(k); },
     // completes the scroll scrub immediately (software-rendered QA browsers draw only a few frames per second)
     sync() { if (st) { ScrollTrigger.update(); const tw = st.getTween && st.getTween(); if (tw) tw.progress(1); st.animation.progress(st.progress); } frame(); },
     frame

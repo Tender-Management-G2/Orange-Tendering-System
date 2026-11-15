@@ -12,6 +12,7 @@ counts from SQL Server (no names, prices or documents). Everything else is illus
 Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
 ===========================================================
 *@
+@inject IWebHostEnvironment HostEnv
 @{
     Layout = "_HomeLayout";
     ViewData["Title"] = "Orange | From Request to Award. One Connected System.";
@@ -76,35 +77,46 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
                 </li>
             }
         </ul>
-        @* Gallery hall behind the entrance: one card per homepage section, mapped onto the 3D wall screens *@
+        @* Curved corridor behind the entrance: five module tiles on the wall, an info card for the selected module,
+           a module timeline, and the overview video wall at the end (plays only if wwwroot/media/company-overview.mp4 exists). *@
         @{
-            var hqStations = new (string id, string title, string text)[] {
-                ("platform", "Inside the platform", "A dedicated workspace for each of the seven roles, from the Sourcing Officer to the Top Committee."),
-                ("how-it-works", "How it works", "Nine stages, one governed path: from purchase request to award and closure."),
-                ("roles", "Seven roles", "Everyone has a seat, no one has every key. See each role's responsibilities and connections."),
-                ("clarifications", "Governed communication", "Five clarification channels between the people directly involved, and nothing else."),
-                ("suppliers", "Supplier participation", "Register, get verified, receive invitations and submit sealed offers. Your offer stays yours."),
-                ("evaluation", "Weighted evaluation", "Weights agreed first, scores computed openly. Try the live weighted-score demo."),
-                ("analysis", "Compliance & AI", "Every bid is screened for compliance and analysed with Ollama. AI informs, people decide."),
-                ("reports", "Reports & signatures", "One unified Orange report, four committee signatures, and a fixed notification order."),
-                ("governance", "Security & governance", "Role-based access, supplier isolation, audit trail and locked weights."),
-                ("about", "About Orange Sourcing", "Paperwork, scattered emails and spreadsheets replaced by one platform."),
-                ("analytics", "Live from the system", "Public aggregate figures read directly from the platform database, never invented."),
-                ("contact", "Contact & get started", "Supplier registration, employee sign-in and the contact page.")
+            var hqModules = new (string icon, string name, string anchor, string text, string[] items)[] {
+                ("i-pr", "Sourcing", "how-it-works", "Requesting departments raise purchase requests that are reviewed and turned into sourcing activity.", new[] { "Submit purchase requests with items and specifications", "Review: approve, return for changes or reject", "Track every request's status", "Clarify details with the Sourcing Officer" }),
+                ("i-tender", "Tender Management", "platform", "Manage the full tender lifecycle with transparency, compliance and collaboration.", new[] { "Create tenders with terms and dates", "Committee proposes weights, the Officer approves them", "Invite suppliers and open bidding", "Track submissions until the deadline" }),
+                ("i-suppliers", "Supplier Management", "suppliers", "Suppliers register, get verified and take part in tenders through their own portal.", new[] { "Registration with official documents", "Admin verification before activation", "Accept or decline invitations", "Each supplier sees only its own offers" }),
+                ("i-committee", "Evaluation & Scoring", "evaluation", "Offers are screened, analysed and scored openly against the approved weights.", new[] { "Compliance screening of every offer", "Ollama-assisted analysis, advisory only", "Four-member weighted scoring", "Ranked recommendation, not an automatic award" }),
+                ("i-report", "Reporting", "reports", "One unified report carries the decision through signatures and approvals.", new[] { "Unified Orange-branded PDF report", "Signed by the four committee members", "Sourcing Manager and Top Committee decisions", "The Sourcing Officer notifies suppliers" })
             };
-            var si = 0;
         }
-        <div class="hq3-gallery" id="hq3-gallery">
-            @foreach (var hs in hqStations)
-            {
-                si++;
-                <article class="hq3-gcard" aria-hidden="true">
-                    <span class="hq3-gnum">@si.ToString("00") <i>/ 12</i></span>
-                    <h3>@hs.title</h3>
-                    <p>@hs.text</p>
-                    <a href="#@hs.id" tabindex="-1">Open this section <span aria-hidden="true">&darr;</span></a>
-                </article>
-            }
+        <div class="hq3-corridor-ui" id="hq3-corridor-ui">
+            <div class="hq3-tiles" id="hq3-tiles">
+                @foreach (var m in hqModules)
+                {
+                    <button type="button" class="hq3-tile" aria-label="Show @m.name"><span class="hq3-tile-ic" aria-hidden="true"><svg><use href="#@m.icon" /></svg></span><b>@m.name</b><i aria-hidden="true">&rarr;</i></button>
+                }
+            </div>
+            <div class="hq3-video" id="hq3-video">
+                <video data-src="@Url.Content("~/media/company-overview.mp4")" data-available="@(System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, "media", "company-overview.mp4")) ? "true" : "false")" controls playsinline preload="none" aria-label="Orange company overview video"></video>
+                <div class="hq3-video-title"><span class="hq3-video-logo">orange</span><h3>Orange<br />Company Overview</h3><p>Sourcing &amp; Tender Management System</p></div>
+            </div>
+            <aside class="hq3-info" id="hq3-info" aria-live="polite">
+                <button type="button" class="hq3-info-close" id="hq3-info-close" aria-label="Close module details">&times;</button>
+                @foreach (var m in hqModules)
+                {
+                    <div class="hq3-mod" hidden>
+                        <h3>@m.name</h3>
+                        <p>@m.text</p>
+                        <ul>@foreach (var it in m.items) { <li>@it</li> }</ul>
+                        <a class="hq-cta" href="#@m.anchor">Explore Module <span aria-hidden="true">&rarr;</span></a>
+                    </div>
+                }
+            </aside>
+            <nav class="hq3-steps" id="hq3-steps" aria-label="Corridor modules">
+                @foreach (var m in hqModules)
+                {
+                    <button type="button"><span aria-hidden="true"><svg><use href="#@m.icon" /></svg></span>@m.name</button>
+                }
+            </nav>
         </div>
         <div class="hq3-flash" id="hq3-flash" aria-hidden="true"></div>
         <div class="hq-shade" id="hq-shade" aria-hidden="true"></div>
