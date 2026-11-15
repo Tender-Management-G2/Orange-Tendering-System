@@ -451,63 +451,18 @@ using (var scope = factory.Services.CreateScope())
         "approved supplier account is active");
 }
 var formCreatedEmail = $"form-created-{suffix}@example.test";
+var formCreatedTemporaryPassword = "G!g7" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 var createUserToken = await Token(admin, "/Admin/Users/Create");
 var createdFromForm = await admin.PostAsync("/Admin/Users/Create", Form(new()
 {
     ["FullName"] = "Form Created Evaluator", ["Email"] = formCreatedEmail,
     ["Role"] = SystemRoles.EvaluationCommittee, ["IsActive"] = "false",
+    ["Password"] = formCreatedTemporaryPassword,
     ["__RequestVerificationToken"] = createUserToken
 }));
 Check(createdFromForm.StatusCode == HttpStatusCode.Redirect &&
       mail.Messages.Any(m => m.To == formCreatedEmail && m.Subject.Contains("Welcome")),
     "Admin Create User form sends welcome email to entered address");
-var temporaryEmail = $"temporary-{suffix}@example.test";
-var temporaryPassword = "T!t8" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-var newEmployeePassword = "N!n9" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-var temporaryPage = await admin.GetAsync("/Admin/Users/Create");
-Check(temporaryPage.StatusCode == HttpStatusCode.OK &&
-      (await temporaryPage.Content.ReadAsStringAsync()).Contains("admin-temp-password.js"),
-    "Admin Create User offers temporary password generation");
-var temporaryToken = await Token(admin, "/Admin/Users/Create");
-var temporaryCreated = await admin.PostAsync("/Admin/Users/Create", Form(new()
-{
-    ["FullName"] = "Temporary Password Employee", ["Email"] = temporaryEmail,
-    ["Role"] = SystemRoles.EvaluationCommittee, ["Password"] = temporaryPassword,
-    ["IsActive"] = "true", ["__RequestVerificationToken"] = temporaryToken
-}));
-Check(temporaryCreated.StatusCode == HttpStatusCode.Redirect &&
-      !mail.Messages.Any(m => m.To == temporaryEmail),
-    "temporary password creates the account without a welcome setup email");
-using (var scope = factory.Services.CreateScope())
-{
-    var account = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>()
-        .Users.SingleAsync(u => u.Email == temporaryEmail);
-    Check(account.EmailConfirmed && account.MustChangePassword && account.PasswordHash != null,
-        "temporary-password account requires a first-login change");
-}
-using (var temporaryClient = Client(factory))
-{
-    var temporaryLoginToken = await Token(temporaryClient, "/Identity/Account/Login");
-    var temporaryLogin = await temporaryClient.PostAsync("/Identity/Account/Login", Form(new()
-    {
-        ["Input.Email"] = temporaryEmail, ["Input.Password"] = temporaryPassword,
-        ["__RequestVerificationToken"] = temporaryLoginToken
-    }));
-    Check(temporaryLogin.StatusCode == HttpStatusCode.Redirect &&
-          temporaryLogin.Headers.Location?.ToString().Contains("FirstLoginPasswordChange") == true,
-        "temporary password sends the employee to the password-change page");
-    var temporaryChangeToken = await Token(temporaryClient, "/Identity/Account/FirstLoginPasswordChange");
-    var temporaryChanged = await temporaryClient.PostAsync("/Identity/Account/FirstLoginPasswordChange", Form(new()
-    {
-        ["Input.CurrentPassword"] = temporaryPassword,
-        ["Input.NewPassword"] = newEmployeePassword,
-        ["Input.ConfirmPassword"] = newEmployeePassword,
-        ["__RequestVerificationToken"] = temporaryChangeToken
-    }));
-    Check(temporaryChanged.StatusCode == HttpStatusCode.Redirect &&
-          temporaryChanged.Headers.Location?.ToString() == "/EvaluationCommittee",
-        "employee changes the temporary password before entering the workspace");
-}
 mail.FailNext = true;
 var failedFormEmail = $"form-mail-fail-{suffix}@example.test";
 var failedFormToken = await Token(admin, "/Admin/Users/Create");
@@ -515,6 +470,7 @@ var failedFromForm = await admin.PostAsync("/Admin/Users/Create", Form(new()
 {
     ["FullName"] = "Undelivered Evaluator", ["Email"] = failedFormEmail,
     ["Role"] = SystemRoles.EvaluationCommittee, ["IsActive"] = "false",
+    ["Password"] = "H!h8" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
     ["__RequestVerificationToken"] = failedFormToken
 }));
 Check(failedFromForm.StatusCode == HttpStatusCode.OK &&
@@ -621,8 +577,9 @@ using (var employee = Client(factory))
     Check(employeeLogin.Headers.Location?.ToString() == "/Department", "activated employee enters assigned workspace");
 }
 
-// The Admin Create User screen emails a private password setup link.
+// Admin creates a temporary password; the employee replaces it through the emailed link.
 var adminCreatedEmail = $"admin-created-{suffix}@example.test";
+var adminCreatedTemporaryPassword = "E!e5" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -637,12 +594,15 @@ using (var scope = factory.Services.CreateScope())
         {
             FullName = "Admin Created Employee", Email = adminCreatedEmail,
             Role = SystemRoles.RequestingDepartment,
-            DepartmentId = departmentId, IsActive = true
+            DepartmentId = departmentId, IsActive = true,
+            Password = adminCreatedTemporaryPassword
         }, adminId, context);
     Check(created.Succeeded, "Admin Create User saves the employee and sends welcome email");
     var account = await db.Users.SingleAsync(u => u.Email == adminCreatedEmail);
-    Check(!account.EmailConfirmed && account.MustChangePassword && account.PasswordHash == null,
-        "Admin-created employee waits for password setup before sign-in");
+    Check(!account.EmailConfirmed && account.MustChangePassword &&
+          await scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>()
+              .CheckPasswordAsync(account, adminCreatedTemporaryPassword),
+        "Admin-created employee has a temporary password but waits for email setup");
 }
 var welcomeEmail = mail.Messages.Last(m => m.To == adminCreatedEmail);
 Check(welcomeEmail.Subject.Contains("Welcome") && welcomeEmail.Body.Contains("sign in") &&
@@ -662,6 +622,15 @@ using (var adminCreated = Client(factory))
     }));
     Check((await activated.Content.ReadAsStringAsync()).Contains("Your password is set"),
         "welcome link sets the password and confirms the account");
+    using (var scope = factory.Services.CreateScope())
+    {
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var account = (await users.FindByEmailAsync(adminCreatedEmail))!;
+        Check(account.EmailConfirmed && !account.MustChangePassword &&
+              !await users.CheckPasswordAsync(account, adminCreatedTemporaryPassword) &&
+              await users.CheckPasswordAsync(account, welcomePassword),
+            "email setup replaces the temporary password");
+    }
     var token = await Token(adminCreated, "/Identity/Account/Login");
     var response = await adminCreated.PostAsync("/Identity/Account/Login", Form(new()
     {
@@ -669,9 +638,9 @@ using (var adminCreated = Client(factory))
         ["__RequestVerificationToken"] = token
     }));
     Check(response.StatusCode == HttpStatusCode.Redirect && response.Headers.Location?.ToString() == "/Department",
-        "Admin-created employee signs in with the assigned role");
+        "Admin-created employee signs in with the private password");
     Check((await adminCreated.GetAsync("/Department")).StatusCode == HttpStatusCode.OK,
-        "Admin-created employee keeps an authenticated session");
+        "Admin-created employee enters the workspace after email setup");
 }
 var failedWelcomeEmail = $"welcome-fail-{suffix}@example.test";
 using (var scope = factory.Services.CreateScope())
@@ -684,7 +653,8 @@ using (var scope = factory.Services.CreateScope())
     mail.FailNext = true;
     var failed = await scope.ServiceProvider.GetRequiredService<AdminService>().CreateUserAsync(
         new CreateUserViewModel { FullName = "Failed Welcome", Email = failedWelcomeEmail,
-            Role = SystemRoles.SourcingOfficer, IsActive = true }, adminId, context);
+            Role = SystemRoles.SourcingOfficer, IsActive = true,
+            Password = "F!f6" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16)) }, adminId, context);
     Check(!failed.Succeeded && !await db.Users.AnyAsync(u => u.Email == failedWelcomeEmail),
         "undelivered welcome email rolls back account creation");
 }

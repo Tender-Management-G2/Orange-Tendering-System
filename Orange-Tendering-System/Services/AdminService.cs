@@ -1045,7 +1045,6 @@ namespace Orange_Tendering_System.Services
                 });
             }
 
-            var hasTemporaryPassword = !string.IsNullOrEmpty(model.Password);
             var user = new ApplicationUser
             {
                 UserName = email,
@@ -1055,18 +1054,16 @@ namespace Orange_Tendering_System.Services
                 SupplierId = null,
                 IsActive = model.IsActive,
                 MustChangePassword = true,
-                // An emailed setup link confirms the account; a temporary password
-                // allows sign-in now but must be replaced at first sign-in.
-                EmailConfirmed = hasTemporaryPassword
+                // The temporary password stays unusable until the employee sets
+                // a private password through the emailed activation link.
+                EmailConfirmed = false
             };
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
             // Create the account using Identity
-            var result = hasTemporaryPassword
-                ? await _userManager.CreateAsync(user, model.Password!)
-                : await _userManager.CreateAsync(user);
+            var result = await _userManager.CreateAsync(user, model.Password);
 
             if (!result.Succeeded)
             {
@@ -1117,29 +1114,26 @@ namespace Orange_Tendering_System.Services
 
             try
             {
-                if (!hasTemporaryPassword)
-                {
-                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-                    var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-                    var passwordUrl = _links.GetUriByPage(httpContext, "/Account/ActivateEmployee",
-                        values: new { area = "Identity", email = user.Email, code });
-                    var loginUrl = _links.GetUriByPage(httpContext, "/Account/Login",
-                        values: new { area = "Identity" });
-                    if (passwordUrl == null || loginUrl == null)
-                        throw new InvalidOperationException("Could not generate account links.");
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+                var passwordUrl = _links.GetUriByPage(httpContext, "/Account/ActivateEmployee",
+                    values: new { area = "Identity", email = user.Email, code });
+                var loginUrl = _links.GetUriByPage(httpContext, "/Account/Login",
+                    values: new { area = "Identity" });
+                if (passwordUrl == null || loginUrl == null)
+                    throw new InvalidOperationException("Could not generate account links.");
 
-                    await _emailSender.SendEmailAsync(email, "Welcome to Orange Tendering",
-                        $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
-                        "<p>Welcome to Orange Tendering. An administrator has created an account for you.</p>" +
-                        $"<p><a href=\"{HtmlEncoder.Default.Encode(passwordUrl)}\">Set your password</a> to activate your account. This secure link expires in one hour.</p>" +
-                        $"<p>After setting your password, <a href=\"{HtmlEncoder.Default.Encode(loginUrl)}\">sign in to Orange Tendering</a> using this email address.</p>" +
-                        "<p>If you were not expecting this invitation, please contact your administrator.</p>" +
-                        "<p>Kind regards,<br>Orange Tendering Team</p>");
-                }
+                await _emailSender.SendEmailAsync(email, "Welcome to Orange Tendering",
+                    $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
+                    "<p>Welcome to Orange Tendering. An administrator has created an account for you.</p>" +
+                    $"<p><a href=\"{HtmlEncoder.Default.Encode(passwordUrl)}\">Set your password</a> to activate your account. This secure link expires in one hour.</p>" +
+                    $"<p>After setting your password, <a href=\"{HtmlEncoder.Default.Encode(loginUrl)}\">sign in to Orange Tendering</a> using this email address.</p>" +
+                    "<p>If you were not expecting this invitation, please contact your administrator.</p>" +
+                    "<p>Kind regards,<br>Orange Tendering Team</p>");
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
-            catch (Exception exception) when (!hasTemporaryPassword && (exception is System.Net.Mail.SmtpException or InvalidOperationException))
+            catch (Exception exception) when (exception is System.Net.Mail.SmtpException or InvalidOperationException)
             {
                 await transaction.RollbackAsync();
                 return IdentityResult.Failed(new IdentityError

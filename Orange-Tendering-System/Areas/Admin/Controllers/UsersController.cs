@@ -97,9 +97,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             TempData["SuccessMessage"] =
-                string.IsNullOrEmpty(model.Password)
-                    ? "User created. A welcome email with a password setup link has been sent."
-                    : "User created. Share the temporary password securely; the user must change it at first sign-in.";
+                "User created. A welcome email with a password setup link has been sent.";
 
             if (Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl!);
 

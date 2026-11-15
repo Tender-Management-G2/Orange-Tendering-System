@@ -72,7 +72,8 @@ static class SmtpLiveChecks
         context.Request.Host = new HostString("localhost");
         var result = await scope.ServiceProvider.GetRequiredService<AdminService>().CreateUserAsync(
             new CreateUserViewModel { FullName = "Orange Tendering SMTP Test",
-                Email = address, Role = SystemRoles.EvaluationCommittee, IsActive = false },
+                Email = address, Role = SystemRoles.EvaluationCommittee, IsActive = false,
+                Password = "Tt!9" + Guid.NewGuid().ToString("N") },
             adminId, context);
         if (!result.Succeeded || !await db.Users.AnyAsync(u => u.Email == address))
             throw new InvalidOperationException("Admin user creation or welcome email delivery failed: " +

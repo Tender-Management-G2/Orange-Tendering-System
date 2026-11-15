@@ -18,9 +18,9 @@ Admin
 ROUTE: /Admin/Users/Create
 
 IMPLEMENTATION:
-AdminService creates the account with a temporary password or
-emails a one-time password setup link. It assigns the role and
-records an audit entry without the password.
+AdminService creates the account with a temporary password,
+assigns its role, and records an audit entry without the password.
+The user receives an email link to replace the temporary password.
 
 DEPENDENCIES:
 AspNetUsers, AspNetRoles, Departments, AuditLogs.
@@ -123,7 +123,7 @@ No hardcoded passwords or demo accounts.
 
             <div class="pg-field pg-field-wide">
                 <label asp-for="Password">
-                    Temporary Password (optional)
+                    Temporary Password
                 </label>
 
                 <div class="admin-temp-password" data-temp-password>
@@ -143,11 +143,11 @@ No hardcoded passwords or demo accounts.
                       class="text-danger"></span>
 
                 <small class="pg-hint">
-                    Generate or enter a password to give the user temporary access. Copy and share it securely;
-                    the user must change it at first sign-in.
+                    Generate or enter a strong temporary password. The user will receive
+                    an email link to replace it with a private password before signing in.
+                    The link expires in one hour.
                 </small>
                 <span class="pg-hint" data-password-status role="status" aria-live="polite"></span>
-                <p class="pg-hint">Leave this blank to send a welcome email with a secure password setup link instead. The link expires in one hour.</p>
             </div>
 
             <div class="pg-field">
