@@ -134,6 +134,42 @@ namespace Orange_Tendering_System.Controllers
             return result.Succeeded ? Json(new { succeeded = true }) : BadRequest(new { error = result.Error });
         }
 
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> FaceSetupChallenge([FromBody] EnrollStartRequest request)
+        {
+            var user = await users.GetUserAsync(User);
+            if (user == null || !await users.IsInRoleAsync(user, Orange_Tendering_System.Models.SystemRoles.Supplier) ||
+                throttle.IsBlocked(BiometricThrottle.IpKey(Ip())) ||
+                !await signIn.AccountAllowedAsync(user) ||
+                !await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id) ||
+                !await signIn.CheckPasswordAsync(user, request.Password))
+                return Unauthorized(new { error = GenericFailure });
+            return Json(faces.CreateChallenge(FaceService.LoginPurpose, user.Id));
+        }
+
+        [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
+        public async Task<IActionResult> FaceSetupLogin([FromBody] FaceSubmission submission)
+        {
+            var user = await users.GetUserAsync(User);
+            var ipKey = BiometricThrottle.IpKey(Ip());
+            if (user == null || throttle.IsBlocked(ipKey)) return Unauthorized(new { error = GenericFailure });
+            var accountKey = BiometricThrottle.AccountKey(user.Email);
+            if (throttle.IsBlocked(accountKey)) return TooManyAttempts();
+
+            var result = await faces.VerifyLoginAsync(user, submission);
+            if (!result.Succeeded || result.User == null)
+            {
+                throttle.Failure(ipKey, accountKey);
+                await signIn.RegisterFailureAsync(user, BiometricSignInService.FaceMethod, result.Error ?? "failed", Ip());
+                return Unauthorized(new { error = result.Error ?? GenericFailure });
+            }
+            if (!await signIn.SignInAsync(user, BiometricSignInService.FaceMethod, Ip()))
+                return Unauthorized(new { error = GenericFailure });
+
+            throttle.Reset(ipKey, accountKey);
+            return Json(new { succeeded = true, redirect = await signIn.DestinationAsync(user, "/Supplier", Url.IsLocalUrl) });
+        }
+
         [AllowAnonymous, HttpPost, ValidateAntiForgeryToken]
         public IActionResult FaceChallenge()
         {

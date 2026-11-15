@@ -22,9 +22,15 @@ authentication system: ASP.NET Core Identity and its cookie. Biometric methods a
 - Namespaces, `ApplicationUser`, supplier rule (`SupplierStatus.Approved`), `MustChangePassword` and role-workspace redirect now match this project.
 - Face templates are a normal EF entity + migration instead of runtime-created DDL in a `biometric` schema.
 - Audit rows use the project's `AuditLogs` columns (no IP column); no biometric data is ever written to it.
-- **Face sign-in requires the account password** (`Biometric:FaceLoginRequiresPassword`, default `true`). The face descriptor and liveness
-  measurements are computed in the browser, so a forged request carrying a descriptor computed from someone's photo could otherwise sign in.
-  Fingerprint (WebAuthn, user verification required, server stores only a public key) stays passwordless.
+- **Supplier face sign-in is password first** (owner decision 2026-11-15). The Login page checks email + password
+  (`Login?handler=Credentials`); for an approved supplier with a face enrolled it does not sign in but opens a short pre-auth
+  transaction (`Services/Biometric/SupplierPreAuth.cs`: a random HttpOnly cookie pointing at a server-side record,
+  `Biometric:PreAuthSeconds`, default 300). `/Biometrics/FaceChallenge` and `/Biometrics/FaceLogin` work only inside it, for that account;
+  an email named by the browser is ignored, so a face alone can never start a sign-in. The transaction ends on success, cancel,
+  lockout, expiry or when the Login page is opened again. There is **no liveness or anti-spoofing** (owner decision): a photo can pass
+  the face step, which is why the password step is mandatory. Device passkeys (WebAuthn, user verification required, server stores
+  only a public key) stay a separate, passwordless method and are not labelled as fingerprint. Fingerprint enrollment/verification is
+  shown as Coming Soon only. Covered by `Tests/AuthSmoke/BiometricChecks.cs`.
 - Enrolling a fingerprint or face re-checks the current password, so a hijacked session cannot add its own biometrics.
 
 ## Configuration (optional, `appsettings` section `Biometric`)

@@ -58,6 +58,7 @@ public sealed class SupplierApprovalGate(RequestDelegate next)
     private static readonly string[] PendingEnrollmentPaths =
     [
         "/Biometrics/FaceEnrollChallenge", "/Biometrics/FaceEnroll",
+        "/Biometrics/FaceSetupChallenge", "/Biometrics/FaceSetupLogin",
         "/Biometrics/PasskeyRegisterOptions", "/Biometrics/PasskeyRegister"
     ];
 

@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services.Biometric;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
@@ -30,6 +32,9 @@ public class PendingApprovalModel(UserManager<ApplicationUser> users, Applicatio
             .Select(s => (SupplierStatus?)s.Status)
             .SingleOrDefaultAsync();
         CompanyApproved = status == SupplierStatus.Approved;
+        var method = User.FindFirstValue(BiometricSignInService.AuthenticationMethodClaim);
+        if (CompanyApproved && method is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod)
+            return LocalRedirect("/Supplier");
         return status switch
         {
             SupplierStatus.Pending => Page(),
@@ -37,4 +42,5 @@ public class PendingApprovalModel(UserManager<ApplicationUser> users, Applicatio
             _ => Forbid()
         };
     }
+
 }

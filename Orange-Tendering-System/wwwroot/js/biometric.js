@@ -351,6 +351,11 @@
         return runFace(options, '/Biometrics/FaceEnrollChallenge', '/Biometrics/FaceEnroll', { replace: !!replace }, { password: password });
     }
 
+    function faceSetupLogin(options, password) {
+        return runFace(options, '/Biometrics/FaceSetupChallenge', '/Biometrics/FaceSetupLogin',
+            { returnUrl: '/Supplier' }, { password: password });
+    }
+
     // ---------- Page wiring ----------
 
     function init() {
@@ -474,6 +479,15 @@
         });
 
         var faceEnrollButton = $('btnFaceEnroll');
+        var faceSetupLoginButton = $('btnFaceSetupLogin');
+        if (faceSetupLoginButton) {
+            faceSetupLoginButton.addEventListener('click', function () {
+                var password = ($('bioPassword') || {}).value || '';
+                if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
+                faceCancelled = false;
+                guarded(function () { return faceSetupLogin(faceOptions, password); }, 'Signed in.');
+            });
+        }
         if (faceEnrollButton) {
             faceEnrollButton.addEventListener('click', function () {
                 var password = ($('bioPassword') || {}).value || '';
