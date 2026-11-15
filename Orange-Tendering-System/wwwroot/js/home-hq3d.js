@@ -33,7 +33,7 @@ function init() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   scene.background = skyTexture();
-  scene.fog = new THREE.FogExp2(0x1c140f, 0.0028);
+  scene.fog = new THREE.FogExp2(0x1c140f, 0.0014);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
   // the studio environment only feeds subtle reflections; every material keeps envMapIntensity low for a night scene
@@ -402,7 +402,7 @@ function init() {
   function applyDayNight() {
     const day = isDay(); if (day === dayMode) return; dayMode = day;
     scene.background = day ? daySky : nightSky;
-    scene.fog.color.set(day ? 0xd4d8dc : 0x1c140f); scene.fog.density = day ? .0016 : .0028;
+    scene.fog.color.set(day ? 0xd4d8dc : 0x1c140f); scene.fog.density = day ? .0004 : .0014;
     hemi.color.set(day ? 0xe4ecf7 : 0x50525e); hemi.groundColor.set(day ? 0x8c7c68 : 0x2a1606); hemi.intensity = day ? 1.55 : .65;
     moon.color.set(day ? 0xfff0d8 : 0xaab8ff); moon.intensity = day ? 2.7 : .75;
     warm.intensity = day ? .35 : .55; entranceLight.intensity = day ? 40 : 150; plazaLight.intensity = day ? 10 : 60;

@@ -49,7 +49,7 @@ function init(section) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0705);
-  scene.fog = new THREE.Fog(0x0a0705, 46, 120);
+  scene.fog = new THREE.Fog(0x0a0705, 70, 190);
   const camera = new THREE.PerspectiveCamera(36, 1, .1, 300);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;

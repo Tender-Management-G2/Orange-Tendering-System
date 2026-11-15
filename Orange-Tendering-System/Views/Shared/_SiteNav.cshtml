@@ -19,7 +19,7 @@
     </a>
     <button class="hc-burger" type="button" aria-expanded="false" aria-controls="hc-links" aria-label="Open navigation"><span></span><span></span></button>
     <div class="hc-links" id="hc-links" role="navigation" aria-label="Main navigation">
-        <a href="@Sec("platform")">Platform</a>
+        <a href="@(navHome ? "#home" : home)">Home</a>
         <a href="@Sec("how-it-works")" class="@(Is("HowItWorks") ? "is-active" : null)" aria-current="@(Is("HowItWorks") ? "page" : null)">How It Works</a>
         <a href="@Sec("evaluation")">Weighted Evaluation</a>
         <a href="@Sec("analysis")">AI Analysis</a>
