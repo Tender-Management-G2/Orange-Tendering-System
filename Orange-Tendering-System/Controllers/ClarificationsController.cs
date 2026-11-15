@@ -96,7 +96,7 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
             Link = $"/Clarifications/Details/{id}", CreatedAt = now
         });
         await db.SaveChangesAsync();
-        TempData["ClarificationMessage"] = "Reply sent.";
+        TempData.Orange(OrangeFeedback.Toast("Reply sent", "The other participant was notified.", OrangeVariant.Send));
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -117,7 +117,7 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
         {
             if (parts.Length != 3 || !int.TryParse(parts[2], out var contextId)) throw new WorkflowException("Choose who to ask.");
             var id = await clarifications.CreateAsync(User, parts[0], parts[1], contextId, subject, message);
-            TempData["ClarificationMessage"] = "Clarification sent.";
+            TempData.Orange(OrangeFeedback.Toast("Clarification sent!", "The recipient was notified.", OrangeVariant.Send));
             return RedirectToAction(nameof(Details), new { id });
         }
         catch (WorkflowException e) { TempData["ClarificationError"] = e.Message; return RedirectToAction(nameof(Index)); }
@@ -127,7 +127,7 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
     public async Task<IActionResult> Resolve(int id)
     {
         if (!await clarifications.ResolveAsync(CurrentUserId!, id)) return NotFound();
-        TempData["ClarificationMessage"] = "Marked as resolved.";
+        TempData.Orange(OrangeFeedback.Toast("Clarification resolved", "The conversation is marked as resolved.", OrangeVariant.Approve));
         return RedirectToAction(nameof(Details), new { id });
     }
 }

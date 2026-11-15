@@ -27,7 +27,9 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         try
         {
             var id = await Workflow.Create(input, User);
-            if (ajax) return Json(new { ok = true, id });
+            var created = OrangeFeedback.Popup("Tender created!", $"T-{id:0000} is ready. Open it to request the committee weights.", OrangeVariant.Save);
+            if (ajax) return Json(new { ok = true, id, feedback = created.ToJsonElement() });
+            TempData.Orange(created);
             return RedirectToAction(nameof(Index), new { created = id });
         }
         catch (WorkflowException e) when (ajax) { return BadRequest(new { errors = new[] { e.Message } }); }
@@ -49,6 +51,7 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
             && !already.Contains(s.Id) && (wanted == null || wanted.Contains(s.Id))).OrderBy(s => s.CompanyName).Select(s => s.Id).ToListAsync();
         TenderWorkflowService.Require(ids.Count > 0, wanted == null ? "Every approved supplier has already been invited." : "Choose at least one supplier that is not invited yet.");
         foreach (var supplierId in ids) await Workflow.Invite(id, supplierId, User);
+        ActionFeedback = OrangeFeedback.Popup("Invitations sent!", $"{ids.Count} supplier{(ids.Count == 1 ? " was" : "s were")} invited to this round.", OrangeVariant.Send);
     });
     [HttpPost] public Task<IActionResult> Invite(int id, int supplierId) => Execute(id, () => Workflow.Invite(id, supplierId, User));
     // The compliance check is automatic: an offer with at least one attached document is compliant; an offer without any document cannot be

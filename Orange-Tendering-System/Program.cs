@@ -48,7 +48,7 @@ builder.Services.AddTransient<IEmailSender>(services => services.GetRequiredServ
 builder.Services.AddScoped<EmployeeProvisioning>();
 builder.Services.AddSingleton<AccountLinkGenerator>();
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options => options.Filters.Add<OrangeMotionResultFilter>());
 builder.Services.AddBiometrics(builder.Configuration);
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierProfileService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierInvitationService>();

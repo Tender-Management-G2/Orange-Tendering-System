@@ -33,7 +33,8 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         public async Task<IActionResult> UploadOffer(int id, IFormFile file)
         {
             var error = await documents.UploadAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, file, bidId: id);
-            TempData[error == null ? "OfferSuccess" : "OfferError"] = error ?? "Attachment uploaded.";
+            if (error == null) TempData.Orange(OrangeFeedback.Toast("Attachment uploaded", "The file is attached to your offer.", OrangeVariant.Upload));
+            else TempData["OfferError"] = error;
             return RedirectToAction("Details", "Offers", new { id });
         }
 
@@ -41,7 +42,8 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         public async Task<IActionResult> UploadCompany(IFormFile file, bool returnToProfile = false)
         {
             var error = await documents.UploadAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, file);
-            TempData["DocumentMessage"] = error ?? "Document uploaded for administrator review.";
+            if (error == null) TempData.Orange(OrangeFeedback.Toast("Document uploaded", "It is waiting for administrator review.", OrangeVariant.Upload));
+            else TempData["DocumentMessage"] = error;
             return returnToProfile ? RedirectToAction("Index", "Profile") : RedirectToAction("Index");
         }
 
@@ -49,7 +51,8 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         public async Task<IActionResult> UploadClarification(int messageId, IFormFile file)
         {
             var error = await documents.UploadAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, file, messageId: messageId);
-            TempData["ClarificationMessage"] = error ?? "Clarification attachment uploaded.";
+            if (error == null) TempData.Orange(OrangeFeedback.Toast("Attachment uploaded", "The file is attached to the clarification.", OrangeVariant.Upload));
+            else TempData["ClarificationMessage"] = error;
             return RedirectToAction("Index", "Clarifications");
         }
     }

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 using System.Security.Claims;
 
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
@@ -32,6 +33,8 @@ public class ClarificationsController(ApplicationDbContext db) : Controller
         db.ClarificationMessages.Add(new ClarificationMessage { ClarificationId = id, SenderUserId = UserId, Message = message.Trim(), SentAt = DateTime.UtcNow });
         thread.Status = ClarificationStatus.Answered;
         db.Notifications.Add(new Notification { UserId = thread.FromUserId == UserId ? thread.ToUserId : thread.FromUserId, Title = "Clarification reply", Message = $"A reply was sent in clarification #{id}.", Link = $"/Supplier/Clarifications/Details/{id}", CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync(); return RedirectToAction(nameof(Details), new { id });
+        await db.SaveChangesAsync();
+        TempData.Orange(OrangeFeedback.Toast("Reply sent", "The supplier was notified.", OrangeVariant.Send));
+        return RedirectToAction(nameof(Details), new { id });
     }
 }

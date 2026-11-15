@@ -199,14 +199,20 @@
         var vals = seatSelects.map(function (s) { return s.value; });
         if (new Set(vals).size !== 4) { showErrors(['Choose four different people for the four committee seats.']); return; }
         var b = $('tc-submit'); b.disabled = true; b.firstChild.textContent = 'Creating… ';
+        var motion = window.OrangeMotion ? OrangeMotion.begin({ mode: 'popup', title: 'Creating the tender', description: 'Saving the requirements and committee seats.' }) : null;
         fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
             .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
             .then(function (x) {
-                if (x.ok && x.d && x.d.id) { window.location.href = form.dataset.listUrl + '?created=' + x.d.id; return; }
+                if (x.ok && x.d && x.d.id) {
+                    var go = function () { window.location.href = form.dataset.listUrl + '?created=' + x.d.id; };
+                    if (motion && x.d.feedback) motion.finish(x.d.feedback).then(go, go); else go();
+                    return;
+                }
+                if (motion) motion.cancel();
                 b.disabled = false; b.firstChild.textContent = 'Create tender ';
                 showErrors((x.d && x.d.errors && x.d.errors.length) ? x.d.errors : ['The tender could not be created. Check the form and try again.']);
             })
-            .catch(function () { b.disabled = false; b.firstChild.textContent = 'Create tender '; showErrors(['The server could not be reached. Try again.']); });
+            .catch(function () { if (motion) motion.cancel(); b.disabled = false; b.firstChild.textContent = 'Create tender '; showErrors(['The server could not be reached. Try again.']); });
     });
     // Dialog open / close, and ?request=ID opens it with that purchase request chosen.
     var dlg = $('tc-dialog');

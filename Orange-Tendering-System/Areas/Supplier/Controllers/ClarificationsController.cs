@@ -46,6 +46,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             if (!ModelState.IsValid) return View(input);
             var id = await communication.CreateAsync(userId, input);
             if (id == null) return NotFound();
+            TempData.Orange(OrangeFeedback.Toast("Clarification sent", "The Sourcing Officer was notified.", OrangeVariant.Send));
             return RedirectToAction("Details", new { id });
         }
 
@@ -57,7 +58,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
                 TempData["ClarificationMessage"] = "Reply not saved. Check the message and whether this clarification is resolved.";
                 return RedirectToAction("Details", new { id });
             }
-            TempData["ClarificationMessage"] = "Reply sent to the Sourcing Officer.";
+            TempData.Orange(OrangeFeedback.Toast("Reply sent", "Your reply was sent to the Sourcing Officer.", OrangeVariant.Send));
             return RedirectToAction("Details", new { id });
         }
     }

@@ -15,6 +15,8 @@ public abstract class WorkflowControllerBase(TenderWorkflowService workflow, Pro
     // The tender workflow is a popup over the list (Views/Shared/_WorkflowPopup.cshtml). The popup loads this action by AJAX;
     // opening the address directly shows the list with the popup already open for this tender.
     protected bool IsAjax => string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Set inside an Execute action when the result needs facts only the action knows (for example how many were invited).</summary>
+    protected OrangeFeedback? ActionFeedback { get; set; }
     public virtual async Task<IActionResult> Details(int id)
     {
         var model = await workflow.Details(id, User);
@@ -37,8 +39,11 @@ public abstract class WorkflowControllerBase(TenderWorkflowService workflow, Pro
         {
         if (!ModelState.IsValid) throw new WorkflowException(string.Join(" ", ModelState.Values.SelectMany(x => x.Errors).Select(x => string.IsNullOrEmpty(x.ErrorMessage) ? "Invalid form value." : x.ErrorMessage)));
         await action();
-        if (IsAjax) return Json(new { ok = true });
-        TempData["WorkflowMessage"] = "The operation was saved successfully.";
+        // Orange Motion feedback for what was actually committed (Services/OrangeWorkflowFeedback.cs).
+        var feedback = ActionFeedback ?? await OrangeWorkflowFeedback.For(this, workflow, id);
+        if (IsAjax) return Json(new { ok = true, feedback = feedback?.ToJsonElement() });
+        if (feedback is not null) TempData.Orange(feedback);
+        else TempData["WorkflowMessage"] = "The operation was saved successfully.";
         return RedirectToAction(nameof(Details), new { id });
         }
         catch (WorkflowException error)

@@ -68,7 +68,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
                 return View(model);
             }
 
-            TempData["OfferSuccess"] = "Your draft offer was saved. It has not been submitted.";
+            TempData.Orange(OrangeFeedback.Toast("Draft saved!", "Your offer is saved as a draft. It has not been submitted."));
             return RedirectToAction("Index");
         }
 
@@ -94,7 +94,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
                 ModelState.AddModelError("", "Draft not saved. Check the items and submission deadline.");
                 return View("Edit", model);
             }
-            TempData["OfferSuccess"] = "Draft updated.";
+            TempData.Orange(OrangeFeedback.Toast("Draft updated", "Your changes are saved. The offer has not been submitted."));
             return RedirectToAction("Details", new { id });
         }
 
@@ -120,7 +120,8 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             if (await offerService.GetOfferAsync(userId, id) == null) return NotFound();
             var error = await offerService.SubmitAsync(userId, id);
-            TempData[error == null ? "OfferSuccess" : "OfferError"] = error ?? "Offer submitted successfully. It can no longer be edited.";
+            if (error == null) TempData.Orange(OrangeFeedback.Popup("Offer submitted!", "Your offer is recorded and can no longer be edited."));
+            else TempData["OfferError"] = error;
             return RedirectToAction("Details", new { id });
         }
 

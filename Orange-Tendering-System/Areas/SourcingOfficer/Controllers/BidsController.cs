@@ -108,7 +108,7 @@ public class BidsController(ApplicationDbContext db, TenderWorkflowService workf
             }
             return result;
         }
-        TempData["ComplianceSaved"] = "Compliance decision saved.";
+        TempData.Orange(OrangeFeedback.Toast("Compliance recorded", $"The offer is marked {status}."));
         return RedirectToAction(nameof(Index), new { id = tenderId.Value });
     }
 

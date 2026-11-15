@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Areas.SourcingManager.Controllers;
@@ -115,7 +116,7 @@ public sealed class ClarificationsController(ApplicationDbContext context) : Con
         });
         await context.SaveChangesAsync();
 
-        TempData["Success"] = "Clarification thread opened and the recipient was notified.";
+        TempData.Orange(OrangeFeedback.Toast("Clarification sent!", "The thread is open and the recipient was notified.", OrangeVariant.Send));
         return RedirectToAction(nameof(Details), new { id = thread.Id });
     }
 
@@ -168,7 +169,7 @@ public sealed class ClarificationsController(ApplicationDbContext context) : Con
             CreatedAt = now
         });
         await context.SaveChangesAsync();
-
+        TempData.Orange(OrangeFeedback.Toast("Reply sent", "The other participant was notified.", OrangeVariant.Send));
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -185,7 +186,7 @@ public sealed class ClarificationsController(ApplicationDbContext context) : Con
         thread.Status = ClarificationStatus.Closed;
         thread.ClosedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
-        TempData["Success"] = "Clarification closed.";
+        TempData.Orange(OrangeFeedback.Toast("Clarification closed", "The thread is closed.", OrangeVariant.Approve));
         return RedirectToAction(nameof(Details), new { id });
     }
 

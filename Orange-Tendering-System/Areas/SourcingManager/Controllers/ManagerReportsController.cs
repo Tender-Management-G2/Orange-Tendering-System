@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using System.Security.Claims;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
@@ -411,7 +412,12 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            TempData["Success"] = "Decision saved successfully.";
+            TempData.Orange(newStatus switch
+            {
+                ReportStatus.Accepted => OrangeFeedback.Popup("Report accepted!", "Your acceptance is recorded. Prepare the executive summary next.", OrangeVariant.Approve),
+                ReportStatus.Returned => OrangeFeedback.Popup("Report returned for correction", "The reason is recorded and sent back to the Sourcing Officer.", OrangeVariant.Return),
+                _ => OrangeFeedback.Popup("Report rejected", "The rejection and its reason are recorded.", OrangeVariant.Return)
+            });
 
             return RedirectToAction(nameof(Index));
         }
@@ -642,8 +648,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] =
-                "Executive summary draft saved successfully.";
+            TempData.Orange(OrangeFeedback.Toast("Summary saved", "The executive summary draft is saved."));
 
             return RedirectToAction(nameof(Forward), new { id });
         }
@@ -827,8 +832,7 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                TempData["Success"] =
-                    "Executive summary forwarded successfully.";
+                TempData.Orange(OrangeFeedback.Popup("Summary forwarded!", "The executive summary is with the Top Committee for its four decisions.", OrangeVariant.Send));
 
                 return RedirectToAction(nameof(Index));
             }

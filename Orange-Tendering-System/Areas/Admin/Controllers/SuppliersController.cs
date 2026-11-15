@@ -140,6 +140,13 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                         "Suspend the supplier before changing document verification.",
                     _ => "Unable to review the document."
                 };
+            if (result == "Success")
+            {
+                TempData.Remove("SuccessMessage");
+                TempData.Orange(model.Status == DocumentVerificationStatus.Verified
+                    ? OrangeFeedback.Toast("Document verified", "The document review is saved.", OrangeVariant.Approve)
+                    : OrangeFeedback.Toast("Document review saved", $"The document is marked {model.Status}.", OrangeVariant.Return));
+            }
 
             return RedirectToAction(nameof(Review),
                 new { id = model.SupplierId });
@@ -200,6 +207,17 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
 
                     _ => "Unable to complete supplier review."
                 };
+            if (result == "Success")
+            {
+                TempData.Remove("SuccessMessage");
+                TempData.Orange(model.Decision switch
+                {
+                    SupplierStatus.Approved => OrangeFeedback.Popup("Supplier approved!", "The supplier can now be invited to tenders.", OrangeVariant.Approve),
+                    SupplierStatus.Rejected => OrangeFeedback.Popup("Supplier rejected", "The decision and its reason are recorded.", OrangeVariant.Return),
+                    SupplierStatus.Suspended => OrangeFeedback.Popup("Supplier suspended", "The supplier cannot take part in tenders until reinstated.", OrangeVariant.Return),
+                    _ => OrangeFeedback.Toast("Supplier review saved", null)
+                });
+            }
 
             return RedirectToAction(nameof(Review),
                 new { id = model.SupplierId });

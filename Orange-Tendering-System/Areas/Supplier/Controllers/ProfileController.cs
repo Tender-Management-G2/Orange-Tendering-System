@@ -58,7 +58,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             }
 
             // 4. بعد نجاح الحفظ نرجع للبروفايل مع رسالة نجاح.
-            TempData["ProfileSuccess"] = "Contact details saved successfully.";
+            TempData.Orange(OrangeFeedback.Toast("Changes saved", "Your contact details are updated."));
             return RedirectToAction("Index");
         }
 

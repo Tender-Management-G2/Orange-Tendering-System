@@ -39,10 +39,7 @@
         </div>
     </section>
 
-    @if (createdId > 0 && Model.Any(r => r.TenderId == createdId))
-    {
-        <div class="wfl-created" role="status"><b aria-hidden="true">&#10003;</b><div><strong>Tender T-@createdId.ToString("0000") was created.</strong><span>It is the highlighted row below. Open it to request the committee weights and continue the cycle.</span></div></div>
-    }
+    @* "Tender created" is confirmed by Orange Motion when the tender is saved; the new row stays highlighted below. *@
 
     <section class="dash-metrics wfl-metrics" aria-label="Tender statistics">
         <article class="dash-metric dash-orange"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5" /></svg></div><div class="dash-metric-copy"><strong>@Model.Count.ToString("N0")</strong><span>All tenders</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
@@ -254,7 +251,13 @@
             var tok = form.querySelector('input[name=__RequestVerificationToken]'); if (tok) fd.set('__RequestVerificationToken', tok.value);
             return ajax(form.action, { method: 'POST', body: fd }).then(function (res) { return (res.headers.get('content-type') || '').indexOf('json') > -1 ? res.json().then(function (d) { if (res.ok && d.ok) done++; else errors.push(r.cells[0].textContent.trim() + ': ' + (d.error || 'Rejected')); }) : res.text().then(function () { done++; }); }).then(function () { return step(i + 1); });
         };
-        step(0).then(function () { return ajax(lastUrl).then(function (r) { return r.text(); }); }).then(function (html) { dirty = true; render(html, openTitles()); if (errors.length) showError(errors[0]); else { var f = document.createElement('div'); f.className = 'wf-flash'; f.innerHTML = '<b aria-hidden="true">✓</b>Compliance saved for ' + done + ' offer' + (done === 1 ? '' : 's') + '.'; var head = body.querySelector('.wf-pop-head'); head.parentNode.insertBefore(f, head.nextSibling); } }).catch(function () { btn.disabled = false; btn.textContent = label; showError('The server could not be reached. Try again.'); });
+        var motion = window.OrangeMotion ? OrangeMotion.begin({ mode: 'toast', title: 'Recording compliance…' }) : null;
+        step(0).then(function () { return ajax(lastUrl).then(function (r) { return r.text(); }); }).then(function (html) {
+            dirty = true; render(html, openTitles());
+            if (errors.length) { if (motion) motion.cancel(); showError(errors[0]); return; }
+            // Every row was confirmed by the server (ok: true) before this is shown.
+            if (motion) motion.finish({ title: 'Compliance recorded', description: 'Saved for ' + done + ' offer' + (done === 1 ? '' : 's') + '.', variant: 'save', mode: 'toast' });
+        }).catch(function () { if (motion) motion.cancel(); btn.disabled = false; btn.textContent = label; showError('The server could not be reached. Try again.'); });
     }
     function submit(e) {
         if (e.currentTarget.hasAttribute('data-bulk-compliance')) { return bulk(e.currentTarget, e); }
@@ -266,14 +269,17 @@
         form.querySelectorAll('input[data-utc]').forEach(function (i) { if (i.value) { fd.delete(i.name); fd.set(i.name, new Date(i.value).toISOString()); } });
         var label = btn ? btn.textContent : ''; form.querySelectorAll('button').forEach(function (b) { b.disabled = true; }); if (btn) btn.textContent = /\/Analyze\//.test(form.action) ? 'Analyzing the offers… about a minute' : 'Working…';
         var keep = openTitles();
+        // Orange Motion: processing while the request runs, then the server's own feedback (Services/OrangeWorkflowFeedback.cs).
+        var motion = window.OrangeMotion ? OrangeMotion.begin({ mode: 'toast', title: /\/Analyze\//.test(form.action) ? 'Analyzing the offers\u2026' : 'Working\u2026' }) : null;
         ajax(form.action, { method: 'POST', body: fd }).then(function (r) {
             var json = (r.headers.get('content-type') || '').indexOf('json') > -1;
             return (json ? r.json() : r.text()).then(function (d) {
-                if (json && d.ok) { dirty = true; return ajax(lastUrl).then(function (r2) { return r2.text(); }).then(function (html) { render(html, keep); var f = document.createElement('div'); f.className = 'wf-flash'; f.innerHTML = '<b aria-hidden="true">\u2713</b>Saved.'; var head = body.querySelector('.wf-pop-head'); head.parentNode.insertBefore(f, head.nextSibling); body.scrollTop = 0; }); }
+                if (json && d.ok) { dirty = true; return ajax(lastUrl).then(function (r2) { return r2.text(); }).then(function (html) { render(html, keep); body.scrollTop = 0; if (motion) motion.finish(d.feedback || { title: 'Changes saved', variant: 'save', mode: 'toast' }); }); }
+                if (motion) motion.cancel();
                 if (json) { form.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); if (btn) btn.textContent = label; showError(d.error || 'The action was rejected.'); return; }
                 if (d.indexOf('wf-pop') > -1) { dirty = true; render(d, keep); var m = body.querySelector('.wf-flash'); if (m) m.scrollIntoView({ block: 'nearest' }); body.scrollTop = 0; } else { window.location.href = r.url; }
             });
-        }).catch(function () { form.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); if (btn) btn.textContent = label; showError('The server could not be reached. Try again.'); });
+        }).catch(function () { if (motion) motion.cancel(); form.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); if (btn) btn.textContent = label; showError('The server could not be reached. Try again.'); });
     }
     var lastUrl = '';
     function refreshView() { if (!lastUrl || !dlg.open) return; ajax(lastUrl).then(function (r) { return r.text(); }).then(function (h) { if (h.indexOf('wf-pop') > -1 && dlg.open) render(h, openTitles()); }); }

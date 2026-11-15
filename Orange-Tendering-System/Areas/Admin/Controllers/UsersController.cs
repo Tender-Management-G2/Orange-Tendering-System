@@ -96,8 +96,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                 return View(model);
             }
 
-            TempData["SuccessMessage"] =
-                "User created. Share the temporary password securely. The user must change it at first sign-in; a setup link was also emailed.";
+            TempData.Orange(OrangeFeedback.Popup("User created!", "Share the temporary password securely. A setup link was also e-mailed.", OrangeVariant.Save));
 
             if (Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl!);
 
@@ -241,8 +240,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                 return View(model);
             }
 
-            TempData["SuccessMessage"] =
-                "User information and role updated successfully.";
+            TempData.Orange(OrangeFeedback.Toast("Changes saved", "User information and role were updated."));
 
             return RedirectToAction(nameof(Index));
         }
@@ -273,9 +271,8 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
         public async Task<IActionResult> ResendSetupLink(string id)
         {
             var result = await _adminService.ResendSetupLinkAsync(id, HttpContext);
-            TempData[result.Succeeded ? "SuccessMessage" : "ErrorMessage"] = result.Succeeded
-                ? "A new password setup link was emailed. It expires in one hour."
-                : result.Errors.FirstOrDefault()?.Description ?? "The setup link could not be sent.";
+            if (result.Succeeded) TempData.Orange(OrangeFeedback.Toast("Setup link sent", "A new password setup link was e-mailed. It expires in one hour.", OrangeVariant.Send));
+            else TempData["ErrorMessage"] = result.Errors.FirstOrDefault()?.Description ?? "The setup link could not be sent.";
             return RedirectToAction(nameof(Details), new { id });
         }
 
