@@ -17,6 +17,10 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
     Layout = "_HomeLayout";
     ViewData["Title"] = "Orange | From Request to Award. One Connected System.";
     var st = ViewBag.Stats as PublicStats;
+    // "Explore the Platform" plays the platform video when the project ships one (wwwroot/media/platform-tour.mp4 or .webm)
+    string? tourVideo = null, tourType = null;
+    foreach (var (file, type) in new[] { ("platform-tour.mp4", "video/mp4"), ("platform-tour.webm", "video/webm") })
+        if (System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, "media", file))) { tourVideo = Url.Content("~/media/" + file); tourType = type; break; }
     var hasData = st is not null && (st.ActiveTenders + st.ApprovedSuppliers + st.CompletedRequests + st.Closed + st.Bidding + st.Evaluation + st.Approvals) > 0;
 }
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -186,7 +190,14 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
             <h1 id="hc-h1">From Procurement Complexity to <em>One Unified Platform</em></h1>
             <p class="hq-lead">Orange's intelligent sourcing and tender management platform connects suppliers, evaluations, approvals and procurement workflows in one secure digital experience.</p>
             <div class="hq-actions">
-                <a class="hq-cta" href="#how-it-works">Explore the Platform <span aria-hidden="true">&rarr;</span></a>
+                @if (tourVideo != null)
+                {
+                    <button type="button" class="hq-cta" data-tour-open aria-haspopup="dialog" aria-controls="hc-tour">Explore the Platform <span class="hq-cta-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span></button>
+                }
+                else
+                {
+                    <a class="hq-cta" href="#how-it-works">Explore the Platform <span aria-hidden="true">&rarr;</span></a>
+                }
                 <a class="hq-play" href="#platform" data-see-action><span class="hq-play-i" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span>See It in Action</a>
             </div>
             <p class="hq-account">
@@ -228,6 +239,16 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
         </div>
     </div>
 </section>
+
+@if (tourVideo != null)
+{
+    <dialog class="hc-tour" id="hc-tour" aria-label="Explore the Platform video">
+        <div class="hc-tour-box">
+            <div class="hc-tour-head"><span class="hc-tour-logo" aria-hidden="true">orange</span><b>Explore the Platform</b><button type="button" class="hc-tour-close" data-tour-close aria-label="Close video">&times;</button></div>
+            <video class="hc-tour-video" controls playsinline preload="metadata"><source src="@tourVideo" type="@tourType" />Your browser cannot play this video.</video>
+        </div>
+    </dialog>
+}
 
 @* ============ 09  WORKSPACES ============ *@
 <section class="hc-sec hc-sec-alt" id="platform" aria-labelledby="hc-ws-h">

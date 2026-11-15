@@ -640,3 +640,21 @@ html[data-theme="light"] .hq-intro-logo{box-shadow:0 0 0 2px rgba(255,190,120,.8
 html[data-theme="light"] .hq h1{color:#1c1a17}
 html[data-theme="light"] .hq .hq-eyebrow{color:#3d3832}
 html[data-theme="light"] .hq h1 em{color:#e86d00}
+
+/* ---------- "Explore the Platform" video ---------- */
+button.hq-cta{border:0;cursor:pointer}
+.hq-cta-play{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.25)}
+.hq-cta-play svg{width:12px;height:12px;fill:#fff;margin-left:1px}
+.hc-tour{border:0;padding:0;background:transparent;width:min(1100px,calc(100vw - 32px));max-width:none;color:#fff}
+.hc-tour::backdrop{background:rgba(6,4,3,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hc-tour[open]{animation:hcTourIn .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes hcTourIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.hc-tour-box{border-radius:18px;overflow:hidden;background:#0d0a08;border:1px solid rgba(255,138,40,.5);box-shadow:0 40px 100px -30px #000,0 0 80px -30px rgba(255,121,0,.7)}
+.hc-tour-head{display:flex;align-items:center;gap:12px;padding:12px 14px 12px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.hc-tour-logo{display:flex;align-items:flex-end;width:30px;height:30px;background:#ff7900;font:700 7px/1 var(--hf);padding:0 0 3px 3px;color:#fff}
+.hc-tour-head b{flex:1;font:600 16px/1.2 var(--hf)}
+.hc-tour-close{width:38px;height:38px;border:1px solid rgba(255,255,255,.2);border-radius:50%;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer}
+.hc-tour-close:hover{background:#ff7900;border-color:#ff7900;color:#111}
+.hc-tour-video{display:block;width:100%;max-height:calc(100vh - 140px);aspect-ratio:16/9;background:#000}
+html[data-theme="light"] .hc-tour::backdrop{background:rgba(236,231,224,.82)}
+@media (prefers-reduced-motion:reduce){.hc-tour[open]{animation:none}}

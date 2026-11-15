@@ -50,6 +50,20 @@
     window.addEventListener("scroll", solid, { passive: true }); burger.addEventListener("click", solid); solid();
   })();
 
+  /* ---------- "Explore the Platform" video player ---------- */
+  (function tour() {
+    var dlg = document.getElementById("hc-tour"), btn = $("[data-tour-open]");
+    if (!dlg || !btn) return;
+    var video = dlg.querySelector("video");
+    btn.addEventListener("click", function () {
+      dlg.showModal();
+      var pl = video.play(); if (pl && pl.catch) pl.catch(function () { /* autoplay blocked: the controls stay available */ });
+    });
+    function close() { if (dlg.open) dlg.close(); }
+    dlg.addEventListener("click", function (e) { if (e.target === dlg || e.target.closest("[data-tour-close]")) close(); });
+    dlg.addEventListener("close", function () { video.pause(); btn.focus({ preventScroll: true }); });
+  })();
+
   /* ---------- roving tablist helper ---------- */
   function tablist(tabs, onSelect) {
     function select(tab, focus) {
