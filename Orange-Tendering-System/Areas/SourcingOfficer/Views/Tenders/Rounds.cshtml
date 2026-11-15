@@ -19,8 +19,8 @@
 <section class="ws-panel pg-panel"><h2>Start another supplier attempt</h2>
 @if (Model.CanStartNextRound)
 {
-    <p>The previous round received fewer than 3 submitted offers and has expired. Starting a new round keeps the old invitations and offers in the history.</p>
-    <form asp-action="StartNextRound" method="post"><input type="hidden" name="tenderId" value="@Model.TenderId" /><button class="pg-btn pg-btn-primary" type="submit">Start next round</button></form>
+    <p>Re-tendering creates a draft round and preserves previous invitations and bids. Open it through the official workflow with a fresh deadline.</p>
+    <form asp-action="StartNextRound" method="post"><input type="hidden" name="tenderId" value="@Model.TenderId" /><label>Reason for re-tendering<textarea name="reason" maxlength="2000" required></textarea></label><button class="pg-btn pg-btn-primary" type="submit">Start next round</button></form>
 }
 else { <p>@Model.NextRoundMessage</p> }
 </section></div>

@@ -213,6 +213,8 @@ a.pg-btn-primary{background:linear-gradient(105deg,#ffb322,#ff7900 45%,#c65200);
 .ws-toast-region{bottom:92px}
 @media (max-width:520px){.ai-panel{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}.ai-fab{right:14px;bottom:14px}}
 
-
+/* Voice controls share the authenticated workspace header. */
+.ws-voice-language{max-width:86px;min-height:34px;border:1px solid var(--ws-rule);border-radius:8px;background:var(--ws-surface);color:var(--ws-ink);font:inherit;font-size:12px;padding:3px}
+[data-voice-search].is-listening{color:#ff7900;box-shadow:0 0 0 3px #ff790033}
 .ai-help-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.ai-help-links a{padding:5px 8px;border:1px solid var(--ws-rule);border-radius:8px;color:var(--ws-accent);font-size:11px;text-decoration:none}.ai-msg-body p{white-space:pre-wrap;overflow-wrap:anywhere}
 .ai-reference{padding:8px 14px;border-bottom:1px solid var(--ws-rule);font-size:12px;flex:none;max-height:180px;overflow:auto}.ai-reference summary{cursor:pointer;font-weight:600}.ai-reference p{line-height:1.7;white-space:pre-wrap}

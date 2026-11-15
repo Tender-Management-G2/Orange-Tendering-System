@@ -60,10 +60,12 @@ through WorkspaceNavigation.LayoutFor.
         <header class="ws-topbar">
             <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
             <div class="ws-officer-search-tools">
-            <div class="ws-search" data-global-search data-search-url="/Search/Query"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Search tenders, purchase requests and suppliers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
+            <div class="ws-search" data-global-search data-search-url="@Url.Action("Query", "Search", new { area = "" })"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="Search for tenders, PRs, suppliers…" aria-label="Search tenders, purchase requests and suppliers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
                 <partial name="_VoiceSearchButton" />
             </div>
             <div class="ws-topbar-actions">
+                <select data-voice-language class="ws-voice-language" aria-label="Voice search language"><option value="en-US">EN</option><option value="ar-JO">العربية</option></select>
+                <span data-search-feedback class="ws-sr-only" role="status" aria-live="polite"></span>
                 <partial name="_NotificationBell" />
                 <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
                 <partial name="_WorkspaceAccountMenu" />
@@ -83,6 +85,7 @@ through WorkspaceNavigation.LayoutFor.
     <script src="~/js/notification-bell.js" asp-append-version="true"></script>
     <partial name="_JQueryScripts" />
     <script src="~/js/report-signature.js" asp-append-version="true"></script>
+    <script src="~/js/global-search.js" asp-append-version="true"></script>
     <script src="~/js/orange-ui.js" asp-append-version="true"></script>
     <script src="~/js/offer-compliance.js" asp-append-version="true"></script>
     <script src="~/js/ai-chat.js" asp-append-version="true"></script>

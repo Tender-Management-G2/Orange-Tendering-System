@@ -178,6 +178,7 @@
     <div class="wf-error" role="alert" hidden></div>
     @if (Model.IsTop && rv != null) { <p><a asp-area="TopCommittee" asp-controller="Rejections" asp-action="Details" asp-route-id="@rv.Report.Id">Top Committee decision and rejection reason agreement</a></p> }
 
+    @if (Model.IsTop && rv != null) { <p><a asp-area="TopCommittee" asp-controller="Rejections" asp-action="Details" asp-route-id="@rv.Report.Id">Top Committee decision and rejection reason agreement</a></p> }
     <div class="wp-layout"><div class="wp-main" data-view="@(stepIndex == 4 ? "approval" : "journey")">
     <section class="wp-now wp-now-@tone" aria-live="polite">
         <div class="wp-now-top">

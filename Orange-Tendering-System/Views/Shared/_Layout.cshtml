@@ -58,7 +58,7 @@ INTEGRATED. No business logic.
     <div id="main-content" class="@(isIdentityPage ? "identity-page" : null)">
         @RenderBody()
     </div>
-    @if (!hideFooter)
+    @if (!hideFooter && ViewData["HideFooter"] is not true)
     {
         <partial name="_Footer" />
     }

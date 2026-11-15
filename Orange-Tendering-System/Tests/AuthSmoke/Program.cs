@@ -28,6 +28,9 @@ if (args.Contains("--verify-saja-demo")) { await SajaDemoFixture.Run(verifyExist
 if (args.Contains("--ai-help-checks")) { await AiHelpChecks.Run(); return; }
 if (args.Contains("--clarification-workflow-checks")) { await ClarificationWorkflowChecks.Run(); return; }
 if (args.Contains("--top-decision-checks")) { await TopDecisionChecks.Run(); return; }
+if (args.Contains("--search-checks")) { await SearchChecks.Run(); return; }
+if (args.Contains("--notification-checks")) { await NotificationChecks.Run(); return; }
+if (args.Contains("--retender-checks")) { await RetenderChecks.Run(); return; }
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
 if (args.Contains("--seed-lifecycle")) { await LifecycleFixture.Run(); return; }

@@ -135,14 +135,20 @@ public sealed class InternalDashboardService(ApplicationDbContext db)
     public async Task<List<SearchHit>> SearchAsync(string role, ClaimsPrincipal principal, string q)
     {
         q = q.Trim();
-        if (q.Length < 2) return [];
+        if (q.Length < 2 || q.Length > 100) return [];
         var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var hits = new List<SearchHit>();
-        foreach (var t in await ScopedTenders(role, user).Where(t => t.Title.Contains(q) || t.Description.Contains(q) || ("T-" + t.Id).Contains(q)).OrderByDescending(t => t.CreatedAt).Take(6).ToListAsync())
-            hits.Add(new("Tender", t.Title, $"T-{t.Id:0000} · {Words(t.Status.ToString())}", "/Workflow/Details/" + t.Id));
+        var tenders = ScopedTenders(role, user);
+        if (role == SystemRoles.EvaluationCommittee) tenders = tenders.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Evaluation));
+        if (role == SystemRoles.SourcingManager) tenders = tenders.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Evaluation && m.Responsibility == CommitteeResponsibility.SourcingManager));
+        if (role == SystemRoles.TopCommittee) tenders = tenders.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Top));
+        // Admin manages accounts and companies; its search must not offer confidential workflow pages it cannot open.
+        if (role != SystemRoles.Admin)
+            foreach (var t in await tenders.Where(t => t.Title.Contains(q) || t.Description.Contains(q) || ("T-" + t.Id).Contains(q) || t.Id == SearchId(q, "T-")).OrderByDescending(t => t.CreatedAt).Take(6).ToListAsync())
+                hits.Add(new("Tender", t.Title, $"T-{t.Id:0000} · {Words(t.Status.ToString())}", role == SystemRoles.RequestingDepartment ? "/Department/PurchaseRequests/Details/" + t.PurchaseRequestId : "/Workflow/Details/" + t.Id));
         var prArea = role == SystemRoles.RequestingDepartment ? "/Department/PurchaseRequests/Details/" : role == SystemRoles.SourcingOfficer ? "/SourcingOfficer/PurchaseRequests/Review/" : null;
         if (prArea != null)
-            foreach (var p in await ScopedRequests(role, user).Where(p => p.Title.Contains(q)).OrderByDescending(p => p.CreatedAt).Take(5).ToListAsync())
+            foreach (var p in await ScopedRequests(role, user).Where(p => p.Title.Contains(q) || p.Id == SearchId(q, "PR-")).OrderByDescending(p => p.CreatedAt).Take(5).ToListAsync())
                 hits.Add(new("Purchase request", p.Title, $"PR-{p.Id:0000} · {p.Status}", prArea + p.Id));
         if (role is SystemRoles.Admin or SystemRoles.SourcingOfficer)
             foreach (var s in await db.Suppliers.AsNoTracking().Where(s => s.CompanyName.Contains(q) || s.Email.Contains(q)).OrderBy(s => s.CompanyName).Take(5).ToListAsync())
@@ -157,23 +163,26 @@ public sealed class InternalDashboardService(ApplicationDbContext db)
     public async Task<List<SearchHit>> SearchSupplierAsync(ClaimsPrincipal principal, string q)
     {
         q = q.Trim();
-        if (q.Length < 2) return [];
+        if (q.Length < 2 || q.Length > 100) return [];
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var supplierId = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.SupplierId).SingleOrDefaultAsync();
         if (supplierId == null) return [];
         var hits = new List<SearchHit>();
         foreach (var i in await db.TenderInvitations.AsNoTracking()
-            .Where(i => i.SupplierId == supplierId && (i.TenderRound.Tender.Title.Contains(q) || ("T-" + i.TenderRound.TenderId).Contains(q)))
+            .Where(i => i.SupplierId == supplierId && (i.TenderRound.Tender.Title.Contains(q) || ("T-" + i.TenderRound.TenderId).Contains(q) || i.TenderRound.TenderId == SearchId(q, "T-")))
             .OrderByDescending(i => i.Id).Take(6)
             .Select(i => new { i.Id, i.TenderRound.Tender.Title, i.TenderRound.TenderId, i.Status }).ToListAsync())
             hits.Add(new("Invitation", i.Title, $"T-{i.TenderId:0000} · {i.Status}", "/Supplier/Invitations/Details/" + i.Id));
         foreach (var b in await db.Bids.AsNoTracking()
-            .Where(b => b.TenderInvitation.SupplierId == supplierId && b.TenderInvitation.TenderRound.Tender.Title.Contains(q))
+            .Where(b => b.TenderInvitation.SupplierId == supplierId && (b.TenderInvitation.TenderRound.Tender.Title.Contains(q) || b.Id == SearchId(q, "B-")))
             .OrderByDescending(b => b.Id).Take(5)
             .Select(b => new { b.Id, b.TenderInvitation.TenderRound.Tender.Title, b.Status }).ToListAsync())
             hits.Add(new("Offer", b.Title, b.Status.ToString(), "/Supplier/Offers/Details/" + b.Id));
         return hits;
     }
+
+    private static int SearchId(string query, string prefix) =>
+        query.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && int.TryParse(query[prefix.Length..], out var id) && id > 0 ? id : -1;
 
     private IQueryable<Tender> ScopedTenders(string role, ApplicationUser user)
     {

@@ -14,9 +14,11 @@ TeamDevDatabase.Apply(builder);
 var connectionString = builder.Configuration.GetConnectionString("Default Connection") ?? throw new InvalidOperationException("Connection string 'Default Connection' not found.");
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<Orange_Tendering_System.Services.NotificationPushInterceptor>();
+builder.Services.AddSingleton<NotificationTransactionInterceptor>();
 builder.Services.AddDbContext<ApplicationDbContext>((services, options) =>
     options.UseSqlServer(connectionString)
-        .AddInterceptors(services.GetRequiredService<Orange_Tendering_System.Services.NotificationPushInterceptor>()));
+        .AddInterceptors(services.GetRequiredService<Orange_Tendering_System.Services.NotificationPushInterceptor>(),
+            services.GetRequiredService<NotificationTransactionInterceptor>()));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 // AddRoles puts the user's Identity roles into the sign-in cookie, which [Authorize(Roles = ...)] on the
