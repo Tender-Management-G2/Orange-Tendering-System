@@ -31,7 +31,7 @@ STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
 *@
 @using Orange_Tendering_System.ViewModels
 @model IReadOnlyList<TeamMemberViewModel>
-@{ ViewData["Title"] = "Our Team | Orange Sourcing"; }
+@{ ViewData["Title"] = "Our Team | Orange Sourcing"; ViewData["HideFooter"] = true; }
 @section Styles {<link rel="stylesheet" href="~/css/team-scene.css" asp-append-version="true" />}
 <main class="public-page team-page tx-page">
   <section class="tx" id="tx" style="--tx-n:@Model.Count" aria-labelledby="tx-title">
@@ -126,7 +126,6 @@ STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
       </div>
     </div>
   </dialog>
-  <section class="page-shell public-next public-reveal"><span class="public-eyebrow">START A CONVERSATION</span><a asp-action="Contact">A question.<br /><em>A new connection.</em><span aria-hidden="true">↗</span></a></section>
 </main>
 @section Scripts {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>

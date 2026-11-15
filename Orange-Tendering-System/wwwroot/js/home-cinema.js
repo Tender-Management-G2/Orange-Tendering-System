@@ -31,9 +31,38 @@
       spy.forEach(function (x) { var on = x === cur; x.a.classList.toggle("is-active", on); if (on) x.a.setAttribute("aria-current", "location"); else x.a.removeAttribute("aria-current"); });
     }
     window.addEventListener("scroll", mark, { passive: true }); window.addEventListener("resize", mark); mark();
+    // day / night switch (the other public pages use experience.js for the same control)
+    var themeBtn = $("#theme-toggle"), themeStatus = $("#theme-status"), metaTheme = $('meta[name="theme-color"]');
+    function applyTheme(theme, announce) {
+      root.dataset.theme = theme; root.style.colorScheme = theme;
+      if (metaTheme) metaTheme.content = theme === "light" ? "#f6f4f0" : "#090909";
+      if (themeBtn) { themeBtn.setAttribute("aria-label", "Switch to " + (theme === "dark" ? "light" : "dark") + " mode"); themeBtn.setAttribute("aria-pressed", String(theme === "light")); themeBtn.title = theme === "dark" ? "Light mode" : "Dark mode"; }
+      if (announce && themeStatus) themeStatus.textContent = (theme === "light" ? "Light" : "Dark") + " mode enabled";
+    }
+    applyTheme(root.dataset.theme === "light" ? "light" : "dark");
+    if (themeBtn) themeBtn.addEventListener("click", function () {
+      var next = root.dataset.theme === "light" ? "dark" : "light";
+      try { localStorage.setItem("orange-ui-theme", next); } catch (_) {}
+      applyTheme(next, true);
+    });
     var bar = $("#hc-nav");
     function solid() { bar.classList.toggle("is-solid", window.scrollY > 40 || links.classList.contains("is-open")); }
     window.addEventListener("scroll", solid, { passive: true }); burger.addEventListener("click", solid); solid();
+  })();
+
+  /* ---------- "Explore the Platform" video player ---------- */
+  (function tour() {
+    var dlg = document.getElementById("hc-tour"), btns = $$("[data-tour-open]"), opener = null;
+    if (!dlg || !btns.length) return;
+    var video = dlg.querySelector("video");
+    btns.forEach(function (b) { b.addEventListener("click", function () {
+      opener = b; dlg.showModal();
+      if (!video) return;
+      var pl = video.play(); if (pl && pl.catch) pl.catch(function () { /* autoplay blocked: the controls stay available */ });
+    }); });
+    function close() { if (dlg.open) dlg.close(); }
+    dlg.addEventListener("click", function (e) { if (e.target === dlg || e.target.closest("[data-tour-close]")) close(); });
+    dlg.addEventListener("close", function () { if (video) video.pause(); if (opener) opener.focus({ preventScroll: true }); });
   })();
 
   /* ---------- roving tablist helper ---------- */
