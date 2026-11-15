@@ -114,6 +114,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             var person = await users.FindByIdAsync(ids[i]);
             Require(person is { IsActive: true }, "Committee account missing or inactive.");
             Require(await Role(person!, i == 0 ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee), "Each member must have the appropriate Identity role.");
+            Require(!await Role(person!, i == 0 ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager), i == 0 ? "The Sourcing Manager seat is only for a dedicated Sourcing Manager, not an Evaluation Committee member." : "A Sourcing Manager cannot take a committee member seat.");
             if (i == 1) Require(person!.DepartmentId == pr!.DepartmentId, "Department representative must belong to the requesting department.");
         }
         var requirements = JsonSerializer.Serialize(new { input.TechnicalRequirements, input.CommercialConditions, input.DeliveryExpectations, input.MandatoryCompliance });
@@ -149,14 +150,14 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         {
             var avg = WeightedCalculation.Average(weights.Proposals.Select(x => (x.Financial, x.Technical)));
             weights.FinancialAverage = avg.Financial; weights.TechnicalAverage = avg.Technical; weights.State = WeightState.AwaitingApproval;
-            await NotifyOfficer(id, "Weight proposals complete", Policy.WeightConfigured ? "Awaiting formal weight approval." : "Awaiting Approval Policy: bidding remains blocked.");
+            await NotifyOfficer(id, "Weight proposals complete", "All four proposals are in. Review the average and approve it to lock the official weights.");
         }
         Audit(a, id, "ProposalEvidence", new { weights.Version, member.Id, financial, technical });
     });
     public Task ApproveWeights(int id, ClaimsPrincipal principal) => Change(id, principal, "WeightsApproved", async (t, a) =>
     {
-        Require(await WeightApprover(a), "Awaiting Approval Policy, or you are not an authorized weight approver.");
-        Require(await Role(a, SystemRoles.SourcingManager) && (await ManagerSeat(id))?.UserId == a.Id, "Only the Sourcing Manager assigned to this tender may approve its calculated weights.");
+        // The Sourcing Officer who defined the tender approves the committee average, which then becomes the official weighting.
+        await Officer(t, a);
         var w = await Weights(id);
         Require(t.Status == TenderStatus.Draft && w.State == WeightState.AwaitingApproval && w.Proposals.Count == 4, "Weights are not awaiting approval.");
         var avg = WeightedCalculation.Average(w.Proposals.Select(x => (x.Financial, x.Technical)));
@@ -173,9 +174,22 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         round.OpensAt = Now; round.Deadline = deadline.UtcDateTime; round.Status = TenderRoundStatus.Open; t.Status = TenderStatus.Bidding;
         if (round.RoundNumber > 1) await CarryForwardSuppliers(t, a, round);
     });
+    // Repair a legacy open round with no deadline only through an explicit Officer action.
+    public Task SetMissingBiddingDeadline(int id, DateTimeOffset deadline, ClaimsPrincipal principal) => Change(id, principal, "MissingBiddingDeadlineSet", async (t, a) =>
+    {
+        await Officer(t, a); var round = await Round(id); var weights = await Weights(id);
+        Require(t.Status == TenderStatus.Bidding && round.Status == TenderRoundStatus.Open && round.Deadline == null,
+            "Only an open legacy round with a missing deadline can be repaired here.");
+        Require(weights.State == WeightState.Approved, "The assigned Sourcing Officer must approve and lock all four weight proposals before a bidding deadline can be set.");
+        Require(deadline != default && deadline.UtcDateTime > Now, "Choose a bidding closing date and time in the future.");
+        Require(!await db.Set<EvaluationSession>().AnyAsync(x => x.TenderRoundId == round.Id), "Evaluation has already started; the deadline cannot change.");
+        round.Deadline = deadline.UtcDateTime; round.OpensAt ??= Now;
+        Audit(a, id, "BiddingDeadlineRepairEvidence", new { round.Id, Deadline = round.Deadline });
+    });
     public Task Invite(int id, int supplierId, ClaimsPrincipal principal) => Change(id, principal, "SupplierInvited", async (t, a) =>
     {
         await Officer(t, a); var r = await Round(id);
+        Require(r.Deadline.HasValue, "This bidding round has no closing deadline. Set the missing deadline before inviting suppliers.");
         Require(t.Status == TenderStatus.Bidding && r.Status == TenderRoundStatus.Open && r.Deadline > Now
             && await db.Set<WeightRound>().AnyAsync(w => w.TenderId == id && w.State == WeightState.Approved), "Complete tender setup and approved weights before inviting suppliers.");
         Require(await db.Suppliers.AnyAsync(x => x.Id == supplierId && x.Status == SupplierStatus.Approved
@@ -403,6 +417,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         if (s.Report != null && await db.Set<ReportSignature>().AnyAsync(x => x.TenderReportId == s.ReportId && x.Stage == ReportSigningStage.Evaluation && x.UserId == a.Id))
         { await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Evaluation, signingRole, member.Responsibility.ToString()!, "Approve", documentHash, confirmed, Now, signatureImage); return; }
         Require(s.State == SessionState.ReportDraft && s.Report != null, "A complete unified report must be available for review.");
+        Require(s.ReportSentAt != null, "The Sourcing Officer has not sent the report for signing yet.");
         await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Evaluation, signingRole, member.Responsibility.ToString()!, "Approve", documentHash, confirmed, Now, signatureImage);
         var reviewRoundId = s.ReportReviewRoundId ?? s.CommitteeRoundId;
         var votes = await db.CommitteeVotes.Where(x => x.CommitteeRoundId == reviewRoundId).ToListAsync();
@@ -611,7 +626,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var bids = await db.Bids.Include(x => x.Items).Include(x => x.TenderInvitation).ThenInclude(x => x.Supplier).Where(x => x.TenderInvitation.TenderRoundId == roundId && (supplier ? x.TenderInvitation.SupplierId == a.SupplierId : canReadBids)).ToListAsync();
         var result = new WorkflowDetails { Tender = t, Weights = w, Session = s, Bids = bids, UserId = a.Id, IsOfficer = officer, IsEvaluator = evaluator, IsTop = top, IsSupplier = supplier,
             IsManager = evaluator && await Role(a, SystemRoles.SourcingManager) && t.CommitteeMembers.Any(x => x.UserId == a.Id && x.Responsibility == CommitteeResponsibility.SourcingManager),
-            CanApproveWeights = !supplier && await WeightApprover(a) && (await ManagerSeat(id))?.UserId == a.Id && await Role(a, SystemRoles.SourcingManager), WeightPolicyConfigured = Policy.WeightConfigured, FinalPolicyConfigured = s?.FinalApprovalPolicyJson != null || Policy.FinalConfigured, UtcNow = Now };
+            CanApproveWeights = !supplier && officer, WeightPolicyConfigured = Policy.WeightConfigured, FinalPolicyConfigured = s?.FinalApprovalPolicyJson != null || Policy.FinalConfigured, UtcNow = Now };
         if (supplier && w != null) w.Proposals = []; // Supplier sees approved published criteria, never proposals/audit.
         await LoadRoundControl(result, t, a, officer, supplier);
         result.Documents = await db.Documents.Where(x => x.TenderId == id || x.BidId != null && bids.Select(b => b.Id).Contains(x.BidId.Value)).AsNoTracking().ToListAsync();

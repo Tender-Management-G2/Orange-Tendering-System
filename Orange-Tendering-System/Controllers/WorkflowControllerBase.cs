@@ -33,9 +33,30 @@ public abstract class WorkflowControllerBase(TenderWorkflowService workflow, Pro
     }
     protected async Task<IActionResult> Execute(int id, Func<Task> action)
     {
+        try
+        {
         if (!ModelState.IsValid) throw new WorkflowException(string.Join(" ", ModelState.Values.SelectMany(x => x.Errors).Select(x => string.IsNullOrEmpty(x.ErrorMessage) ? "Invalid form value." : x.ErrorMessage)));
-        await action(); TempData["WorkflowMessage"] = "The operation was saved successfully.";
+        await action();
+        if (IsAjax) return Json(new { ok = true });
+        TempData["WorkflowMessage"] = "The operation was saved successfully.";
         return RedirectToAction(nameof(Details), new { id });
+        }
+        catch (WorkflowException error)
+        {
+            // Expected business-rule refusals are handled here, before they escape
+            // into MVC's action filter (and appear user-unhandled in the debugger).
+            return WorkflowFailure(error.Message);
+        }
+        catch (DbUpdateException)
+        {
+            return WorkflowFailure("The record changed or a duplicate operation was rejected. Reload and check its current state.");
+        }
+    }
+    private IActionResult WorkflowFailure(string message)
+    {
+        if (IsAjax) return BadRequest(new { error = message });
+        ViewData.Model = message;
+        return new ViewResult { ViewName = "WorkflowError", ViewData = ViewData, TempData = TempData, StatusCode = 400 };
     }
     public override void OnActionExecuted(ActionExecutedContext context)
     {

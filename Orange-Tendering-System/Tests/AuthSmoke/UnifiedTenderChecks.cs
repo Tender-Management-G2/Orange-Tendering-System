@@ -116,7 +116,10 @@ public static class UnifiedTenderChecks
         Check(duplicateRejected && await db.Tenders.CountAsync() == 1, "duplicate tender rejected on server");
         await flow.RequestWeights(id, Principal(officer));
         foreach (var member in new[] { manager, evaluator, financial, technical }) await flow.Propose(id, 40, 60, Principal(member));
-        await flow.ApproveWeights(id, Principal(manager));
+        var managerApprovalRejected = false;
+        try { await flow.ApproveWeights(id, Principal(manager)); } catch (WorkflowException) { managerApprovalRejected = true; }
+        Check(managerApprovalRejected, "the manager cannot approve weights assigned to the Sourcing Officer");
+        await flow.ApproveWeights(id, Principal(officer));
         await flow.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(3), Principal(officer));
         await flow.Invite(id, supplier.Id, Principal(officer));
         await flow.Invite(id, competitor.Id, Principal(officer));
@@ -255,6 +258,11 @@ public static class UnifiedTenderChecks
         await flow.GenerateReport(id, "Test unified report", Principal(technical));
         var reportId = session.ReportId!.Value;
         var hash = session.Report!.PdfSha256!;
+        Check(!(await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee,
+            "committee signing stays closed until the Officer sends the report");
+        await flow.SendReportToCommittee(id, Principal(officer));
+        Check((await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee,
+            "Officer sending the report opens committee signing");
         var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=").Concat(new byte[250]).ToArray();
         foreach (var signer in new[] { technical, financial, evaluator, manager })
         {

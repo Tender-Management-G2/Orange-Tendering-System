@@ -196,6 +196,7 @@
                 if (el.dataset.final) { label.textContent = 'Scoring is closed'; clock.textContent = '00:00:00'; return; }
                 var now = Date.now(), state = now < st ? 'before' : now < en ? 'open' : 'closed';
                 if (state !== shown && now - lastRefresh > 4000) { lastRefresh = now; refreshView(); return; }
+                var jn = el.querySelector('[data-join]'); if (jn) { var locked = now < st; jn.classList.toggle('is-locked', locked); if (locked) { jn.removeAttribute('href'); jn.setAttribute('aria-disabled', 'true'); jn.tabIndex = -1; } else { jn.setAttribute('href', jn.dataset.join); jn.removeAttribute('aria-disabled'); jn.removeAttribute('tabindex'); } jn.querySelector('[data-join-label]').innerHTML = locked ? '&#128274; Opens when the meeting starts' : '&#127909; Join the meeting'; }
                 if (state === 'before') { label.textContent = 'Meeting and scoring start in'; clock.textContent = fmt(st - now); }
                 else if (state === 'open') { label.textContent = 'Scoring is open, it closes in'; clock.textContent = fmt(en - now); }
                 else { label.textContent = 'Scoring is closed'; clock.textContent = '00:00:00'; }
@@ -251,7 +252,7 @@
             if (i >= rows.length) { return Promise.resolve(); }
             var r = rows[i], fd = new FormData(); fd.set('bidId', r.dataset.bid); fd.set('status', r.querySelector('[data-f=status]').value); fd.set('notes', r.querySelector('[data-f=notes]').value); fd.set('missing', '');
             var tok = form.querySelector('input[name=__RequestVerificationToken]'); if (tok) fd.set('__RequestVerificationToken', tok.value);
-            return ajax(form.action, { method: 'POST', body: fd }).then(function (res) { return (res.headers.get('content-type') || '').indexOf('json') > -1 ? res.json().then(function (d) { errors.push(r.cells[0].textContent.trim() + ': ' + (d.error || 'Rejected')); }) : res.text().then(function () { done++; }); }).then(function () { return step(i + 1); });
+            return ajax(form.action, { method: 'POST', body: fd }).then(function (res) { return (res.headers.get('content-type') || '').indexOf('json') > -1 ? res.json().then(function (d) { if (res.ok && d.ok) done++; else errors.push(r.cells[0].textContent.trim() + ': ' + (d.error || 'Rejected')); }) : res.text().then(function () { done++; }); }).then(function () { return step(i + 1); });
         };
         step(0).then(function () { return ajax(lastUrl).then(function (r) { return r.text(); }); }).then(function (html) { dirty = true; render(html, openTitles()); if (errors.length) showError(errors[0]); else { var f = document.createElement('div'); f.className = 'wf-flash'; f.innerHTML = '<b aria-hidden="true">✓</b>Compliance saved for ' + done + ' offer' + (done === 1 ? '' : 's') + '.'; var head = body.querySelector('.wf-pop-head'); head.parentNode.insertBefore(f, head.nextSibling); } }).catch(function () { btn.disabled = false; btn.textContent = label; showError('The server could not be reached. Try again.'); });
     }
