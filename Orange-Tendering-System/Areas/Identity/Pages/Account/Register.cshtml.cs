@@ -15,6 +15,7 @@ public class RegisterModel(
     ApplicationDbContext db,
     UserManager<ApplicationUser> users,
     IEmailSender emailSender,
+    IConfiguration configuration,
     IWebHostEnvironment environment,
     ILogger<RegisterModel> logger) : PageModel
 {
@@ -22,6 +23,7 @@ public class RegisterModel(
     [BindProperty] public IFormFile? CommercialRegistrationCertificate { get; set; }
     [BindProperty] public IFormFile? TaxCertificate { get; set; }
     [BindProperty] public List<IFormFile> LegalDocuments { get; set; } = [];
+    public IReadOnlyList<string> Categories => SupplierCategories.All;
 
     public class InputModel
     {
@@ -30,6 +32,7 @@ public class RegisterModel(
         [Required, StringLength(100, MinimumLength = 8), DataType(DataType.Password)] public string Password { get; set; } = string.Empty;
         [Required, Compare(nameof(Password)), DataType(DataType.Password)] public string ConfirmPassword { get; set; } = string.Empty;
         [Required, StringLength(200)] public string CompanyName { get; set; } = string.Empty;
+        [Required, StringLength(80)] public string Category { get; set; } = string.Empty;
         [Required, StringLength(80)] public string RegistrationNumber { get; set; } = string.Empty;
         [StringLength(80)] public string? TaxNumber { get; set; }
         [Required, EmailAddress, StringLength(256)] public string CompanyEmail { get; set; } = string.Empty;
@@ -39,6 +42,18 @@ public class RegisterModel(
 
     public async Task<IActionResult> OnPostAsync()
     {
+        // A previous OTP attempt already stored the documents. Resume it without
+        // requiring the browser to upload those files again.
+        if (!string.IsNullOrWhiteSpace(Input.Email) && !string.IsNullOrWhiteSpace(Input.Password))
+        {
+            var pending = await users.FindByEmailAsync(Input.Email.Trim());
+            if (pending is { SupplierId: not null, EmailConfirmed: false } &&
+                await users.CheckPasswordAsync(pending, Input.Password))
+                return RedirectToPage("./VerifyEmail", new { email = Input.Email.Trim() });
+        }
+
+        if (!SupplierCategories.All.Contains(Input.Category))
+            ModelState.AddModelError("Input.Category", "Choose one of the listed supplier categories.");
         if (CommercialRegistrationCertificate == null)
             ModelState.AddModelError(nameof(CommercialRegistrationCertificate), "Commercial registration certificate is required.");
         if (!string.IsNullOrWhiteSpace(Input.TaxNumber) && TaxCertificate == null)
@@ -59,10 +74,12 @@ public class RegisterModel(
 
         var email = Input.Email.Trim();
         var registration = Input.RegistrationNumber.Trim();
-        if (await users.FindByEmailAsync(email) != null ||
+        var existingUser = await users.FindByEmailAsync(email);
+        if (existingUser != null ||
             await db.Suppliers.AnyAsync(s => s.RegistrationNumber == registration))
         {
-            ModelState.AddModelError(string.Empty, "This account or commercial registration is already registered.");
+            ModelState.AddModelError(string.Empty,
+                "An account or company with these details already exists. If you started an application, use Verify Email with your original contact address to request a new code.");
             return Page();
         }
 
@@ -74,6 +91,7 @@ public class RegisterModel(
             var supplier = new Orange_Tendering_System.Models.Entities.Supplier
             {
                 CompanyName = Input.CompanyName.Trim(), RegistrationNumber = registration,
+                Category = SupplierCategories.All.Contains(Input.Category) ? Input.Category : SupplierCategories.Other,
                 TaxNumber = Input.TaxNumber?.Trim(), Email = Input.CompanyEmail.Trim(),
                 Phone = Input.CompanyPhone.Trim(), Address = Input.CompanyAddress.Trim(),
                 Status = SupplierStatus.Pending, CreatedAt = DateTime.UtcNow
@@ -84,7 +102,7 @@ public class RegisterModel(
             var user = new ApplicationUser
             {
                 UserName = email, Email = email, FullName = Input.FullName.Trim(),
-                SupplierId = supplier.Id, IsActive = true, EmailOtpSentAt = DateTime.UtcNow
+                SupplierId = supplier.Id, IsActive = false, EmailOtpSentAt = DateTime.UtcNow
             };
             var created = await users.CreateAsync(user, Input.Password);
             if (!created.Succeeded)
@@ -112,18 +130,9 @@ public class RegisterModel(
                 });
             }
 
-            var admins = await users.GetUsersInRoleAsync(SystemRoles.Admin);
-            foreach (var admin in admins)
-                db.Notifications.Add(new Notification
-                {
-                    UserId = admin.Id, Title = "Supplier awaiting review",
-                    Message = $"{supplier.CompanyName} submitted a supplier registration.",
-                    Link = "/Admin/Suppliers/Review/" + supplier.Id,
-                    CreatedAt = DateTime.UtcNow
-                });
             db.AuditLogs.Add(new AuditLog
             {
-                UserId = user.Id, Action = "SupplierRegistered", EntityName = "Supplier",
+                UserId = user.Id, Action = "SupplierRegistrationStarted", EntityName = "Supplier",
                 EntityId = supplier.Id.ToString(), CreatedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync();
@@ -139,8 +148,21 @@ public class RegisterModel(
         catch (Exception exception) when (exception is DbUpdateException or IOException or InvalidOperationException or FormatException or System.Net.Mail.SmtpException)
         {
             await transaction.RollbackAsync();
-            logger.LogError(exception, "Supplier registration failed.");
-            ModelState.AddModelError(string.Empty, "Registration could not be completed. Please try again later.");
+            if (exception is System.Net.Mail.SmtpException smtpException)
+                logger.LogWarning("Supplier email delivery failed with SMTP status {Status}.", smtpException.StatusCode);
+            else
+                logger.LogError(exception, "Supplier registration failed.");
+            var localMail = environment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(configuration);
+            var deliveryFailed = exception is System.Net.Mail.SmtpException ||
+                (exception is InvalidOperationException && !SmtpEmailSender.IsConfigured(configuration));
+            var message = deliveryFailed && localMail
+                ? "The local development mail inbox is not running. Start it with 'node Tools/DevMail/server.js', then try again."
+                : deliveryFailed && !SmtpEmailSender.IsConfigured(configuration)
+                    ? "Email delivery is not configured. Configure SMTP before registering."
+                    : deliveryFailed
+                        ? "Email delivery failed. Check the SMTP service settings and try again."
+                    : "Registration could not be completed. Check the application log and try again.";
+            ModelState.AddModelError(string.Empty, message);
             return Page();
         }
         finally

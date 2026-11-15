@@ -1,68 +1,10 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Supplier Documents
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Supplier Portal
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Upload and track the company’s legal documents and their
-verification status.
-
-BUSINESS ACCESS:
-Supplier (own company only, Admin-approved)
-
-ROUTE: /Supplier/Documents
-
-FUTURE IMPLEMENTATION:
-- Documents where SupplierId = own company.
-- Safe upload: extension/MIME/size checks, generated storage
-  names, outside wwwroot.
-- Access-checked download.
-
-DEPENDENCIES:
-Documents, Suppliers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Every query must be filtered by the signed-in user’s
-SupplierId. Never show other suppliers’ invitations, offers,
-prices or evaluations.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "Supplier Documents";
-    ViewData["WorkspaceSection"] = "Documents";
-    ViewData["Description"] = "Company legal documents reviewed by Admin.";
-}
+@model List<SupplierDocumentViewModel>
+@{ ViewData["Title"] = "Company Documents"; ViewData["WorkspaceSection"] = "Documents"; }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-company-documents">
-    <div class="pg-panel-head"><h2 id="tbl-company-documents">Company documents</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Uploaded</th><th scope="col">Expires</th><th scope="col">Verification</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No documents uploaded yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<section class="ws-panel pg-panel">
-    <h2>Upload document</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-document-type-1">Document type</label><select id="f-document-type-1"><option>Commercial registration</option><option>Tax certificate</option><option>Quality certificate</option><option>Other</option></select></div>
-                <div class="pg-field"><label for="f-file-2">File</label><input id="f-file-2" type="file" /><small class="pg-hint">Stored outside wwwroot; checked for type and size.</small></div>
-                <div class="pg-field"><label for="f-expires-on-3">Expires on</label><input id="f-expires-on-3" type="date" /></div>
-            </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Upload</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
-    </form>
-</section>
+@if (TempData["DocumentMessage"] is string message) { <p class="pg-note" role="status">@message</p> }
+<section class="ws-panel pg-panel"><h2>Official company documents</h2>
+<ul>@foreach (var doc in Model) { <li><a asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a> — @doc.UploadedAt.ToString("yyyy-MM-dd")</li> }</ul>
+@if (Model.Count == 0) { <p>No company documents uploaded.</p> }
+<form asp-action="UploadCompany" method="post" enctype="multipart/form-data" class="pg-form">
+<label for="company-file">PDF, PNG or JPEG (maximum 10 MB)</label><input id="company-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" required />
+<button type="submit" class="pg-btn pg-btn-primary">Upload for review</button></form></section>

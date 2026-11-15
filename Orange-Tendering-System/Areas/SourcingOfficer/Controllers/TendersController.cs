@@ -1,72 +1,33 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Shared — Amal (Index, Details, Edit, Create, SelectSuppliers, Timeline, Rounds); UNASSIGNED — Team assignment required (Committees)
-// Module: Sourcing Officer / Tender Management / Committees (tender-specific membership)
-// Purpose: MVC endpoints for the Tenders pages of the Sourcing Officer workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.ViewModels;
 
-namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
+namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
+
+// Compatibility addresses only. All tender creation and mutations use WorkflowController and its service.
+[Area("SourcingOfficer"), Authorize(Roles = SystemRoles.SourcingOfficer)]
+public class TendersController(ApplicationDbContext db) : Controller
 {
-    [Area("SourcingOfficer")]
-    [Authorize(Roles = SystemRoles.SourcingOfficer)]
-    public class TendersController : Controller
+    [HttpGet] public IActionResult Index() => RedirectToAction("Index", "Workflow");
+    [HttpGet] public IActionResult Create(int id) => RedirectToAction("Index", "Workflow");
+    [HttpGet] public IActionResult Details(int id) => RedirectToAction("Details", "Workflow", new { id });
+    [HttpGet] public IActionResult Rounds(int id) => RedirectToAction("Details", "Workflow", new { id });
+    [HttpGet] public IActionResult Edit(int id) => RedirectToAction("Details", "Workflow", new { id });
+    [HttpGet] public IActionResult Timeline(int id) => RedirectToAction("Details", "Workflow", new { id });
+    [HttpGet] public IActionResult Committees(int id) => RedirectToAction("Details", "Workflow", new { id });
+    [HttpGet]
+    public async Task<IActionResult> SelectSuppliers(int id, string? category = null)
     {
-        // Manage Tenders — Owner: Amal · Trello: Manage Tenders (https://trello.com/c/e2e0QlHT)
-        // GET /SourcingOfficer/Tenders. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
-        {
-            return View();
-        }
-
-        // Tender Details — Owner: Amal · Trello: Manage Tenders (https://trello.com/c/e2e0QlHT)
-        // GET /SourcingOfficer/Tenders/Details/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Details(int? id)
-        {
-            return View();
-        }
-
-        // Edit Tender — Owner: Amal · Trello: Manage Tenders (https://trello.com/c/e2e0QlHT)
-        // GET /SourcingOfficer/Tenders/Edit/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Edit(int? id)
-        {
-            return View();
-        }
-
-        // Committee Assignment — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Tenders/Committees/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Committees(int? id)
-        {
-            return View();
-        }
-
-        // Create Tender — Owner: Amal · Trello: Create Tender (https://trello.com/c/907F6ufP)
-        // GET /SourcingOfficer/Tenders/Create/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Create(int? id)
-        {
-            return View();
-        }
-
-        // Supplier Selection — Owner: Amal · Trello: Supplier Selection (https://trello.com/c/CDiXqUwu)
-        // GET /SourcingOfficer/Tenders/SelectSuppliers/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult SelectSuppliers(int? id)
-        {
-            return View();
-        }
-
-        // Tender Timeline & Closing — Owner: Amal · Trello: Tender Timeline & Closing (https://trello.com/c/zNRW9odq)
-        // GET /SourcingOfficer/Tenders/Timeline/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Timeline(int? id)
-        {
-            return View();
-        }
-
-        // Tendering / Retendering Rounds — Owner: Amal · No Trello card
-        // GET /SourcingOfficer/Tenders/Rounds/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Rounds(int? id)
-        {
-            return View();
-        }
+        var tenderId = await db.TenderRounds.Where(r => r.Id == id).Select(r => (int?)r.TenderId).SingleOrDefaultAsync();
+        return tenderId.HasValue ? RedirectToAction("Details", "Workflow", new { id = tenderId.Value }) : NotFound();
     }
+    // Old POST forms cannot bypass committee assignment, approved weights, deadlines or duplicate protection.
+    [HttpPost, ValidateAntiForgeryToken] public IActionResult Create(CreateOfficerTenderModel model) => UseTenderPage();
+    [HttpPost, ValidateAntiForgeryToken] public IActionResult StartNextRound(int tenderId) => UseTenderPage();
+    [HttpPost, ValidateAntiForgeryToken] public IActionResult InviteSupplier(int roundId, int supplierId, string category) => UseTenderPage();
+    private IActionResult UseTenderPage() => StatusCode(StatusCodes.Status409Conflict,
+        "This form has moved. Open the Tender page to continue the authorized workflow.");
 }

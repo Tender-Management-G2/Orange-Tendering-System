@@ -1,0 +1,10 @@
+@model SupplierClarificationInputModel
+@{ ViewData["Title"] = "Contact Sourcing Officer"; ViewData["WorkspaceSection"] = "Clarifications"; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel"><form asp-action="Create" method="post" class="pg-form">
+<div asp-validation-summary="All" role="alert"></div><input asp-for="BidId" type="hidden" />
+<input asp-for="InvitationId" type="hidden" />
+<div class="pg-field"><label asp-for="Subject"></label><input asp-for="Subject" maxlength="200" required /><span asp-validation-for="Subject"></span></div>
+<div class="pg-field"><label asp-for="Message"></label><textarea asp-for="Message" rows="5" maxlength="10000" required></textarea><span asp-validation-for="Message"></span></div>
+<button type="submit" class="pg-btn pg-btn-primary">Send to Sourcing Officer</button></form></section>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

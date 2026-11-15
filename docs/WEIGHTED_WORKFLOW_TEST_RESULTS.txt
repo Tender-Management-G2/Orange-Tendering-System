@@ -1,0 +1,62 @@
+PASS weight sum must equal 100
+PASS negative financial weight rejected
+PASS technical weight over 100 rejected
+PASS proposal precision validated before persistence
+PASS known four-proposal average is exactly 40/60
+PASS six-place proposal average is preserved
+PASS missing proposals block averaging
+PASS more than four proposals rejected
+PASS known member score is exactly 84
+PASS known supplier final score is exactly 86.75
+PASS missing evaluations cannot use partial divisor
+PASS negative financial score rejected
+PASS technical score over 100 rejected
+PASS invalid approved weight total rejected
+PASS fractional approved weights retain precision
+PASS ranking uses full precision rather than rounded display
+PASS exact highest-score ties explicitly flagged
+PASS approval policies fail closed by default
+PASS policy does not infer majority or quorum
+PASS four member policy validates explicit voting rules
+PASS all role workflow controllers declare Areas and authorization
+PASS workflow browser writes have antiforgery validation
+PASS SQL migrations and relational constraints
+PASS SQL duplicate member weight proposal blocked
+PASS SQL four proposals calculate exact average
+PASS SQL missing proposals block formal approval
+PASS SQL unapproved weights block bidding
+PASS SQL approved weights cannot be reapproved or reproposed
+PASS SQL officer has no implicit weight approval authority
+PASS SQL supplier cannot view competitor bid or documents
+PASS SQL non-compliant bid excluded from evaluation
+PASS SQL missing document cannot be silently compliant
+PASS SQL evaluation before scheduled start rejected
+PASS SQL evaluation after deadline rejected
+PASS SQL duplicate final evaluation rejected
+PASS SQL incomplete final submission is atomic
+PASS SQL financial and technical range checked
+PASS SQL omitted score cannot be silently treated as zero
+PASS SQL manual closure restricted to owning officer
+PASS SQL manual closure requires confirmation
+PASS SQL incomplete session blocks recommendation
+PASS SQL automatic deadline closure marks incomplete
+PASS SQL finalized committee scores remain immutable
+PASS SQL unfinalized report cannot be forwarded
+PASS SQL manager allowed transitions and repeat decision blocked
+PASS SQL return requires reasons and preserves report
+PASS SQL top voting restricted to assigned members
+PASS SQL missing final votes block award
+PASS SQL rejected recommendation cannot be awarded
+PASS SQL concurrent weight submissions cannot duplicate
+PASS SQL concurrent approvals cannot duplicate
+PASS SQL concurrent final evaluations cannot duplicate
+PASS SQL concurrent closure and submission remain consistent
+PASS SQL two-offer exception requires three previous failed rounds
+PASS SQL Ollama transport failure preserves all bid records
+PASS SQL report correction creates version and preserves scores
+PASS SQL final approval policy is frozen before voting
+PASS SQL explicitly configured non-Top tender can be awarded after manager approval
+PASS SQL configured quorum is enforced within four assigned Top members
+PASS SQL explicitly configured Top vote tie blocks award
+PASS SQL full workflow reaches Award and Closure after approvals
+RESULT: 61 passed; 0 failed; 0 skipped.

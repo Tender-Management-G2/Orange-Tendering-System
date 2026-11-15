@@ -36,33 +36,142 @@ IMPORTANT:
 No hardcoded passwords or demo accounts.
 ===========================================================
 *@
+
+@model CreateUserViewModel
+
 @{
     ViewData["Title"] = "Create User";
     ViewData["WorkspaceSection"] = "Users";
-    ViewData["Description"] = "Provision an internal employee account and assign its department and role(s).";
+    ViewData["Description"] =
+        "Create an internal employee account.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
 <section class="ws-panel pg-panel">
-    <h2>Account details</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-full-name-1">Full name</label><input id="f-full-name-1" type="text" /></div>
-                <div class="pg-field"><label for="f-email-2">Email</label><input id="f-email-2" type="email" /></div>
-                <div class="pg-field"><label for="f-department-3">Department</label><select id="f-department-3"><option>Select a department</option></select></div>
-                <div class="pg-field"><label for="f-role-s-4">Role(s)</label><select id="f-role-s-4"><option>Requesting Department</option><option>Sourcing Officer</option><option>Evaluation Committee</option><option>Sourcing Manager</option><option>Top Committee</option><option>Admin</option></select></div>
-                <div class="pg-field"><label for="f-temporary-password-5">Temporary password</label><input id="f-temporary-password-5" type="password" /><small class="pg-hint">The user changes it after the first sign-in.</small></div>
-                <label class="pg-check"><input type="checkbox" id="f-active-account-6" /> Active account</label>
+
+    <h2>Create Employee Account</h2>
+
+    <form asp-area="Admin"
+          asp-controller="Users"
+          asp-action="Create"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="All"
+             class="text-danger"></div>
+
+        <div class="pg-form-grid">
+
+            <div class="pg-field">
+                <label asp-for="FullName">Full Name</label>
+
+                <input asp-for="FullName"
+                       class="form-control"
+                       maxlength="150" />
+
+                <span asp-validation-for="FullName"
+                      class="text-danger"></span>
             </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Create account</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
+
+            <div class="pg-field">
+                <label asp-for="Email">Email</label>
+
+                <input asp-for="Email"
+                       class="form-control"
+                       type="email" />
+
+                <span asp-validation-for="Email"
+                      class="text-danger"></span>
+            </div>
+
+            <div class="pg-field">
+                <label asp-for="DepartmentId">Department</label>
+
+                <select asp-for="DepartmentId"
+                        asp-items="Model.Departments"
+                        class="form-control">
+                    <option value="">Select Department</option>
+                </select>
+
+                <span asp-validation-for="DepartmentId"
+                      class="text-danger"></span>
+            </div>
+
+            <div class="pg-field">
+                <label asp-for="Role">Role</label>
+
+                <select asp-for="Role"
+                        asp-items="Model.Roles"
+                        class="form-control">
+                    <option value="">Select Role</option>
+                </select>
+
+                <span asp-validation-for="Role"
+                      class="text-danger"></span>
+            </div>
+
+            <div class="pg-field">
+                <label asp-for="Password">
+                    Temporary Password
+                </label>
+
+                <input asp-for="Password"
+                       type="password"
+                       class="form-control"
+                       autocomplete="new-password" />
+
+                <span asp-validation-for="Password"
+                      class="text-danger"></span>
+
+                <small class="pg-hint">
+                    Password must follow Identity security requirements.
+                    The account must be confirmed before sign-in.
+                </small>
+            </div>
+
+            <div class="pg-field">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Account
+                </label>
+            </div>
+
+        </div>
+
+        <div class="pg-actions">
+
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Create Account
+            </button>
+
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index"
+               class="pg-btn">
+                Cancel
+            </a>
+
+        </div>
+
     </form>
 </section>
 
 <nav class="pg-links" aria-label="Related pages">
     <ul>
-        <li><a asp-area="Admin" asp-controller="Users" asp-action="Index">Back to users</a></li>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index">
+                Back to Users
+            </a>
+        </li>
     </ul>
 </nav>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

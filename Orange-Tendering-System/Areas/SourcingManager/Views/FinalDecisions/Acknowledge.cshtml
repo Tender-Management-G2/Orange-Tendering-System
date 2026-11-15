@@ -1,0 +1,14 @@
+@model Orange_Tendering_System.Models.Entities.FinalDecisionNotice
+@{ ViewData["Title"] = "Acknowledge final decision"; ViewData["WorkspaceSection"] = "Final Decisions"; ViewData["Description"] = Model.Tender.Title; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <dl class="ui-facts">
+        <div><dt>Tender</dt><dd>@Model.Tender.Title</dd></div>
+        <div><dt>Top Committee</dt><dd>@(Model.TopVotes == 0 ? "Manager decision" : $"{Model.TopApprovals} of {Model.TopVotes} members approved")</dd></div>
+    </dl>
+    <p>By acknowledging, you confirm that you reviewed the final decision and forward it to the Sourcing Officer. The Officer alone announces the results to suppliers.</p>
+    <form method="post" asp-action="Acknowledge" asp-route-id="@Model.TenderId" class="pg-form">
+        <div class="pg-field pg-field-wide"><label for="comment">Comment (optional)</label><textarea id="comment" name="comment" maxlength="1000"></textarea></div>
+        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Acknowledge and forward to Officer</button><a class="pg-btn" asp-action="Index">Cancel</a></div>
+    </form>
+</section>

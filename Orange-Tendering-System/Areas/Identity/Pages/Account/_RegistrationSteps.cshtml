@@ -1,0 +1,12 @@
+@model int
+@* Supplier registration progress. Model = current step: 1 details, 2 email, 3 face, 4 passkey, 5 pending approval (done). *@
+@{
+    string[] steps = ["Company details", "Verify email", "Face registration", "Register Fingerprint / Passkey", "Pending approval"];
+}
+<ol class="reg-steps" aria-label="Registration progress">
+    @for (var i = 0; i < steps.Length; i++)
+    {
+        var number = i + 1;
+        <li class="@(number < Model ? "is-done" : number == Model ? "is-current" : "")" aria-current="@(number == Model ? "step" : null)">@steps[i]</li>
+    }
+</ol>

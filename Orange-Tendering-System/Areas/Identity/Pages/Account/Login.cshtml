@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model LoginModel
 @*
 ===========================================================
@@ -13,13 +13,18 @@ TRELLO TASK: User Login & Role Redirect
 TRELLO URL: https://trello.com/c/WoTewqHd
 
 PURPOSE:
-One Identity email/password sign-in for employees and approved suppliers.
+The ONE sign-in page of the system: employees, pending suppliers and approved suppliers all start here with their email.
 
 BUSINESS ACCESS:
 Anonymous visitors.
 
-FUTURE IMPLEMENTATION:
-- Fingerprint and face sign-in remain disabled until a real verification flow exists.
+BIOMETRIC SIGN-IN:
+- Face recognition (email + live camera challenge) and fingerprint
+  (WebAuthn passkey, demo) are wired to BiometricsController and
+  wwwroot/js/biometric.js. They issue the same Identity cookie.
+- An Approved supplier who has enrolled face/passkey cannot use the
+  password form (Login.cshtml.cs); pending suppliers can, to reach
+  Pending Approval and finish face setup.
 
 DEPENDENCIES:
 AspNetUsers, ApplicationUser, Supplier, SignInManager,
@@ -27,7 +32,7 @@ Biometrics pages, AuditLogs.
 
 STATUS:
 Identity sign-in, role redirect, account-state checks, and lockout are implemented.
-Biometric sign-in is deferred.
+Biometric sign-in is implemented (see Controllers/BiometricsController.cs).
 
 IMPORTANT:
 Do not add a second authentication system next to Identity.
@@ -37,35 +42,66 @@ Do not add a second authentication system next to Identity.
     ViewData["Title"] = "Sign In";
 }
 <section class="section auth-section">
-    <div class="glass auth-card">
-        <span class="eyebrow">YOUR PROCUREMENT WORKSPACE</span>
-        <h1>Sign In</h1>
-        <p>Use an account provisioned for this system. Supplier accounts require Admin approval.</p>
-        <form id="account" method="post">
-            <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-            <label asp-for="Input.Email">Email</label>
-            <input asp-for="Input.Email" autocomplete="username" aria-required="true" />
-            <span asp-validation-for="Input.Email" class="field-error"></span>
-            <label asp-for="Input.Password">Password</label>
-            <input asp-for="Input.Password" autocomplete="current-password" aria-required="true" />
-            <span asp-validation-for="Input.Password" class="field-error"></span>
-            <label class="auth-check"><input asp-for="Input.RememberMe" /> @Html.DisplayNameFor(m => m.Input.RememberMe)</label>
-            <button id="login-submit" type="submit" class="primary">Sign In →</button>
-        </form>
+    <div class="glass login-shell">
+        <aside class="login-brand" aria-hidden="true">
+            <span class="logo">orange<span>&reg;</span></span>
+            <h2>Sourcing &amp; Tender Management</h2>
+            <p>One workspace from purchase request to award.</p>
+            <ul>
+                <li>Every role signs in here</li>
+                <li>Suppliers can use face recognition or a fingerprint / passkey</li>
+                <li>Your actions are recorded in the audit trail</li>
+            </ul>
+        </aside>
 
-        @* Biometric entry points — Ahmad. Disabled until a real verification flow exists. *@
-        <div class="auth-biometric" aria-label="Biometric sign-in">
-            <small>Biometric sign-in (not implemented yet)</small>
-            <button type="button" class="overview" disabled title="Fingerprint sign-in is not implemented yet">Sign in with fingerprint</button>
-            <button type="button" class="overview" disabled title="Face recognition sign-in is not implemented yet">Sign in with face recognition</button>
+        <div class="login-main auth-card">
+            <span class="eyebrow">YOUR PROCUREMENT WORKSPACE</span>
+            <h1>Sign in</h1>
+            <p class="login-lead">Enter your account email. Employees sign in with a password; approved suppliers can also use face recognition or a fingerprint / passkey.</p>
+
+            <form id="account" method="post" novalidate>
+                <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
+                <label asp-for="Input.Email">Email</label>
+                <input asp-for="Input.Email" type="email" autocomplete="username" autofocus aria-required="true" placeholder="name@company.com" />
+                <span asp-validation-for="Input.Email" class="field-error"></span>
+                <label asp-for="Input.Password">Password</label>
+                <input asp-for="Input.Password" autocomplete="current-password" aria-required="true" />
+                <span asp-validation-for="Input.Password" class="field-error"></span>
+                <div class="login-row">
+                    <label class="auth-check"><input asp-for="Input.RememberMe" /> @Html.DisplayNameFor(m => m.Input.RememberMe)</label>
+                    <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
+                </div>
+                <button id="login-submit" type="submit" class="primary">Sign in</button>
+            </form>
+
+            @* Biometric sign-in for supplier companies (Ahmad): same email box as above; BiometricsController verifies the live face
+               (or the WebAuthn passkey) and issues the same Identity cookie. *@
+            <div class="login-or"><span>or sign in as a supplier with</span></div>
+            <div class="login-bio" id="bio-root" data-return-url="@Model.ReturnUrl">
+                <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
+                <div class="login-bio-buttons">
+                    <button type="button" id="btnFaceLogin">Login with Face Recognition</button>
+                    <button type="button" id="btnPasskeyLogin">Login with Fingerprint / Passkey</button>
+                </div>
+                <div id="facePanel" class="bio-face-panel bio-hidden">
+                    <video id="faceVideo" playsinline muted autoplay></video>
+                    <div id="faceHint" class="bio-face-hint"></div>
+                </div>
+                <small>Face recognition uses the email typed above. The camera picture stays on this device; only face measurements are checked. A passkey uses your device's own fingerprint, face unlock or PIN.</small>
+            </div>
+
+            <p class="login-foot">
+                New supplier? <a class="auth-link" asp-page="./Register">Register your company</a>
+                &middot; <a class="auth-link" id="resend-confirmation" asp-page="./VerifyEmail">Verify your email</a>
+            </p>
         </div>
-
-        <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
-        <a class="auth-link" asp-page="./Register">Register as a supplier ↗</a>
-        <a class="auth-link" id="resend-confirmation" asp-page="./VerifyEmail">Verify supplier email</a>
     </div>
 </section>
 
+@section Styles {
+    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+}
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
 }

@@ -28,29 +28,105 @@ STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 ===========================================================
 *@
+
+@model CreateDepartmentViewModel
+
 @{
     ViewData["Title"] = "Create Department";
     ViewData["WorkspaceSection"] = "Departments";
+    ViewData["Description"] = "Add a new department to the organization.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
 <section class="ws-panel pg-panel">
-    <h2>Department</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-name-1">Name</label><input id="f-name-1" type="text" /><small class="pg-hint">Must be unique.</small></div>
-                <div class="pg-field pg-field-wide"><label for="f-description-2">Description</label><textarea id="f-description-2" rows="4"></textarea></div>
-                <label class="pg-check"><input type="checkbox" id="f-active-3" /> Active</label>
+
+    <h2>Create Department</h2>
+
+    <form asp-area="Admin"
+          asp-controller="Departments"
+          asp-action="Create"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="ModelOnly"
+             class="text-danger"></div>
+
+        <div class="pg-form-grid">
+
+            <!-- Department Name -->
+            <div class="pg-field">
+                <label asp-for="Name"></label>
+
+                <input asp-for="Name"
+                       class="form-control"
+                       placeholder="Enter department name"
+                       maxlength="100" />
+
+                <span asp-validation-for="Name"
+                      class="text-danger"></span>
+
+                <small class="pg-hint">
+                    Department name must be unique.
+                </small>
             </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Create department</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
+
+            <!-- Description -->
+            <div class="pg-field pg-field-wide">
+                <label asp-for="Description"></label>
+
+                <textarea asp-for="Description"
+                          class="form-control"
+                          rows="4"
+                          maxlength="500"
+                          placeholder="Enter department description"></textarea>
+
+                <span asp-validation-for="Description"
+                      class="text-danger"></span>
+            </div>
+
+            <!-- Status -->
+            <label class="pg-check">
+                <input asp-for="IsActive" />
+                Active
+            </label>
+
+        </div>
+
+        <div class="pg-actions">
+
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Create Department
+            </button>
+
+            <a asp-area="Admin"
+               asp-controller="Departments"
+               asp-action="Index"
+               class="pg-btn">
+                Cancel
+            </a>
+
+        </div>
+
     </form>
+
 </section>
 
 <nav class="pg-links" aria-label="Related pages">
     <ul>
-        <li><a asp-area="Admin" asp-controller="Departments" asp-action="Index">Back to departments</a></li>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Departments"
+               asp-action="Index">
+                Back to Departments
+            </a>
+        </li>
     </ul>
 </nav>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

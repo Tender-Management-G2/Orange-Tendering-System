@@ -19,7 +19,18 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Services;
+using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
+
+if (args.Contains("--seed-saja-demo")) { await SajaDemoFixture.Run(); return; }
+if (args.Contains("--unified-tender-checks")) { await UnifiedTenderChecks.Run(); return; }
+if (args.Contains("--verify-saja-demo")) { await SajaDemoFixture.Run(verifyExisting: true); return; }
+if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
+if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
+if (args.Contains("--seed-lifecycle")) { await LifecycleFixture.Run(); return; }
+if (args.Contains("--final-decision-checks")) { await FinalDecisionChecks.Run(); return; }
+if (args.Contains("--clarification-checks")) { await ClarificationChecks.Run(); return; }
+if (args.Contains("--smtp-mode-checks")) { SmtpModeChecks.Run(); return; }
 
 var connection = Environment.GetEnvironmentVariable("AUTH_TEST_CONNECTION")
     ?? throw new InvalidOperationException("Set AUTH_TEST_CONNECTION to a migrated, isolated test database.");
@@ -28,6 +39,8 @@ if (!new SqlConnectionStringBuilder(connection).InitialCatalog.StartsWith("Orang
 var root = Environment.GetEnvironmentVariable("AUTH_PROJECT_ROOT")
     ?? throw new InvalidOperationException("Set AUTH_PROJECT_ROOT to the web project directory.");
 var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(5)).ToLowerInvariant();
+var isolatedContentRoot = Path.Combine(Path.GetTempPath(), "OrangeAuthCheck_Files_" + suffix);
+Directory.CreateDirectory(isolatedContentRoot);
 var adminEmail = $"admin-{suffix}@example.test";
 var supplierEmail = $"supplier-{suffix}@example.test";
 var adminPassword = "A!a1" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
@@ -39,6 +52,7 @@ Environment.SetEnvironmentVariable("ConnectionStrings__Default Connection", conn
 Environment.SetEnvironmentVariable("BootstrapAdmin__Email", adminEmail);
 Environment.SetEnvironmentVariable("BootstrapAdmin__Password", adminPassword);
 Environment.SetEnvironmentVariable("Smtp__Host", "test.local");
+Environment.SetEnvironmentVariable("Smtp__Mode", "Smtp");
 Environment.SetEnvironmentVariable("Smtp__Port", "587");
 Environment.SetEnvironmentVariable("Smtp__From", "sender@example.test");
 Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.EntityFrameworkCore", "Warning");
@@ -103,7 +117,7 @@ foreach (var field in new Dictionary<string, string>
 {
     ["Input.FullName"] = "Test Contact", ["Input.Email"] = supplierEmail,
     ["Input.Password"] = supplierPassword, ["Input.ConfirmPassword"] = supplierPassword,
-    ["Input.CompanyName"] = "Test Supplier " + suffix,
+    ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
     ["Input.RegistrationNumber"] = "CR-" + suffix,
     ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
     ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
@@ -120,15 +134,46 @@ using (var scope = factory.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var company = await db.Suppliers.SingleAsync(s => s.RegistrationNumber == "CR-" + suffix);
     var user = await db.Users.SingleAsync(u => u.Email == supplierEmail);
-    Check(company.Status == SupplierStatus.Pending && user.SupplierId == company.Id && !user.EmailConfirmed,
-        "pending supplier, linked unconfirmed Identity user");
+    Check(company.Status == SupplierStatus.Pending && user.SupplierId == company.Id && !user.EmailConfirmed && !user.IsActive,
+        "provisional supplier and inactive unconfirmed Identity user");
     Check(await db.Documents.CountAsync(d => d.SupplierId == company.Id) == 2, "supplier document metadata stored");
     Check(await db.UserRoles.CountAsync(r => r.UserId == user.Id) == 1, "supplier has one role");
+    Check(!await db.Notifications.AnyAsync(n => n.Link == "/Admin/Suppliers/Review/" + company.Id),
+        "unverified application does not notify Admin");
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.GetSupplierDetailsAsync(company.Id) == null &&
+        !(await review.GetSuppliersAsync(null, null)).Suppliers.Any(s => s.Id == company.Id),
+        "unverified supplier is not in Admin review");
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    Check(await review.ReviewSupplierAsync(new SupplierReviewDecisionViewModel
+    { SupplierId = company.Id, Decision = SupplierStatus.Approved }, adminId) == "EmailUnverified",
+        "Admin cannot approve an unverified supplier");
+    var adminPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+        [new Claim(ClaimTypes.NameIdentifier, adminId)], "test"));
+    var workflowReview = scope.ServiceProvider.GetRequiredService<SupplierReviewService>();
+    Check(!(await workflowReview.List(adminPrincipal)).Any(s => s.Id == company.Id),
+        "workflow review hides unverified supplier");
+    var workflowDenied = false;
+    try { await workflowReview.Decide(company.Id, true, "Document review", adminPrincipal); }
+    catch (WorkflowException e) { workflowDenied = e.Message.Contains("verify", StringComparison.OrdinalIgnoreCase); }
+    Check(workflowDenied, "workflow review cannot approve an unverified supplier");
 }
 var duplicateToken = await Token(supplier, "/Identity/Account/Register");
 var duplicate = await supplier.PostAsync("/Identity/Account/Register",
-    RegistrationContent(supplierEmail, supplierPassword, suffix, duplicateToken));
-Check(duplicate.StatusCode == HttpStatusCode.OK, "duplicate supplier registration rejected");
+    Form(new() { ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = duplicateToken }));
+Check(duplicate.StatusCode == HttpStatusCode.Redirect && duplicate.Headers.Location?.ToString().Contains("VerifyEmail") == true,
+    "unverified supplier resumes OTP without reuploading files");
+using (var unverifiedVisitor = Client(factory))
+{
+    var unverifiedLoginToken = await Token(unverifiedVisitor, "/Identity/Account/Login");
+    var unverifiedLogin = await unverifiedVisitor.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = unverifiedLoginToken
+    }));
+    Check(unverifiedLogin.StatusCode == HttpStatusCode.OK, "unverified supplier cannot sign in");
+}
 var message = mail.Messages.Last(m => m.Subject.Contains("Verify"));
 Check(message.To == supplierEmail, "OTP sent through IEmailSender");
 var otp = Regex.Match(message.Body, @"\b\d{6}\b").Value;
@@ -145,18 +190,39 @@ var verified = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(ne
     ["Input.Email"] = supplierEmail, ["Input.Code"] = otp,
     ["__RequestVerificationToken"] = verifyToken
 }));
-Check((await verified.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "email verified, approval pending");
+Check(verified.StatusCode == HttpStatusCode.Redirect &&
+    verified.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "valid OTP signs supplier in and redirects to pending approval");
+Check((await supplier.GetAsync("/Identity/Account/PendingApproval")).StatusCode == HttpStatusCode.OK,
+    "pending approval page opens with Identity cookie");
+var pendingWorkspace = await supplier.GetAsync("/Supplier");
+Check(pendingWorkspace.StatusCode == HttpStatusCode.Redirect &&
+    pendingWorkspace.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "pending supplier cannot enter tender workspace");
+var pendingOffer = await supplier.PostAsync("/Supplier/Workflow/SubmitBid/1", Form(new()));
+Check(pendingOffer.StatusCode == HttpStatusCode.Forbidden,
+    $"pending supplier cannot submit offer request (HTTP {(int)pendingOffer.StatusCode})");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    Check(await db.Users.Where(u => u.Email == supplierEmail).Select(u => u.EmailConfirmed).SingleAsync(), "Identity email confirmed");
+    var user = await db.Users.SingleAsync(u => u.Email == supplierEmail);
+    Check(user.EmailConfirmed && user.IsActive, "verified supplier contact activated");
+    var review = scope.ServiceProvider.GetRequiredService<AdminService>();
+    Check(await review.GetSupplierDetailsAsync(user.SupplierId!.Value) != null,
+        "verified supplier enters Admin review");
+    Check(await db.Notifications.AnyAsync(n => n.Link == "/Admin/Suppliers/Review/" + user.SupplierId),
+        "Admin notified only after OTP verification");
 }
-var replay = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new()
+using (var replayVisitor = Client(factory))
 {
-    ["Input.Email"] = supplierEmail, ["Input.Code"] = otp,
-    ["__RequestVerificationToken"] = verifyToken
-}));
-Check(!(await replay.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "OTP replay rejected");
+    var replayToken = await Token(replayVisitor, "/Identity/Account/VerifyEmail?email=" + Uri.EscapeDataString(supplierEmail));
+    var replay = await replayVisitor.PostAsync("/Identity/Account/VerifyEmail", Form(new()
+    {
+        ["Input.Email"] = supplierEmail, ["Input.Code"] = otp,
+        ["__RequestVerificationToken"] = replayToken
+    }));
+    Check(replay.StatusCode == HttpStatusCode.OK, "OTP replay rejected");
+}
 Check((await supplier.GetAsync("/Identity/Account/ConfirmEmail?code=unused")).StatusCode == HttpStatusCode.NotFound,
     "default confirmation-link route cannot bypass OTP");
 Check((await supplier.GetAsync("/Identity/Account/ResendEmailConfirmation")).Headers.Location?.ToString().Contains("VerifyEmail") == true,
@@ -182,7 +248,7 @@ var expiredAttempt = await supplier.PostAsync("/Identity/Account/VerifyEmail", F
     ["Input.Email"] = expiredEmail, ["Input.Code"] = expiredOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check(!(await expiredAttempt.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "expired OTP rejected");
+Check(expiredAttempt.StatusCode == HttpStatusCode.OK, "expired OTP rejected");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -202,13 +268,19 @@ var limited = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new
     ["Input.Email"] = expiredEmail, ["Input.Code"] = expiredOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check(!(await limited.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "five wrong OTPs block verification");
+Check(limited.StatusCode == HttpStatusCode.OK, "five wrong OTPs block verification");
 var mailCount = mail.Messages.Count;
-await supplier.PostAsync("/Identity/Account/VerifyEmail?handler=Resend", Form(new()
+var cooldownResend = await supplier.PostAsync("/Identity/Account/VerifyEmail?handler=Resend", Form(new()
 {
     ["email"] = expiredEmail, ["__RequestVerificationToken"] = expiredToken
 }));
 Check(mail.Messages.Count == mailCount, "OTP resend cooldown enforced");
+Check(cooldownResend.StatusCode == HttpStatusCode.Redirect &&
+    cooldownResend.Headers.Location?.ToString().Contains("handler=", StringComparison.OrdinalIgnoreCase) == false,
+    "resend returns to the plain Verify Email URL");
+var verifyPage = await (await supplier.GetAsync("/Identity/Account/VerifyEmail?handler=Resend")).Content.ReadAsStringAsync();
+Check(verifyPage.Contains("<form method=\"post\" action=\"/Identity/Account/VerifyEmail\">"),
+    "verify form posts to the verify handler even from a ?handler=Resend address");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -227,13 +299,15 @@ var oldOtpAttempt = await supplier.PostAsync("/Identity/Account/VerifyEmail", Fo
     ["Input.Email"] = expiredEmail, ["Input.Code"] = expiredOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check(!(await oldOtpAttempt.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "resend invalidates old OTP");
+Check(oldOtpAttempt.StatusCode == HttpStatusCode.OK, "resend invalidates old OTP");
 var resentVerified = await supplier.PostAsync("/Identity/Account/VerifyEmail", Form(new()
 {
     ["Input.Email"] = expiredEmail, ["Input.Code"] = resentOtp,
     ["__RequestVerificationToken"] = expiredToken
 }));
-Check((await resentVerified.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"), "new OTP verifies after resend");
+Check(resentVerified.StatusCode == HttpStatusCode.Redirect &&
+    resentVerified.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "new OTP signs in after resend");
 var failedEmail = $"delivery-fail-{suffix}@example.test";
 mail.FailNext = true;
 var failedRegisterToken = await Token(supplier, "/Identity/Account/Register");
@@ -254,7 +328,9 @@ var pendingLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new(
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
     ["__RequestVerificationToken"] = supplierLoginToken
 }));
-Check(pendingLogin.StatusCode == HttpStatusCode.OK, "pending supplier cannot sign in");
+Check(pendingLogin.StatusCode == HttpStatusCode.Redirect &&
+    pendingLogin.Headers.Location?.ToString().Contains("PendingApproval") == true,
+    "verified pending supplier can sign in again without OTP");
 using (var scope = factory.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -262,10 +338,11 @@ using (var scope = factory.Services.CreateScope())
     company.Status = SupplierStatus.Approved;
     await db.SaveChangesAsync();
 }
+var approvedLoginToken = await Token(supplier, "/Identity/Account/Login");
 var approvedLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new()
 {
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
-    ["__RequestVerificationToken"] = supplierLoginToken
+    ["__RequestVerificationToken"] = approvedLoginToken
 }));
 Check(approvedLogin.StatusCode == HttpStatusCode.Redirect && approvedLogin.Headers.Location?.ToString() == "/Supplier",
     "approved supplier redirected to Supplier workspace");
@@ -348,6 +425,40 @@ using (var employee = Client(factory))
     Check(employeeLogin.Headers.Location?.ToString() == "/Department", "activated employee enters assigned workspace");
 }
 
+// The Admin Create User screen supplies the password directly. Its accounts must
+// already be confirmed because that screen has no email confirmation step.
+var adminCreatedEmail = $"admin-created-{suffix}@example.test";
+using (var scope = factory.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var departmentId = await db.Departments.Where(d => d.Name == "Auth Test Department " + suffix)
+        .Select(d => d.Id).SingleAsync();
+    var adminId = await db.Users.Where(u => u.Email == adminEmail).Select(u => u.Id).SingleAsync();
+    var created = await scope.ServiceProvider.GetRequiredService<AdminService>().CreateUserAsync(
+        new CreateUserViewModel
+        {
+            FullName = "Admin Created Employee", Email = adminCreatedEmail,
+            Password = supplierPassword, Role = SystemRoles.RequestingDepartment,
+            DepartmentId = departmentId, IsActive = true
+        }, adminId);
+    Check(created.Succeeded, "Admin Create User saves the employee");
+    var account = await db.Users.SingleAsync(u => u.Email == adminCreatedEmail);
+    Check(account.EmailConfirmed, "Admin-created employee is confirmed for password sign-in");
+}
+using (var adminCreated = Client(factory))
+{
+    var token = await Token(adminCreated, "/Identity/Account/Login");
+    var response = await adminCreated.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = adminCreatedEmail, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = token
+    }));
+    Check(response.StatusCode == HttpStatusCode.Redirect && response.Headers.Location?.ToString() == "/Department",
+        "Admin-created employee signs in with the assigned role");
+    Check((await adminCreated.GetAsync("/Department")).StatusCode == HttpStatusCode.OK,
+        "Admin-created employee keeps an authenticated session");
+}
+
 var forgotToken = await Token(admin, "/Identity/Account/ForgotPassword");
 var forgot = await admin.PostAsync("/Identity/Account/ForgotPassword", Form(new()
 {
@@ -394,17 +505,94 @@ using (var scope = secondFactory.Services.CreateScope())
     Check(await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Roles.CountAsync() == 7,
         "role seed is idempotent");
 
+// Exercise every real role dashboard with real Identity cookies and SQL Server rows.
+// The database-name guard above keeps these accounts out of the application database.
+string? officerId = null;
+foreach (var workspace in Orange_Tendering_System.ViewModels.WorkspaceNavigation.Workspaces)
+{
+    var email = $"role-{workspace.Area.ToLowerInvariant()}-{suffix}@example.test";
+    using (var scope = factory.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var account = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true,
+            IsActive = true, FullName = "Isolated dashboard verification" };
+        if (workspace.Role == SystemRoles.Supplier)
+        {
+            var company = new Supplier { CompanyName = "Isolated role check " + suffix,
+                Email = email, RegistrationNumber = "ROLE-" + suffix, Status = SupplierStatus.Approved };
+            db.Suppliers.Add(company); await db.SaveChangesAsync(); account.SupplierId = company.Id;
+        }
+        if (workspace.Role == SystemRoles.RequestingDepartment)
+        {
+            var department = new Department { Name = "Isolated dashboard " + suffix };
+            db.Departments.Add(department); await db.SaveChangesAsync(); account.DepartmentId = department.Id;
+        }
+        Check((await users.CreateAsync(account, supplierPassword)).Succeeded, workspace.Role + " test account created");
+        Check((await users.AddToRoleAsync(account, workspace.Role)).Succeeded, workspace.Role + " assigned");
+        if (workspace.Role == SystemRoles.SourcingOfficer) officerId = account.Id;
+    }
+    using var roleClient = Client(factory);
+    var roleToken = await Token(roleClient, "/Identity/Account/Login");
+    var roleLogin = await roleClient.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = email, ["Input.Password"] = supplierPassword,
+        ["__RequestVerificationToken"] = roleToken
+    }));
+    Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString() == "/" + workspace.Area,
+        workspace.Role + " login routes to its dashboard");
+    Check((await roleClient.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.OK,
+        workspace.Role + " dashboard renders with authenticated cookie");
+    if (workspace.Role != SystemRoles.Admin)
+        Check((await roleClient.GetAsync("/Admin")).StatusCode != HttpStatusCode.OK, workspace.Role + " cannot enter Admin");
+    using var anonymous = Client(factory);
+    Check((await anonymous.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.Redirect,
+        workspace.Role + " dashboard blocks anonymous access");
+}
+using (var scope = factory.Services.CreateScope())
+{
+    var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var workflow = scope.ServiceProvider.GetRequiredService<TenderWorkflowService>();
+    var officer = (await users.FindByIdAsync(officerId!))!;
+    Check(await workflow.IsOfficer(officer), "one active Sourcing Officer has global management authority");
+    var extra = new ApplicationUser { UserName = $"extra-officer-{suffix}@example.test", Email = $"extra-officer-{suffix}@example.test", EmailConfirmed = true,
+        IsActive = true, FullName = "Isolated duplicate-officer guard check" };
+    Check((await users.CreateAsync(extra)).Succeeded && (await users.AddToRoleAsync(extra, SystemRoles.SourcingOfficer)).Succeeded,
+        "duplicate Officer fixture exists only in isolated SQL database");
+    Check(!await workflow.IsOfficer(officer) && !await workflow.IsOfficer(extra), "multiple active Officers fail closed");
+    extra.IsActive = false; Check((await users.UpdateAsync(extra)).Succeeded, "duplicate Officer deactivated");
+    Check(await workflow.IsOfficer(officer), "single active Officer authority restored");
+}
+
+await BiometricChecks.Run(() => Client(factory), Token, Check, factory.Services, suffix);
+
+using (var productionFactory = CreateFactory().WithWebHostBuilder(builder => builder.UseEnvironment("Production")))
+using (var production = Client(productionFactory))
+{
+    foreach (var path in new[] { "/fingerprint-demo", "/fingerprint-demo/register-options", "/fingerprint-demo/register", "/fingerprint-demo/login-options", "/fingerprint-demo/verify", "/fingerprint-demo/reset", "/face-demo" })
+    {
+        Check((await production.GetAsync(path)).StatusCode == HttpStatusCode.NotFound, "Production GET " + path + " returns 404");
+        Check((await production.PostAsync(path, new StringContent("{}"))).StatusCode == HttpStatusCode.NotFound, "Production POST " + path + " returns 404");
+    }
+}
+
 Console.WriteLine("Authentication smoke checks passed.");
 
 WebApplicationFactory<Orange_Tendering_System.WebAppMarker> CreateFactory() => new WebApplicationFactory<Orange_Tendering_System.WebAppMarker>().WithWebHostBuilder(builder =>
 {
-    builder.UseContentRoot(root).UseEnvironment("Development");
-    builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+    // Razor pages are compiled into the app. Keep synthetic registration uploads out of
+    // the real application's App_Data while loading the real application's settings.
+    builder.UseContentRoot(isolatedContentRoot).UseEnvironment("Development");
+    builder.ConfigureAppConfiguration((_, config) => config
+        .AddJsonFile(Path.Combine(root, "appsettings.json"), optional: false)
+        .AddInMemoryCollection(new Dictionary<string, string?>
     {
         ["ConnectionStrings:Default Connection"] = connection,
         ["BootstrapAdmin:Email"] = adminEmail,
         ["BootstrapAdmin:Password"] = adminPassword,
-        ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test"
+        ["Smtp:Mode"] = "Smtp", ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test",
+        ["Smtp:Username"] = "unused", ["Smtp:Password"] = "unused",
+        ["Biometric:MaxFailuresPerWindow"] = "100"
     }));
     builder.ConfigureTestServices(services =>
     {
@@ -443,7 +631,7 @@ static MultipartFormDataContent RegistrationContent(string email, string passwor
     {
         ["Input.FullName"] = "Test Contact", ["Input.Email"] = email,
         ["Input.Password"] = password, ["Input.ConfirmPassword"] = password,
-        ["Input.CompanyName"] = "Test Supplier " + suffix,
+        ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
         ["Input.RegistrationNumber"] = "CR-" + suffix,
         ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
         ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",

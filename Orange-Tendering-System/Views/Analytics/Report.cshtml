@@ -1,0 +1,8 @@
+@model Orange_Tendering_System.Services.ReportModel
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = Model.Title; ViewData["WorkspaceSection"] = "Analytics & Exports"; ViewData["Description"] = Model.Description;
+}
+<partial name="_PageHeader" />
+<partial name="_ReportBody" model="Model" />
+<p><a class="pg-btn" asp-action="Index">All reports</a></p>

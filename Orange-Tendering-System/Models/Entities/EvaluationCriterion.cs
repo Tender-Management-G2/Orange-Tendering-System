@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orange_Tendering_System.Models.Entities
 {
-    // A technical or financial criterion confirmed by the Evaluation Committee for one evaluation round.
-    // Weight and MaxScore stay null until the committee sets them; no formula is hardcoded.
+    // A technical or financial criterion for one evaluation round. The weighted workflow copies
+    // formally approved weights here and uses the approved 0–100 score scale.
     public class EvaluationCriterion
     {
         public int Id { get; set; }
@@ -20,7 +20,7 @@ namespace Orange_Tendering_System.Models.Entities
 
         public CriterionType Type { get; set; }
 
-        [Precision(9, 4)]
+        [Precision(12, 6)]
         public decimal? Weight { get; set; }
 
         [Precision(9, 4)]

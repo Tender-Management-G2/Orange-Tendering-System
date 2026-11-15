@@ -6,6 +6,9 @@
 // Purpose: Public website pages, converted from the supplied layout ZIP.
 // Status: Static pages. Team content comes from wwwroot/data/team.json. No business logic.
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.ViewModels;
 using System.Diagnostics;
@@ -13,11 +16,24 @@ using System.Text.Json;
 
 namespace Orange_Tendering_System.Controllers
 {
-    public class HomeController(IWebHostEnvironment environment) : Controller
+    public class HomeController(IWebHostEnvironment environment, ApplicationDbContext db) : Controller
     {
         // Home / Landing Page — Owner: Tariq (Trello: Home / Landing Page)
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
+            // Public, non-confidential aggregates only (counts); no names, prices or documents ever leave the database here.
+            var statuses = await db.Tenders.AsNoTracking().GroupBy(t => t.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync();
+            int Count(params TenderStatus[] set) => statuses.Where(x => set.Contains(x.Key)).Sum(x => x.Count);
+            var since = DateTime.UtcNow.AddMonths(-5);
+            var first = new DateTime(since.Year, since.Month, 1);
+            var created = await db.Tenders.AsNoTracking().Where(t => t.CreatedAt >= first).Select(t => t.CreatedAt).ToListAsync();
+            ViewBag.Stats = new PublicStats(
+                Count(TenderStatus.Bidding, TenderStatus.Evaluation, TenderStatus.OfficerReview, TenderStatus.ManagerReview, TenderStatus.TopCommitteeReview),
+                await db.Suppliers.AsNoTracking().CountAsync(x => x.Status == SupplierStatus.Approved),
+                await db.PurchaseRequests.AsNoTracking().CountAsync(r => r.Status == PurchaseRequestStatus.Accepted || r.Status == PurchaseRequestStatus.Approved || r.Status == PurchaseRequestStatus.ConvertedToTender),
+                Count(TenderStatus.Bidding), Count(TenderStatus.Evaluation, TenderStatus.OfficerReview),
+                Count(TenderStatus.ManagerReview, TenderStatus.TopCommitteeReview), Count(TenderStatus.Awarded, TenderStatus.Rejected, TenderStatus.Cancelled),
+                Enumerable.Range(0, 6).Select(i => first.AddMonths(i)).Select(m => new KeyValuePair<string, int>(m.ToString("MMM"), created.Count(d => d.Year == m.Year && d.Month == m.Month))).ToList());
             return View();
         }
 
@@ -73,3 +89,5 @@ namespace Orange_Tendering_System.Controllers
         }
     }
 }
+
+public sealed record PublicStats(int ActiveTenders, int ApprovedSuppliers, int CompletedRequests, int Bidding, int Evaluation, int Approvals, int Closed, List<KeyValuePair<string, int>> Monthly);

@@ -1,0 +1,9 @@
+@model List<Orange_Tendering_System.ViewModels.WorkflowListRow>
+@{
+    ViewData["Title"] = "Invitations"; ViewData["WorkspaceSection"] = "Invitations";
+    ViewData["Description"] = "Review your tender invitations, requirements, submission dates and own offers.";
+}
+<partial name="_WorkflowList" model="Model" />
+@section Styles {
+    <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" />
+}

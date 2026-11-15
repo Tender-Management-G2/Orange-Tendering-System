@@ -1,40 +1,4 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Supplier Dashboard
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Supplier Portal
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Landing page for a supplier: open invitations, draft and
-submitted offers, and clarifications.
-
-BUSINESS ACCESS:
-Supplier (own company only, Admin-approved)
-
-ROUTE: /Supplier
-
-FUTURE IMPLEMENTATION:
-- Counts and lists filtered by the user’s SupplierId.
-- Pending-approval message when Supplier.Status is not
-  Approved.
-
-DEPENDENCIES:
-Suppliers, TenderInvitations, Bids, Clarifications.
-
-STATUS:
-LAYOUT FROM THE SUPPLIED ZIP — DATA NOT CONNECTED.
-Metrics show "—" until a service fills WorkspaceDashboardViewModel.
-
-IMPORTANT:
-Every query must be filtered by the signed-in user’s
-SupplierId. Never show other suppliers’ invitations, offers,
-prices or evaluations.
-===========================================================
-*@
+@* Owner: Saja. Existing dashboard layout bound to supplier-owned data. *@
 @model WorkspaceDashboardViewModel
 @{
     ViewData["Title"] = "Supplier Dashboard";
@@ -65,15 +29,21 @@ prices or evaluations.
         <article class="dash-metric dash-purple"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 5v7l5 3"/></svg></div><div class="dash-metric-copy"><strong>@data.Number("pending-clarifications")</strong><span>Pending Clarifications</span></div><div class="dash-metric-wave" aria-hidden="true"></div>@if(data.Trends.TryGetValue("pending-clarifications",out var trendpendingclarifications)) { <span class="dash-trend @(trendpendingclarifications >= 0 ? "is-positive" : "is-negative")">@(trendpendingclarifications >= 0 ? "↑" : "↓") @trendpendingclarifications.ToString("+0.##;-0.##;0")%</span> } else { <span class="dash-metric-source">@(data.DataConnected ? "Verified data" : "Not connected")</span> }</article>
     </section>
     <section class="dash-supplier-middle">
-        <article class="dash-panel dash-invitations"><div class="dash-panel-heading"><h2>My Tender Invitations</h2><button type="button" class="dash-text-action" disabled title="This module is not available yet">View All <span aria-hidden="true">→</span></button></div><div class="dash-table-scroll"><table><caption class="ws-sr-only">Tender invitations assigned to this supplier</caption><thead><tr><th scope="col">Tender No.</th><th scope="col">Title</th><th scope="col">Deadline</th><th scope="col">Status</th></tr></thead><tbody>@if(data.Invitations.Count > 0) { foreach(var invitation in data.Invitations) { <tr><th scope="row">@invitation.Reference</th><td>@invitation.Title</td><td>@invitation.Deadline</td><td><span class="dash-status-pill">@invitation.Status</span></td></tr> } } else { <tr><td colspan="4"><div class="dash-empty-state"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h9l5 5v15H5zM14 2v6h5M8 13h8M8 17h5"/></svg><span>@(data.DataConnected ? "No invitations available." : "Invitation data is not connected.")</span></div></td></tr> }</tbody></table></div></article>
+        <article class="dash-panel dash-invitations"><div class="dash-panel-heading"><h2>My Tender Invitations</h2><a asp-area="Supplier" asp-controller="Invitations" asp-action="Index" class="dash-text-action">View all invitations →</a></div><div class="dash-table-scroll"><table><caption class="ws-sr-only">Tender invitations assigned to this supplier</caption><thead><tr><th scope="col">Tender No.</th><th scope="col">Title</th><th scope="col">Deadline</th><th scope="col">Status</th></tr></thead><tbody>@if(data.Invitations.Count > 0) { foreach(var invitation in data.Invitations) { <tr><th scope="row">@invitation.Reference</th><td>@invitation.Title</td><td>@invitation.Deadline</td><td><span class="dash-status-pill">@invitation.Status</span></td></tr> } } else { <tr><td colspan="4"><div class="dash-empty-state"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h9l5 5v15H5zM14 2v6h5M8 13h8M8 17h5"/></svg><span>@(data.DataConnected ? "No invitations available." : "Invitation data is not connected.")</span></div></td></tr> }</tbody></table></div></article>
         <article class="dash-panel dash-distribution"><div class="dash-panel-heading"><h2>My Offers by Status</h2></div><div class="dash-distribution-body"><div class="dash-donut @(data.Statuses.Count > 0 ? "has-data" : "")" style="--dash-distribution:@distribution"><span><strong>@data.Number("offers-total")</strong><small>Offers</small></span></div><div class="dash-legend">@if(data.Statuses.Count > 0) { foreach(var status in data.Statuses) { <div><i></i><span>@status.Label</span><b>@status.Count</b></div> } } else { <div><i></i><span>Submitted</span><b>—</b></div><div><i></i><span>Under Evaluation</span><b>—</b></div><div><i></i><span>Awarded</span><b>—</b></div><div><i></i><span>Not Submitted</span><b>—</b></div> }</div></div><span class="dash-data-caption">@(data.DataConnected ? "Verified system data" : "Waiting for verified data")</span></article>
-        <article class="dash-panel dash-participation"><div class="dash-panel-heading"><h2>Participation Overview</h2></div><div class="dash-chart-grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div class="dash-chart-empty"><span>Participation history</span><small>Verified monthly activity is not available.</small></div><div class="dash-chart-axis" aria-hidden="true"><span>—</span><span>—</span><span>—</span><span>—</span><span>—</span><span>—</span></div></article>
+        <article class="dash-panel dash-participation"><div class="dash-panel-heading"><h2>Participation Overview</h2></div><div class="ui-chart" role="img" aria-label="Offers submitted per month, last six months">@{
+            var pts = data.Monthly; var max = Math.Max(1, pts.Count == 0 ? 1 : pts.Max(x => x.Value)); var top = max <= 4 ? 4 : max;
+            string X(int i) => (30 + i * (pts.Count <= 1 ? 0 : 450.0 / (pts.Count - 1))).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+            string Y(int v) => (170 - v * 140.0 / top).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+            Microsoft.AspNetCore.Html.IHtmlContent T(string x, string y, string anchor, string label, int dy) => Html.Raw($"<text x=\"{x}\" y=\"{y}\" dy=\"{dy}\" class=\"ui-chart-tick\" text-anchor=\"{anchor}\">{System.Net.WebUtility.HtmlEncode(label)}</text>");
+            var line = string.Join(" ", pts.Select((x, i) => X(i) + "," + Y(x.Value)));
+        }<svg viewBox="0 0 500 200"><defs><linearGradient id="ui-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ff9a1f" stop-opacity=".55"/><stop offset="1" stop-color="#ff7900" stop-opacity="0"/></linearGradient></defs>@for (var g = 0; g <= 4; g++) { <line x1="30" x2="480" y1="@Y(g * top / 4)" y2="@Y(g * top / 4)" class="ui-chart-grid"/>@T("22", Y(g * top / 4), "end", (g * top / 4).ToString(), 4) }@if (pts.Count > 1) { <polygon points="30,170 @line 480,170" fill="url(#ui-area)"/><polyline points="@line" class="ui-chart-line"/>@for (var i = 0; i < pts.Count; i++) { <circle cx="@X(i)" cy="@Y(pts[i].Value)" r="4.5" class="ui-chart-dot"><title>@pts[i].Label: @pts[i].Value offer(s)</title></circle>@T(X(i), "192", "middle", pts[i].Label, 0) } }</svg></div></article>
     </section>
     <section class="dash-supplier-bottom">
-        <article class="dash-panel dash-activity"><div class="dash-panel-heading"><h2>Recent Activities</h2><button type="button" class="dash-text-action" disabled title="This module is not available yet">View All <span aria-hidden="true">→</span></button></div><div class="dash-activity-list">@if (data.Activities.Count > 0) { foreach(var activity in data.Activities) { <div class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@activity.Title</strong><span>@activity.Context</span></div><time>@activity.Time</time></div> } } else { <div class="dash-empty-timeline" aria-hidden="true"><i></i><i></i><i></i></div><div class="dash-empty-state"><span>@(data.DataConnected ? "No recent activities." : "Activity history is not connected.")</span></div> }</div></article>
-        <article class="dash-panel dash-quick-actions"><div class="dash-panel-heading"><h2>Quick Actions</h2></div><div class="dash-action-grid"><button type="button" class="is-featured" disabled title="This module is not available yet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h9l5 5v15H5zM14 2v6h5M8 13h8M8 17h5"/></svg><span>View<br />Invitations</span></button><button type="button" disabled title="This module is not available yet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15v7h18v-7M12 19V2M5 9l7-7 7 7"/></svg><span>Submit<br />Offer</span></button><button type="button" disabled title="This module is not available yet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v14H9l-6 5zM7 10h.01M12 10h.01M17 10h.01"/></svg><span>Respond to<br />Clarifications</span></button><button type="button" disabled title="This module is not available yet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22V13h4v9M10 22V7h4v15M17 22V2h4v20"/></svg><span>View<br />Reports</span></button></div></article>
+        <article class="dash-panel dash-activity"><div class="dash-panel-heading"><h2>Recent Activities</h2><a asp-area="Supplier" asp-controller="Notifications" asp-action="Index" class="dash-text-action">View notifications →</a></div><div class="dash-activity-list">@if (data.Activities.Count > 0) { foreach(var activity in data.Activities) { <div class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@activity.Title</strong><span>@activity.Context</span></div><time>@activity.Time</time></div> } } else { <div class="dash-empty-timeline" aria-hidden="true"><i></i><i></i><i></i></div><div class="dash-empty-state"><span>@(data.DataConnected ? "No recent activities." : "Activity history is not connected.")</span></div> }</div></article>
+        <article class="dash-panel dash-quick-actions"><div class="dash-panel-heading"><h2>Quick Actions</h2></div><div class="dash-action-grid"><a asp-area="Supplier" asp-controller="Invitations" asp-action="Index" class="is-featured"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2h9l5 5v15H5zM14 2v6h5M8 13h8M8 17h5"/></svg><span>View<br />Invitations</span></a><a asp-area="Supplier" asp-controller="Offers" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15v7h18v-7M12 19V2M5 9l7-7 7 7"/></svg><span>My<br />Offers</span></a><a asp-area="Supplier" asp-controller="Clarifications" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v14H9l-6 5zM7 10h.01M12 10h.01M17 10h.01"/></svg><span>Respond to<br />Clarifications</span></a><a asp-area="Supplier" asp-controller="Offers" asp-action="DownloadSummary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22V13h4v9M10 22V7h4v15M17 22V2h4v20"/></svg><span>Download<br />Summary</span></a></div></article>
     </section>
 </div>
-@section Styles { <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" /> }
+@section Styles { <link rel="stylesheet" href="~/css/supplier-dashboard-links.css" asp-append-version="true" /> <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" /> }
 
 

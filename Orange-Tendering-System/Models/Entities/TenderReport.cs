@@ -45,6 +45,17 @@ namespace Orange_Tendering_System.Models.Entities
         public string? ReviewComment { get; set; }
         public DateTime? ReviewedAt { get; set; }
 
+        // Immutable canonical report. Personalized access copies never replace these bytes.
+        public byte[]? PdfContent { get; set; }
+        [MaxLength(64)] public string? PdfSha256 { get; set; }
+        public string? SnapshotJson { get; set; }
+        [MaxLength(64)] public string? SnapshotSha256 { get; set; }
+        [MaxLength(64)] public string? SourceSha256 { get; set; }
+        [MaxLength(40)] public string? TemplateVersion { get; set; }
+        public int? SignaturePageIndex { get; set; }
+        public DateTime? SupersededAt { get; set; }
+        [Timestamp] public byte[] RowVersion { get; set; } = [];
+
         public ICollection<Document> Documents { get; set; } = new List<Document>();
     }
 }

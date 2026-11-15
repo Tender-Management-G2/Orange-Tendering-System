@@ -1,67 +1,26 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Received Bids
-
-DEVELOPER OWNER: Saja
-MODULE: Sourcing Officer / Bid Management
-TRELLO TASK: Received Bids
-TRELLO URL: https://trello.com/c/06s4zwV2
-
-PURPOSE:
-List the offers received for a tender round with their
-compliance status.
-
-BUSINESS ACCESS:
-Sourcing Officer
-
-ROUTE: /SourcingOfficer/Bids/Index/{id?}
-
-FUTURE IMPLEMENTATION:
-- Query the latest Submitted Bid per TenderInvitation in the
-  selected TenderRound.
-- Quoted total = Σ(Quantity × UnitPrice) + extra costs
-  (calculated, not stored).
-- Row actions: Details, Compliance.
-
-DEPENDENCIES:
-Bids, BidItems, TenderInvitations, Suppliers, TenderRounds.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Only offers of the current round count; offers from earlier
-rounds are history.
-===========================================================
-*@
+@model Orange_Tendering_System.ViewModels.SourcingOfficerBidsViewModel
 @{
-    ViewData["Title"] = "Received Bids";
+    ViewData["Title"] = "Received offers";
     ViewData["WorkspaceSection"] = "Received Bids";
-    ViewData["Description"] = "Offers submitted by invited suppliers in the selected tendering round.";
+    ViewData["Description"] = "Check each supplier offer and record whether it meets the tender requirements.";
+    var rows = Model.Offers;
 }
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="pg-cards" aria-label="Summary">
-    <article class="pg-card"><span>Invited suppliers</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Submitted offers</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Distinct suppliers</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Compliance pending</span><strong>—</strong><small>Not connected</small></article>
+<div class="so-page"><partial name="_PageHeader" />
+<section class="pg-cards" aria-label="Offer summary">
+    <article class="pg-card"><span>Submitted offers</span><strong>@rows.Count</strong></article>
+    <article class="pg-card"><span>Need a compliance check</span><strong>@rows.Count(b => b.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.NotChecked)</strong></article>
+    <article class="pg-card"><span>Compliant offers</span><strong>@rows.Count(b => b.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant)</strong></article>
 </section>
-
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search supplier" aria-label="Search supplier" disabled />
-    <select aria-label="Compliance" disabled><option>Compliance: All</option><option>Compliance: Not checked</option><option>Compliance: Compliant</option><option>Compliance: Non-Compliant</option><option>Compliance: Pending Clarification</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
+<section class="so-forward-shortcut" aria-label="Committee forwarding">
+    <div><span class="so-eyebrow">NEXT STEP AFTER COMPLIANCE</span><strong>Send offers to the evaluation committee</strong><span class="pg-hint">Review ready rounds and select which compliant offers to forward.</span></div>
+    <a class="pg-btn pg-btn-primary" asp-action="Forwarding">Open committee forwarding <span aria-hidden="true">→</span></a>
 </section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-offers">
-    <div class="pg-panel-head"><h2 id="tbl-offers">Offers</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Supplier</th><th scope="col">Tender</th><th scope="col">Round</th><th scope="col">Revision</th><th scope="col">Submitted</th><th scope="col">Quoted total</th><th scope="col">Compliance</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="8"><partial name="_EmptyState" model='"No offers have been received for this round."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>All submitted offers</h2><span class="pg-hint">Open an offer to read it, then check its requirements.</span></div><a class="pg-btn" asp-controller="Tenders" asp-action="Index">← Tenders</a></div>
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Tender</th><th>Supplier</th><th>Submitted</th><th>Compliance</th><th>Next step</th></tr></thead><tbody>
+@if (rows.Count == 0) { <tr><td colspan="5" class="so-empty">No submitted offers yet. Suppliers can submit after accepting their invitation.</td></tr> }
+@foreach (var bid in rows)
+{
+    var badge = bid.ComplianceStatus switch { Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant => "is-ok", Orange_Tendering_System.Models.Entities.ComplianceStatus.NonCompliant => "is-bad", Orange_Tendering_System.Models.Entities.ComplianceStatus.PendingClarification => "is-warn", _ => "" };
+    <tr><td><strong>@bid.TenderInvitation.TenderRound.Tender.Title</strong><br /><small class="pg-hint">Round @bid.TenderInvitation.TenderRound.RoundNumber · Offer #@bid.Id</small></td><td>@bid.TenderInvitation.Supplier.CompanyName</td><td>@bid.SubmittedAt?.ToLocalTime().ToString("d MMM yyyy")</td><td><span class="pg-badge @badge">@bid.ComplianceStatus</span></td><td><div class="so-actions"><a class="pg-btn" asp-action="Details" asp-route-id="@bid.Id">Read offer</a><a class="pg-btn pg-btn-primary" asp-action="Compliance" asp-route-id="@bid.Id">@(bid.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.NotChecked ? "Check requirements" : "Update check")</a></div></td></tr>
+}
+</tbody></table></div></section></div>

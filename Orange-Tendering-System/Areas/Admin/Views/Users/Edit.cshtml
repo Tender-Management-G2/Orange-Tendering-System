@@ -30,35 +30,168 @@ STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 ===========================================================
 *@
+
+@model EditUserViewModel
+
 @{
     ViewData["Title"] = "Edit User";
     ViewData["WorkspaceSection"] = "Users";
-    ViewData["Description"] = "Change an employee account’s name, department, roles and active status.";
+    ViewData["Description"] =
+        "Update account information and active status.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
 <section class="ws-panel pg-panel">
-    <h2>Account details</h2>
-    <form class="pg-form">
-        <fieldset disabled>
-            <div class="pg-form-grid">
-                <div class="pg-field"><label for="f-full-name-1">Full name</label><input id="f-full-name-1" type="text" /></div>
-                <div class="pg-field"><label for="f-email-2">Email</label><input id="f-email-2" type="email" /><small class="pg-hint">Changing the email also changes the sign-in name.</small></div>
-                <div class="pg-field"><label for="f-department-3">Department</label><select id="f-department-3"><option>Select a department</option></select></div>
-                <div class="pg-field"><label for="f-role-s-4">Role(s)</label><select id="f-role-s-4"><option>Requesting Department</option><option>Sourcing Officer</option><option>Evaluation Committee</option><option>Sourcing Manager</option><option>Top Committee</option><option>Admin</option></select></div>
-                <label class="pg-check"><input type="checkbox" id="f-active-account-5" /> Active account</label>
+
+    <div class="pg-panel-head">
+        <h2>Edit Account</h2>
+    </div>
+
+    <form asp-area="Admin"
+          asp-controller="Users"
+          asp-action="Edit"
+          asp-route-id="@Model.Id"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" asp-for="Id" />
+
+        <div asp-validation-summary="All"
+             class="text-danger"></div>
+
+        <div class="pg-form-grid">
+
+            <!-- Full Name -->
+            <div class="pg-field">
+                <label asp-for="FullName">Full Name</label>
+
+                <input asp-for="FullName"
+                       class="form-control"
+                       maxlength="150" />
+
+                <span asp-validation-for="FullName"
+                      class="text-danger"></span>
             </div>
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save changes</button><span class="pg-hint">Not implemented yet — nothing is saved.</span></div>
-        </fieldset>
+
+            <!-- Email: Display only -->
+            <div class="pg-field">
+                <label>Email</label>
+
+                <input type="email"
+                       value="@Model.Email"
+                       class="form-control"
+                       readonly />
+
+                <small class="pg-hint">
+                    Email changes are handled through
+                    the account verification process.
+                </small>
+            </div>
+
+            <!-- Department -->
+            <div class="pg-field">
+                <label asp-for="DepartmentId">Department</label>
+
+                <select asp-for="DepartmentId"
+                        asp-items="Model.Departments"
+                        class="form-control">
+
+                    <option value="">Select Department</option>
+
+                </select>
+
+                <span asp-validation-for="DepartmentId"
+                      class="text-danger"></span>
+            </div>
+
+            <!-- Current Roles -->
+            <div class="pg-field">
+                <label>Current Role(s)</label>
+
+                <input type="text"
+                       value="@Model.CurrentRoles"
+                       class="form-control"
+                       readonly />
+
+                <small class="pg-hint">
+                    Roles are managed separately in
+                    the Roles Management page.
+                </small>
+            </div>
+
+            <!-- Account Status -->
+            <div class="pg-field">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Account
+                </label>
+
+                <small class="pg-hint">
+                    Deactivating an account should
+                    prevent further access to the system.
+                </small>
+            </div>
+
+        </div>
+
+        <!-- Actions -->
+        <div class="pg-actions">
+
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Save Changes
+            </button>
+
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index"
+               class="pg-btn">
+                Cancel
+            </a>
+
+        </div>
+
     </form>
+
 </section>
 
-<aside class="pg-note"><strong>Deactivate, do not delete</strong><p>Users who created requests, bids, scores or votes must stay in the database. Clear "Active account" to block sign-in.</p></aside>
+<!-- Information -->
+<aside class="pg-note">
+    <strong>Deactivate, do not delete</strong>
+
+    <p>
+        Accounts linked to purchase requests,
+        tenders, bids, evaluations or decisions
+        should remain in the database.
+        Deactivate them to preserve history.
+    </p>
+</aside>
 
 <nav class="pg-links" aria-label="Related pages">
     <ul>
-        <li><a asp-area="Admin" asp-controller="Users" asp-action="Details">User details</a></li>
-        <li><a asp-area="Admin" asp-controller="Users" asp-action="Index">Back to users</a></li>
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Details"
+               asp-route-id="@Model.Id">
+                User Details
+            </a>
+        </li>
+
+        <li>
+            <a asp-area="Admin"
+               asp-controller="Users"
+               asp-action="Index">
+                Back to Users
+            </a>
+        </li>
     </ul>
 </nav>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

@@ -32,22 +32,241 @@ STATUS:
 UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 ===========================================================
 *@
+
+@model List<RoleListViewModel>
+
 @{
     ViewData["Title"] = "Role & Permission Management";
     ViewData["WorkspaceSection"] = "Roles";
-    ViewData["Description"] = "The seven system roles and who holds them.";
+    ViewData["Description"] =
+        "Manage system roles and user memberships.";
 }
+
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
 
-<aside class="pg-note"><strong>How permissions work</strong><p>The seven roles are defined in Models/SystemRoles.cs: Admin, Requesting Department, Sourcing Officer, Supplier, Evaluation Committee, Sourcing Manager and Top Committee. Every workspace controller checks the role. Committee scoring and voting also require tender-specific assignment (CommitteeMembers) — a role alone is never enough.</p></aside>
+<aside class="pg-note">
+    <strong>How permissions work</strong>
 
-<section class="ws-panel pg-panel" aria-labelledby="tbl-roles">
-    <div class="pg-panel-head"><h2 id="tbl-roles">Roles</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Role</th><th scope="col">Purpose</th><th scope="col">Users</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="4"><partial name="_EmptyState" model='"Roles are not seeded in the database yet."' /></td></tr></tbody>
-        </table>
+    <p>
+        The system uses seven fixed Identity roles.
+        Access is controlled by role authorization.
+        Committee actions also require tender-specific
+        membership and permissions.
+    </p>
+</aside>
+
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <div>
+            <h2>System Roles</h2>
+
+            <p>
+                Total defined roles: @Model.Count
+            </p>
+        </div>
     </div>
+
+    <div class="pg-table-wrap">
+
+        <table class="pg-table">
+
+            <thead>
+                <tr>
+                    <th>Role Name</th>
+                    <th>Purpose</th>
+                    <th>Users</th>
+                    <th>Database Status</th>
+                    <th>Assigned Users</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @foreach (var role in Model)
+                {
+                    <tr>
+                        <td>
+                            <strong>@role.RoleName</strong>
+                        </td>
+
+                        <td>@role.Purpose</td>
+
+                        <td>@role.UserCount</td>
+
+                        <td>
+                            @if (role.IsSeeded)
+                            {
+                                <span class="pg-status">
+                                    Available
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="pg-status">
+                                    Not Seeded
+                                </span>
+                            }
+                        </td>
+
+                        <td>
+                            @if (role.Users.Any())
+                            {
+                                <details>
+                                    <summary>
+                                        View Users (@role.UserCount)
+                                    </summary>
+
+                                    <ul>
+                                        @foreach (var user in role.Users)
+                                        {
+                                            <li>@user</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </td>
+                    </tr>
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
 </section>
+
+<!-- Role Assignment -->
+<section class="ws-panel pg-panel">
+
+    <div class="pg-panel-head">
+        <h2>Manage User Role Membership</h2>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">
+            @TempData["SuccessMessage"]
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">
+            @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <!-- Assign Role -->
+    <form asp-area="Admin"
+          asp-controller="Roles"
+          asp-action="Assign"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <h3>Assign Role</h3>
+
+        <div class="pg-form-grid">
+
+            <div class="pg-field">
+                <label for="assignUser">User</label>
+
+                <select id="assignUser"
+                        name="UserId"
+                        asp-items="ViewBag.Users"
+                        class="form-control"
+                        required>
+                    <option value="">Select User</option>
+                </select>
+            </div>
+
+            <div class="pg-field">
+                <label for="assignRole">Role</label>
+
+                <select id="assignRole"
+                        name="RoleName"
+                        asp-items="ViewBag.AvailableRoles"
+                        class="form-control"
+                        required>
+                    <option value="">Select Role</option>
+                </select>
+            </div>
+
+        </div>
+
+        <div class="pg-actions">
+            <button type="submit"
+                    class="pg-btn pg-btn-primary">
+                Assign Role
+            </button>
+        </div>
+    </form>
+
+    <hr />
+
+    <!-- Remove Role -->
+    <form asp-area="Admin"
+          asp-controller="Roles"
+          asp-action="Remove"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <h3>Remove Role</h3>
+
+        <div class="pg-form-grid">
+
+            <div class="pg-field">
+                <label for="removeUser">User</label>
+
+                <select id="removeUser"
+                        name="UserId"
+                        asp-items="ViewBag.Users"
+                        class="form-control"
+                        required>
+                    <option value="">Select User</option>
+                </select>
+            </div>
+
+            <div class="pg-field">
+                <label for="removeRole">Role</label>
+
+                <select id="removeRole"
+                        name="RoleName"
+                        asp-items="ViewBag.AvailableRoles"
+                        class="form-control"
+                        required>
+                    <option value="">Select Role</option>
+                </select>
+            </div>
+
+        </div>
+
+        <div class="pg-actions">
+            <button type="submit"
+                    class="pg-btn">
+                Remove Role
+            </button>
+        </div>
+    </form>
+
+</section>
+
+
+<aside class="pg-note">
+    <strong>Role Assignment</strong>
+
+    <p>
+        Role assignment and removal will be enabled
+        in the next step, with authorization checks
+        and audit logging.
+    </p>
+</aside>

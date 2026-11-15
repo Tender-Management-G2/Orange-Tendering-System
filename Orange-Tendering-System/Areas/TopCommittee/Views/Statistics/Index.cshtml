@@ -1,59 +1,7 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Management Statistics
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Top Committee
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Management view required by the specification: awarded
-tenders and totals per supplier.
-
-BUSINESS ACCESS:
-Top Committee member
-
-ROUTE: /TopCommittee/Statistics
-
-FUTURE IMPLEMENTATION:
-- Aggregate from Tenders.AwardedBidId → Bid →
-  TenderInvitation → Supplier.
-- Non-confidential aggregates only.
-
-DEPENDENCIES:
-Tenders, Bids, BidItems, TenderInvitations, Suppliers.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-In the specification (section 9) but no Trello card — team
-assignment required.
-===========================================================
-*@
+@model Orange_Tendering_System.Services.ReportModel
 @{
-    ViewData["Title"] = "Management Statistics";
-    ViewData["WorkspaceSection"] = "Management Statistics";
-    ViewData["Description"] = "Totals by supplier and how often each supplier was awarded.";
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Management Statistics"; ViewData["WorkspaceSection"] = "Statistics"; ViewData["Description"] = "Site-wide statistics and the number of transactions with each supplier. Download the report as PDF or Excel.";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="pg-cards" aria-label="Summary">
-    <article class="pg-card"><span>Awarded tenders</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Total awarded value</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Active tenders</span><strong>—</strong><small>Not connected</small></article>
-    <article class="pg-card"><span>Suppliers awarded</span><strong>—</strong><small>Not connected</small></article>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-awards-by-supplier">
-    <div class="pg-panel-head"><h2 id="tbl-awards-by-supplier">Awards by supplier</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Supplier</th><th scope="col">Awarded tenders</th><th scope="col">Total awarded value</th></tr></thead>
-            <tbody><tr><td colspan="3"><partial name="_EmptyState" model='"No awards recorded yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
+<partial name="_ReportBody" model="Model" />

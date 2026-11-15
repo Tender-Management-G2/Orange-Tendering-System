@@ -1,63 +1,8 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Manage Tenders
-
-DEVELOPER OWNER: Amal
-MODULE: Sourcing Officer / Tender Management
-TRELLO TASK: Manage Tenders
-TRELLO URL: https://trello.com/c/e2e0QlHT
-
-PURPOSE:
-List tenders with status, current tendering round and
-deadlines.
-
-BUSINESS ACCESS:
-Sourcing Officer
-
-ROUTE: /SourcingOfficer/Tenders
-
-FUTURE IMPLEMENTATION:
-- Query Tenders with their latest TenderRound.
-- Row actions: Details, Edit (Draft only), Timeline, Rounds,
-  Select suppliers, Received bids.
-
-DEPENDENCIES:
-Tenders, TenderRounds, PurchaseRequests.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "Manage Tenders";
-    ViewData["WorkspaceSection"] = "Tenders";
-    ViewData["Description"] = "All tenders with their current round and stage.";
-}
-<partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="pg-toolbar" aria-label="Search and filters">
-    <input type="search" placeholder="Search tenders" aria-label="Search tenders" disabled />
-    <select aria-label="Status" disabled><option>Status: All</option><option>Status: Draft</option><option>Status: Bidding</option><option>Status: Evaluation</option><option>Status: OfficerReview</option><option>Status: ManagerReview</option><option>Status: TopCommitteeReview</option><option>Status: Awarded</option><option>Status: Rejected</option><option>Status: Cancelled</option></select>
-    <span class="pg-hint">Search and filters are not implemented yet.</span>
-</section>
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-tenders">
-    <div class="pg-panel-head"><h2 id="tbl-tenders">Tenders</h2><a class="pg-btn pg-btn-primary" asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Create">Create tender</a></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Reference</th><th scope="col">Title</th><th scope="col">Purchase request</th><th scope="col">Current round</th><th scope="col">Status</th><th scope="col">Deadline</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="7"><partial name="_EmptyState" model='"No tenders are loaded yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Details">Tender details</a></li>
-        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Rounds">Tender rounds</a></li>
-        <li><a asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Timeline">Timeline &amp; closing</a></li>
-        <li><a asp-area="SourcingOfficer" asp-controller="Invitations" asp-action="Index">Supplier invitations</a></li>
-    </ul>
-</nav>
+@model IEnumerable<Orange_Tendering_System.Models.Entities.Tender>
+@{ ViewData["Title"] = "Tenders"; ViewData["WorkspaceSection"] = "Tenders"; ViewData["Description"] = "Each tender is based on a department request. Open a tender to invite suppliers or review its offers."; var rows=Model.ToList(); }
+<div class="so-page"><partial name="_PageHeader" />
+<section class="pg-cards"><article class="pg-card"><span>Total tenders</span><strong>@rows.Count</strong></article><article class="pg-card"><span>Taking offers</span><strong>@rows.Count(t=>t.Status==Orange_Tendering_System.Models.Entities.TenderStatus.Bidding)</strong></article><article class="pg-card"><span>Under evaluation or review</span><strong>@rows.Count(t=>t.Status is Orange_Tendering_System.Models.Entities.TenderStatus.Evaluation or Orange_Tendering_System.Models.Entities.TenderStatus.ManagerReview or Orange_Tendering_System.Models.Entities.TenderStatus.OfficerReview)</strong></article></section>
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>Your tenders</h2><span class="pg-hint">Use Details to see the next available action for each tender.</span></div><a class="pg-btn" asp-controller="PurchaseRequests" asp-action="Index">← Requests</a></div><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Tender</th><th>From request</th><th>Round</th><th>Status</th><th></th></tr></thead><tbody>
+@if(rows.Count==0){<tr><td colspan="5" class="so-empty">No tenders yet. Accept a request, then use Create tender from the request list.</td></tr>}
+@foreach(var t in rows){var round=t.Rounds.OrderByDescending(r=>r.RoundNumber).FirstOrDefault();<tr><td><strong>@t.Title</strong><br/><small class="pg-hint">Tender #@t.Id</small></td><td>@t.PurchaseRequest.Title</td><td>@(round==null?"—":$"Round {round.RoundNumber} · {round.Status}")</td><td><span class="pg-badge @(t.Status==Orange_Tendering_System.Models.Entities.TenderStatus.Bidding?"is-ok":"")">@t.Status</span></td><td><a class="pg-btn pg-btn-primary" asp-action="Details" asp-route-id="@t.Id">Open tender</a></td></tr>}
+</tbody></table></div></section></div>

@@ -2,11 +2,14 @@
   OWNER: Tariq — Shared Layout (account menu markup) · Ahmad — Authentication (sign-out, biometrics links)
   Account dropdown used by _WorkspaceLayout and _SupplierLayout. Sign-out is the real Identity POST.
 *@
+@inject Microsoft.AspNetCore.Identity.UserManager<Orange_Tendering_System.Models.Entities.ApplicationUser> AccountUsers
 @{
+    var me = await AccountUsers.GetUserAsync(User);
+    var shownName = string.IsNullOrWhiteSpace(me?.FullName) ? (User.Identity?.Name ?? "Signed-in user") : me!.FullName;
     var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
 }
 <details class="ws-account">
-    <summary aria-label="Account menu"><span class="ws-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M3 22v-3c0-10 18-10 18 0v3" /></svg></span><span class="ws-account-label"><strong>@(User.Identity?.Name ?? "Signed-in user")</strong><small>@(workspace?.Label ?? "No workspace role")</small></span><svg class="ws-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
+    <summary aria-label="Account menu"><span class="ws-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M3 22v-3c0-10 18-10 18 0v3" /></svg></span><span class="ws-account-label"><strong>@shownName</strong><small>@(workspace?.Label ?? "No workspace role")</small></span><svg class="ws-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
     <div class="ws-account-menu">
         <span class="ws-account-role">@(workspace?.Role ?? "No role assigned")</span>
         <a asp-area="" asp-controller="Workspace" asp-action="Index">My workspaces</a>

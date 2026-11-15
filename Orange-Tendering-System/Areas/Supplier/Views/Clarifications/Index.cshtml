@@ -1,58 +1,20 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Supplier Clarifications
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Supplier Portal
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Supplier ↔ Sourcing Officer clarification threads.
-
-BUSINESS ACCESS:
-Supplier (own company only, Admin-approved)
-
-ROUTE: /Supplier/Clarifications
-
-FUTURE IMPLEMENTATION:
-- Own threads only; new question linked to an own invitation
-  or offer.
-- Thread view is the shared Clarifications/Details page.
-
-DEPENDENCIES:
-Clarifications, ClarificationMessages, Notifications.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Every query must be filtered by the signed-in user’s
-SupplierId. Never show other suppliers’ invitations, offers,
-prices or evaluations.
-===========================================================
-*@
-@{
-    ViewData["Title"] = "Supplier Clarifications";
-    ViewData["WorkspaceSection"] = "Clarifications";
-    ViewData["Description"] = "Questions between your company and the Sourcing Officer.";
-}
+@model List<SupplierClarificationViewModel>
+@{ ViewData["Title"] = "Clarifications"; ViewData["WorkspaceSection"] = "Clarifications"; }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel" aria-labelledby="tbl-clarifications">
-    <div class="pg-panel-head"><h2 id="tbl-clarifications">Clarifications</h2></div>
-    <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead><tr><th scope="col">Subject</th><th scope="col">Tender / offer</th><th scope="col">Status</th><th scope="col">Opened</th><th scope="col">Last message</th><th scope="col">Actions</th></tr></thead>
-            <tbody><tr><td colspan="6"><partial name="_EmptyState" model='"No clarifications yet."' /></td></tr></tbody>
-        </table>
-    </div>
-</section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="" asp-controller="Clarifications" asp-action="Details">Open a thread</a></li>
-    </ul>
-</nav>
+@if (TempData["ClarificationMessage"] is string message) { <p class="pg-note" role="status">@message</p> }
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><div><h2>Messages with the Sourcing Officer</h2><span class="pg-hint">Open a thread to read the full conversation or send a reply.</span></div></div>
+<form asp-action="Index" method="get" class="pg-toolbar" aria-label="Search clarifications">
+    <input type="search" name="search" value="@ViewData["Search"]" maxlength="200" placeholder="Search a subject or message" aria-label="Search clarifications" />
+    <select name="status" aria-label="Filter conversations">
+        <option value="">All statuses</option>
+        <option value="Pending" selected="@(ViewData["Status"]?.ToString() == "Pending")">Pending</option>
+        <option value="Answered" selected="@(ViewData["Status"]?.ToString() == "Answered")">Answered</option>
+        <option value="Resolved" selected="@(ViewData["Status"]?.ToString() == "Resolved")">Resolved</option>
+    </select>
+    <button type="submit" class="pg-btn pg-btn-primary">Search</button>
+    <a asp-action="Index" class="pg-btn">Reset</a>
+</form>
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Subject</th><th>Status</th><th>Last update</th><th>Action</th></tr></thead><tbody>
+@foreach (var thread in Model) { <tr><td><strong>@thread.Subject</strong></td><td><span class="pg-badge @(thread.Status == "Pending" ? "is-warn" : thread.Status == "Resolved" ? "is-ok" : "")">@thread.Status</span></td><td>@thread.LastMessageAt.ToLocalTime().ToString("d MMM yyyy h:mm tt")</td><td><a asp-action="Details" asp-route-id="@thread.Id" class="pg-btn">Open conversation</a></td></tr> }
+@if (Model.Count == 0) { <tr><td colspan="4">No conversations match this search. You can start one from an invitation or offer details page.</td></tr> }
+</tbody></table></div></section>

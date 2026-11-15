@@ -3,7 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orange_Tendering_System.Models.Entities
 {
-    // One vote per member per committee round. 4/4 Approve is checked in business logic.
+    // One vote per member/round. Evaluation reports require four endorsements;
+    // Top Committee decisions follow the explicitly configured, frozen approval policy.
     [Index(nameof(CommitteeRoundId), nameof(CommitteeMemberId), IsUnique = true)]
     public class CommitteeVote
     {

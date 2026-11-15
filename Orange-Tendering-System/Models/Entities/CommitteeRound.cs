@@ -24,9 +24,9 @@ namespace Orange_Tendering_System.Models.Entities
         public CommitteeRoundStatus Status { get; set; } = CommitteeRoundStatus.InProgress;
 
         // Optional technical/financial split decided by the Evaluation Committee. Not fixed by the system.
-        [Precision(9, 4)]
+        [Precision(12, 6)]
         public decimal? TechnicalWeight { get; set; }
-        [Precision(9, 4)]
+        [Precision(12, 6)]
         public decimal? FinancialWeight { get; set; }
 
         public DateTime StartedAt { get; set; }

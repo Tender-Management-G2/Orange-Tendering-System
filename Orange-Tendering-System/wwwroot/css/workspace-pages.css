@@ -7,6 +7,33 @@
 /* Let wide tables scroll inside their panel instead of widening the page (phones). */
 .pg-page>*,.pg-grid>*{min-width:0}
 
+/* Sourcing Officer pages use the same shared workspace tokens, with a small set of workflow helpers. */
+.so-page .so-eyebrow{display:block;margin-bottom:7px;color:var(--ws-accent);font-size:10px;font-weight:700;letter-spacing:.12em}
+.so-welcome{display:flex;align-items:center;justify-content:space-between;gap:24px;border-color:#ff790055;background:radial-gradient(ellipse at 0 0,#ff790018,transparent 60%),linear-gradient(135deg,var(--ws-raised),var(--ws-surface))}
+.so-welcome h2{margin:0 0 8px;font-size:22px}.so-welcome p{margin:0;color:var(--ws-muted);line-height:1.7}
+.so-metrics .pg-card{text-decoration:none;transition:transform .16s ease,border-color .16s ease}.so-metrics .pg-card:hover{transform:translateY(-2px);border-color:#ff790080}
+.so-guide .pg-panel-head{align-items:end}.so-guide .pg-panel-head h2{margin:0}.so-steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0;counter-reset:step}
+.so-steps>li{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:start;gap:14px;padding:18px 0;border-top:1px solid var(--ws-soft-rule)}
+.so-step-number{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#ff790018;border:1px solid #ff790060;color:var(--ws-accent);font-size:13px;font-weight:700}
+.so-steps h3{margin:1px 0 5px;font-size:15px}.so-steps p{margin:0;color:var(--ws-muted);font-size:13px;line-height:1.7}.so-steps .pg-btn{white-space:nowrap}
+.so-inline-link{display:inline-block;margin-top:8px;color:var(--ws-accent)!important;font-size:13px;font-weight:600}
+.so-step-actions{display:flex;gap:8px;flex-wrap:wrap}.so-help{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;padding:14px 18px;border:1px solid var(--ws-rule);border-radius:12px;background:var(--ws-raised);font-size:12px;color:var(--ws-muted)}.so-help strong{color:var(--ws-ink)}.so-help code{color:var(--ws-accent);font-family:ui-monospace,monospace}.so-help .so-inline-link{margin:0}
+.so-page .pg-table-wrap{background:var(--ws-surface)}.so-page .pg-table td{vertical-align:middle}.so-page .pg-table td:last-child{min-width:150px}.so-actions{display:flex;flex-wrap:wrap;gap:7px}.so-actions .pg-btn{min-height:34px;padding:0 11px;font-size:12px}
+.so-summary{display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;color:var(--ws-muted);font-size:13px}.so-summary strong{color:var(--ws-ink)}
+.so-form-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,.65fr);gap:20px;align-items:start}.so-form-layout .ws-panel{margin:0}
+.so-chat{display:flex;flex-direction:column;gap:12px}.so-message{max-width:780px;padding:12px 15px;border:1px solid var(--ws-rule);border-radius:14px;background:var(--ws-raised)}.so-message p{margin:5px 0 0;white-space:pre-wrap;line-height:1.65}.so-message small{color:var(--ws-muted)}.so-message.is-own{align-self:flex-end;border-color:#ff790060;background:#ff790010}
+.so-empty{padding:28px 18px;text-align:center;color:var(--ws-muted)}.so-status{display:inline-flex;align-items:center;gap:6px}.so-form-actions{display:flex;gap:8px;flex-wrap:wrap}
+.so-round{padding:14px 0;border-top:1px solid var(--ws-soft-rule)}.so-round-title{display:flex;justify-content:space-between;align-items:center;gap:10px}.so-round p{line-height:1.6}
+.so-requirements{padding:14px 16px;border:1px solid var(--ws-rule);border-left:3px solid var(--ws-accent);border-radius:10px;background:var(--ws-raised)}.so-requirements p{margin:6px 0 0;white-space:pre-wrap}
+.so-offer-picks{display:flex;flex-direction:column;gap:9px}.so-offer-pick{display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid var(--ws-rule);border-radius:12px;background:var(--ws-raised);cursor:pointer}.so-offer-pick:hover{border-color:#ff790080}.so-offer-pick>input{accent-color:var(--ws-accent)}.so-offer-pick>span:nth-child(2){display:flex;flex-direction:column;gap:4px;flex:1}.so-offer-pick small{font-size:11px;color:var(--ws-muted)}.so-offer-total{font-weight:700;white-space:nowrap}.so-note-field{margin-top:18px}
+.so-report-content{white-space:pre-wrap;line-height:1.8;color:var(--ws-ink)}.so-json{overflow:auto;padding:14px;border-radius:10px;background:var(--ws-raised);color:var(--ws-muted);font-size:12px}.so-manager-note{border-color:#ff790060}.so-subheading{margin-top:24px!important}.so-supplier-list{max-width:620px;min-height:170px}.pg-validation{display:block;margin-top:5px;color:#ed7865;font-size:12px}.so-page .pg-form form{margin:0}
+.so-supplier-table a{color:var(--ws-accent)}.so-supplier-details summary{color:var(--ws-accent);cursor:pointer;font-size:12px;font-weight:600}.so-supplier-detail-list{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:8px 16px;min-width:300px;margin:10px 0 0}.so-supplier-detail-list div{min-width:0}.so-supplier-detail-list dt{font-size:10px;color:var(--ws-muted)}.so-supplier-detail-list dd{margin:2px 0 0;font-size:12px;overflow-wrap:anywhere}.so-alert{padding:11px 14px;border:1px solid #2fbf7160;border-radius:10px;background:#2fbf7110;color:#2fbf71;font-size:13px}
+.so-alert-error{border-color:#e5604f70;background:#e5604f12;color:#e98275}
+.so-forward-panel{border-color:#ff790055;background:radial-gradient(ellipse at 100% 0,#ff790012,transparent 60%),linear-gradient(135deg,var(--ws-raised),var(--ws-surface))}.so-round-forward-list{display:flex;flex-direction:column}.so-round-forward{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 0;border-top:1px solid var(--ws-soft-rule)}.so-round-forward>div{display:flex;flex-direction:column;gap:5px}.so-round-forward small{color:var(--ws-muted);font-size:12px}.so-round-forward>.pg-badge{white-space:nowrap}
+@media(max-width:700px){.so-round-forward{align-items:flex-start;flex-direction:column}}
+.so-page form:not(.pg-form){display:inline-flex;gap:6px;align-items:center;margin:0}.so-page form:not(.pg-form) input:not([type=hidden]){min-width:120px;max-width:180px;padding:7px 9px;border:1px solid var(--ws-rule);border-radius:8px;background:var(--ws-surface);color:var(--ws-ink)}
+@media(max-width:760px){.so-welcome{align-items:flex-start;flex-direction:column}.so-steps>li{grid-template-columns:32px minmax(0,1fr)}.so-steps>li>.pg-btn,.so-step-actions{grid-column:2}.so-form-layout{grid-template-columns:1fr}.so-help{align-items:flex-start;flex-direction:column}}
+
 /* The supplied sidebar was designed for ~5 items; long role menus would cover the decorative
    building image. Keep the image in the flow, below the menu. */
 .ws-sidebar-bottom{padding-bottom:24px}

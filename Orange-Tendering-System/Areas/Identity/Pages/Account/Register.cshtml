@@ -1,5 +1,8 @@
 @page
 @model RegisterModel
+@inject IWebHostEnvironment HostEnvironment
+@inject IConfiguration Configuration
+@using Orange_Tendering_System.Services
 @{
     ViewData["Title"] = "Supplier Registration";
 }
@@ -7,8 +10,15 @@
     <div class="glass auth-card auth-card-wide">
         <span class="eyebrow">SUPPLIER ONBOARDING</span>
         <h1>Register your company</h1>
-        <p>Registration is for supplier companies. Your company can participate only after administrator approval.</p>
+        <partial name="_RegistrationSteps" model="1" />
+        <p>Registration is for supplier companies. After your details, you verify your email and register your face for sign-in. Your company can participate only after administrator approval.</p>
+        <p><a class="auth-link" asp-page="./VerifyEmail">Already started? Verify your email or request a new code</a></p>
+        @if (HostEnvironment.IsDevelopment() && SmtpEmailSender.IsLocalInbox(Configuration))
+        {
+            <p class="auth-note">Local development: start <code>node Tools/DevMail/server.js</code> and read verification emails at <a href="http://127.0.0.1:8025" target="_blank" rel="noopener noreferrer">the local inbox</a>.</p>
+        }
         <form id="registerForm" method="post" enctype="multipart/form-data">
+            <div id="registrationErrors" class="validation-summary" role="alert" aria-live="polite"></div>
             <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
             <fieldset class="auth-fieldset">
                 <legend>Contact account</legend>
@@ -30,6 +40,12 @@
                 <label asp-for="Input.CompanyName">Legal company name</label>
                 <input asp-for="Input.CompanyName" />
                 <span asp-validation-for="Input.CompanyName" class="field-error"></span>
+                <label asp-for="Input.Category">Main supply category</label>
+                <select asp-for="Input.Category">
+                    <option value="">Choose your category</option>
+                    @foreach (var category in Model.Categories) { <option value="@category">@category</option> }
+                </select>
+                <span asp-validation-for="Input.Category" class="field-error"></span>
                 <label asp-for="Input.RegistrationNumber">Commercial registration number</label>
                 <input asp-for="Input.RegistrationNumber" />
                 <span asp-validation-for="Input.RegistrationNumber" class="field-error"></span>
@@ -59,10 +75,13 @@
                 <input asp-for="LegalDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg" />
                 <span asp-validation-for="LegalDocuments" class="field-error"></span>
             </fieldset>
-            <p class="auth-note">After email verification, your company remains Pending until an administrator reviews its details and documents.</p>
-            <button id="registerSubmit" type="submit" class="primary">Submit registration →</button>
+            <p class="auth-note">First, verify your email with the code we send. Your application is submitted for administrator review only after verification.</p>
+            <button id="registerSubmit" type="submit" class="primary">Send verification code →</button>
         </form>
-        <a class="auth-link" asp-page="./Login">Already registered? Sign in</a>
+        <a class="auth-link" asp-page="./Login">Already started? Sign in with your email and password to resume setup</a>
     </div>
 </section>
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/supplier-registration.js" asp-append-version="true"></script>
+}

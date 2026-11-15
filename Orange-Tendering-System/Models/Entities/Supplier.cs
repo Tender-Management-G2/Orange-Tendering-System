@@ -27,6 +27,9 @@ namespace Orange_Tendering_System.Models.Entities
         [MaxLength(500)]
         public string? Address { get; set; }
 
+        [Required, MaxLength(80)]
+        public string Category { get; set; } = SupplierCategories.Other;
+
         public SupplierStatus Status { get; set; } = SupplierStatus.Pending;
 
         // Admin review of the registration (approval, rejection or suspension reason).

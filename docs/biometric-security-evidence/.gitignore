@@ -1,0 +1,5 @@
+screenshots/
+logs/
+results.json
+report.html
+__pycache__/

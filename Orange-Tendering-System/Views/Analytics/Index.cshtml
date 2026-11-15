@@ -1,59 +1,18 @@
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Reports & Analytics
-
-DEVELOPER OWNER: UNASSIGNED — Team assignment required
-MODULE: Reports, Analytics & Exports
-TRELLO TASK: None — no dedicated Trello card
-TRELLO URL: —
-
-PURPOSE:
-Entry page listing every required report category.
-
-BUSINESS ACCESS:
-Admin, Sourcing Officer, Sourcing Manager, Top Committee
-(exact audience per report to be confirmed; results must be
-role- and ownership-filtered)
-
-ROUTE: /Analytics
-
-FUTURE IMPLEMENTATION:
-- Decide owners and per-report audiences.
-- Create a reporting service that returns view models;
-  exports reuse the same queries.
-
-DEPENDENCIES:
-All domain tables (read-only).
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-
-IMPORTANT:
-Required report category (spec §16); no Trello card covers
-reports/exports — team assignment required. No PDF/Excel
-generation yet.
-===========================================================
-*@
+@model List<(string Key, string Title, string Description)>
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
-    ViewData["Title"] = "Reports & Analytics";
-    ViewData["WorkspaceSection"] = "Analytics & Exports";
-    ViewData["Description"] = "All report categories required by the specification, with search, filters and export entry points.";
+    ViewData["Title"] = "Reports & Analytics"; ViewData["WorkspaceSection"] = "Analytics & Exports";
+    ViewData["Description"] = "Reports calculated live from the system records, with PDF and Excel export. You see only the reports your role may open.";
+    var actionFor = new Dictionary<string, string> { ["purchase-requests"] = "PurchaseRequests", ["tenders"] = "Tenders", ["suppliers"] = "Suppliers", ["evaluations"] = "Evaluations", ["governance"] = "Governance", ["management"] = "Management" };
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<aside class="pg-note"><strong>Real data only</strong><p>Every figure must be calculated from current database records; show — when no data exists. Never display sample numbers.</p></aside>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li><a asp-area="" asp-controller="Analytics" asp-action="PurchaseRequests">Purchase request reports</a></li>
-        <li><a asp-area="" asp-controller="Analytics" asp-action="Tenders">Tender reports</a></li>
-        <li><a asp-area="" asp-controller="Analytics" asp-action="Suppliers">Supplier reports</a></li>
-        <li><a asp-area="" asp-controller="Analytics" asp-action="Evaluations">Bids &amp; evaluation reports</a></li>
-        <li><a asp-area="" asp-controller="Analytics" asp-action="Governance">Approvals &amp; governance</a></li>
-        <li><a asp-area="TopCommittee" asp-controller="Statistics" asp-action="Index">Management statistics (Top Committee)</a></li>
-        <li><a asp-area="Admin" asp-controller="AuditLogs" asp-action="Index">Audit logs (Admin)</a></li>
-    </ul>
-</nav>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><h2>Available reports</h2></div>
+    <div class="pg-cards">
+        @foreach (var r in Model)
+        {
+            <a class="pg-card" asp-controller="Analytics" asp-action="@actionFor[r.Key]"><span>@r.Title</span><strong style="font-size:15px">@r.Description</strong><small>Open report · export PDF / Excel</small></a>
+        }
+    </div>
+    @if (User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Admin)) { <p><a class="pg-btn" asp-area="Admin" asp-controller="AuditLogs" asp-action="Index">Audit logs</a></p> }
+</section>

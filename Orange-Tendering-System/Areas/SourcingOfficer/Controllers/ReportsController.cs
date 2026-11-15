@@ -1,65 +1,54 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: UNASSIGNED — Team assignment required
-// Module: Sourcing Officer / Reports
-// Purpose: MVC endpoints for the Reports pages of the Sourcing Officer workspace.
-// Status: Scaffold only. GET actions return views; no POST actions, no database access, no business logic.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Controllers;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
+using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
+using Orange_Tendering_System.ViewModels;
 
-namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
+namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
+
+[Area("SourcingOfficer")]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
+public class ReportsController(ApplicationDbContext db, TenderWorkflowService workflow) : ReportControllerBase(workflow)
 {
-    [Area("SourcingOfficer")]
-    [Authorize(Roles = SystemRoles.SourcingOfficer)]
-    public class ReportsController : Controller
+    public override async Task<IActionResult> Index()
     {
-        // Officer Reports — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Reports. TODO: query the data in a service and pass a view model.
-        public IActionResult Index()
+        var reports = await db.TenderReports.AsNoTracking().Include(r => r.TenderRound).ThenInclude(r => r.Tender)
+            .Where(r => r.ReportType == ReportType.FullEvaluation || r.ReportType == ReportType.OfficerComparison)
+            .OrderByDescending(r => r.CreatedAt).ToListAsync();
+        var ids = reports.Select(r => r.Id.ToString()).ToList();
+        var forwardedIds = await db.AuditLogs.AsNoTracking()
+            .Where(a => a.Action == "ForwardEvaluationReportToManager" && ids.Contains(a.EntityId))
+            .Select(a => a.EntityId).ToListAsync();
+        return View(new OfficerReportsViewModel
         {
-            return View();
-        }
-
-        // Officer Comparison Report — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Reports/Comparison/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Comparison(int? id)
-        {
-            return View();
-        }
-
-        // Report Details — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Reports/Details/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Details(int? id)
-        {
-            return View();
-        }
-
-        // Committee Result Received — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Reports/EvaluationResult/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult EvaluationResult(int? id)
-        {
-            return View();
-        }
-
-        // Submit Full Report to Sourcing Manager — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Reports/SubmitToManager/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult SubmitToManager(int? id)
-        {
-            return View();
-        }
-
-        // Returned Report Review — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Reports/Returned/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult Returned(int? id)
-        {
-            return View();
-        }
-
-        // Report Versions — Owner: UNASSIGNED — Team assignment required · No Trello card
-        // GET /SourcingOfficer/Reports/History/{id?}. TODO: load the record by id (NotFound when missing) and check access.
-        public IActionResult History(int? id)
-        {
-            return View();
-        }
+            Reports = reports,
+            ForwardedReportIds = forwardedIds.Select(int.Parse).ToHashSet()
+        });
     }
+
+    public async Task<IActionResult> Details(int id)
+    {
+        await Workflow.ReviewReport(id, User);
+        return RedirectToAction(nameof(Review), new { id });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public Task<IActionResult> SubmitToManager(int id) => Forward(id);
+
+    public IActionResult Comparison(int? id) => RedirectToAction("Index", "Workflow");
+    public IActionResult EvaluationResult(int? id) => RedirectToAction("Index", "Workflow");
+    public IActionResult Returned(int? id) => RedirectToAction("Index", "Workflow");
+    public IActionResult History(int? id) => RedirectToAction("Index", "Workflow");
+
+    [HttpPost]
+    public Task<IActionResult> Forward(int id) => Execute(id, async () =>
+    {
+        var report = await Workflow.ReviewReport(id, User);
+        TenderWorkflowService.Require(report.IsCurrent, "Only the current finalized report can be forwarded.");
+        await Workflow.Forward(report.Tender.Id, User);
+    });
 }

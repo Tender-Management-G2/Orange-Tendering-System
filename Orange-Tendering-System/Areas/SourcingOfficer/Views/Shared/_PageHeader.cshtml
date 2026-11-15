@@ -1,0 +1,13 @@
+@{
+    var title = ViewData["Title"]?.ToString() ?? "Sourcing Officer";
+    var description = ViewData["Description"]?.ToString();
+    var words = title.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+}
+<header class="dash-welcome officer-page-hero">
+    <div class="dash-welcome-photo" aria-hidden="true"></div>
+    <div class="dash-welcome-waves" aria-hidden="true"></div>
+    <div class="dash-welcome-copy">
+        <h1>@if (words.Length > 1) { @words[0]<strong>@words[1]</strong> } else { <strong>@title</strong> }</h1>
+        @if (!string.IsNullOrWhiteSpace(description)) { <p>@description</p> }
+    </div>
+</header>

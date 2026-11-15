@@ -1,0 +1,23 @@
+@model Orange_Tendering_System.Services.ReportModel
+@* Shared report renderer: the page, the Excel file and the PDF all use the same ReportModel computed from live SQL data. *@
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">@Model.Description · generated @Model.GeneratedAt.ToString("yyyy-MM-dd HH:mm") UTC</span></div>
+        <div class="pg-actions"><a class="pg-btn pg-btn-primary" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "pdf" })">Download PDF</a>
+            <a class="pg-btn" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "xlsx" })">Download Excel</a></div></div>
+    <dl class="ui-facts">
+        @foreach (var k in Model.Kpis) { <div><dt>@k.Label</dt><dd><strong style="font-size:22px">@k.Value</strong></dd></div> }
+    </dl>
+</section>
+@foreach (var t in Model.Tables)
+{
+    <section class="ws-panel pg-panel">
+        <div class="pg-panel-head"><h2>@t.Title</h2></div>
+        <div class="pg-table-wrap"><table class="pg-table">
+            <thead><tr>@foreach (var c in t.Columns) { <th scope="col">@c</th> }</tr></thead>
+            <tbody>
+            @foreach (var row in t.Rows) { <tr>@foreach (var cell in row) { <td>@cell</td> }</tr> }
+            @if (t.Rows.Count == 0) { <tr><td colspan="@t.Columns.Length"><partial name="_EmptyState" model='"No records yet."' /></td></tr> }
+            </tbody>
+        </table></div>
+    </section>
+}

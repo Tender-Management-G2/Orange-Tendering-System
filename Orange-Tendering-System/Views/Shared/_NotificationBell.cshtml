@@ -1,0 +1,22 @@
+@*
+  Live notification bell (all seven roles). Data: SQL Server Notifications rows of the signed-in user only
+  (GET /Notifications/Feed, POST /Notifications/Read|ReadAll). Real-time pushes arrive through the SignalR hub /hubs/notifications.
+*@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var isSupplier = User.IsInRole(SystemRoles.Supplier);
+    var allUrl = isSupplier ? Url.Action("Index", "Notifications", new { area = "Supplier" }) : Url.Action("Index", "Notifications", new { area = "" });
+}
+<div class="ws-bell" data-notification-bell data-csrf="@Antiforgery.GetAndStoreTokens(Context).RequestToken" data-all-url="@allUrl">
+    <button type="button" class="ws-icon-button ws-bell-button" aria-haspopup="dialog" aria-expanded="false" aria-label="Notifications" title="Notifications">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg>
+        <span class="ws-bell-badge" hidden aria-live="polite">0</span>
+    </button>
+    <div class="ws-bell-panel" role="dialog" aria-label="Notifications" hidden>
+        <header><strong>Notifications</strong><button type="button" class="ws-link-button" data-bell-readall>Mark all as read</button></header>
+        <ul class="ws-bell-list" aria-live="polite"></ul>
+        <p class="ws-bell-empty" hidden>You are all caught up. No notifications yet.</p>
+        <footer><a href="@allUrl">View all notifications</a></footer>
+    </div>
+    <div class="ws-toast-region" aria-live="polite"></div>
+</div>
