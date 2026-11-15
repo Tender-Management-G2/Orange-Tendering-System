@@ -72,16 +72,33 @@ public static class UnifiedTenderChecks
             var u = new ApplicationUser { UserName = name + "@unified.test", Email = name + "@unified.test", FullName = name,
                 EmailConfirmed = true, IsActive = true, DepartmentId = supplierId.HasValue ? null : department.Id, SupplierId = supplierId };
             Check((await users.CreateAsync(u, password)).Succeeded, "create " + name);
-            Check((await users.AddToRoleAsync(u, role)).Succeeded, "role " + name);
+            Check((await users.AddToRolesAsync(u, SystemRoles.AccountRoles(role))).Succeeded, "role " + name);
             return u;
         }
         ClaimsPrincipal Principal(ApplicationUser u) => new(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, u.Id)], "Check"));
         var officer = await User("officer", SystemRoles.SourcingOfficer);
+        var admin = await User("admin", SystemRoles.Admin);
         var requester = await User("requester", SystemRoles.RequestingDepartment);
         var manager = await User("manager", SystemRoles.SourcingManager);
-        var evaluator = await User("department", SystemRoles.EvaluationCommittee);
-        var financial = await User("financial", SystemRoles.EvaluationCommittee);
-        var technical = await User("technical", SystemRoles.EvaluationCommittee);
+        var evaluator = await User("department", SystemRoles.DepartmentRepresentative);
+        var financial = await User("financial", SystemRoles.Finance);
+        var technical = await User("technical", SystemRoles.Technical);
+        var ceo = await User("ceo", SystemRoles.ChiefExecutiveOfficer);
+        var cfo = await User("cfo", SystemRoles.ChiefFinancialOfficer);
+        var cto = await User("cto", SystemRoles.ChiefTechnologyOfficer);
+        var coo = await User("coo", SystemRoles.ChiefOperationsOfficer);
+        var evaluationRoster = await flow.StandingCommittee("Evaluation", Principal(admin));
+        await flow.SaveStandingCommittee(new StandingCommitteeInput
+        {
+            Committee = "Evaluation", Version = evaluationRoster.Version, MemberOneId = manager.Id,
+            MemberTwoId = technical.Id, MemberThreeId = financial.Id, MemberFourId = evaluator.Id
+        }, Principal(admin));
+        var topRoster = await flow.StandingCommittee("Top", Principal(admin));
+        await flow.SaveStandingCommittee(new StandingCommitteeInput
+        {
+            Committee = "Top", Version = topRoster.Version, MemberOneId = ceo.Id,
+            MemberTwoId = cfo.Id, MemberThreeId = cto.Id, MemberFourId = coo.Id
+        }, Principal(admin));
         var supplier = new Supplier { CompanyName = "Private supplier", RegistrationNumber = suffix, Email = "supplier@unified.test", Status = SupplierStatus.Approved };
         var competitor = new Supplier { CompanyName = "COMPETITOR_SECRET_NAME", RegistrationNumber = suffix + "X", Email = "competitor@unified.test", Status = SupplierStatus.Approved };
         db.AddRange(supplier, competitor); await db.SaveChangesAsync();
@@ -130,7 +147,9 @@ public static class UnifiedTenderChecks
             SourcingManagerId = manager.Id, DepartmentRepresentativeId = evaluator.Id, FinancialRepresentativeId = financial.Id, TechnicalRepresentativeId = technical.Id,
             EstimatedValue = 1000, Currency = "JOD" };
         var id = await flow.Create(input, Principal(officer));
-        Check(await db.CommitteeMembers.CountAsync(m => m.TenderId == id) == 4, "canonical creation assigns four distinct seats");
+        Check(await db.CommitteeMembers.CountAsync(m => m.TenderId == id && m.CommitteeType == CommitteeType.Evaluation) == 4 &&
+              await db.CommitteeMembers.CountAsync(m => m.TenderId == id && m.CommitteeType == CommitteeType.Top) == 4,
+            "canonical creation applies both saved four-person committees");
         var duplicateRejected = false;
         try { await flow.Create(input, Principal(officer)); } catch (WorkflowException e) { duplicateRejected = e.Message.Contains("already has a tender"); }
         Check(duplicateRejected && await db.Tenders.CountAsync() == 1, "duplicate tender rejected on server");
@@ -260,7 +279,7 @@ public static class UnifiedTenderChecks
         // In particular, signing by Technical must not prevent the remaining three members.
         var round = await db.TenderRounds.SingleAsync(x => x.TenderId == id);
         var weightRound = await db.Set<WeightRound>().SingleAsync(x => x.TenderId == id);
-        var seats = await db.CommitteeMembers.Where(x => x.TenderId == id).ToListAsync();
+        var seats = await db.CommitteeMembers.Where(x => x.TenderId == id && x.CommitteeType == CommitteeType.Evaluation).ToListAsync();
         var committeeRound = new CommitteeRound { TenderRoundId = round.Id, CommitteeType = CommitteeType.Evaluation, RoundNumber = 1,
             StartedAt = DateTime.UtcNow.AddHours(-2), FinancialWeight = weightRound.ApprovedFinancial, TechnicalWeight = weightRound.ApprovedTechnical };
         committeeRound.Criteria.Add(new EvaluationCriterion { Name = "Financial", Type = CriterionType.Financial, MaxScore = 100, Weight = weightRound.ApprovedFinancial });
