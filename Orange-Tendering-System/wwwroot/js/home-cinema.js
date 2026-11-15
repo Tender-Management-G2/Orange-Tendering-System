@@ -22,7 +22,15 @@
     burger.addEventListener("click", function () { set(burger.getAttribute("aria-expanded") !== "true"); });
     links.addEventListener("click", function (e) { if (e.target.closest("a")) set(false); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") { set(false); } });
-    window.addEventListener("resize", function () { if (window.innerWidth > 1020) set(false); });
+    window.addEventListener("resize", function () { if (window.innerWidth > 1180) set(false); });
+    // highlight the in-page section currently on screen
+    var spy = $$('a[href^="#"]', links).map(function (a) { return { a: a, el: document.getElementById(a.getAttribute("href").slice(1)) }; }).filter(function (x) { return x.el; });
+    function mark() {
+      var line = window.innerHeight * .35, cur = null;
+      spy.forEach(function (x) { var r = x.el.getBoundingClientRect(); if (r.top <= line && r.bottom > line) cur = x; });
+      spy.forEach(function (x) { var on = x === cur; x.a.classList.toggle("is-active", on); if (on) x.a.setAttribute("aria-current", "location"); else x.a.removeAttribute("aria-current"); });
+    }
+    window.addEventListener("scroll", mark, { passive: true }); window.addEventListener("resize", mark); mark();
     var bar = $("#hc-nav");
     function solid() { bar.classList.toggle("is-solid", window.scrollY > 40 || links.classList.contains("is-open")); }
     window.addEventListener("scroll", solid, { passive: true }); burger.addEventListener("click", solid); solid();

@@ -7,3 +7,7 @@ No runtime CDN connection is needed. Keep license headers when updating these fi
 The editorial team module loads these files on demand. The earlier Three.js network and its dependency have been removed.
 
 - Microsoft SignalR JavaScript client **8.0.7** (MIT): https://www.npmjs.com/package/@microsoft/signalr/v/8.0.7 — `dist/browser/signalr.min.js`, served locally for the live notification bell.
+
+- three.js **0.160.0** (MIT, see `three/LICENSE`): https://www.npmjs.com/package/three/v/0.160.0 — `build/three.module.min.js` plus the
+  post-processing modules (EffectComposer, RenderPass, UnrealBloomPass, OutputPass and their shaders) and RoomEnvironment, kept in the
+  package's own folder layout under `three/`, loaded through an import map by `wwwroot/js/home-hq3d.js` (public homepage 3D headquarters).

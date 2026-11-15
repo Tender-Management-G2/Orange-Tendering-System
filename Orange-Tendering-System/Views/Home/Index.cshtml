@@ -43,38 +43,122 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
     </defs>
 </svg>
 
-@* ============ 01-03  ORANGE HQ HERO: the approved reference image, cut into layers (Tools/HeroLayers),
-     exploded at rest and assembled on scroll in the same locked perspective (wwwroot/js/home-hq.js) ============ *@
+@* ============ 01-03  ORANGE HQ: procedural 3D reconstruction (wwwroot/js/home-hq3d.js, Three.js).
+     Real geometry assembles on scroll under a moving 3D camera; panels are interactive HTML anchored in 3D. ============ *@
 @{
-    var heroManifest = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(HostEnv.WebRootPath, "assets", "hero", "manifest.json")));
-    var heroZ = new[] { "papers", "ulpanels", "lslab", "chip", "rightcube", "supcard", "leftbox", "l5", "l4", "l3", "l2", "roof", "card" };
+    var hqPanels = new (string side, string floor, string icon, string name, string desc)[] {
+        ("left", "f1", "i-pr", "Purchase Requests", "Departments submit items, quantities, specifications, priority and target date. Each request is reviewed and approved, returned or rejected."),
+        ("right", "f1", "i-tender", "Tender Management", "The Sourcing Officer turns an approved request into a tender with terms, dates and committee-approved weights."),
+        ("left", "f2", "i-suppliers", "Supplier Management", "Suppliers register with official documents. An Admin verifies each account before it can take part."),
+        ("right", "f2", "i-bids", "Bidding", "Invited suppliers submit prices, technical details and documents before the deadline. Each supplier sees only its own offer."),
+        ("left", "f3", "i-compliance", "Compliance", "Mandatory documents and requirements are checked and marked Compliant, Non-Compliant or Pending Clarification."),
+        ("right", "f3", "i-ai", "AI Analysis", "Ollama-assisted analysis compares prices, delivery and missing items. It is advisory only: people decide."),
+        ("left", "f4", "i-committee", "Technical & Financial Evaluation", "A four-member committee scores every offer; member scores are weighted and averaged into a recommendation."),
+        ("right", "f4", "i-report", "Reports", "One unified Orange-branded report with scores, observations and the recommendation, signed by the four members."),
+        ("left", "roof", "i-approve", "Approvals", "The Sourcing Manager approves, rejects or returns the report; the Top Committee decides when policy requires."),
+        ("right", "roof", "i-award", "Award & Closure", "The decision reaches the Sourcing Officer, who notifies suppliers. The tender closes with a complete audit trail."),
+    };
+    var pi = 0;
 }
 <section class="hq" id="home" aria-labelledby="hc-h1">
-    <div class="hq-stage" id="hq-stage">
-        <div class="hq-world" id="hq-world" aria-hidden="true">
-            <img class="hq-plate" src="~/assets/hero/plate@1x.webp" srcset="@Url.Content("~/assets/hero/plate@1x.webp") 1x, @Url.Content("~/assets/hero/plate@2x.webp") 2x" width="1672" height="941" alt="" fetchpriority="high" decoding="async" />
-            <svg class="hq-wires" id="hq-wires" viewBox="0 0 1672 941" focusable="false">
-                <defs><filter id="hq-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.4" /></filter></defs>
-            </svg>
-            @foreach (var name in heroZ)
+    <div class="hq-stage hq3" id="hq-stage">
+        <canvas class="hq3-canvas" id="hq3-canvas" role="img" aria-label="3D model of the Orange headquarters assembling floor by floor"></canvas>
+        <svg class="hq3-lines" id="hq3-lines" aria-hidden="true" focusable="false"></svg>
+        <ul class="hq3-panels" id="hq3-panels" aria-label="Procurement capabilities">
+            @foreach (var p in hqPanels)
             {
-                var l = heroManifest.RootElement.GetProperty("layers").EnumerateArray().First(e => e.GetProperty("name").GetString() == name);
-                <img class="hq-layer" data-layer="@name" src="@Url.Content($"~/assets/hero/{name}@1x.webp")" srcset="@Url.Content($"~/assets/hero/{name}@1x.webp") 1x, @Url.Content($"~/assets/hero/{name}@2x.webp") 2x"
-                     style="left:@(l.GetProperty("x").GetInt32())px;top:@(l.GetProperty("y").GetInt32())px;width:@(l.GetProperty("w").GetInt32())px;height:@(l.GetProperty("h").GetInt32())px" alt="" decoding="async" />
+                pi++;
+                <li class="hq3-panel hq3-@p.side" data-side="@p.side" data-floor="@p.floor" data-stage="@pi">
+                    <button type="button" aria-expanded="false" aria-controls="hq3-d@(pi)">
+                        <span class="hq3-ic" aria-hidden="true"><svg><use href="#@p.icon" /></svg></span>
+                        <span class="hq3-name">@p.name</span>
+                    </button>
+                    <p class="hq3-desc" id="hq3-d@(pi)">@p.desc</p>
+                </li>
             }
-            <i class="hq-glow hq-glow-roof" data-follow="roof"></i>
-            <i class="hq-glow hq-glow-base"></i>
-            <i class="hq-glow hq-glow-award"></i>
-            <i class="hq-ring"></i>
+        </ul>
+        @* Curved corridor behind the entrance: seven module tiles on the wall; reaching a tile opens its popup.
+           A module timeline runs along the bottom, and the overview video wall stands at the end
+           (it plays only if wwwroot/media/company-overview.mp4 exists). *@
+        @{
+            var hqModules = new (string icon, string name, string kicker, string anchor, string text, string[] items)[] {
+                ("i-pr", "Sourcing", "Where every purchase starts", "how-it-works",
+                    "Departments raise purchase requests; the Sourcing Officer reviews each one and turns approved requests into tenders.",
+                    new[] { "Purchase requests with items, quantities and specifications", "Approve, return for changes or reject, with a reason", "Live status for the requesting department", "Clarifications between the department and the Sourcing Officer" }),
+                ("i-tender", "Tender Management", "One lifecycle, fully traceable", "platform",
+                    "The Sourcing Officer builds the tender, the committee agrees its weights, and bidding opens on a fixed schedule.",
+                    new[] { "Tender terms, documents, opening date and deadline", "Weights proposed by the committee and approved before bidding", "Supplier invitations and supplier questions", "Submissions tracked round by round until the deadline" }),
+                ("i-suppliers", "Supplier Management", "A verified supplier base", "suppliers",
+                    "Suppliers register with their official documents and join tenders through their own portal once an administrator verifies them.",
+                    new[] { "Registration with commercial documents", "Administrator verification before activation", "Accept or decline each tender invitation", "Every supplier sees only its own offers and messages" }),
+                ("i-committee", "Evaluation & Scoring", "Four independent evaluations", "evaluation",
+                    "Offers that pass compliance screening are scored separately by each of the four committee members.",
+                    new[] { "Compliance screening of every offer", "Financial and technical score out of 100 per offer", "Each member scores independently", "Scores are recalculated on the server, never taken from the browser" }),
+                ("i-ai", "AI Analysis", "Assistance, not a decision", "analysis",
+                    "A locally hosted Ollama model reads the offers and their documents and prepares an evidence-based briefing for the reviewers.",
+                    new[] { "Financial, technical and delivery comparison", "Missing information, strengths and weaknesses", "Every claim cites its offer, document and uncertainty", "May suggest a compliant supplier, clearly marked advisory", "Never sets weights or scores, and never approves or awards" }),
+                ("i-weights", "Weights Calculation", "How the final score is built", "evaluation",
+                    "", new string[0]),
+                ("i-report", "Reporting", "From ranking to decision", "reports",
+                    "One report carries the ranking through signatures and approvals to the final decision.",
+                    new[] { "Unified Orange-branded PDF report", "Signed by all four committee members", "Sourcing Manager and, when policy requires, Top Committee decisions", "The Sourcing Officer notifies the suppliers of the outcome" })
+            };
+        }
+        <div class="hq3-corridor-ui" id="hq3-corridor-ui">
+            <div class="hq3-tiles" id="hq3-tiles">
+                @foreach (var m in hqModules)
+                {
+                    <button type="button" class="hq3-tile" aria-label="Show @m.name"><span class="hq3-tile-ic" aria-hidden="true"><svg><use href="#@m.icon" /></svg></span><b>@m.name</b><i aria-hidden="true">&rarr;</i></button>
+                }
+            </div>
+            <div class="hq3-video" id="hq3-video">
+                <video data-src="@Url.Content("~/media/company-overview.mp4")" data-available="@(System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, "media", "company-overview.mp4")) ? "true" : "false")" controls playsinline preload="none" aria-label="Orange company overview video"></video>
+                <div class="hq3-video-title"><span class="hq3-video-logo">orange</span><h3>Orange<br />Company Overview</h3><p>Sourcing &amp; Tender Management System</p></div>
+            </div>
+            <aside class="hq3-info" id="hq3-info" aria-live="polite" aria-label="Module details">
+                <button type="button" class="hq3-info-close" id="hq3-info-close" aria-label="Close module details">&times;</button>
+                @for (var mi = 0; mi < hqModules.Length; mi++)
+                {
+                    var m = hqModules[mi];
+                    <div class="hq3-mod@(m.icon == "i-weights" ? " hq3-mod-calc" : "")" hidden>
+                        <div class="hq3-mod-head">
+                            <span class="hq3-mod-ic" aria-hidden="true"><svg><use href="#@m.icon" /></svg></span>
+                            <div><span class="hq3-mod-num">@((mi + 1).ToString("00")) / @hqModules.Length.ToString("00")</span><span class="hq3-mod-kicker">@m.kicker</span></div>
+                        </div>
+                        <h3>@m.name</h3>
+                        @if (m.icon == "i-weights")
+                        {
+                            <ol class="hq3-calc">
+                                <li><b>Agree the weights</b><span>Each of the four committee members proposes a Financial % and a Technical %; each proposal must total exactly 100%.</span></li>
+                                <li><b>Average and approve</b><span>The four proposals are averaged, approved by the authorised approver and locked before scoring.</span></li>
+                                <li><b>Score each offer</b><span>Every member gives each offer a Financial and a Technical score out of 100.</span></li>
+                                <li><b>Combine</b><span class="hq3-formula">Member score = (Financial &times; W<sub>F</sub> + Technical &times; W<sub>T</sub>) &divide; 100</span></li>
+                                <li><b>Average and rank</b><span>Final score = average of the four member scores. Offers are ranked from highest to lowest; ties are flagged, never broken silently.</span></li>
+                            </ol>
+                            <div class="hq3-example" aria-label="Worked example">
+                                <span>Example &middot; weights 40% / 60%</span>
+                                <p>Financial 80, Technical 90 &rarr; (80 &times; 40 + 90 &times; 60) &divide; 100 = <b>86</b></p>
+                            </div>
+                        }
+                        else
+                        {
+                            <p>@m.text</p>
+                            <ul>@foreach (var it in m.items) { <li>@it</li> }</ul>
+                        }
+                        <a class="hq-cta" href="#@m.anchor">Explore @m.name <span aria-hidden="true">&rarr;</span></a>
+                    </div>
+                }
+            </aside>
+            <nav class="hq3-steps" id="hq3-steps" aria-label="Corridor modules">
+                @foreach (var m in hqModules)
+                {
+                    <button type="button" aria-label="Go to @m.name"><span aria-hidden="true"><svg><use href="#@m.icon" /></svg></span><em>@m.name</em></button>
+                }
+            </nav>
         </div>
+        <div class="hq3-flash" id="hq3-flash" aria-hidden="true"></div>
+        <div class="hq-shade" id="hq-shade" aria-hidden="true"></div>
 
-        @* Final hero angle: the approved image of the completed headquarters (Tools/HeroLayers/build_final.py) *@
-        <div class="hq-final" id="hq-final" aria-hidden="true">
-            <img class="hq-final-bg" src="~/assets/hero/final-bg.webp" alt="" decoding="async" />
-            <img class="hq-final-img" src="~/assets/hero/final@1x.webp" srcset="@Url.Content("~/assets/hero/final@1x.webp") 1x, @Url.Content("~/assets/hero/final@2x.webp") 2x" width="1448" height="1086" alt="" fetchpriority="low" decoding="async" />
-        </div>
-
-        <i class="hq-flare" id="hq-flare" aria-hidden="true"></i>
         <div class="hq-copy" id="hq-copy">
             <p class="hq-eyebrow">Sourcing &amp; Tender Management</p>
             <h1 id="hc-h1">From Procurement Complexity to <em>One Unified Platform</em></h1>
@@ -99,6 +183,7 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
             <div class="hq-label" id="hq-label"><b>00</b><span>Scroll to assemble the headquarters</span></div>
             <div class="hq-progress"><i id="hq-progress"></i></div>
         </div>
+        <div class="hq3-cap" id="hq3-cap" aria-live="polite"></div>
         <div class="hq-fade" id="hq-fade" aria-hidden="true"></div>
     </div>
 </section>

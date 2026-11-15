@@ -1,0 +1,113 @@
+/* Our Team — scroll-controlled courtyard experience (wwwroot/js/team-scene.js) */
+.tx { position: relative; height: calc((2.4 + var(--tx-n, 7) * 1.9) * 100vh); background: #120d09; color: #fff; }
+.tx-sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; isolation: isolate; }
+.tx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tx-shade { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, #0008 100%), linear-gradient(0deg, #0007, transparent 30%); }
+.tx-eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #ff7900; }
+
+.tx-intro { position: absolute; left: clamp(20px, 6vw, 96px); bottom: clamp(70px, 14vh, 150px); max-width: 560px; text-shadow: 0 2px 24px #0009; }
+.tx-intro h1 { font-size: clamp(42px, 6vw, 86px); line-height: 1; margin: 14px 0 18px; color: #fff; }
+.tx-intro h1 em { font-style: normal; color: #ff7900; }
+.tx-intro p { font-size: clamp(15px, 1.3vw, 18px); line-height: 1.55; color: #f1e9df; max-width: 440px; margin: 0; }
+.tx-hint { display: inline-flex; align-items: center; gap: 10px; margin-top: 26px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #fff; }
+.tx-hint i { width: 1px; height: 34px; background: linear-gradient(#ff7900, transparent); }
+
+.tx-stages { position: absolute; right: clamp(16px, 3vw, 48px); top: 50%; transform: translateY(-50%); list-style: none; margin: 0; padding: 0; display: grid; justify-items: end; gap: 10px; z-index: 4; }
+.tx-stages li { width: 30px; height: 30px; border: 1px solid #fff7; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fffc; background: #0003; backdrop-filter: blur(4px); transition: background .2s, color .2s; }
+.tx-stages li.tx-stage-all { width: auto; border-radius: 15px; padding: 0 10px; letter-spacing: .12em; text-transform: uppercase; font-size: 9px; }
+.tx-stages li.is-done { background: #fff3; color: #fff; }
+.tx-stages li.is-on { background: #ff7900; border-color: #ff7900; color: #111; }
+.tx-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #fff2; z-index: 4; }
+.tx-progress i { display: block; height: 100%; background: #ff7900; transform-origin: 0 50%; transform: scaleX(0); }
+
+/* per-member profile card, opened by scroll while the member looks up */
+.tx-member { position: absolute; z-index: 3; right: clamp(70px, 8vw, 140px); top: 50%; width: min(400px, 34vw); transform-origin: 50% 60%; margin-top: -170px; opacity: 0; pointer-events: none; display: grid; grid-template-columns: 112px 1fr; background: #111111eb; color: #fff; border-top: 4px solid #ff7900; border-radius: 4px; overflow: hidden; box-shadow: 0 30px 60px -20px #000c; backdrop-filter: blur(8px); }
+.tx-member.is-live { pointer-events: auto; }
+.tx-member-photo { position: relative; min-height: 150px; background: linear-gradient(140deg, #2c2e31, #17181b); }
+.tx-member-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tx-member-copy { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tx-member-idx { font-size: 11px; font-weight: 700; letter-spacing: .14em; color: #ff7900; }
+.tx-member-status { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: #a7a7ab; }
+.tx-member h3 { margin: 2px 0 0; font-size: 21px; line-height: 1.2; color: #fff; overflow-wrap: anywhere; }
+.tx-member-role { margin: 0; font-size: 14px; color: #d0d0d3; }
+.tx-member-text { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: #b9b9bd; }
+.tx-member-open { align-self: flex-start; margin-top: 8px; border: 0; background: #ff7900; color: #111; font-weight: 700; font-size: 12px; padding: 9px 14px; border-radius: 3px; cursor: pointer; }
+.tx-member-open:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* finale: the team stands together; heading on top, the team row along the bottom */
+.tx-reveal { position: absolute; inset: 0; z-index: 3; opacity: 0; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(28px, 6vh, 64px) clamp(20px, 5vw, 80px) clamp(22px, 4vh, 40px); color: #fff; pointer-events: none; background: linear-gradient(#0b0806d9, #0b080600 32%, #0b080600 58%, #0b0806e6 86%); }
+.tx-reveal.is-live { pointer-events: auto; }
+.tx-reveal-head { display: flex; align-items: flex-end; gap: clamp(16px, 2.4vw, 32px); }
+.tx-brand { flex: none; width: clamp(54px, 5.4vw, 84px); aspect-ratio: 1; background: #ff7900; position: relative; }
+.tx-brand span { position: absolute; left: 10%; bottom: 9%; color: #fff; font: 700 clamp(10px, .95vw, 14px)/1 Helvetica, Arial, sans-serif; }
+.tx-reveal .tx-eyebrow { color: #ff7900; }
+.tx-reveal h2 { font-size: clamp(30px, 4.2vw, 64px); line-height: 1.02; margin: 8px 0 0; color: #fff; text-shadow: 0 2px 20px #0008; }
+.tx-reveal h2 em { font-style: normal; color: #ff7900; }
+.tx-note { margin: 10px 0 0; font-size: 12px; color: #e7dfd6; max-width: 640px; }
+
+.tx-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tx-card { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; height: 100%; padding: 8px; background: #141414e6; color: #fff; border-radius: 4px; border-bottom: 2px solid #ff7900; transition: translate .2s, background .2s; }
+.tx-card:hover { translate: 0 -3px; background: #1d1d1d; }
+.tx-card:focus-visible { outline: 3px solid #ff7900; outline-offset: 2px; }
+.tx-card-photo { flex: none; width: 52px; height: 52px; border-radius: 3px; background: linear-gradient(140deg, #2c2e31, #17181b); position: relative; overflow: hidden; }
+.tx-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tx-card-photo .tx-ph b { font-size: 18px; }
+.tx-card-photo .tx-ph small { display: none; }
+.tx-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #9a9ca0; }
+.tx-ph b { font-size: 34px; font-weight: 300; color: #ff7900; }
+.tx-ph small { font-size: 8px; letter-spacing: .16em; text-transform: uppercase; text-align: center; }
+.tx-card-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tx-card-status { font-size: 8px; letter-spacing: .14em; text-transform: uppercase; color: #ff7900; }
+.tx-card strong { font-size: 12px; line-height: 1.25; }
+.tx-card-role { font-size: 11px; color: #c9c9cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-card-more { font-size: 10px; font-weight: 700; color: #fff; margin-top: 2px; }
+
+.tx-dialog { border: 0; padding: 0; background: transparent; max-width: min(880px, calc(100vw - 32px)); width: 100%; color: #fff; }
+.tx-dialog::backdrop { background: #0b0805d9; backdrop-filter: blur(6px); }
+.tx-dlg { position: relative; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); background: #141414; border-top: 4px solid #ff7900; border-radius: 4px; overflow: hidden; }
+.tx-dlg-photo { position: relative; min-height: 340px; background: linear-gradient(140deg, #2c2e31, #17181b); }
+.tx-dlg-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tx-dlg-copy { padding: clamp(24px, 4vw, 44px); display: flex; flex-direction: column; gap: 10px; }
+.tx-dlg-copy h2 { font-size: clamp(26px, 3vw, 38px); line-height: 1.1; margin: 0; color: #fff; }
+.tx-dlg-role { margin: 0 0 12px; color: #d0d0d3; font-size: 16px; }
+.tx-dlg-label { margin-top: 8px; color: #a7a7ab; font-size: 10px; }
+.tx-dlg-text { margin: 0; line-height: 1.65; color: #e6e6e8; }
+.tx-dlg-links { display: flex; gap: 14px; margin-top: 12px; }
+.tx-dlg-links a { color: #ff7900; font-weight: 700; }
+.tx-dlg-close { position: absolute; top: 10px; right: 12px; z-index: 1; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #0008; color: #fff; font-size: 26px; line-height: 1; cursor: pointer; }
+.tx-dlg-close:focus-visible { outline: 3px solid #ff7900; }
+
+/* reduced motion / no WebGL: one still frame, the team section in normal flow */
+.tx.is-static { height: auto; }
+.tx.is-static .tx-sticky { position: relative; height: auto; overflow: visible; }
+.tx.is-static .tx-canvas { position: relative; height: 100vh; height: 100svh; }
+.tx.is-static .tx-shade, .tx.is-static .tx-stages, .tx.is-static .tx-progress, .tx.is-static .tx-hint { display: none; }
+.tx.is-static .tx-intro { display: none; }
+.tx.is-static .tx-member { display: none; }
+.tx.is-static .tx-reveal { position: absolute; opacity: 1 !important; transform: none !important; pointer-events: auto; }
+.tx.is-static .tx-card { opacity: 1 !important; transform: none !important; }
+.tx.is-static .tx-sticky { overflow: hidden; }
+.tx.no-webgl .tx-canvas { background: linear-gradient(#5b86b8, #f3d4ae 60%, #6b5a48); }
+
+@media (max-width: 760px) {
+  .tx { height: calc((2.4 + var(--tx-n, 7) * 1.6) * 100vh); }
+  .tx-stages { top: 14px; bottom: auto; right: 12px; left: 12px; transform: none; display: flex; justify-content: center; gap: 5px; }
+  .tx-stages li { width: 24px; height: 24px; font-size: 9px; }
+  .tx-intro { left: 20px; right: 20px; bottom: 70px; }
+  .tx-member { left: 12px; right: 12px; width: auto; top: auto; bottom: 18px; margin-top: 0; grid-template-columns: 88px 1fr; }
+  .tx-member-photo { min-height: 120px; }
+  .tx-member-copy { padding: 14px 14px 16px; }
+  .tx-member h3 { font-size: 18px; }
+  .tx-member-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .tx-reveal { padding: 56px 14px 20px; }
+  .tx-reveal-head { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .tx-brand { width: 44px; }
+  .tx-cards { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; margin-inline: -14px; padding: 0 14px 6px; scroll-padding-inline: 14px; }
+  .tx-cards li { flex: 0 0 62%; scroll-snap-align: start; }
+  .tx-dlg { grid-template-columns: 1fr; max-height: calc(100svh - 32px); overflow-y: auto; }
+  .tx-dlg-photo { min-height: 200px; }
+}
+@media (prefers-reduced-motion: reduce) { .tx-card, .tx-stages li { transition: none; } }
+/* scroll-driven overlays are composited on the GPU (transform/opacity only) */
+.tx-sticky, .tx-canvas { transform: translateZ(0); }
+.tx-intro, .tx-member, .tx-reveal, .tx-card, .tx-progress i { will-change: transform, opacity; }
