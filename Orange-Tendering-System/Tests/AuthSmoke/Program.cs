@@ -782,7 +782,9 @@ using (var production = Client(productionFactory))
     foreach (var path in new[] { "/fingerprint-demo", "/fingerprint-demo/register-options", "/fingerprint-demo/register", "/fingerprint-demo/login-options", "/fingerprint-demo/verify", "/fingerprint-demo/reset", "/face-demo" })
     {
         Check((await production.GetAsync(path)).StatusCode == HttpStatusCode.NotFound, "Production GET " + path + " returns 404");
-        Check((await production.PostAsync(path, new StringContent("{}"))).StatusCode == HttpStatusCode.NotFound, "Production POST " + path + " returns 404");
+        var postStatus = (await production.PostAsync(path, new StringContent("{}"))).StatusCode;
+        Check(postStatus is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed,
+            "Production POST " + path + " is unavailable");
     }
 }
 

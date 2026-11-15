@@ -26,6 +26,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
         options.Lockout.MaxFailedAccessAttempts = 5;
         options.Lockout.AllowedForNewUsers = true;
+        options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -58,6 +59,14 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TenderWorkflowService>();
 builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<InternalDashboardService>();
+builder.Services.AddScoped<FinalDecisionService>();
+builder.Services.AddScoped<AiChatService>();
+builder.Services.AddScoped<ClarificationService>();
+builder.Services.AddScoped<ReportingService>();
+builder.Services.AddScoped<ReportExport>();
+builder.Services.AddScoped<Orange_Tendering_System.Areas.TopCommittee.Services.TopCommitteeService>();
+builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<SettingsService>();
 builder.Services.Configure<ReportSigningOptions>(builder.Configuration.GetSection("ReportSigning"));
 builder.Services.Configure<ReportRevisionPolicy>(builder.Configuration.GetSection("ReportRevisionPolicy"));
 builder.Services.Configure<ReportPdfOptions>(builder.Configuration.GetSection("ReportPdf"));
@@ -66,7 +75,8 @@ builder.Services.AddScoped<IReportCertificateProvider, StoreReportCertificatePro
 builder.Services.AddScoped<ReportCryptography>();
 builder.Services.AddScoped<ReportDocumentService>();
 builder.Services.Configure<OllamaSettings>(builder.Configuration.GetSection("Ollama"));
-builder.Services.AddHttpClient<OllamaBidAnalysisService>();
+builder.Services.AddHttpClient<OllamaChatClient>();
+builder.Services.AddScoped<OllamaBidAnalysisService>();
 builder.Services.AddScoped<ProtectedDocumentStore>();
 builder.Services.Configure<ZoomOptions>(builder.Configuration.GetSection("Zoom"));
 builder.Services.AddHttpClient<ZoomMeetingService>();
@@ -101,6 +111,7 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseMiddleware<FirstLoginGate>();
+app.UseMiddleware<SupplierApprovalGate>();
 app.UseAuthorization();
 
 app.MapStaticAssets();

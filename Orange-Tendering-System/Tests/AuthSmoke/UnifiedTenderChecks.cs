@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -16,6 +17,7 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services;
+using Orange_Tendering_System.Services.Biometric;
 using Orange_Tendering_System.ViewModels;
 
 // Real SQL Server + Identity requests. Isolated test data never enters the user's working database.
@@ -38,7 +40,25 @@ public static class UnifiedTenderChecks
                 ["DemoData:Enabled"] = "false", ["Logging:LogLevel:Default"] = "Error",
                 ["TenderApprovalPolicy:Version"] = "UNIFIED-CHECK", ["TenderApprovalPolicy:WeightApproverRoles:0"] = SystemRoles.SourcingManager
             }));
-            b.ConfigureTestServices(s => s.RemoveAll<IHostedService>()); // Never dispatch queued test invitations to SMTP.
+            b.ConfigureTestServices(s =>
+            {
+                s.RemoveAll<IHostedService>(); // Never dispatch queued test invitations to SMTP.
+                // This tender-only fixture marks its synthetic supplier cookies as biometric.
+                // AuthSmoke separately exercises real face and passkey enrollment and sign-in.
+                s.PostConfigure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, options =>
+                {
+                    var validate = options.Events.OnValidatePrincipal;
+                    options.Events.OnValidatePrincipal = async context =>
+                    {
+                        if (validate != null) await validate(context);
+                        if (context.Principal?.IsInRole(SystemRoles.Supplier) == true &&
+                            context.Principal.Identity is ClaimsIdentity identity &&
+                            !identity.HasClaim(c => c.Type == BiometricSignInService.AuthenticationMethodClaim))
+                            identity.AddClaim(new Claim(BiometricSignInService.AuthenticationMethodClaim,
+                                BiometricSignInService.FaceMethod));
+                    };
+                });
+            });
         });
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
