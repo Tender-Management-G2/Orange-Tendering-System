@@ -42,8 +42,8 @@ function init() {
   scene.add(new THREE.HemisphereLight(0x50525e, 0x2a1606, 0.65));
   const moon = new THREE.DirectionalLight(0xaab8ff, 0.75);
   moon.position.set(-60, 90, 70); moon.castShadow = !lowPower;
-  moon.shadow.mapSize.set(2048, 2048);
-  Object.assign(moon.shadow.camera, { left: -70, right: 70, top: 70, bottom: -30, near: 10, far: 260 });
+  moon.shadow.mapSize.set(1024, 1024);
+  Object.assign(moon.shadow.camera, { left: -45, right: 45, top: 50, bottom: -12, near: 20, far: 200 }); // building only
   moon.shadow.bias = -0.0004;
   scene.add(moon);
   const warm = new THREE.DirectionalLight(0xffa860, 0.55); warm.position.set(60, 25, 80); scene.add(warm);
@@ -103,7 +103,7 @@ function init() {
     trunk: new THREE.MeshStandardMaterial({ color: 0x3a2618, roughness: .9 }),
     planter: new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: .6, metalness: .3 }),
     sign: new THREE.MeshBasicMaterial({ map: signTex, toneMapped: false }),
-    ground: new THREE.MeshStandardMaterial({ color: 0x241c16, roughness: .2, metalness: .65, envMapIntensity: .35 }),
+    ground: new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: .12, metalness: .75, envMapIntensity: .45 }),
     door: new THREE.MeshBasicMaterial({ color: 0xffc58a, toneMapped: false }),
     hidden: new THREE.MeshBasicMaterial({ visible: false }),
     rail: new THREE.MeshPhysicalMaterial({ color: 0x9fb0bc, envMapIntensity: .3, transparent: true, opacity: .14, roughness: .05, metalness: .1, side: THREE.DoubleSide, depthWrite: false }),
@@ -195,7 +195,7 @@ function init() {
   }
 
   /* ---------------- the building ---------------- */
-  const TW = 30, TD = 26, TR = [9, 9, 9, 9];                 // tower footprint: stadium-rounded like the master reference
+  const TW = 36, TD = 26, TR = [10, 10, 10, 10];                 // tower footprint: stadium-rounded like the master reference
   const POD_H = 8.6, FH = 4.8, TOP_H = 5.6;
   const building = new THREE.Group(); scene.add(building);
 
@@ -241,17 +241,17 @@ function init() {
     { name: "f1", people: 22, desks: 26 }, { name: "f2", people: 20, desks: 24, ring: true },
     { name: "f3", people: 20, desks: 24 }, { name: "f4", people: 18, desks: 22 }
   ];
-  const FLOOR = [{ w: 32, d: 26, ox: 0 }, { w: 31, d: 25.5, ox: -1.2 }, { w: 32.5, d: 26, ox: 1 }, { w: 30.5, d: 25, ox: -.6 }];
+  const FLOOR = [{ w: 38, d: 27, ox: 0 }, { w: 36.5, d: 26, ox: -1.6 }, { w: 38.5, d: 27.5, ox: 1.3 }, { w: 36, d: 26, ox: -.9 }];
   floorDefs.forEach((f, i) => {
     const F = FLOOR[i];
-    const s = storey({ w: F.w, d: F.d, r: TR, h: FH, people: f.people, desks: f.desks, ring: f.ring, ox: F.ox, bal: 1.5 });
+    const s = storey({ w: F.w, d: F.d, r: TR, h: FH, people: f.people, desks: f.desks, ring: f.ring, ox: F.ox, bal: 2.1 });
     const rail = new THREE.Mesh(new THREE.ExtrudeGeometry(plan(F.w - .1, F.d - .1, TR.map(v => v - .05), F.ox), { depth: 1.05, bevelEnabled: false, curveSegments: 24 }).rotateX(-Math.PI / 2), [M.hidden, M.rail]);
     rail.position.y = FH; s.add(rail);
     perimeterShrubs(s, plan(F.w - .9, F.d - .9, TR.map(v => v - .45), F.ox), FH, 90, .28);
     part(f.name, s, POD_H + i * FH, i, [[.06, -1.6, 1.2], [-.08, 2.2, -1], [.1, -2.4, .6], [-.07, 1.8, -1.4]][i]);
   });
   // top floor: taller, garden terrace with a tree, upper orange sign
-  const tf = storey({ w: 29, d: 24, r: TR, h: TOP_H, top: false, people: 14, desks: 16, bal: .6 });
+  const tf = storey({ w: 34, d: 24, r: TR, h: TOP_H, top: false, people: 14, desks: 16, bal: .6 });
   
   tree(tf, -6, 0, 7, .8); shrubs(tf, new THREE.Vector3(-13, 0, 10), new THREE.Vector3(-2, 0, 10), 0, 14, .32);
   part("tf", tf, POD_H + 4 * FH, 4, [.09, -2, 1.6]);
@@ -259,9 +259,9 @@ function init() {
   const roof = new THREE.Group();
   const roofShape = plan(TW + 14, TD + 8, [10, 12, 10, 10], 3.5, .6);
   const rslab = prism(roofShape, 1.3, M.slab); rslab.castShadow = true; roof.add(rslab);
-  const soffit = prism(plan(TW + 13.6, TD + 7.6, [9.8, 11.8, 9.8, 9.8], 3.5, .6), .06, M.slabUnder); soffit.position.y = -.03; roof.add(soffit);
+  const soffit = prism(plan(TW + 13.6, TD + 7.6, [9.8, 11.8, 9.8, 9.8], 3.5, .6), .06, new THREE.MeshStandardMaterial({ color: 0x6a4428, roughness: .6, emissive: 0x3a1c08, emissiveIntensity: .6, envMapIntensity: .15 })); soffit.position.y = -.04; roof.add(soffit);
   roof.add(ledLoop(plan(TW + 14.04, TD + 8.04, [10, 12, 10, 10], 3.5, .6), .05, 1.25, .1));
-  const rsign = new THREE.Mesh(new THREE.BoxGeometry(6, 5.4, .5), [M.slabUnder, M.slabUnder, M.slabUnder, M.slabUnder, M.sign, M.slabUnder]); rsign.position.set(0, 1.3 + 2.4, (TD + 8) / 2 + .6 - 1.6); roof.add(rsign);
+  const rsign = new THREE.Mesh(new THREE.BoxGeometry(6, 5.4, .5), [M.slabUnder, M.slabUnder, M.slabUnder, M.slabUnder, M.sign, M.slabUnder]); rsign.position.set(0, 1.3 + .9, (TD + 8) / 2 + .6 + .35); roof.add(rsign); // on the canopy fascia, front centre
   
   part("roof", roof, POD_H + 4 * FH + TOP_H, 5, [-.1, 2.6, -1.8]);
   // entrance canopy (structural component, lands with the first floor)
@@ -365,19 +365,24 @@ function init() {
   const videoWall = { g: vg, corners: [[-6.5, 3], [6.5, 3], [6.5, -3], [-6.5, -3]].map(([a, b]) => V3(a, b, .05)) };
 
   /* ---------------- environment: plaza, trees, people, skyline ---------------- */
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), M.ground); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-  [[-3, .02, 30, 60, 30, .42], [22, .02, 26, 34, 16, .26], [-30, .02, 24, 30, 14, .24], [0, .02, 52, 90, 30, .14]].forEach(([x, y, z, w, d, o]) => {
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(260, 220), M.ground); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  [[-3, .02, 30, 70, 34, .55], [24, .02, 26, 40, 18, .32], [-30, .02, 24, 36, 16, .3], [0, .02, 52, 100, 36, .2]].forEach(([x, y, z, w, d, o]) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); scene.add(m);
   });
-  [[-36, 21], [-24, 23], [-12, 24], [12, 23], [26, 22], [40, 18], [-46, 14], [50, 10], [32, 26], [-30, 28]].forEach(([x, z]) => tree(scene, x, 0, z, .9 + rnd() * .35));
-  { const pm = []; for (let i = 0; i < 12; i++) pm.push(mtx(-14 + rnd() * 26, .9, 21 + rnd() * 6, 0, .85, .95 + rnd() * .2, .85)); scene.add(instanced(new THREE.CapsuleGeometry(.26, 1.15, 3, 8), M.person, pm)); }
+  [[-34, 22], [-20, 24], [14, 24], [30, 22], [-44, 15], [46, 14]].forEach(([x, z]) => tree(scene, x, 0, z, .9 + rnd() * .35));
+  { const pm = []; for (let i = 0; i < 8; i++) pm.push(mtx(-14 + rnd() * 26, .9, 21 + rnd() * 6, 0, .85, .95 + rnd() * .2, .85)); scene.add(instanced(new THREE.CapsuleGeometry(.26, 1.15, 3, 8), M.person, pm)); }
   { const cm = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: .8, emissive: 0xffffff, emissiveMap: cityTex, emissiveIntensity: 1.05 }), ms = [];
-    for (let i = 0; i < (lowPower ? 50 : 110); i++) { const a = -1.3 + rnd() * 2.6, rad = 230 + rnd() * 180, h = 15 + rnd() * rnd() * 80; ms.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.sin(a) * rad, h / 2, -Math.cos(a) * rad * .8 - 40), new THREE.Quaternion(), new THREE.Vector3(10 + rnd() * 18, h, 10 + rnd() * 18))); }
+    for (let i = 0; i < (lowPower ? 18 : 40); i++) { const a = -1.3 + rnd() * 2.6, rad = 230 + rnd() * 180, h = 15 + rnd() * rnd() * 80; ms.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.sin(a) * rad, h / 2, -Math.cos(a) * rad * .8 - 40), new THREE.Quaternion(), new THREE.Vector3(10 + rnd() * 18, h, 10 + rnd() * 18))); }
     scene.add(instanced(new THREE.BoxGeometry(1, 1, 1), cm, ms)); }
 
+  { // curved orange light line sweeping across the plaza in front of the steps
+    const arc = new THREE.CatmullRomCurve3([V3p(-60, .06, 30), V3p(-30, .06, 27), V3p(-6, .06, 31), V3p(16, .06, 36), V3p(44, .06, 30), V3p(64, .06, 26)]);
+    function V3p(x, y, z) { return new THREE.Vector3(x, y, z); }
+    scene.add(new THREE.Mesh(new THREE.TubeGeometry(arc, 200, .09, 6, false), led(1.1)));
+  }
   { // soft bokeh city lights near the horizon and orange light streaks on the wet plaza
-    const n = lowPower ? 120 : 260, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    const n = lowPower ? 40 : 90, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { const a = -1.5 + rnd() * 3, r = 120 + rnd() * 200; pos.set([Math.sin(a) * r, 2 + rnd() * 26, -Math.cos(a) * r * .8 - 20], i * 3); const c = rnd() > .4 ? [1, .62, .25] : [1, .9, .75]; col.set(c, i * 3); }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
     scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 3.2, map: glowTex, vertexColors: true, transparent: true, opacity: .75, depthWrite: false, blending: THREE.AdditiveBlending })));
@@ -413,8 +418,8 @@ function init() {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   // 0..4: assembly (reference three-quarter -> dolly -> orbit + rise -> close to the facade -> reference hero view)
   // 4..6: orbit to the opposite three-quarter view, then fly toward the entrance
-  const CAM = new THREE.CatmullRomCurve3([V(14, 12, 112), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(0, 4, 108), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
-  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 19.5, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
+  const CAM = new THREE.CatmullRomCurve3([V(14, 12, 112), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(0, 6, 92), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
+  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 21.2, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
   const camState = { t: 0, walk: 0, gal: 0 }; let override = null, inGallery = false;
   const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);
   // corridor walk: the camera follows the curve, dwells at each module (zero speed at every stop) and turns
@@ -434,7 +439,7 @@ function init() {
     pos.add(gallery.position); tgt.add(gallery.position);
     return [pos, tgt];
   }
-  const VIEWS = { reference: [V(0, 4, 108), V(0, 19.5, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
+  const VIEWS = { reference: [V(0, 6, 92), V(0, 21.2, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
   function applyCamera() {
     const W = stage.clientWidth, H = stage.clientHeight; camera.aspect = W / H;
     camera.fov = W / H < 1 ? 54 : W / H < 1.4 ? 44 : 36;
@@ -548,10 +553,12 @@ function init() {
     stage.classList.toggle("hq-wide", W >= 1100 && W / H >= 1.2); stage.classList.toggle("hq-narrow", !(W >= 1100 && W / H >= 1.2));
   }
   const clock = new THREE.Clock();
+  renderer.shadowMap.autoUpdate = false; let shadowSig = "";
   let visible = true, raf = 0;
   function frame() {
     const t = clock.getElapsedTime();
     applyParts(t);
+    if (renderer.shadowMap.enabled) { const sig = assembled().toFixed(4) + door.open.toFixed(3) + (assembled() < 1 ? t.toFixed(1) : ""); if (sig !== shadowSig) { shadowSig = sig; renderer.shadowMap.needsUpdate = true; } }
     leaves.forEach(l => { l.position.x = l.userData.base + l.userData.sgn * 2.45 * door.open; });
     sensorMat.color.copy(ORANGE).multiplyScalar(1 + door.open * 3);
     const gm = !override && camState.walk >= .72;
@@ -563,11 +570,25 @@ function init() {
     applyCards();
   }
   let lastFrame = -Infinity;
+  // adaptive resolution: keep the frame budget for ~100 fps on strong GPUs and >= 50 fps on weaker ones
+  const MAX_DPR = Math.min(devicePixelRatio, lowPower ? 1 : 1.6), MIN_DPR = Math.min(1, devicePixelRatio) * .75;
+  let dpr = renderer.getPixelRatio(), acc = 0, cnt = 0, fps = 0;
+  function adapt(cost, gap) {
+    if (gap > 0 && gap < 1000) { fps = fps ? fps * .9 + (1000 / gap) * .1 : 1000 / gap; }
+    acc += cost; if (++cnt < 40) return;
+    const avg = acc / cnt; acc = 0; cnt = 0;
+    let next = dpr;
+    if (avg > 16 && dpr > MIN_DPR) next = Math.max(MIN_DPR, dpr - .2);
+    else if (avg < 7 && dpr < MAX_DPR) next = Math.min(MAX_DPR, dpr + .1);
+    if (next !== dpr) { dpr = next; renderer.setPixelRatio(dpr); if (composer) composer.setPixelRatio(dpr); resize(); }
+  }
   function loop(now) {
     raf = 0;
     if (!visible || document.hidden) return;
-    // High-refresh displays need not run the scene's JS and DOM updates at 144/240 Hz.
-    if (now - lastFrame >= 1000 / 60 - .5) { frame(); lastFrame = now; }
+    // Up to 100 fps: high-refresh displays run smoothly without burning 144/240 Hz.
+    if (now - lastFrame >= 1000 / 100 - .5) {
+      const t0 = performance.now(); frame(); adapt(performance.now() - t0, now - lastFrame); lastFrame = now;
+    }
     raf = requestAnimationFrame(loop);
   }
   function resume() {
@@ -618,6 +639,8 @@ function init() {
       return out;
     },
     setView(name) { override = name || null; frame(); },
+    get fps() { return Math.round(fps); },
+    get pixelRatio() { return dpr; },
     get door() { return +door.open.toFixed(4); },
     get inGallery() { return inGallery; },
     get station() { return station; },
