@@ -149,10 +149,14 @@ function init() {
     parent.add(instanced(new THREE.IcosahedronGeometry(1, 0), M.leaf, ms));
   }
 
+  function perimeterShrubs(parent, shape, y, n, s0 = .3) {
+    const ms = shape.getSpacedPoints(n).map(pt => mtx(pt.x + (rnd() - .5) * .2, y + .28, -pt.y + (rnd() - .5) * .2, rnd() * 6, s0 * (.8 + rnd() * .5), s0 * (.7 + rnd() * .7), s0 * (.8 + rnd() * .5)));
+    parent.add(instanced(new THREE.IcosahedronGeometry(1, 0), M.leaf, ms));
+  }
   /* One storey: glass curtain wall + mullions + lit interior (+ optional slab on top with its orange LED edge). */
-  function storey({ w, d, r, h, top = true, people = 18, desks = 22, ring = false, ox = 0, oz = 0 }) {
+  function storey({ w, d, r, h, top = true, people = 18, desks = 22, ring = false, ox = 0, oz = 0, bal = .35 }) {
     const g = new THREE.Group();
-    const inset = .35, glassShape = plan(w - inset * 2, d - inset * 2, r.map(v => Math.max(.2, v - inset)), ox, oz), inner = plan(w - 2.2, d - 2.2, r.map(v => Math.max(.2, v - 1.1)), ox, oz);
+    const inset = bal, glassShape = plan(w - inset * 2, d - inset * 2, r.map(v => Math.max(.2, v - inset)), ox, oz), inner = plan(w - inset * 2 - 1.8, d - inset * 2 - 1.8, r.map(v => Math.max(.2, v - inset - .9)), ox, oz);
     const gh = top ? h - .45 : h;
     const glass = new THREE.Mesh(new THREE.ExtrudeGeometry(glassShape, { depth: gh, bevelEnabled: false, curveSegments: 18 }).rotateX(-Math.PI / 2), [M.hidden, M.glass]);
     glass.renderOrder = 2; g.add(glass);
@@ -191,19 +195,24 @@ function init() {
   }
 
   /* ---------------- the building ---------------- */
-  const TW = 30, TD = 26, TR = [1.4, 7, 1.4, 1.4];          // tower footprint (rounded front-right corner)
-  const POD_H = 11, FH = 4.8, TOP_H = 5.6;
+  const TW = 30, TD = 26, TR = [9, 9, 9, 9];                 // tower footprint: stadium-rounded like the master reference
+  const POD_H = 8.6, FH = 4.8, TOP_H = 5.6;
   const building = new THREE.Group(); scene.add(building);
 
   // Podium (static foundation): two storeys, wide base with left and right wings.
   const podium = new THREE.Group(); building.add(podium);
   const PW = 66, PD = 32, POX = -3;
-  const pod1 = storey({ w: PW, d: PD, r: [2, 5, 2, 2], h: POD_H / 2, people: 46, desks: 30, ox: POX }); podium.add(pod1);
-  const pod2 = storey({ w: PW, d: PD, r: [2, 5, 2, 2], h: POD_H / 2, people: 34, desks: 34, ox: POX }); pod2.position.y = POD_H / 2; podium.add(pod2);
-  const plinth = prism(plan(PW + 1, PD + 1, [2.5, 5.5, 2.5, 2.5], POX), .3, M.slabUnder); podium.add(plinth);
+  const PR = [10, 10, 10, 10];
+  const pod1 = storey({ w: PW, d: PD, r: PR, h: POD_H / 2, people: 14, desks: 30, ox: POX }); podium.add(pod1);
+  const pod2 = storey({ w: PW, d: PD, r: PR, h: POD_H / 2, people: 12, desks: 34, ox: POX }); pod2.position.y = POD_H / 2; podium.add(pod2);
+  const plinth = prism(plan(PW + 1, PD + 1, PR.map(v => v + .5), POX), .3, M.slabUnder); podium.add(plinth);
+  // front steps, bollard lights and the curved light line on the plaza (as in the master reference)
+  [0, 1, 2, 3].forEach(i => { const st2 = prism(plan(26 - i * 1.2, 1.1, [.3, .3, .3, .3], -1, PD / 2 + 3.4 - i * .9), .16, M.slab); st2.position.y = i * .16; podium.add(st2); });
+  { const bm = [], bt = []; for (let i = 0; i < 14; i++) { const x = -34 + i * 5.2, z = PD / 2 + 7 + Math.sin(i * .7) * 1.2; bm.push(mtx(x, .5, z, 0)); bt.push(mtx(x, 1.02, z, 0)); }
+    podium.add(instanced(new THREE.CylinderGeometry(.12, .12, 1, 8), M.mullion, bm)); podium.add(instanced(new THREE.CylinderGeometry(.13, .13, .08, 8), led(1), bt)); }
   // right wing (lower block) and its terrace
   // podium sign, entrance doors and canopy
-  const psign = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 6.8), M.sign); psign.position.set(7.5, 6.4, PD / 2 + .08); podium.add(psign);
+  const psign = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4), M.sign); psign.position.set(7.5, 4.6, PD / 2 + .08); podium.add(psign);
   // automatic sliding entrance: two framed glass leaves part as the visitor arrives (door.open 0..1)
   const lobbyGlow = new THREE.Mesh(new THREE.PlaneGeometry(10, 4.4), M.door); lobbyGlow.position.set(-3.5, 2.2, PD / 2 - 3); podium.add(lobbyGlow);
   const header = new THREE.Mesh(new THREE.BoxGeometry(5.6, .38, .34), M.slab); header.position.set(-3.5, 3.78, PD / 2 + .3); podium.add(header);
@@ -219,8 +228,7 @@ function init() {
   });
   const door = { open: 0 };
   // podium roof terraces (planters and shrubs along the edges)
-  shrubs(podium, new THREE.Vector3(-34, 0, 14.6), new THREE.Vector3(-18, 0, 14.6), POD_H, 16);
-  shrubs(podium, new THREE.Vector3(18, 0, 13), new THREE.Vector3(27, 0, 10), POD_H, 10);
+  perimeterShrubs(podium, plan(PW - 1.6, PD - 1.6, PR.map(v => v - .8), POX), POD_H, 120, .42);
   podium.traverse(o => { if (o.isMesh && o.material === M.slab) o.castShadow = true; });
 
   // Tower components that assemble (each pivot is its base on the building axis).
@@ -233,35 +241,39 @@ function init() {
     { name: "f1", people: 22, desks: 26 }, { name: "f2", people: 20, desks: 24, ring: true },
     { name: "f3", people: 20, desks: 24 }, { name: "f4", people: 18, desks: 22 }
   ];
+  const FLOOR = [{ w: 32, d: 26, ox: 0 }, { w: 31, d: 25.5, ox: -1.2 }, { w: 32.5, d: 26, ox: 1 }, { w: 30.5, d: 25, ox: -.6 }];
   floorDefs.forEach((f, i) => {
-    const s = storey({ w: TW, d: TD, r: TR, h: FH, people: f.people, desks: f.desks, ring: f.ring });
-    { const rail = new THREE.Mesh(new THREE.ExtrudeGeometry(plan(TW + .3, TD + .3, TR.map(v => v + .15)), { depth: 1.1, bevelEnabled: false, curveSegments: 18 }).rotateX(-Math.PI / 2), [M.hidden, M.rail]); rail.position.y = FH; s.add(rail); shrubs(s, new THREE.Vector3(-TW / 2 + 1, 0, TD / 2 - .15), new THREE.Vector3(TW / 2 - 4, 0, TD / 2 - .15), FH, 40, .26); shrubs(s, new THREE.Vector3(TW / 2 - .15, 0, TD / 2 - 6), new THREE.Vector3(TW / 2 - .15, 0, -TD / 2 + 2), FH, 22, .26); }
+    const F = FLOOR[i];
+    const s = storey({ w: F.w, d: F.d, r: TR, h: FH, people: f.people, desks: f.desks, ring: f.ring, ox: F.ox, bal: 1.5 });
+    const rail = new THREE.Mesh(new THREE.ExtrudeGeometry(plan(F.w - .1, F.d - .1, TR.map(v => v - .05), F.ox), { depth: 1.05, bevelEnabled: false, curveSegments: 24 }).rotateX(-Math.PI / 2), [M.hidden, M.rail]);
+    rail.position.y = FH; s.add(rail);
+    perimeterShrubs(s, plan(F.w - .9, F.d - .9, TR.map(v => v - .45), F.ox), FH, 90, .28);
     part(f.name, s, POD_H + i * FH, i, [[.06, -1.6, 1.2], [-.08, 2.2, -1], [.1, -2.4, .6], [-.07, 1.8, -1.4]][i]);
   });
   // top floor: taller, garden terrace with a tree, upper orange sign
-  const tf = storey({ w: TW, d: TD, r: TR, h: TOP_H, top: false, people: 14, desks: 16 });
+  const tf = storey({ w: 29, d: 24, r: TR, h: TOP_H, top: false, people: 14, desks: 16, bal: .6 });
   
   tree(tf, -6, 0, 7, .8); shrubs(tf, new THREE.Vector3(-13, 0, 10), new THREE.Vector3(-2, 0, 10), 0, 14, .32);
   part("tf", tf, POD_H + 4 * FH, 4, [.09, -2, 1.6]);
   // roof: thick slab with the cantilevered left overhang, rounded front-right corner and orange edge light
   const roof = new THREE.Group();
-  const roofShape = plan(TW + 7, TD + 7, [4, 10, 4, 4], 0, .5);
-  const rslab = prism(roofShape, 1.5, M.slab); rslab.castShadow = true; roof.add(rslab);
-  const soffit = prism(plan(TW + 6.6, TD + 6.6, [3.8, 9.8, 3.8, 3.8], 0, .5), .06, M.slabUnder); soffit.position.y = -.03; roof.add(soffit);
-  roof.add(ledLoop(plan(TW + 7.04, TD + 7.04, [4, 10, 4, 4], 0, .5), .05, 1.25, .1));
-  const rsign = new THREE.Mesh(new THREE.BoxGeometry(6.6, 6.6, .4), [M.slabUnder, M.slabUnder, M.slabUnder, M.slabUnder, M.sign, M.slabUnder]); rsign.position.set(2, .6, (TD + 7) / 2 + .5 + .25); roof.add(rsign);
-  const parapet = prism(plan(TW - 2, TD - 2, [1, 6, 1, 1]), .5, M.slab); parapet.position.y = 1.5; roof.add(parapet);
+  const roofShape = plan(TW + 14, TD + 8, [10, 12, 10, 10], 3.5, .6);
+  const rslab = prism(roofShape, 1.3, M.slab); rslab.castShadow = true; roof.add(rslab);
+  const soffit = prism(plan(TW + 13.6, TD + 7.6, [9.8, 11.8, 9.8, 9.8], 3.5, .6), .06, M.slabUnder); soffit.position.y = -.03; roof.add(soffit);
+  roof.add(ledLoop(plan(TW + 14.04, TD + 8.04, [10, 12, 10, 10], 3.5, .6), .05, 1.25, .1));
+  const rsign = new THREE.Mesh(new THREE.BoxGeometry(6, 5.4, .5), [M.slabUnder, M.slabUnder, M.slabUnder, M.slabUnder, M.sign, M.slabUnder]); rsign.position.set(0, 1.3 + 2.4, (TD + 8) / 2 + .6 - 1.6); roof.add(rsign);
+  
   part("roof", roof, POD_H + 4 * FH + TOP_H, 5, [-.1, 2.6, -1.8]);
   // entrance canopy (structural component, lands with the first floor)
   const canopy = new THREE.Group();
   const cslab = prism(plan(13, 4.5, [.3, .3, .3, .3], -3.5, 18.2), .35, M.slab); canopy.add(cslab);
   canopy.add(ledLoop(plan(13.04, 4.54, [.3, .3, .3, .3], -3.5, 18.2), -.02, .9, .06));
-  part("canopy", canopy, 4.2, 0, [0, 0, 6]);
+  part("canopy", canopy, 4.3, 0, [0, 0, 6]);
 
   // per-floor attach points for the live lines (left facade corner, right facade)
-  const ATTACH = {}; // per-floor attach points for the live lines (left facade near the front corner, right facade)
-  ["f1", "f2", "f3", "f4"].forEach((n, i) => { const y = POD_H + i * FH + FH * .55; ATTACH[n] = [[-TW / 2 - .2, y, TD / 2 - 2], [TW / 2 + .2, y, -3]]; });
-  ATTACH.roof = [[-TW / 2 - .2, POD_H + 4 * FH + TOP_H * .55, TD / 2 - 2], [TW / 2 + .2, POD_H + 4 * FH + TOP_H * .55, -3]];
+  const ATTACH = {}; // per-floor attach points for the live lines (left and right balcony edges)
+  ["f1", "f2", "f3", "f4"].forEach((n, i) => { const F = FLOOR[i], y = POD_H + i * FH + FH * .55; ATTACH[n] = [[F.ox - F.w / 2 - .1, y, 4], [F.ox + F.w / 2 + .1, y, 4]]; });
+  ATTACH.roof = [[3.5 - (TW + 14) / 2 + 2, POD_H + 4 * FH + TOP_H + .6, 6], [3.5 + (TW + 14) / 2 - 2, POD_H + 4 * FH + TOP_H + .6, 6]];
 
   /* ---------------- interior: the curved Orange corridor behind the entrance ----------------
      Left: curved wall with the five module tiles. Right: glass meeting rooms. Reflective floor, orange light lines,
@@ -359,7 +371,7 @@ function init() {
     m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); scene.add(m);
   });
   [[-36, 21], [-24, 23], [-12, 24], [12, 23], [26, 22], [40, 18], [-46, 14], [50, 10], [32, 26], [-30, 28]].forEach(([x, z]) => tree(scene, x, 0, z, .9 + rnd() * .35));
-  { const pm = []; for (let i = 0; i < 26; i++) pm.push(mtx(-14 + rnd() * 26, .9, 19 + rnd() * 6, 0, 1, .95 + rnd() * .2, 1)); scene.add(instanced(new THREE.CapsuleGeometry(.26, 1.15, 3, 8), M.person, pm)); }
+  { const pm = []; for (let i = 0; i < 12; i++) pm.push(mtx(-14 + rnd() * 26, .9, 21 + rnd() * 6, 0, .85, .95 + rnd() * .2, .85)); scene.add(instanced(new THREE.CapsuleGeometry(.26, 1.15, 3, 8), M.person, pm)); }
   { const cm = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: .8, emissive: 0xffffff, emissiveMap: cityTex, emissiveIntensity: 1.05 }), ms = [];
     for (let i = 0; i < (lowPower ? 50 : 110); i++) { const a = -1.3 + rnd() * 2.6, rad = 230 + rnd() * 180, h = 15 + rnd() * rnd() * 80; ms.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.sin(a) * rad, h / 2, -Math.cos(a) * rad * .8 - 40), new THREE.Quaternion(), new THREE.Vector3(10 + rnd() * 18, h, 10 + rnd() * 18))); }
     scene.add(instanced(new THREE.BoxGeometry(1, 1, 1), cm, ms)); }
@@ -401,8 +413,8 @@ function init() {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   // 0..4: assembly (reference three-quarter -> dolly -> orbit + rise -> close to the facade -> reference hero view)
   // 4..6: orbit to the opposite three-quarter view, then fly toward the entrance
-  const CAM = new THREE.CatmullRomCurve3([V(30, 12, 100), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(24, 5, 86), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
-  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 18.5, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
+  const CAM = new THREE.CatmullRomCurve3([V(14, 12, 112), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(0, 4, 108), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
+  const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 19.5, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
   const camState = { t: 0, walk: 0, gal: 0 }; let override = null, inGallery = false;
   const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);
   // corridor walk: the camera follows the curve, dwells at each module (zero speed at every stop) and turns
@@ -422,7 +434,7 @@ function init() {
     pos.add(gallery.position); tgt.add(gallery.position);
     return [pos, tgt];
   }
-  const VIEWS = { reference: [V(24, 5, 86), V(0, 18.5, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
+  const VIEWS = { reference: [V(0, 4, 108), V(0, 19.5, 0)], left: [V(-56, 18, 62), V(-2, 16, 0)], aerial: [V(48, 74, 70), V(0, 14, 0)], rear: [V(-30, 22, -84), V(0, 18, 0)], close: [V(26, 22, 34), V(-2, 21, 4)] };
   function applyCamera() {
     const W = stage.clientWidth, H = stage.clientHeight; camera.aspect = W / H;
     camera.fov = W / H < 1 ? 54 : W / H < 1.4 ? 44 : 36;
