@@ -25,6 +25,7 @@ using System.Security.Claims;
 if (args.Contains("--seed-saja-demo")) { await SajaDemoFixture.Run(); return; }
 if (args.Contains("--unified-tender-checks")) { await UnifiedTenderChecks.Run(); return; }
 if (args.Contains("--verify-saja-demo")) { await SajaDemoFixture.Run(verifyExisting: true); return; }
+if (args.Contains("--ai-help-checks")) { await AiHelpChecks.Run(); return; }
 if (args.Contains("--clarification-workflow-checks")) { await ClarificationWorkflowChecks.Run(); return; }
 if (args.Contains("--top-decision-checks")) { await TopDecisionChecks.Run(); return; }
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
