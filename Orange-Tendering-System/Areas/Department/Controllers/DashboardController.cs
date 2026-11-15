@@ -35,17 +35,17 @@ public class DashboardController(ApplicationDbContext db, UserManager<Applicatio
         return View(new DepartmentDashboard
         {
             DepartmentName = department.Name, UserId = user.Id, Counts = counts,
-            Recent = await query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).Take(5).ToListAsync(),
+            Recent = await query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).Take(8).ToListAsync(),
             ActionRequired = await query.Where(r => r.CreatedByUserId == user.Id && !r.Tenders.Any() &&
                 (r.Status == PurchaseRequestStatus.Draft || r.Status == PurchaseRequestStatus.Returned))
-                .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+                .OrderByDescending(r => r.Status == PurchaseRequestStatus.Returned).ThenByDescending(r => r.CreatedAt)
                 .Take(10).ToListAsync(),
             RecentActivity = await db.PurchaseRequestReviews.AsNoTracking().Include(r => r.PurchaseRequest)
                 .Where(r => r.PurchaseRequest.DepartmentId == department.Id)
-                .OrderByDescending(r => r.SubmittedAt).ThenByDescending(r => r.Id).Take(8).ToListAsync(),
+                .OrderByDescending(r => r.ReviewedAt ?? r.SubmittedAt).Take(8).ToListAsync(),
             Notifications = await db.Notifications.AsNoTracking().Where(n => n.UserId == user.Id &&
                 n.Link != null && n.Link.StartsWith("/Department/"))
-                .OrderByDescending(n => n.CreatedAt).ThenByDescending(n => n.Id).Take(10).ToListAsync()
+                .OrderByDescending(n => n.CreatedAt).Take(10).ToListAsync()
         });
     }
 }

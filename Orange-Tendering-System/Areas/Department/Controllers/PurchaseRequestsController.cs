@@ -67,18 +67,12 @@ public class PurchaseRequestsController : Controller
         }
         var total = await query.CountAsync();
         page = Math.Clamp(page, 1, Math.Max(1, (int)Math.Ceiling(total / 20m)));
-        var model = new RequestList
+        return View(new RequestList
         {
             Search = search, Status = status, Priority = priority, Page = page, Total = total, UserId = user.Id,
             Requests = await query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
                 .Skip((page - 1) * 20).Take(20).ToListAsync()
-        };
-        if (string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
-        {
-            Response.Headers.CacheControl = "no-store";
-            return PartialView("_MyRequestResults", model);
-        }
-        return View(model);
+        });
     }
 
     public async Task<IActionResult> Details(int id)
@@ -92,7 +86,7 @@ public class PurchaseRequestsController : Controller
             Request = request, CanEdit = RequestDisplay.Editable(request, user.Id),
             Clarifications = await db.Clarifications.AsNoTracking().Include(c => c.Messages)
                 .Where(c => c.PurchaseRequestId == id && (c.FromUserId == user.Id || c.ToUserId == user.Id))
-                .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id).ToListAsync()
+                .OrderByDescending(c => c.CreatedAt).ToListAsync()
         });
     }
 
@@ -142,8 +136,8 @@ public class PurchaseRequestsController : Controller
         if (form.Items.Count is < 1 or > 100)
             ModelState.AddModelError("Items", "Add between 1 and 100 items.");
         for (var i = 0; i < form.Items.Count; i++)
-            if (form.Items[i].Quantity < 1 || decimal.Truncate(form.Items[i].Quantity) != form.Items[i].Quantity)
-                ModelState.AddModelError($"Items[{i}].Quantity", "Use a whole number of 1 or more.");
+            if (decimal.Round(form.Items[i].Quantity, 3) != form.Items[i].Quantity)
+                ModelState.AddModelError($"Items[{i}].Quantity", "Use at most three decimal places.");
         if (form.NeededBy?.Date < DateTime.UtcNow.Date && intent == "submit")
             ModelState.AddModelError("NeededBy", "Choose today or a future needed-by date when submitting.");
         await ValidateAttachments(form.Attachments);

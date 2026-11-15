@@ -8,7 +8,7 @@
     // Policy-aware navigation: the weighted-evaluation links are only offered to roles that can actually open them.
     var canWorkflow = User.IsInRole(SystemRoles.SourcingOfficer) || User.IsInRole(SystemRoles.EvaluationCommittee) || User.IsInRole(SystemRoles.SourcingManager) || User.IsInRole(SystemRoles.TopCommittee);
     var workspace = WorkspaceNavigation.Current(ViewContext.RouteData.Values["area"]?.ToString(), User);
-    var showWeightedEvaluation = canWorkflow && workspace?.Area != "TopCommittee";
+    var showWeightedEvaluation = canWorkflow && (workspace?.Area is "EvaluationCommittee" or "SourcingManager");
     var activeSection = ViewData["WorkspaceSection"] as string;
     var isAdminWorkspace = string.Equals(workspace?.Area, "Admin", StringComparison.OrdinalIgnoreCase);
 }

@@ -50,7 +50,8 @@ namespace Orange_Tendering_System.ViewModels
                 new("Tender", "Workflow", "Index", "tender"),
                 new("Received Bids", "Bids", "Index", "layers"),
                 new("Reports", "Reports", "Index", "report"),
-                  new("Supplier Clarifications", "Clarifications", "Index", "chat")
+                new("Final Decisions", "FinalDecisions", "Index", "check"),
+                new("Clarifications", "Clarifications", "Index", "chat")
             ]),
             new("Supplier", "Supplier Portal", SystemRoles.Supplier,
             [
@@ -105,7 +106,8 @@ namespace Orange_Tendering_System.ViewModels
         public static Workspace? Current(string? area, ClaimsPrincipal user) => ForArea(area) ?? ForUser(user);
 
         public static string LayoutFor(ClaimsPrincipal user) =>
-            user.IsInRole(SystemRoles.Supplier) ? "_SupplierLayout" : "_WorkspaceLayout";
+            user.IsInRole(SystemRoles.Supplier) ? "_SupplierLayout"
+            : ForUser(user)?.Area is { } area ? $"_{area}Layout" : "_WorkspaceLayout";
 
         // Inline SVG content (24x24, stroke icons) taken from the supplied layout.
         public static readonly IReadOnlyDictionary<string, string> Icons = new Dictionary<string, string>

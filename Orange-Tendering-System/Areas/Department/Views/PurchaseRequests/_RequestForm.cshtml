@@ -17,7 +17,7 @@
 </section>
 <section class="ws-panel pg-panel">
     <div class="pg-panel-head"><h2>Requested items</h2><button type="button" class="pg-btn" id="department-add-item">Add item</button></div>
-    <p class="pg-hint">At least one item. Quantities must be whole numbers of 1 or more.</p>
+    <p class="pg-hint">At least one item. Quantities must be positive, with up to three decimal places.</p>
     <div class="pg-table-wrap"><table class="pg-table">
         <thead><tr><th scope="col">Item / service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Action</th></tr></thead>
         <tbody id="department-items">
@@ -26,7 +26,7 @@
             <tr>
                 <td><input asp-for="Items[i].Name" aria-label="Item name" maxlength="200" required /></td>
                 <td><textarea asp-for="Items[i].Specifications" aria-label="Item specifications" maxlength="10000" rows="2"></textarea></td>
-                <td><input asp-for="Items[i].Quantity" aria-label="Quantity" type="number" min="1" max="999999999999999" step="1" inputmode="numeric" required /></td>
+                <td><input asp-for="Items[i].Quantity" aria-label="Quantity" type="number" min="0.001" max="999999999999999.999" step="0.001" required /></td>
                 <td><input asp-for="Items[i].Unit" aria-label="Unit" maxlength="30" required /></td>
                 <td><button type="button" class="pg-btn" data-remove-item>Remove</button></td>
             </tr>
@@ -42,10 +42,10 @@
         <ul>@foreach (var document in Model.ExistingDocuments) { <li>@document.FileName</li> }</ul>
         <p class="pg-hint">Existing attachments are preserved.</p>
     }
-    <div class="pg-field"><label asp-for="Attachments">Add files <span class="pg-hint">(optional)</span></label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" /><span asp-validation-for="Attachments"></span>
+    <div class="pg-field"><label asp-for="Attachments">Add files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" /><span asp-validation-for="Attachments"></span>
     <small class="pg-hint">PDF, PNG, JPEG, DOCX or XLSX. Up to five files per save, 5 MB each and 10 MB combined. Reselect new files if validation fails.</small></div>
     <div class="pg-actions">
-        @if (Model.Id != 0) { <button type="submit" name="intent" value="save" class="pg-btn">Save changes</button> }
+        <button type="submit" name="intent" value="save" class="pg-btn">@(Model.Id == 0 ? "Save draft" : "Save changes")</button>
         <button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary">@(Model.Id == 0 ? "Submit to Sourcing Officer" : "Submit / resubmit to Sourcing Officer")</button>
         <a class="pg-btn" asp-action="Index">Cancel</a>
     </div>
