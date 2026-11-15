@@ -58,25 +58,17 @@ public class TendersController(ApplicationDbContext db, TenderWorkflowService wo
         var latest = orderedRounds.LastOrDefault();
         var latestSuppliers = latest?.Invitations.Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted))
             .Select(i => i.SupplierId).Distinct().Count() ?? 0;
-        var canStart = latest != null && latest.Invitations.Count > 0 && latestSuppliers < 3
-            && latest.Status is TenderRoundStatus.Open or TenderRoundStatus.Failed or TenderRoundStatus.Closed
-            && (latest.Status is TenderRoundStatus.Failed or TenderRoundStatus.Closed
-                || (latest.Deadline.HasValue && latest.Deadline.Value <= DateTime.UtcNow));
+        var canStart = latest != null && latest.Status == TenderRoundStatus.Closed
+            && latest.RoundNumber < TenderWorkflowService.MaxRounds;
 
         var model = new TenderRoundsViewModel
         {
             TenderId = tender.Id,
             TenderTitle = tender.Title,
             CanStartNextRound = canStart,
-            NextRoundMessage = canStart ? null : latest == null
-                ? "This tender has no rounds yet."
-                : latest.Invitations.Count == 0
-                    ? "Invite suppliers in the current round before starting another attempt."
-                    : latestSuppliers >= 3
-                        ? "This round received at least three supplier offers; continue to the committee review."
-                        : latest.Deadline > DateTime.UtcNow && latest.Status == TenderRoundStatus.Open
-                            ? "Wait until the current bidding deadline before starting another attempt."
-                            : "Only a failed or expired round can be retried." ,
+            NextRoundMessage = canStart ? null : latest == null ? "This tender has no rounds yet."
+                : latest.RoundNumber >= TenderWorkflowService.MaxRounds ? "Four bidding rounds is the maximum. No fifth round is permitted."
+                : "Close bidding through the tender workflow before re-tendering. Further evaluation safeguards are checked by the shared service.",
             Rounds = orderedRounds.Select(r =>
             {
                 var submitted = r.Invitations.SelectMany(i => i.Bids).Where(b => b.Status == BidStatus.Submitted).ToList();
@@ -90,38 +82,20 @@ public class TendersController(ApplicationDbContext db, TenderWorkflowService wo
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> StartNextRound(int tenderId)
+    public async Task<IActionResult> StartNextRound(int tenderId, string reason)
     {
-        var tender = await db.Tenders.Include(t => t.Rounds).ThenInclude(r => r.Invitations).ThenInclude(i => i.Bids)
-            .SingleOrDefaultAsync(t => t.Id == tenderId);
-        if (tender == null) return NotFound();
-        var latest = tender.Rounds.OrderByDescending(r => r.RoundNumber).FirstOrDefault();
-        if (latest == null || latest.Invitations.Count == 0) return BadRequest();
-        var distinctSuppliers = latest.Invitations.Where(i => i.Bids.Any(b => b.Status == BidStatus.Submitted))
-            .Select(i => i.SupplierId).Distinct().Count();
-        var roundExpired = latest.Status is TenderRoundStatus.Failed or TenderRoundStatus.Closed
-            || (latest.Status == TenderRoundStatus.Open && latest.Deadline.HasValue && latest.Deadline.Value <= DateTime.UtcNow);
-        if (!roundExpired || distinctSuppliers >= 3 || tender.Status != TenderStatus.Bidding)
+        if (!ModelState.IsValid) return BadRequest("Supply a valid re-tender reason.");
+        try
         {
-            TempData["RoundError"] = "A new round can start only after an expired/failed attempt that received fewer than three supplier offers.";
-            return RedirectToAction(nameof(Rounds), new { id = tenderId });
+            // The shared service owns authorization, tender-row locking, round limits,
+            // cancellation policy and audit history. Bidding is reopened separately with
+            // a fresh deadline, which invokes the shared supplier carry-forward rules.
+            await workflow.Retender(tenderId, reason, User);
         }
-
-        var now = DateTime.UtcNow;
-        latest.Status = TenderRoundStatus.Failed;
-        latest.ClosedAt = now;
-        tender.Rounds.Add(new TenderRound
-        {
-            RoundNumber = latest.RoundNumber + 1,
-            Status = TenderRoundStatus.Open,
-            OpensAt = now,
-            Deadline = now.AddDays(7),
-            CreatedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value,
-            CreatedAt = now
-        });
-        await db.SaveChangesAsync();
-        TempData["RoundStarted"] = $"Round {latest.RoundNumber + 1} is open. Choose suppliers to invite.";
-        return RedirectToAction(nameof(Rounds), new { id = tenderId });
+        catch (WorkflowException error) { return BadRequest(error.Message); }
+        catch (DbUpdateException) { return Conflict("The round changed. Reload before trying again."); }
+        TempData["RoundStarted"] = "A new draft round was created. Open it through the tender workflow with a fresh deadline; eligible suppliers will then be invited automatically.";
+        return RedirectToAction("Index", "Workflow", new { open = tenderId });
     }
 
     public async Task<IActionResult> SelectSuppliers(int id, string? category = null)

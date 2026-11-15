@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,6 +23,7 @@ using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
 if (args.Contains("--top-decision-checks")) { await TopDecisionChecks.Run(); return; }
+if (args.Contains("--retender-checks")) { await RetenderChecks.Run(); return; }
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
 if (args.Contains("--seed-lifecycle")) { await LifecycleFixture.Run(); return; }
