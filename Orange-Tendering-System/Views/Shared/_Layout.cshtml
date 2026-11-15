@@ -41,6 +41,7 @@ INTEGRATED. No business logic.
     <link rel="stylesheet" href="~/css/experience.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/mvc.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/public-pages.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site-nav.css" asp-append-version="true" />
     @if (isIdentityPage)
     {
         <link rel="stylesheet" href="~/css/identity.css" asp-append-version="true" />
@@ -50,7 +51,7 @@ INTEGRATED. No business logic.
 <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
     <partial name="_Icons" />
-    <partial name="_Header" />
+    <partial name="_SiteNav" />
     <div id="main-content" class="@(isIdentityPage ? "identity-page" : null)">
         @RenderBody()
     </div>
@@ -63,6 +64,7 @@ INTEGRATED. No business logic.
         <script src="~/js/auth-forms.js" asp-append-version="true"></script>
     }
     <script src="~/js/experience.js" asp-append-version="true"></script>
+    <script src="~/js/site-nav.js" asp-append-version="true"></script>
     <script src="~/js/public-pages.js" asp-append-version="true"></script>
 </body>
 </html>

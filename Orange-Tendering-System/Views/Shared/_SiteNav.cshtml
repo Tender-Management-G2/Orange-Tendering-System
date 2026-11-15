@@ -1,0 +1,52 @@
+@*
+  OWNER: Tariq — the one public navbar, shared by the homepage (_HomeLayout) and every other public page
+  and Identity page (_Layout). On the homepage the section links scroll in place; elsewhere they go to the
+  homepage section. Styles: css/home-cinema.css (homepage) and css/site-nav.css (other pages).
+*@
+@{
+    var navHome = ViewData["NavHome"] is true;
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var action = ViewContext.RouteData.Values["action"]?.ToString();
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var area = ViewContext.RouteData.Values["area"]?.ToString();
+    var home = Url.Action("Index", "Home", new { area = "" });
+    string Sec(string id) => navHome ? "#" + id : home + "#" + id;
+    bool Is(string a) => string.IsNullOrEmpty(area) && controller == "Home" && action == a;
+}
+<div class="hc-nav@(navHome ? "" : " is-solid hc-nav-page")" id="hc-nav" role="banner">
+    <a class="hc-brand" href="@(navHome ? "#home" : home)" aria-label="Orange Sourcing and Tender Management home">
+        <span class="hc-logo" aria-hidden="true">orange</span>
+    </a>
+    <button class="hc-burger" type="button" aria-expanded="false" aria-controls="hc-links" aria-label="Open navigation"><span></span><span></span></button>
+    <div class="hc-links" id="hc-links" role="navigation" aria-label="Main navigation">
+        <a href="@Sec("platform")">Platform</a>
+        <a href="@Sec("how-it-works")" class="@(Is("HowItWorks") ? "is-active" : null)" aria-current="@(Is("HowItWorks") ? "page" : null)">How It Works</a>
+        <a href="@Sec("evaluation")">Weighted Evaluation</a>
+        <a href="@Sec("analysis")">AI Analysis</a>
+        <a href="@Sec("suppliers")">Suppliers</a>
+        <a asp-area="" asp-controller="Home" asp-action="Team" class="@(Is("Team") ? "is-active" : null)" aria-current="@(Is("Team") ? "page" : null)">Our Team</a>
+        <a asp-area="" asp-controller="Home" asp-action="About" class="@(Is("About") ? "is-active" : null)" aria-current="@(Is("About") ? "page" : null)">About</a>
+        <a asp-area="" asp-controller="Home" asp-action="Contact" class="@(Is("Contact") ? "is-active" : null)" aria-current="@(Is("Contact") ? "page" : null)">Contact</a>
+        <span class="hc-links-cta">
+            @if (!navHome)
+            {
+                <button class="hc-theme" type="button" id="theme-toggle" aria-label="Switch color theme" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3a9 9 0 1 0 10.5 11Z" /></svg>
+                </button>
+                <span class="sr-only" id="theme-status" role="status"></span>
+            }
+            @if (signedIn)
+            {
+                <a class="hc-btn hc-btn-solid" asp-area="" asp-controller="Workspace" asp-action="Index">My Workspace</a>
+                <form class="hc-signout" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@home" method="post">
+                    <button type="submit" class="hc-btn hc-btn-text">Sign Out</button>
+                </form>
+            }
+            else
+            {
+                <a class="hc-btn hc-btn-text" asp-area="Identity" asp-page="/Account/Register">Supplier Registration</a>
+                <a class="hc-btn hc-btn-solid" asp-area="Identity" asp-page="/Account/Login">Log in</a>
+            }
+        </span>
+    </div>
+</div>

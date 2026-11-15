@@ -276,7 +276,7 @@ function init() {
   ATTACH.roof = [[3.5 - (TW + 14) / 2 + 2, POD_H + 4 * FH + TOP_H + .6, 6], [3.5 + (TW + 14) / 2 - 2, POD_H + 4 * FH + TOP_H + .6, 6]];
 
   /* ---------------- interior: the curved Orange corridor behind the entrance ----------------
-     Left: curved wall with the seven module tiles. Right: glass meeting rooms. Reflective floor, orange light lines,
+     Left: curved wall with one tile per navbar item. Right: glass meeting rooms. Reflective floor, orange light lines,
      the corridor straightens at its end where the overview video wall is. Built away from the HQ (GZ); the entry
      flash carries the cut. */
   const GZ = -700, HALF = 5.5, CH_ = 6.5;
@@ -334,7 +334,7 @@ function init() {
     [0, 1].forEach(i => { const f = frameAt(.25 + i * .45); const l = new THREE.PointLight(0xffb070, 140, 70, 1.6); l.position.copy(f.p).setY(CH_ - 1); gallery.add(l); });
   }
   // module stations (corridor positions) and the end video wall
-  const STATIONS = [.1, .19, .28, .37, .46, .55, .66]; // seven modules along the curve
+  const STATIONS = [.08, .16, .24, .32, .4, .48, .56, .645]; // one station per navbar item along the curve
   const U_STOPS = [.02, ...STATIONS, .9];
   const tiles = [], rooms = [];
   STATIONS.forEach((u, k) => {
@@ -421,7 +421,7 @@ function init() {
   const CAM = new THREE.CatmullRomCurve3([V(14, 12, 112), V(52, 20, 84), V(62, 34, 54), V(38, 26, 40), V(0, 6, 92), V(-44, 16, 70), V(-3.5, 2.5, 30)], false, "centripetal");
   const TGT = new THREE.CatmullRomCurve3([V(0, 26, 0), V(1, 24, 0), V(2, 25, 0), V(-2, 22, 4), V(0, 21.2, 0), V(-2, 16, 0), V(-3.5, 2.2, 14)], false, "centripetal");
   // scroll timeline (0..TL_END): assembly 0..70, orbit and entrance 70..108, corridor GAL0..GAL0+GAL_LEN
-  const GAL0 = 108, GAL_LEN = 120, TL_END = GAL0 + GAL_LEN + 6;
+  const GAL0 = 108, GAL_LEN = 132, TL_END = GAL0 + GAL_LEN + 6;
   const INTRO = 60; // cinematic intro (welcome, connection, reveal) runs on the same scroll timeline before the assembly
   const camState = { t: 0, walk: 0, gal: 0, intro: 1 }; let override = null, inGallery = false;
   const DOOR_IN = V(-3.5, 2.0, 9), DOOR_T0 = V(-3.5, 2.2, 14), DOOR_T1 = V(-3.5, 2.0, -6);

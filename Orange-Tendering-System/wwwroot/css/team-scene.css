@@ -1,6 +1,6 @@
 /* Our Team — "The Minds Behind Orange" (wwwroot/js/team-scene.js) */
 .tx { position: relative; height: calc((3 + var(--tx-n, 7) * 1.25) * 100vh); background: #0a0705; color: #fff; }
-.tx-sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; isolation: isolate; background: radial-gradient(120% 80% at 50% 60%, #2a170b, #0a0705 70%); }
+.tx-sticky { position: sticky; top: var(--nav, 84px); height: calc(100vh - var(--nav, 84px)); height: calc(100svh - var(--nav, 84px)); overflow: hidden; isolation: isolate; background: radial-gradient(120% 80% at 50% 60%, #2a170b, #0a0705 70%); }
 .tx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
 .tx-vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(140% 100% at 50% 55%, transparent 52%, #000a 100%), linear-gradient(#0a0705e6, transparent 22%, transparent 80%, #0a0705cc); }
 .tx-eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #ff7900; }
