@@ -32,10 +32,10 @@ authentication system: ASP.NET Core Identity and its cookie. Biometric methods a
   only a public key) stay a separate, passwordless method and are not labelled as fingerprint. Fingerprint enrollment/verification is
   shown as Coming Soon only. Covered by `Tests/AuthSmoke/BiometricChecks.cs`.
 - **Fingerprint / Passkey tile** (identity step): runs the WebAuthn passkey ceremony scoped to the account that passed the
-  password ( returns only its credentials;  refuses another account's passkey). The device
+  password (`PasskeyLoginOptions` returns only its credentials; `PasskeyLogin` refuses another account's passkey). The device
   unlocks the passkey with its fingerprint reader, Windows Hello face or PIN, or the browser shows a QR code for a phone passkey.
   WebAuthn does not tell the server which modality was used, so the UI never claims a fingerprint was verified.
-- **Face templates and data protection:** the key ring uses a fixed application name (). Before
+- **Face templates and data protection:** the key ring uses a fixed application name (`Orange-Tendering-System`). Before
   2026-11-15 it was scoped to the folder the app ran from, so a face enrolled from one copy (Visual Studio, a worktree, another
   port) could not be read by another and every face sign-in failed. Faces enrolled before this change must be enrolled again;
   an unreadable template now produces an explicit re-enrollment message.
