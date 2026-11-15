@@ -48,6 +48,7 @@ import { fallbackSvg } from './login/fallback.js';
   shell.addEventListener('authstudio:signal', event => director.signal(event.detail?.phase));
   shell.addEventListener('authstudio:step', event => director.step(event.detail));
   shell.addEventListener('authstudio:face', event => director.face(event.detail));
+  shell.addEventListener('authstudio:account', () => director.accountType());
   shell.addEventListener('authstudio:signed-in', event => {
     if (director.finale(event.detail.redirect)) event.preventDefault();
   });

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { Stage, webglAvailable } from './core/stage.js';
-import { Stroke } from './core/stroke.js';
+import { Stroke, PenDot } from './core/stroke.js';
 import { sheetMaterial, sheetGeometry, develop } from './core/paper.js';
 import { Path, roundedRect } from './core/paths.js';
 import { metalMaterial } from './core/metal.js';
@@ -17,7 +17,9 @@ import './core/segments.js'; // registers the material eases (paperSettle, board
 //                            the Paper Iris opens on the live camera only after biometric.js reports
 //                            that the camera is really running; it folds shut and the identity card
 //                            goes into the package only when the server confirms the enrollment.
-//                            The fingerprint seal is presentation only ("Coming Soon").
+//                            Fingerprint / Device Passkey: a mobile module in front of the station; its link to
+//                            the identity package lights only after the server verified the WebAuthn registration
+//                            (the browser's own prompt or QR code does the device part; no QR is drawn here).
 // Server facts arrive as data attributes on #authStudio and as authstudio:face events from
 // biometric.js. Animation never decides anything.
 
@@ -63,7 +65,8 @@ function boot() {
   const say = text => { if (status) status.textContent = text; };
   const ground = new THREE.Color(COLOR.ground);
   const scene = stage.scene;
-  const rig = { dev: 0, line: 0, ride: 0, ring: 0, warn: 0, iris: 0, proc: 0, procPhase: 0, card: 0, lid: 0, fp: 0, pending: 0 };
+  const rig = { dev: 0, line: 0, ride: 0, ring: 0, warn: 0, iris: 0, proc: 0, procPhase: 0, card: 0, lid: 0, fp: 0, pending: 0,
+    phone: 0, link: 0, glow: 0, pulseT: 0, pulse: 0, wait: 0, pwarn: 0 };
   const invalidate = () => stage.invalidate();
   const to = (props, o = {}) => {
     if (reduced) { Object.assign(rig, props); stage.invalidate(); o.onComplete?.(); return; }
@@ -235,6 +238,35 @@ function boot() {
     // Waiting platform for the pending application (R10).
     const pendingPad = new Stroke(circlePath(5.6, 2.6, 2.6), { color: COLOR.champagne, width: 0.05, y: 0.12, dash: 0.25, gap: 0.2 });
     scene.add(pendingPad);
+    // Mobile module: a small phone in front of the station, linked to the identity package.
+    const PH = { x: -1.1, z: 5.7, w: 1.7, d: 3.1 };
+    const phone = new THREE.Group();
+    phone.position.set(PH.x, 0, PH.z);
+    scene.add(phone);
+    const phoneBody = mesh(sheetGeometry(roundedRect(-PH.w / 2, -PH.d / 2, PH.w / 2, PH.d / 2, 0.3), 0.2),
+      [new THREE.MeshStandardMaterial({ color: '#3a332d', roughness: 0.45, metalness: 0.3 }), ceramicEdge, champagne]);
+    phone.add(phoneBody);
+    const screenMat = new THREE.MeshStandardMaterial({ color: '#1f1b18', roughness: 0.1, emissive: new THREE.Color(COLOR.orange), emissiveIntensity: 0 });
+    phone.add(mesh(sheetGeometry(roundedRect(-PH.w / 2 + 0.12, -PH.d / 2 + 0.2, PH.w / 2 - 0.12, PH.d / 2 - 0.2, 0.2), 0.01, { y: 0.2 }), screenMat, false));
+    const phoneRidges = [];
+    for (let k = 0; k < 5; k++) {
+      const a = 0.1 + k * 0.08;
+      const top = 0.14 + k * 0.09;
+      const foot = 0.1 + k * 0.06;
+      const kk = 0.62 * a;
+      const s = new Stroke(new Path().M(-a, foot).L(-a, 0).C(-a, -top * 0.7, -kk, -top, 0, -top).C(kk, -top, a, -top * 0.7, a, 0).L(a, foot).build({ step: 0.03 }), { color: COLOR.orange, width: 0.03, y: 0.215 });
+      phone.add(s);
+      phoneRidges.push(s);
+    }
+    const linkPath = new Path().M(PH.x + PH.w / 2, PH.z).L(5.6, PH.z, 0.6).L(5.6, 2.6 + 1.25).build({ step: 0.04 });
+    const link = new Stroke(linkPath, { color: COLOR.orangeInk, width: LINE.main, y: 0.015 });
+    scene.add(link);
+    const pulseDot = new PenDot({ color: COLOR.orange, radius: 0.22 });
+    scene.add(pulseDot);
+    const phoneMaterials = [ceramicEdge];
+    const linkOk = new THREE.Color(COLOR.orangeInk);
+    const linkWarn = new THREE.Color(COLOR.warning);
+
     groups.push([station, [ceramic, ceramicEdge, bladeMat]], [parcel, [kraft, kraftIn]]);
 
     const cardFrom = new THREE.Vector3(0, 1.6, 0);
@@ -264,6 +296,17 @@ function boot() {
       card.rotation.y = lerp(0, -0.35, c);
       lidHinge.rotation.x = -lerp(1.9, 0, smooth(rig.lid));
       pendingPad.drawn = rig.pending;
+      // Mobile module and its link to the package.
+      develop(phone, phoneMaterials, ground, rig.phone);
+      phone.visible = rig.phone > 0.002;
+      screenMat.emissiveIntensity = 0.25 * rig.glow;
+      phoneRidges.forEach((s, i) => (s.drawn = clamp01(rig.link * 1.6 - i * 0.12)));
+      link.drawn = rig.link;
+      link.material.uniforms.uColor.value.copy(linkOk).lerp(linkWarn, rig.pwarn);
+      const lp = linkPath.pointAt(clamp01(rig.pulseT) * linkPath.total);
+      pulseDot.position.set(lp[0], 0.06, lp[1]);
+      pulseDot.opacity = rig.pulse;
+      pulseDot.ring(rig.wait, rig.wait > 0 ? 0.6 : 0);
       // Live camera in the aperture.
       if (cameraEl && shell.dataset.optics === '1') {
         stage.rig.apply();
@@ -303,9 +346,14 @@ function boot() {
     Object.assign(stage.rig.state, SHOTS.wide);
 
     const faceDone = shell.dataset.faceDone === 'true';
+    const passkeyDone = shell.dataset.passkeyDone === 'true';
+    if (passkeyDone) {
+      to({ phone: 1 }, { duration: 1.0, delay: 0.4, ease: 'power2.out' });
+      to({ link: 1 }, { duration: 1.2, delay: 1.0, ease: 'power1.inOut' });
+    }
     to({ dev: 1 }, { duration: 1.0, ease: 'power2.out' });
     to({ fp: 1 }, { duration: 1.6, delay: 0.9, ease: 'power1.inOut' });
-    if (faceDone) {
+    if (faceDone || passkeyDone) {
       rig.lid = 1;
       to({ ring: 1 }, { duration: 0.9, delay: 0.6 });
       to({ pending: 1 }, { duration: 1.4, delay: 1.0, ease: 'power1.inOut' });
@@ -315,11 +363,51 @@ function boot() {
       say('The Identity Station is ready. The camera opens only after you start face enrollment.');
     }
 
+    let waitLoop = null;
+    const stopWait = () => { waitLoop?.kill(); waitLoop = null; rig.wait = 0; };
+    // The browser's own WebAuthn prompt (this device, or a phone via its QR code) is open while 'requesting'.
+    function passkeyState(state) {
+      switch (state) {
+        case 'requesting':
+          stopWait();
+          aim('wide');
+          to({ pwarn: 0, phone: 1 }, { duration: 0.9, ease: 'power2.out' });
+          to({ link: 1 }, { duration: 1.1, delay: 0.3, ease: 'power1.inOut' });
+          to({ glow: 1, pulse: 1, pulseT: 0 }, { duration: 0.4, delay: 0.9, onComplete: () => {
+            if (!reduced && !waitLoop) waitLoop = gsap.fromTo(rig, { wait: 0 }, { wait: 1, duration: 1.5, ease: 'power1.out', repeat: -1, repeatDelay: 0.25, onUpdate: invalidate });
+          } });
+          say('The mobile module is waiting for your device: confirm with its fingerprint, face or PIN, or choose a phone and scan the browser\'s QR code.');
+          break;
+        case 'confirmed':
+          // Only after the server verified the registration: the pulse runs into the package, the lid closes.
+          stopWait();
+          to({ pulseT: 1 }, { duration: 1.0, ease: 'glide' });
+          to({ glow: 0, pulse: 0 }, { duration: 0.4, delay: 1.0 });
+          to({ lid: 1 }, { duration: 0.7, delay: 1.0, ease: 'boardSettle' });
+          to({ ring: 1 }, { duration: 0.8, delay: 0.6 });
+          say('Device passkey registered. Your identity package is sealed.');
+          break;
+        case 'failed':
+        case 'cancelled':
+          stopWait();
+          to({ glow: 0, pulse: 0.4 }, { duration: 0.4 });
+          to({ pwarn: state === 'failed' ? 1 : 0.5 }, { duration: 0.4 });
+          say(state === 'failed' ? 'The passkey was not registered. The mobile module is ready for another try.' : 'The device prompt was closed. Try again when you are ready.');
+          break;
+        default:
+          break;
+      }
+      stage.invalidate();
+    }
+
     let procLoop = null;
     const stopProc = () => { procLoop?.kill(); procLoop = null; };
     shell.addEventListener('authstudio:face', event => {
       const { state, code, method } = event.detail || {};
-      if (method === 'passkey') return;
+      if (method === 'passkey') {
+        passkeyState(state);
+        return;
+      }
       shell.dataset.faceState = state;
       const active = ['requesting', 'camera', 'capturing', 'processing'].includes(state);
       const actions = document.getElementById('faceActions');

@@ -44,12 +44,17 @@ public class LoginModel(
         [Required, EmailAddress] public string Email { get; set; } = string.Empty;
         [Required, DataType(DataType.Password)] public string Password { get; set; } = string.Empty;
         [Display(Name = "Remember me")] public bool RememberMe { get; set; }
+
+        /// <summary>"supplier" or "other": what the person says they are. A UI preference, never authorization:
+        /// the server checks it against the account's real role only after a correct password.</summary>
+        public string? AccountType { get; set; }
     }
 
-    /// <summary>Which methods the account has enrolled. Told to the browser only after a correct password.</summary>
-    public sealed record BiometricStep(bool Face, bool Passkey);
+    /// <summary>Which methods the account can use next. Told to the browser only after a correct password.</summary>
+    public sealed record BiometricStep(bool Face, bool Passkey, bool PasswordOnly);
 
-    private sealed record Accepted(string? Redirect, BiometricStep? Biometric);
+    /// <summary>Mismatch: the password was right but the chosen account type was not; nothing is signed in.</summary>
+    private sealed record Accepted(string? Redirect, BiometricStep? Biometric, string? Mismatch = null);
 
     public async Task OnGetAsync(string? returnUrl = null)
     {
@@ -70,6 +75,11 @@ public class LoginModel(
             return Page();
         }
 
+        if (accepted.Mismatch is not null)
+        {
+            ModelState.AddModelError(string.Empty, accepted.Mismatch);
+            return Page();
+        }
         if (accepted.Redirect is not null) return LocalRedirect(accepted.Redirect);
         Biometric = accepted.Biometric;
         return Page();
@@ -83,9 +93,31 @@ public class LoginModel(
         if (accepted is null)
             return new JsonResult(new { outcome = "rejected", error = Rejected }) { StatusCode = StatusCodes.Status401Unauthorized };
 
+        if (accepted.Mismatch is not null)
+            return new JsonResult(new { outcome = "mismatch", error = accepted.Mismatch }) { StatusCode = StatusCodes.Status409Conflict };
         return accepted.Redirect is not null
             ? new JsonResult(new { outcome = "signedIn", redirect = accepted.Redirect })
-            : new JsonResult(new { outcome = "biometric", face = accepted.Biometric!.Face, passkey = accepted.Biometric.Passkey });
+            : new JsonResult(new { outcome = "biometric", face = accepted.Biometric!.Face, passkey = accepted.Biometric.Passkey, passwordOnly = accepted.Biometric.PasswordOnly });
+    }
+
+    /// <summary>
+    /// "Continue with Email &amp; Password" on the supplier's identity step (owner decision 2026-11-15, switch
+    /// Biometric:SupplierPasswordOnly). Accepted only inside the live pre-auth transaction that the correct password
+    /// opened in this browser, for that account; the password is not sent again.
+    /// </summary>
+    public async Task<IActionResult> OnPostPasswordOnlyAsync(string? returnUrl = null)
+    {
+        ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
+        var user = biometricOptions.Value.SupplierPasswordOnly ? await preAuth.UserAsync(HttpContext, users) : null;
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        if (user is null || !await biometric.SignInAsync(user, BiometricSignInService.PasswordStepMethod, ip))
+        {
+            preAuth.End(HttpContext);
+            return new JsonResult(new { outcome = "rejected", restart = true, error = "Enter your email and password again to continue." })
+                { StatusCode = StatusCodes.Status401Unauthorized };
+        }
+        preAuth.End(HttpContext);
+        return new JsonResult(new { outcome = "signedIn", redirect = await biometric.DestinationAsync(user, ReturnUrl, Url.IsLocalUrl) });
     }
 
     /// <summary>The supplier left the biometric step ("Use a different account").</summary>
@@ -128,6 +160,16 @@ public class LoginModel(
             return null;
         }
 
+        // The account-type choice is checked against the real role, after the password: a mismatch signs nobody in.
+        var chosen = Input.AccountType?.Trim().ToLowerInvariant();
+        if (chosen is "supplier" or "other" && (chosen == "supplier") != isSupplier)
+        {
+            logger.LogInformation("Account type choice did not match the account for user {UserId}.", user.Id);
+            return new Accepted(null, null, isSupplier
+                ? "This is a supplier account. Choose Supplier above, then sign in again."
+                : "This account is not a supplier account. Choose Other User above, then sign in again.");
+        }
+
         // An approved supplier with biometrics enrolled is not signed in by the password. It opens the
         // pre-auth transaction; the supplier workspace needs the face (or passkey) session that follows.
         if (isSupplier && supplierStatus == SupplierStatus.Approved)
@@ -136,11 +178,11 @@ public class LoginModel(
             var passkey = (await users.GetPasskeysAsync(user)).Count > 0;
             if (face || passkey)
             {
-                // Without a face there is nothing for the password step to lead to: the passkey signs in on its own.
-                if (face) preAuth.Begin(HttpContext, user);
+                // The identity step (face, passkey or, where allowed, password only) happens inside this transaction.
+                preAuth.Begin(HttpContext, user);
                 await biometric.AuditAsync(user.Id, "BiometricStepStarted", "password",
                     HttpContext.Connection.RemoteIpAddress?.ToString(), null);
-                return new Accepted(null, new BiometricStep(face, passkey));
+                return new Accepted(null, new BiometricStep(face, passkey, biometricOptions.Value.SupplierPasswordOnly));
             }
         }
 

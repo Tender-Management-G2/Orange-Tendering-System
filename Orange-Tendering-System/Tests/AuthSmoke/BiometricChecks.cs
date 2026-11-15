@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.DataProtection;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -302,13 +304,15 @@ static class BiometricChecks
             (await pendingPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.Redirect, "valid passkey cannot sign in a pending supplier");
 
         // Step 1 of the sign-in page as the page script sends it (Login?handler=Credentials).
-        async Task<(HttpResponseMessage Response, string Csrf)> Credentials(HttpClient client, string pass)
+        async Task<(HttpResponseMessage Response, string Csrf)> Credentials(HttpClient client, string pass, string? accountType = null)
         {
             var t = await token(client, "/Identity/Account/Login");
-            var response = await client.PostAsync("/Identity/Account/Login?handler=Credentials", new FormUrlEncodedContent(new Dictionary<string, string>
+            var fields = new Dictionary<string, string>
             {
                 ["Input.Email"] = email, ["Input.Password"] = pass, ["__RequestVerificationToken"] = t
-            }));
+            };
+            if (accountType is not null) fields["Input.AccountType"] = accountType;
+            var response = await client.PostAsync("/Identity/Account/Login?handler=Credentials", new FormUrlEncodedContent(fields));
             return (response, t);
         }
 
@@ -373,6 +377,33 @@ static class BiometricChecks
             check(stepSigned.StatusCode == HttpStatusCode.OK && (await stepPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
                 "fingerprint / passkey completes the supplier identity step");
         }
+        using (var legacy = newClient())
+        {
+            // A face enrolled before 2026-11-15 under the old folder-based Data Protection scope is still read,
+            // and re-encrypted under the current scope on first use.
+            using (var scope = services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var current = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>().CreateProtector("Orange.Biometric.FaceTemplate.v1");
+                var root = scope.ServiceProvider.GetRequiredService<IHostEnvironment>().ContentRootPath.TrimEnd(Path.DirectorySeparatorChar);
+                var keys = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ASP.NET", "DataProtection-Keys"));
+                var old = DataProtectionProvider.Create(keys, b => b.SetApplicationName(root + Path.DirectorySeparatorChar)).CreateProtector("Orange.Biometric.FaceTemplate.v1");
+                foreach (var row in await db.FaceTemplates.Where(t => t.UserId == userId).ToListAsync())
+                    row.ProtectedTemplate = old.Protect(current.Unprotect(row.ProtectedTemplate));
+                await db.SaveChangesAsync();
+            }
+            var (_, legacyCsrf) = await Credentials(legacy, password);
+            var legacyFace = await Post(legacy, legacyCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(legacy, legacyCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+            bool migrated;
+            using (var scope = services.CreateScope())
+            {
+                var current = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>().CreateProtector("Orange.Biometric.FaceTemplate.v1");
+                migrated = (await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().FaceTemplates.AsNoTracking().Where(t => t.UserId == userId).ToListAsync())
+                    .All(t => { try { current.Unprotect(t.ProtectedTemplate); return true; } catch { return false; } });
+            }
+            check(legacyFace.StatusCode == HttpStatusCode.OK && migrated && (await legacy.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
+                "a face enrolled under the old key scope still signs in and is re-encrypted under the current scope");
+        }
         using (var unreadable = newClient())
         {
             // Templates encrypted under other data-protection keys: the person is told to enroll again.
@@ -381,9 +412,30 @@ static class BiometricChecks
                     .ExecuteUpdateAsync(t => t.SetProperty(x => x.ProtectedTemplate, RandomNumberGenerator.GetBytes(64)));
             var (_, unreadableCsrf) = await Credentials(unreadable, password);
             var unreadableFace = await Post(unreadable, unreadableCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(unreadable, unreadableCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
-            check(unreadableFace.StatusCode == HttpStatusCode.Unauthorized && (await unreadableFace.Content.ReadAsStringAsync()).Contains("can no longer be read") &&
+            check(unreadableFace.StatusCode == HttpStatusCode.Unauthorized && (await unreadableFace.Content.ReadAsStringAsync()).Contains("could not be opened") &&
                   (await unreadable.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
                 "an unreadable stored face asks for re-enrollment and signs nobody in");
+        }
+        using (var mismatch = newClient())
+        {
+            var (wrongType, mismatchCsrf) = await Credentials(mismatch, password, "other");
+            check(wrongType.StatusCode == HttpStatusCode.Conflict && (await wrongType.Content.ReadAsStringAsync()).Contains("supplier account") &&
+                  (await Post(mismatch, mismatchCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized &&
+                  (await mismatch.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+                "an account-type mismatch signs nobody in and opens no identity step");
+        }
+        using (var passwordChoice = newClient())
+        {
+            var noStepCsrf = await token(passwordChoice, "/Identity/Account/Login");
+            var noStep = await passwordChoice.PostAsync("/Identity/Account/Login?handler=PasswordOnly", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = noStepCsrf }));
+            check(noStep.StatusCode == HttpStatusCode.Unauthorized && (await passwordChoice.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+                "the password-only choice needs the password step first");
+            var (stepped, choiceCsrf) = await Credentials(passwordChoice, password, "supplier");
+            var choiceBody = await stepped.Content.ReadFromJsonAsync<JsonElement>();
+            var chosen = await passwordChoice.PostAsync("/Identity/Account/Login?handler=PasswordOnly", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = choiceCsrf }));
+            check(choiceBody.GetProperty("passwordOnly").GetBoolean() && chosen.StatusCode == HttpStatusCode.OK &&
+                  (await passwordChoice.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
+                "an approved supplier can choose Continue with Email & Password inside the identity step");
         }
 
         using var passwordOnly = newClient();

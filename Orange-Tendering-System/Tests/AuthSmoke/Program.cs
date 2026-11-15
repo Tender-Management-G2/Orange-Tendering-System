@@ -30,6 +30,7 @@ if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
 if (args.Contains("--seed-lifecycle")) { await LifecycleFixture.Run(); return; }
 if (args.Contains("--final-decision-checks")) { await FinalDecisionChecks.Run(); return; }
 if (args.Contains("--clarification-checks")) { await ClarificationChecks.Run(); return; }
+if (args.Contains("--face-key-audit")) { await FaceKeyAudit.Run(); return; }
 if (args.Contains("--smtp-mode-checks")) { SmtpModeChecks.Run(); return; }
 if (args.Contains("--smtp-live-check")) { await SmtpLiveChecks.Run(); return; }
 if (args.Contains("--smtp-live-create-check")) { await SmtpLiveChecks.RunCreate(); return; }

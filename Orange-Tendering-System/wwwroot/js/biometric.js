@@ -144,13 +144,14 @@
         });
     }
 
-    // ---------- Face recognition (eight-second capture) ----------
+    // ---------- Face recognition (seven-second capture, holding still) ----------
     // Detect a face, take a few descriptors from consecutive camera frames, send them. There are no liveness
     // steps (owner decision for the academic demo), so a photo of the person held up to the camera can pass.
 
-    var CAPTURE_MS = 8000;     // one sample a second: more varied samples match more reliably
+    var CAPTURE_MS = 7000;     // a steady seven-second hold, one sample every 0.7 s
+    var SAMPLE_MS = 700;
     var NO_FACE_TIMEOUT_MS = 40000; // time to position the face and complete a continuous capture
-    var MIN_FACE_WIDTH = 80;       // pixels in the analysed frame; smaller faces give unreliable descriptors
+    var MIN_FACE_WIDTH = 110;      // pixels in the analysed frame; smaller faces give unreliable descriptors
 
     function loadScript(src) {
         return new Promise(function (resolve, reject) {
@@ -244,8 +245,8 @@
     async function capture(video, setHint, onDetect, isCancelled) {
         var faceapi = window.faceapi;
         // Fast detector first; after 1.5 s without a face a more sensitive one (dim light, face further away).
-        var fast = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
-        var sensitive = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 });
+        var fast = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
+        var sensitive = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.3 });
         var cpuTried = false;
 
         // Each frame is read from a plain 2D canvas instead of straight from the <video>: on some graphics drivers
@@ -266,7 +267,7 @@
         var lastFrameTime = -1;
         var captureStarted = null;
         var lastSample = -Infinity;
-        setHint('Look at the camera for 8 seconds.');
+        setHint('Hold still and look straight at the camera for 7 seconds.');
 
         while (performance.now() - started < NO_FACE_TIMEOUT_MS) {
             if (isCancelled && isCancelled()) { throw cancelled(); }
@@ -291,17 +292,17 @@
                 lastSeen = performance.now();
                 if (captureStarted === null) { captureStarted = lastSeen; }
                 var elapsed = lastSeen - captureStarted;
-                if (lastSeen - lastSample >= 1000 || elapsed >= CAPTURE_MS) {
+                if (lastSeen - lastSample >= SAMPLE_MS || elapsed >= CAPTURE_MS) {
                     descriptors.push({ t: Math.round(elapsed), v: Array.from(found.descriptor) });
                     lastSample = lastSeen;
                 }
-                setHint('Keep looking at the camera: ' + Math.max(0, Math.ceil((CAPTURE_MS - elapsed) / 1000)) + ' seconds remaining.');
+                setHint('Hold still: ' + Math.max(0, Math.ceil((CAPTURE_MS - elapsed) / 1000)) + ' seconds remaining.');
                 if (elapsed >= CAPTURE_MS && descriptors.length >= 3) { return { descriptors: descriptors }; }
             } else {
                 captureStarted = null;
                 descriptors = [];
                 lastSample = -Infinity;
-                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 8-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 8-second capture will restart.');
+                setHint(detected.length > 1 ? 'Only one person should be in view. Restarting the 7-second capture.' : found ? 'Move a little closer to the camera.' : 'Look straight at the camera with light on your face. The 7-second capture will restart.');
             }
         }
 
@@ -406,6 +407,7 @@
             try {
                 var result = await action();
                 if (result && result.redirect) {
+                    if (method === 'passkey') { announce('confirmed', { method: 'passkey' }); }
                     setStatus('Signed in. Redirecting...', 'success');
                     // The server has issued the session. A studio page may play a short closing
                     // transition before it navigates (it cancels this event and navigates itself).
@@ -417,6 +419,7 @@
                     return;
                 }
                 setStatus(successMessage, 'success');
+                if (method === 'passkey') { announce('confirmed', { method: 'passkey' }); }
                 return result;
             } catch (e) {
                 if (e && e.code === 'cancelled') {
@@ -437,7 +440,8 @@
         [$('btnPasskeyLogin'), $('btnPasskeyStep')].forEach(function (passkeyLoginButton) {
             if (!passkeyLoginButton) { return; }
             passkeyLoginButton.addEventListener('click', function () {
-                setStatus('Use your fingerprint, face or PIN when your device asks.');
+                setStatus('Use your fingerprint, face or PIN when your device asks, or choose a phone and scan the QR code.');
+                announce('requesting', { method: 'passkey' });
                 guarded(function () { return passkeyLogin(returnUrl); }, 'Signed in.', 'passkey');
             });
         });
@@ -462,9 +466,12 @@
                 var label = ($('passkeyLabel').value || '').trim() || 'My device';
                 var password = ($('bioPassword') || {}).value || '';
                 if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
-                setStatus('Use your fingerprint, face or PIN when your device asks.');
+                setStatus('Use your fingerprint, face or PIN when your device asks, or choose a phone and scan the QR code.');
+                announce('requesting', { method: 'passkey' });
                 guarded(function () { return passkeyRegister(label, password); }, 'Fingerprint / Passkey Registered Successfully', 'passkey').then(function (ok) {
-                    if (ok) { window.location.reload(); }
+                    // Let the Identity Station finish its confirmed sequence before the page shows the new state.
+                    var delay = ok && scene && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1700 : 0;
+                    if (ok) { window.setTimeout(function () { window.location.reload(); }, delay); }
                 });
             });
         }

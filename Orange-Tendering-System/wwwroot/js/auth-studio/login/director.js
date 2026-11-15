@@ -23,7 +23,7 @@ import gsap from 'gsap';
 //                                            └─cancelled──┘
 
 const TRACE_GOAL = { empty: 0, typing: 'a', domain: 'b', invalid: 'stub', valid: 'done' };
-const PHASE_SHOT = { verify: 'verify', refused: 'verify', nosignal: 'verify', passed: 'verify', choose: 'choose', optics: 'optics' };
+const PHASE_SHOT = { verify: 'verify', refused: 'verify', nosignal: 'verify', passed: 'verify', choose: 'choose', optics: 'optics', cred: 'cred', touch: 'touch' };
 const CAMERA_PROBLEMS = ['cameraDenied', 'cameraMissing', 'cameraUnavailable'];
 
 export class SignalDirector {
@@ -49,6 +49,7 @@ export class SignalDirector {
     this.procLoop = null;
     this.confirmedAt = 0;
     this.navigated = false;
+    this.method = null; // the identity method that really completed: 'face' | 'passkey' | 'password'
 
     // The live camera is placed in the opening the iris blades leave, every frame it changes.
     if (cameraEl) {
@@ -320,6 +321,26 @@ export class SignalDirector {
         this.to({ lift: 0 }, { duration: 0.85, ease: 'boardSettle', delay: 0.2 });
         this.say('The signal stopped at the boundary: the server refused the sign-in.');
         break;
+      case 'mismatch':
+        this.setPhase('refused');
+        this.stopWait();
+        this.to({ pulseSig: 0.82 }, { duration: 0.6, ease: 'power2.out' });
+        this.to({ pulse: 0.4 }, { duration: 0.9, delay: 0.15 });
+        this.to({ gateWarn: 1, gateErr: 0 }, { duration: 0.45, delay: 0.1 });
+        this.to({ block: 1 }, { duration: 0.4, ease: 'power2.out', delay: 0.3 });
+        this.to({ lift: 0 }, { duration: 0.85, ease: 'boardSettle', delay: 0.2 });
+        this.say('The signal stopped at the boundary: the account type does not match this account.');
+        break;
+      case 'password-choice':
+        // Email & Password chosen: the pulse turns onto the credential path and waits for the server.
+        this.method = 'password';
+        this.setPhase('cred');
+        this.stopWait();
+        this.to({ hover: 0, credLit: 1 }, { duration: 0.5 });
+        this.scene.rig.pulseC = 0.001;
+        this.to({ pulseC: 1 }, { duration: 0.9, ease: 'glide', onComplete: () => this.phase === 'cred' && this.startWait() });
+        this.say('The signal is travelling to Credential Identity. The server is checking the password step.');
+        break;
       case 'unavailable':
       case 'timeout':
         this.setPhase('nosignal');
@@ -331,7 +352,8 @@ export class SignalDirector {
         this.say('No answer from the sign-in service. The signal is holding before the boundary.');
         break;
       case 'accepted':
-        this.setPhase('passed');
+        // After Email & Password the camera stays on Credential Identity; the finale leaves from there.
+        if (this.method !== 'password') this.setPhase('passed');
         this.stopWait();
         this.to({ gateOk: 1, pulse: 1, pulseSig: 1 }, { duration: 0.35 });
         this.say('The server accepted the sign-in.');
@@ -361,9 +383,11 @@ export class SignalDirector {
     this.to({ optic: 1 }, { duration: 1.0, ease: 'power2.out', delay: 0.25 });
     this.to({ bezel: 1 }, { duration: 0.95, ease: 'boardSettle', delay: 0.85 });
     this.to({ touch: 1 }, { duration: 1.0, ease: 'power2.out', delay: 0.45 });
+    this.to({ cred: 1 }, { duration: 1.0, ease: 'power2.out', delay: 0.35 });
+    this.to({ credLit: 0, pulseC: 0, phone: 0, phoneLink: 0, phonePulse: 0, phoneWait: 0, touchWarn: 0 }, { duration: 0.5 });
     this.to({ fp: 1 }, { duration: 1.6, ease: 'power1.inOut', delay: 1.1 });
     this.to({ iris: 0, irisWarn: 0, ring: 0, ringOk: 0, proc: 0, hover: 0 }, { duration: 0.5 });
-    this.say('Password accepted. Two identity modules: Optical Identity (face) and Touch Identity (fingerprint or passkey).');
+    this.say('Password accepted. Three identity modules: Credential Identity (email and password), Optical Identity (face) and Touch Identity (fingerprint or passkey).');
     this.aim();
   }
 
@@ -372,7 +396,9 @@ export class SignalDirector {
     this.stopWait();
     this.stopProc();
     this.confirmedAt = 0;
-    this.to({ optic: 0, bezel: 0, touch: 0, fp: 0, branches: 0, pulseBranch: 0, iris: 0, ring: 0, ringOk: 0, proc: 0, irisWarn: 0, hover: 0 }, { duration: 0.7, ease: 'power2.in' });
+    this.method = null;
+    this.to({ optic: 0, bezel: 0, touch: 0, fp: 0, branches: 0, pulseBranch: 0, iris: 0, ring: 0, ringOk: 0, proc: 0, irisWarn: 0, hover: 0,
+      cred: 0, credLit: 0, pulseC: 0, phone: 0, phoneLink: 0, phonePulse: 0, phoneWait: 0, touchWarn: 0 }, { duration: 0.7, ease: 'power2.in' });
     this.to({ depth: 0, lift: 0, pulse: 0, pulseSig: 0, gateOk: 0, gateErr: 0, gateWarn: 0, block: 0 }, { duration: 0.9, delay: 0.35 });
     this.setPhase('idle');
     this.status = '';
@@ -402,8 +428,13 @@ export class SignalDirector {
   face(detail) {
     const state = detail?.state;
     if (!state || this.phase === 'finale') return;
+    if (detail.method === 'passkey') {
+      this.passkey(state, detail);
+      this.aim();
+      return;
+    }
     if (this.shell) this.shell.dataset.faceState = state;
-    if (detail.method === 'passkey') return;
+    if (state === 'confirmed') this.method = 'face';
     switch (state) {
       case 'requesting':
         this.stopWait();
@@ -459,6 +490,54 @@ export class SignalDirector {
     this.aim();
   }
 
+  /**
+   * Fingerprint / Passkey (WebAuthn). requesting: the browser's own prompt is open (this device's reader, or a phone
+   * through the browser's QR code); the mobile module rises and its link is drawn, the pulse waits on the phone.
+   * confirmed: the server verified the passkey; the pulse travels phone → sensor and the finale follows.
+   */
+  passkey(state) {
+    // The passwordless passkey button of step 1 has no identity modules on stage: text only, finale from the boundary.
+    if (this.phase !== 'choose' && this.phase !== 'touch') {
+      if (state === 'requesting') this.say('Waiting for your device passkey.');
+      return;
+    }
+    switch (state) {
+      case 'requesting':
+        this.stopWait();
+        this.setPhase('touch');
+        this.to({ hover: 0, touchWarn: 0, touchLit: 1 }, { duration: 0.5 });
+        this.to({ phone: 1 }, { duration: 0.9, ease: 'power2.out' });
+        this.to({ phoneLink: 1 }, { duration: 1.0, ease: 'power1.inOut', delay: 0.35 });
+        this.scene.rig.phonePulse = 0.001;
+        this.to({ pulse: 1, phoneWait: 1 }, { duration: 0.5, delay: 0.9, onComplete: () => this.startWait() });
+        this.say('Touch Identity is waiting for your device: use its fingerprint, face or PIN, or choose a phone and scan the browser\'s QR code.');
+        break;
+      case 'confirmed':
+        this.method = 'passkey';
+        this.stopWait();
+        this.to({ phoneWait: 0, touchWarn: 0 }, { duration: 0.4 });
+        this.to({ phonePulse: 1 }, { duration: 0.85, ease: 'glide' });
+        this.say('Passkey verified by the server.');
+        break;
+      case 'failed':
+      case 'cancelled':
+        this.stopWait();
+        this.to({ phoneWait: 0, pulse: 0.45 }, { duration: 0.5 });
+        this.to({ touchWarn: state === 'failed' ? 1 : 0.5 }, { duration: 0.45 });
+        this.say(state === 'failed' ? 'The passkey was not accepted. Touch Identity is ready for another try.' : 'The passkey prompt was closed. Touch Identity is ready when you are.');
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** The account-type preference changed: a small acknowledgement on the signal point, nothing more. */
+  accountType() {
+    if (this.reduced || !this.introDone || this.phase !== 'idle') return;
+    const rig = this.scene.rig;
+    gsap.fromTo(rig, { halo: 0 }, { halo: 1, duration: 1.1, ease: 'power1.out', onUpdate: this.scene.apply });
+  }
+
   placeCamera() {
     const el = this.cameraEl;
     if (!el || this.phase !== 'optics') return;
@@ -479,7 +558,8 @@ export class SignalDirector {
    */
   finale(redirect) {
     if (this.reduced || this.navigated) return false;
-    const fromOptic = this.phase === 'optics' || this.phase === 'choose';
+    // The finale leaves from the module that really completed: optic (face), touch (passkey), credential (password).
+    const origin = this.method === 'face' ? 'optic' : this.method === 'passkey' ? 'touch' : this.method === 'password' ? 'cred' : 'gate';
     this.setPhase('finale');
     if (this.stageEl) this.stageEl.dataset.optics = '0';
     this.stopWait();
@@ -494,7 +574,7 @@ export class SignalDirector {
     const wait = this.confirmedAt ? Math.max(0, 0.95 - (performance.now() - this.confirmedAt) / 1000) : 0;
     const rig = this.scene.rig;
     const hw = this.scene.hw;
-    const fiber = hw.buildFiber(hw.finaleOrigin(fromOptic));
+    const fiber = hw.buildFiber(hw.finaleOrigin(origin));
     rig.cable = 0;
     rig.finale = 0;
     this.to({ gateOk: 1, pulse: 1, iris: 0 }, { duration: 0.3 });

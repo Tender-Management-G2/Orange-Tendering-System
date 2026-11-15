@@ -33,6 +33,9 @@
     const passkeyNote = document.getElementById('fingerprintMethodNote');
     const bioStatus = document.getElementById('bio-status');
     const back = document.getElementById('btnBiometricBack');
+    const passwordOnlyButton = document.getElementById('btnPasswordOnly');
+    const accountInputs = Array.from(form.querySelectorAll('input[name="Input.AccountType"]'));
+    const ACCOUNT_KEY = 'orange.signin.accountType';
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     const REQUEST_TIMEOUT_MS = 20000;
 
@@ -55,7 +58,7 @@
     }
 
     function publish() {
-        const detail = { email: emailState(), hasPassword: password.value.length > 0, focus: focusName };
+        const detail = { email: emailState(), hasPassword: password.value.length > 0, focus: focusName, accountType: accountType() };
         shell.authState = detail;
         emit('authstudio:state', detail);
     }
@@ -82,6 +85,26 @@
             button.setAttribute('aria-pressed', String(show));
         });
     });
+
+    // ---------- Account type: a remembered preference, checked by the server after the password ----------
+
+    function accountType() {
+        const checked = accountInputs.find(input => input.checked);
+        return checked ? checked.value : null;
+    }
+
+    try {
+        const remembered = window.localStorage.getItem(ACCOUNT_KEY);
+        const match = accountInputs.find(input => input.value === remembered);
+        if (match && !form.querySelector('.validation-summary-errors')) match.checked = true;
+    } catch (e) { /* storage unavailable: keep the server's default */ }
+
+    accountInputs.forEach(input => input.addEventListener('change', () => {
+        try { window.localStorage.setItem(ACCOUNT_KEY, input.value); } catch (e) { /* not essential */ }
+        setMessage('');
+        emit('authstudio:account', { type: input.value });
+        publish();
+    }));
 
     // ---------- Validation messages (same look as the server's) ----------
 
@@ -184,7 +207,16 @@
         if (response.ok && data && data.outcome === 'biometric') {
             setBusy(false);
             emit('authstudio:signal', { phase: 'biometric' });
-            showBiometric(!!data.face, !!data.passkey);
+            showBiometric(!!data.face, !!data.passkey, !!data.passwordOnly);
+            return;
+        }
+        if (response.status === 409 && data && data.outcome === 'mismatch') {
+            // The password was right, the account type was not: nothing was signed in.
+            setBusy(false);
+            setMessage(data.error);
+            emit('authstudio:signal', { phase: 'mismatch' });
+            const other = accountInputs.find(input => !input.checked);
+            if (other) other.focus();
             return;
         }
 
@@ -211,12 +243,14 @@
 
     // ---------- Step 2: the supplier's biometric step ----------
 
-    function showBiometric(face, passkey) {
+    function showBiometric(face, passkey, passwordOnly) {
         credentials.hidden = true;
         biometric.hidden = false;
         shell.dataset.step = 'biometric';
         root.dataset.face = String(face);
         root.dataset.passkey = String(passkey);
+        root.dataset.passwordOnly = String(!!passwordOnly);
+        if (passwordOnlyButton) passwordOnlyButton.hidden = !passwordOnly;
         if (passkeyButton) {
             passkeyButton.disabled = !passkey;
             passkeyButton.toggleAttribute('data-bio-disabled', !passkey);
@@ -232,7 +266,7 @@
         const title = document.getElementById('biometricTitle');
         if (title) title.focus();
         startExpiry(face);
-        emit('authstudio:step', { step: 'biometric', face, passkey });
+        emit('authstudio:step', { step: 'biometric', face, passkey, passwordOnly: !!passwordOnly });
     }
 
     function showCredentials(text) {
@@ -279,6 +313,40 @@
 
     if (back) back.addEventListener('click', leaveBiometric);
 
+    // "Continue with Email & Password": the server signs in only inside the pre-auth step the correct password
+    // opened in this browser; nothing here sends the password again.
+    if (passwordOnlyButton) {
+        passwordOnlyButton.addEventListener('click', async () => {
+            if (passwordOnlyButton.disabled) return;
+            passwordOnlyButton.disabled = true;
+            emit('authstudio:signal', { phase: 'password-choice' });
+            const url = new URL(window.location.href);
+            url.searchParams.set('handler', 'PasswordOnly');
+            const token = form.querySelector('input[name="__RequestVerificationToken"]');
+            let data = null;
+            let response = null;
+            try {
+                response = await fetch(url.pathname + url.search, {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'RequestVerificationToken': token ? token.value : '', 'Accept': 'application/json' }
+                });
+                try { data = await response.json(); } catch (e) { data = null; }
+            } catch (e) {
+                passwordOnlyButton.disabled = false;
+                if (bioStatus) { bioStatus.textContent = 'The sign-in service could not be reached. Try again.'; bioStatus.className = 'as-status bio-status bio-status--danger'; }
+                emit('authstudio:signal', { phase: 'unavailable' });
+                return;
+            }
+            if (response.ok && data && data.outcome === 'signedIn' && data.redirect) {
+                emit('authstudio:signal', { phase: 'accepted', method: 'password' });
+                navigate(data.redirect);
+                return;
+            }
+            passwordOnlyButton.disabled = false;
+            showCredentials((data && data.error) || 'Enter your email and password again to continue.');
+        });
+    }
+
     // biometric.js reports what really happened during the face step; this script only keeps the
     // form in step with it (camera controls shown while the camera is live, back to step 1 when
     // the server ended the pre-auth step).
@@ -290,7 +358,7 @@
 
     // A plain post may have rendered the page already on step 2.
     if (shell.dataset.step === 'biometric') {
-        showBiometric(root.dataset.face === 'true', root.dataset.passkey === 'true');
+        showBiometric(root.dataset.face === 'true', root.dataset.passkey === 'true', root.dataset.passwordOnly === 'true');
     }
     publish();
 })();

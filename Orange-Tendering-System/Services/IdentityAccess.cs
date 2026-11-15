@@ -23,7 +23,7 @@ public static class IdentityAccess
         await context.HttpContext.RequestServices.GetRequiredService<ISecurityStampValidator>().ValidateAsync(context);
         if (context.Principal?.Identity?.IsAuthenticated != true)
             return;
-        if (biometricMethod is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod &&
+        if (biometricMethod is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod or BiometricSignInService.PasswordStepMethod &&
             context.Principal.FindFirst(BiometricSignInService.AuthenticationMethodClaim) is null &&
             context.Principal.Identity is ClaimsIdentity identity)
         {
@@ -79,7 +79,10 @@ public sealed class SupplierApprovalGate(RequestDelegate next)
             var approved = await db.Users.AsNoTracking().AnyAsync(u => u.Id == userId &&
                 u.Supplier != null && u.Supplier.Status == SupplierStatus.Approved);
             var method = context.User.FindFirstValue(BiometricSignInService.AuthenticationMethodClaim);
-            var biometricSession = method is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod;
+            // A password-step session counts only while the owner's switch allows it (Biometric:SupplierPasswordOnly).
+            var biometricSession = method is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod ||
+                (method == BiometricSignInService.PasswordStepMethod &&
+                 context.RequestServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<Orange_Tendering_System.Models.Biometric.BiometricOptions>>().Value.SupplierPasswordOnly);
             if (!approved || !biometricSession)
             {
                 if (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))

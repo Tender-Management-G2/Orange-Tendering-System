@@ -193,7 +193,9 @@ export const FRAMES = {
   core: { tx: 0.6, tz: -1.0, w: 17.6, h: 18.6, tilt: 0, yaw: 0, fov: 3 },
   // L03+: the same camera leaves the optically flat lens (a dolly-zoom) and tilts into depth.
   verify: { tx: 3.2, tz: -1.0, w: 21.5, h: 17.5, tilt: 32, yaw: -10, fov: 24 },
-  choose: { tx: 7.6, tz: -1.4, w: 28.5, h: 19.5, tilt: 40, yaw: -14, fov: 26 },
+  choose: { tx: 8.4, tz: -1.2, w: 31, h: 20, tilt: 40, yaw: -14, fov: 26 },
+  cred: { tx: 16.8, ty: 0.2, tz: -1.0, w: 11, h: 8.5, tilt: 36, yaw: -14, fov: 26 },
+  touch: { tx: 18.0, ty: 0.2, tz: 4.6, w: 11, h: 8.5, tilt: 34, yaw: -16, fov: 26 },
   // Straight down the optical axis: the stable, camera-facing composition for the live picture.
   optics: { tx: 15.8, ty: 0.9, tz: -6.2, w: 8.1, h: 8.1, tilt: 0, yaw: 0, fov: 16 }
 };
@@ -203,6 +205,8 @@ export const FRAMES_COMPACT = {
   traces: { tx: -0.4, tz: -1.0, w: 24.0, h: 16.0, tilt: 0, yaw: 0, fov: 3 },
   core: { tx: 1.4, tz: -1.0, w: 19.0, h: 12.4, tilt: 0, yaw: 0, fov: 3 },
   verify: { tx: 3.2, tz: -1.0, w: 22.0, h: 13.0, tilt: 30, yaw: -10, fov: 24 },
-  choose: { tx: 7.6, tz: -1.0, w: 30.0, h: 16.5, tilt: 38, yaw: -12, fov: 26 },
+  choose: { tx: 8.4, tz: -1.0, w: 32.0, h: 17.0, tilt: 38, yaw: -12, fov: 26 },
+  cred: { tx: 16.8, ty: 0.2, tz: -1.0, w: 12, h: 7.5, tilt: 34, yaw: -14, fov: 26 },
+  touch: { tx: 18.0, ty: 0.2, tz: 4.6, w: 12, h: 7.5, tilt: 32, yaw: -16, fov: 26 },
   optics: { tx: 15.8, ty: 0.9, tz: -6.2, w: 7.8, h: 7.8, tilt: 0, yaw: 0, fov: 16 }
 };

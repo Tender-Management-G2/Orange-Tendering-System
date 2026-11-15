@@ -37,8 +37,24 @@ authentication system: ASP.NET Core Identity and its cookie. Biometric methods a
   WebAuthn does not tell the server which modality was used, so the UI never claims a fingerprint was verified.
 - **Face templates and data protection:** the key ring uses a fixed application name (`Orange-Tendering-System`). Before
   2026-11-15 it was scoped to the folder the app ran from, so a face enrolled from one copy (Visual Studio, a worktree, another
-  port) could not be read by another and every face sign-in failed. Faces enrolled before this change must be enrolled again;
-  an unreadable template now produces an explicit re-enrollment message.
+  port) could not be read by another and every face sign-in failed. Older templates are **recovered, not lost**: `FaceService`
+  opens the same key ring under the old folder scope (the running content root, sibling checkouts in Development, and
+  `Biometric:LegacyKeyScopes`) and re-encrypts each template under the fixed scope on first use. A read-only audit
+  (`AuthSmoke --face-key-audit`) found all 45 templates of the shared dev database recoverable. Only a template unreadable
+  under every scope produces the re-enrollment message.
+- **Face capture and matching:** 7-second still capture (one sample every 0.7 s, larger detector input, minimum face size);
+  enrollment keeps 8 samples. The decision averages the live samples into one descriptor, which must be within
+  `FaceMatchThreshold` (0.5, unchanged) of an enrolled template, and at least 60% of the single samples must be too.
+- **Supplier sign-in choices** (owner decision 2026-11-15): after a correct password an approved supplier with a face or
+  passkey enrolled chooses Email & Password, Face Recognition or Fingerprint / Passkey, all inside the same pre-auth
+  transaction. "Email & Password" (`Login?handler=PasswordOnly`) signs in with the `supplier-password-step` method; the
+  supplier workspace accepts it only while `Biometric:SupplierPasswordOnly` is true (set it to false to make face or
+  passkey mandatory again).
+- **Account type** (Supplier / Other User) on the sign-in form is a preference. After a correct password the server compares
+  it with the real role; a mismatch signs nobody in and opens no identity step.
+- **Registration identity step** (Pending Approval): Face Recognition or Fingerprint / Device Passkey; either one completes
+  onboarding. Passkey registration uses the browser's WebAuthn prompt (this device, or a phone through the browser's own QR
+  code); the server verifies the attestation and binds it to the signed-in account after a password re-check.
 - Enrolling a fingerprint or face re-checks the current password, so a hijacked session cannot add its own biometrics.
 
 ## Configuration (optional, `appsettings` section `Biometric`)

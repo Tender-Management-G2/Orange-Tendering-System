@@ -33,7 +33,7 @@ public class PendingApprovalModel(UserManager<ApplicationUser> users, Applicatio
             .SingleOrDefaultAsync();
         CompanyApproved = status == SupplierStatus.Approved;
         var method = User.FindFirstValue(BiometricSignInService.AuthenticationMethodClaim);
-        if (CompanyApproved && method is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod)
+        if (CompanyApproved && method is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod or BiometricSignInService.PasswordStepMethod)
             return LocalRedirect("/Supplier");
         return status switch
         {

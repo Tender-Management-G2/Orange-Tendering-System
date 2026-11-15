@@ -23,7 +23,7 @@
     @* RIGHT: a normal form. It never waits for the illustration. *@
     <div class="as-panel">
         <div class="as-panel-inner" id="bio-root" data-return-url="@Model.ReturnUrl"
-             data-face="@(step?.Face == true ? "true" : "false")" data-passkey="@(step?.Passkey == true ? "true" : "false")"
+             data-face="@(step?.Face == true ? "true" : "false")" data-passkey="@(step?.Passkey == true ? "true" : "false")" data-password-only="@(step?.PasswordOnly == true ? "true" : "false")"
              data-expires-in="@Model.BiometricStepSeconds">
             <p class="as-brand"><span class="as-brand-mark" aria-hidden="true"></span><span class="as-brand-name">Sourcing &amp; Tender Management</span></p>
 
@@ -36,6 +36,12 @@
                 <form id="account" method="post" novalidate>
                     <div id="signInMessage" class="as-summary" role="alert"></div>
                     <div asp-validation-summary="ModelOnly" class="as-summary" role="alert"></div>
+                    @* A preference only: the server checks it against the account's real role after the password. *@
+                    <fieldset class="as-account" id="accountType">
+                        <legend class="as-account-legend">I am signing in as</legend>
+                        <label class="as-seg"><input type="radio" name="Input.AccountType" value="supplier" checked="@(Model.Input.AccountType != "other")" /><span>Supplier</span></label>
+                        <label class="as-seg"><input type="radio" name="Input.AccountType" value="other" checked="@(Model.Input.AccountType == "other")" /><span>Other User</span></label>
+                    </fieldset>
                     <div class="as-field">
                         <label asp-for="Input.Email">Email address</label>
                         <input asp-for="Input.Email" autocomplete="username" inputmode="email" aria-required="true" />
@@ -70,9 +76,18 @@
             <div id="signInBiometric" hidden="@(step is null)">
                 <p class="as-kicker">Step 2 of 2 · Supplier identity</p>
                 <h1 class="as-title" id="biometricTitle" tabindex="-1">Choose your identity</h1>
-                <p class="as-lede">Your password is correct. Confirm it is you to open your supplier workspace.</p>
+                <p class="as-lede">Your password is correct. Confirm it is you to open your supplier workspace: choose one method.</p>
 
-                <div class="as-methods" role="group" aria-labelledby="biometricTitle">
+                <div class="as-methods as-methods--three" role="group" aria-labelledby="biometricTitle">
+                    <button type="button" id="btnPasswordOnly" class="as-method" aria-describedby="passwordMethodNote" hidden="@(step?.PasswordOnly != true)">
+                        <span class="as-method-icon" aria-hidden="true">
+                            <svg class="as-icon" viewBox="0 0 48 48"><rect x="9" y="21" width="30" height="20" rx="4" /><path d="M16 21v-6a8 8 0 0 1 16 0v6M24 29v5" /></svg>
+                        </span>
+                        <span class="as-method-text">
+                            <strong>Email &amp; Password</strong>
+                            <small id="passwordMethodNote">Continue with the password you just entered</small>
+                        </span>
+                    </button>
                     <button type="button" id="btnFaceLogin" class="as-method" aria-describedby="faceMethodNote">
                         <span class="as-method-icon" aria-hidden="true">
                             <svg class="as-icon" viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" /><circle cx="24" cy="24" r="7.5" /><path d="M24 5 30.5 20.3M40.4 14.5 27.8 30.5M40.4 33.5 20.5 31M24 43 17.5 27.7M7.6 33.5 20.2 17.5M7.6 14.5 27.5 17" /></svg>

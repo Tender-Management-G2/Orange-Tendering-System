@@ -34,6 +34,20 @@ public class BiometricOptions
     /// <summary>How long a supplier has, after a correct password, to complete the face step before starting again.</summary>
     public int PreAuthSeconds { get; set; } = 300;
 
+    /// <summary>
+    /// Owner decision 2026-11-15: after a correct password an approved supplier may choose "Continue with Email &amp;
+    /// Password" instead of face or passkey. The choice is accepted only inside the server-side pre-auth transaction.
+    /// Set to false to make face or passkey mandatory again for the supplier workspace.
+    /// </summary>
+    public bool SupplierPasswordOnly { get; set; } = true;
+
+    /// <summary>
+    /// Extra Data Protection application names whose face templates are still readable (they are re-encrypted with the
+    /// current key scope on first use). Before 2026-11-15 the scope was the content root folder of whichever copy ran.
+    /// In Development the content roots of sibling checkouts are tried automatically.
+    /// </summary>
+    public string[] LegacyKeyScopes { get; set; } = [];
+
     public int MaxFaceTemplatesPerUser { get; set; } = 10;
     public int MaxPasskeysPerUser { get; set; } = 10;
 

@@ -22,11 +22,13 @@ public class BiometricSignInService(
 {
     public const string FaceMethod = "biometric-face";
     public const string PasskeyMethod = "biometric-passkey";
+    /// <summary>Supplier chose "Continue with Email &amp; Password" inside the pre-auth transaction (Biometric:SupplierPasswordOnly).</summary>
+    public const string PasswordStepMethod = "supplier-password-step";
     public const string AuthenticationMethodClaim = "orange:biometric-auth-method";
 
     public async Task<bool> SignInAsync(ApplicationUser user, string method, string? ipAddress)
     {
-        if (method is not (PasskeyMethod or FaceMethod) || !await AccountAllowedAsync(user))
+        if (method is not (PasskeyMethod or FaceMethod or PasswordStepMethod) || !await AccountAllowedAsync(user))
         {
             await AuditAsync(user.Id, "BiometricSignInDenied", method, ipAddress, "account not allowed to sign in");
             return false;

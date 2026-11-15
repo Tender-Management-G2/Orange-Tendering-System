@@ -23,10 +23,13 @@ public class FaceService(
     ChallengeStore challenges,
     IDataProtectionProvider dataProtection,
     IOptions<BiometricOptions> options,
-    ILogger<FaceService> logger)
+    ILogger<FaceService> logger,
+    IHostEnvironment environment)
 {
-    /// <summary>Shown after the password step when the stored face cannot be read (keys changed): enrolling again fixes it.</summary>
-    public const string ReEnrollRequired = "Your enrolled face can no longer be read by this server. Sign in with a passkey, or open Pending Approval / Face settings and enroll your face again.";
+    private const string TemplatePurpose = "Orange.Biometric.FaceTemplate.v1";
+
+    /// <summary>Shown after the password step when no stored face can be read under any known key scope.</summary>
+    public const string ReEnrollRequired = "Your saved face record could not be opened on this server, so it could not be compared. This is not a face mismatch. Use Email & Password or Fingerprint / Passkey to sign in, then enroll your face again.";
 
     public const string LoginPurpose = "face-login";
     public const string EnrollPurpose = "face-enroll";
@@ -34,10 +37,10 @@ public class FaceService(
 
     private const int DescriptorLength = 128;
     private const int MinSamples = 3;
-    private const int MaxSamples = 12; // the browser sends one sample a second over 8 s
+    private const int MaxSamples = 14; // the browser sends one sample every 0.7 s over 7 s
     private const int SamplesStored = 8; // more enrolled views of the face: fewer false rejections
 
-    private readonly IDataProtector protector = dataProtection.CreateProtector("Orange.Biometric.FaceTemplate.v1");
+    private readonly IDataProtector protector = dataProtection.CreateProtector(TemplatePurpose);
 
     public FaceChallengeResponse CreateChallenge(string purpose, string? userId) => new()
     {
@@ -94,22 +97,30 @@ public class FaceService(
 
         var rows = await db.FaceTemplates.Where(t => t.UserId == user.Id).ToListAsync();
         var templates = new List<float[]>();
+        var migrated = 0;
         foreach (var row in rows)
         {
-            try
+            var bytes = Read(row.ProtectedTemplate);
+            if (bytes is null)
+                continue;
+            if (bytes.Value.Legacy)
             {
-                templates.Add(FromBytes(protector.Unprotect(row.ProtectedTemplate)));
+                // Enrolled under the old folder-based key scope: re-encrypt it under the current one, once.
+                row.ProtectedTemplate = protector.Protect(bytes.Value.Data);
+                migrated++;
             }
-            catch (CryptographicException)
-            {
-                // A template that can no longer be decrypted (keys changed) is ignored.
-            }
+            templates.Add(FromBytes(bytes.Value.Data));
+        }
+        if (migrated > 0)
+        {
+            logger.LogInformation("Re-encrypted {Count} face template(s) of user {UserId} under the current key scope.", migrated, user.Id);
+            await db.SaveChangesAsync();
         }
 
         if (rows.Count > 0 && templates.Count == 0)
         {
             // Not a mismatch: nothing to compare with. Say so (the password was already correct) instead of failing forever.
-            logger.LogWarning("Face templates for user {UserId} could not be decrypted; re-enrollment required.", user.Id);
+            logger.LogWarning("Face templates for user {UserId} could not be decrypted under any known key scope.", user.Id);
             return BiometricResult.Fail(ReEnrollRequired);
         }
 
@@ -123,17 +134,92 @@ public class FaceService(
     }
 
     /// <summary>
-    /// The face decision used by sign-in: each live sample is compared with its closest enrolled template; at least
-    /// 70% of the samples (minimum 3) and the average distance must be within FaceMatchThreshold.
+    /// The face decision used by sign-in. The live samples are averaged into one descriptor (single frames are noisy:
+    /// blur, a blink, a half-turned head); that average must be within FaceMatchThreshold of the closest enrolled
+    /// template, and at least 60% of the individual samples (minimum 3) must be within it too. The threshold itself is
+    /// unchanged, so the decision is steadier for the enrolled person without being easier for someone else.
+    /// AverageDistance reports the averaged descriptor's distance.
     /// </summary>
     public FaceMatch Match(IReadOnlyList<FaceDescriptorSample> live, IReadOnlyList<float[]> templates)
     {
         var best = live.Select(d => templates.Min(t => Distance(d.V, t))).ToList();
         var threshold = options.Value.FaceMatchThreshold;
         var matching = best.Count(d => d <= threshold);
-        var required = Math.Max(MinSamples, (int)Math.Ceiling(best.Count * 0.7));
-        var average = best.Count == 0 ? double.PositiveInfinity : best.Average();
-        return new FaceMatch(best.Count > 0 && matching >= required && average <= threshold, best, average, matching, required, threshold);
+        var required = Math.Max(MinSamples, (int)Math.Ceiling(best.Count * 0.6));
+        var centroid = best.Count == 0 ? double.PositiveInfinity : templates.Min(t => Distance(Centroid(live), t));
+        return new FaceMatch(best.Count > 0 && matching >= required && centroid <= threshold, best, centroid, matching, required, threshold);
+    }
+
+    private static float[] Centroid(IReadOnlyList<FaceDescriptorSample> live)
+    {
+        var mean = new float[DescriptorLength];
+        foreach (var sample in live)
+            for (var i = 0; i < DescriptorLength; i++)
+                mean[i] += sample.V[i] / live.Count;
+        return mean;
+    }
+
+    // ---- Reading templates, including ones encrypted under an earlier key scope ----
+
+    /// <summary>The template bytes, flagged when they could only be read with a legacy key scope; null when unreadable.</summary>
+    private (byte[] Data, bool Legacy)? Read(byte[] protectedTemplate)
+    {
+        try
+        {
+            return (protector.Unprotect(protectedTemplate), false);
+        }
+        catch (CryptographicException)
+        {
+        }
+        foreach (var legacy in LegacyProtectors())
+        {
+            try
+            {
+                return (legacy.Unprotect(protectedTemplate), true);
+            }
+            catch (CryptographicException)
+            {
+            }
+        }
+        return null;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IDataProtector[]> LegacyCache = new();
+
+    /// <summary>
+    /// Until 2026-11-15 AddDataProtection had no application name, so its scope was the content root folder of the
+    /// running copy. The key files are the same (per Windows user, %LOCALAPPDATA%\ASP.NET\DataProtection-Keys); only
+    /// the scope differs, so those templates are recoverable by opening the same key ring under the old scope.
+    /// </summary>
+    private IDataProtector[] LegacyProtectors()
+    {
+        var root = environment.ContentRootPath;
+        return LegacyCache.GetOrAdd(root, _ =>
+        {
+            var keys = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ASP.NET", "DataProtection-Keys"));
+            if (!keys.Exists)
+                return [];
+            var folders = new List<string> { root };
+            if (environment.IsDevelopment())
+            {
+                // Sibling checkouts of this repository (Visual Studio folder, worktrees) used their own folder as scope.
+                var repositories = Directory.GetParent(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))?.Parent;
+                if (repositories?.Exists == true)
+                    folders.AddRange(repositories.GetDirectories()
+                        .Select(d => Path.Combine(d.FullName, "Orange-Tendering-System"))
+                        .Where(Directory.Exists));
+            }
+            var scopes = options.Value.LegacyKeyScopes
+                .Concat(folders.SelectMany(f => new[]
+                {
+                    f.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    f.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar
+                }))
+                .Distinct(StringComparer.Ordinal);
+            return scopes
+                .Select(scope => DataProtectionProvider.Create(keys, b => b.SetApplicationName(scope)).CreateProtector(TemplatePurpose))
+                .ToArray();
+        });
     }
 
     // ---- Development-only /face-demo (Controllers/FaceDemoController.cs) ----

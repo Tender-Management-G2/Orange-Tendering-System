@@ -34,6 +34,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 // --- Layout ---------------------------------------------------------------------------------------
 export const OPT = { x: 15.8, z: -6.2, housing: 3.85, h: 0.62, pitch: 2.3, open: 1.5, cover: 1.62, bezel: 3.72 };
 export const TOUCH = { x: 15.8, z: 4.6, w: 3.8, d: 4.4, h: 0.46 };
+export const CRED = { x: 19.1, z: -1.0, w: 3.2, d: 2.3, h: 0.5 }; // Credential Identity (email & password)
+export const PHONE = { x: 20.5, z: 4.6, w: 1.9, d: 3.7, h: 0.2 }; // mobile module of Touch Identity
 const J = { x: 11.0, z: L.SIM.row }; // junction beyond the boundary where the two module paths split
 const BLADES = 8;
 const LIFT = 0.55; // world height the contact plates rise to at full lift
@@ -45,6 +47,8 @@ export const RIG_DEFAULTS = {
   gateOk: 0, gateErr: 0, gateWarn: 0, block: 0,
   branches: 0, optic: 0, bezel: 0, touch: 0, fp: 0, hover: 0, touchLit: 0,
   iris: 0, irisWarn: 0, ring: 0, ringOk: 0, proc: 0, procPhase: 0,
+  cred: 0, credLit: 0, branchC: 0, pulseC: 0,
+  phone: 0, phoneLink: 0, phonePulse: 0, phoneWait: 0, touchWarn: 0,
   cable: 0, finale: 0
 };
 
@@ -212,6 +216,70 @@ export function buildHardware(stage, root, card, pads, sig) {
   const opticMaterials = [ceramic, ceramicSide];
 
   // ----------------------------------------------------------------------------------------------
+  // Credential Identity: a ceramic security block with a champagne contact plate and an orange key slot,
+  // on a third path straight on from the junction.
+  // ----------------------------------------------------------------------------------------------
+  const branchC = new Path().M(J.x, J.z).L(CRED.x - CRED.w / 2, CRED.z).build({ step: 0.05 });
+  const inkC = new Stroke(branchC, { color: COLOR.ink, width: LINE.detail, y: 0.012 });
+  const litC = new Stroke(branchC, { color: COLOR.orangeInk, width: LINE.main, y: 0.013 });
+  root.add(inkC, litC);
+  const cred = new THREE.Group();
+  cred.position.set(CRED.x, 0, CRED.z);
+  root.add(cred);
+  const cw = CRED.w / 2;
+  const cd = CRED.d / 2;
+  const credBody = new THREE.Mesh(sheetGeometry(roundedRect(-cw, -cd, cw, cd, 0.45), CRED.h), [ceramic, ceramic, ceramicSide]);
+  credBody.castShadow = true;
+  credBody.receiveShadow = true;
+  cred.add(credBody);
+  const plate = new THREE.Mesh(sheetGeometry(roundedRect(-cw + 0.35, -cd + 0.32, cw - 0.35, cd - 0.32, 0.22), 0.04, { y: CRED.h }), metalMaterial(stage.renderer, COLOR.champagne, { roughness: 0.3 }));
+  plate.castShadow = true;
+  cred.add(plate);
+  const slotMat = new THREE.MeshStandardMaterial({ color: '#2a2520', roughness: 0.5 });
+  const slot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.05, 24), slotMat);
+  slot.position.set(-0.55, CRED.h + 0.06, 0);
+  const slotBar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.36), slotMat);
+  slotBar.position.set(-0.55, CRED.h + 0.06, 0.2);
+  cred.add(slot, slotBar);
+  const credLines = [-0.3, 0, 0.3].map(z => {
+    const s = new Stroke(new Path().M(-0.1, z).L(0.95 - Math.abs(z), z).build({ step: 0.04 }), { color: COLOR.ink, width: 0.05, y: CRED.h + 0.045 });
+    s.drawn = 1;
+    cred.add(s);
+    return s;
+  });
+  const credRing = new Stroke(roundedRectPath(-cw - 0.18, -cd - 0.18, cw + 0.18, cd + 0.18, 0.6), { color: COLOR.orangeInk, width: 0.07, y: 0.02 });
+  cred.add(credRing);
+  const credMaterials = [ceramic, ceramicSide];
+
+  // ----------------------------------------------------------------------------------------------
+  // Mobile module of Touch Identity: a small phone linked to the sensor slab. It stands for the device
+  // that unlocks the passkey (this computer's reader, or a phone reached through the browser's own QR
+  // code). It never shows a QR code of its own and never decides anything.
+  // ----------------------------------------------------------------------------------------------
+  const phonePath = new Path().M(TOUCH.x + TOUCH.w / 2, TOUCH.z).L(PHONE.x - PHONE.w / 2, PHONE.z).build({ step: 0.04 });
+  const phoneLinkStroke = new Stroke(phonePath, { color: COLOR.orangeInk, width: LINE.main, y: 0.014 });
+  root.add(phoneLinkStroke);
+  const phone = new THREE.Group();
+  phone.position.set(PHONE.x, 0, PHONE.z);
+  root.add(phone);
+  const pw = PHONE.w / 2;
+  const pd = PHONE.d / 2;
+  const phoneBody = new THREE.Mesh(sheetGeometry(roundedRect(-pw, -pd, pw, pd, 0.32), PHONE.h), [new THREE.MeshStandardMaterial({ color: '#3a332d', roughness: 0.45, metalness: 0.3, envMap: env, envMapIntensity: 0.6 }), ceramicSide, metalMaterial(stage.renderer, COLOR.champagne, { roughness: 0.3 })]);
+  phoneBody.castShadow = true;
+  phone.add(phoneBody);
+  const screenMat = new THREE.MeshStandardMaterial({ color: '#1f1b18', roughness: 0.08, metalness: 0.1, envMap: env, envMapIntensity: 0.9, emissive: new THREE.Color(COLOR.orange), emissiveIntensity: 0 });
+  const screen = new THREE.Mesh(sheetGeometry(roundedRect(-pw + 0.12, -pd + 0.22, pw - 0.12, pd - 0.22, 0.22), 0.01, { y: PHONE.h }), screenMat);
+  phone.add(screen);
+  const phonePrint = fingerprintRidges().slice(0, 6).map(p => {
+    const s = new Stroke(p, { color: COLOR.orange, width: 0.03, y: PHONE.h + 0.014 });
+    s.scale.setScalar(0.62);
+    s.position.y = PHONE.h * (1 - 0.62) + 0.006;
+    phone.add(s);
+    return s;
+  });
+  const phoneMaterials = [ceramicSide];
+
+  // ----------------------------------------------------------------------------------------------
   // The pulse
   // ----------------------------------------------------------------------------------------------
   const pulse = new PenDot({ color: COLOR.orange, radius: 0.24 });
@@ -274,6 +342,15 @@ export function buildHardware(stage, root, card, pads, sig) {
   const sigTotal = sigInner.total + sigOuter.total;
   const _p = [0, 0];
   function pulsePoint(rig, cardTop) {
+    if (rig.phonePulse > 0) {
+      // From the phone back along the link into the sensor.
+      phonePath.pointAt((1 - rig.phonePulse) * phonePath.total, _p);
+      return [_p[0], 0.06, _p[1]];
+    }
+    if (rig.pulseC > 0) {
+      branchC.pointAt(rig.pulseC * branchC.total, _p);
+      return [_p[0], 0.05, _p[1]];
+    }
     if (rig.pulseBranch > 0) {
       branchA.pointAt(rig.pulseBranch * branchA.total, _p);
       return [_p[0], 0.05, _p[1]];
@@ -366,11 +443,29 @@ export function buildHardware(stage, root, card, pads, sig) {
     // Touch module.
     develop(touch, touchMaterials, groundColor, rig.touch);
     touch.visible = rig.touch > 0.002;
-    _c.copy(inkColor).lerp(okColor, rig.touchLit);
+    _c.copy(inkColor).lerp(okColor, rig.touchLit).lerp(warnColor, rig.touchWarn);
     ridges.forEach((s, i) => {
       s.drawn = clamp01(rig.fp * 1.8 - i * 0.07);
       s.material.uniforms.uColor.value.copy(_c);
     });
+
+    // Credential Identity.
+    develop(cred, credMaterials, groundColor, rig.cred);
+    cred.visible = rig.cred > 0.002;
+    inkC.drawn = clamp01(rig.branches * 1.3 - 0.15);
+    litC.range = [0, rig.pulseC > 0 ? rig.pulseC * branchC.total : -1];
+    credRing.drawn = rig.credLit;
+    credLines.forEach(s => s.material.uniforms.uColor.value.copy(inkColor).lerp(okColor, rig.credLit));
+
+    // Mobile module and its link.
+    develop(phone, phoneMaterials, groundColor, rig.phone);
+    phone.visible = rig.phone > 0.002;
+    phone.position.y = 0.08 * smooth(rig.phone);
+    phoneLinkStroke.drawn = rig.phoneLink;
+    screenMat.emissiveIntensity = 0.08 + 0.22 * rig.phoneWait;
+    phonePrint.forEach((s, i) => (s.drawn = clamp01(rig.phoneLink * 1.6 - i * 0.12)));
+    _c.copy(okColor).lerp(warnColor, rig.touchWarn);
+    phoneLinkStroke.material.uniforms.uColor.value.copy(_c);
 
     // Pulse.
     const pt = pulsePoint(rig, L.T_SHELL * sy + 0.02);
@@ -407,11 +502,18 @@ export function buildHardware(stage, root, card, pads, sig) {
   }
 
   /** Where a finale should start: the far side of the optical housing, or just past the boundary. */
-  function finaleOrigin(fromOptic) {
-    return fromOptic ? [OPT.x + OPT.housing + 0.1, OPT.z] : [G.x + G.r + 0.2, G.z];
+  function finaleOrigin(from) {
+    if (from === true || from === 'optic') return [OPT.x + OPT.housing + 0.1, OPT.z];
+    if (from === 'cred') return [CRED.x + CRED.w / 2 + 0.1, CRED.z];
+    if (from === 'touch') return [PHONE.x + PHONE.w / 2 + 0.1, PHONE.z];
+    return [G.x + G.r + 0.2, G.z];
   }
 
   return { apply, apertureOnScreen, buildFiber, disposeFiber, finaleOrigin, defaults: RIG_DEFAULTS };
+}
+
+function roundedRectPath(x0, z0, x1, z1, r) {
+  return new Path().M(x0 + r, z0).L(x1, z0, r).L(x1, z1, r).L(x0, z1, r).L(x0, z0, r).L(x0 + r, z0).build({ step: 0.04 });
 }
 
 /** Engraved ridges of the Touch Identity sensor: nested arches around an off-centre core. */
