@@ -4,9 +4,13 @@ using Orange_Tendering_System.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Orange_Tendering_System.Models;
 using System.Text.Json;
+using System.Text;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Orange_Tendering_System.Services
 {
@@ -15,15 +19,24 @@ namespace Orange_Tendering_System.Services
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IEmailSender _emailSender;
+        private readonly LinkGenerator _links;
+        private readonly IWebHostEnvironment _environment;
 
         public AdminService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            RoleManager<IdentityRole> roleManager)
+            RoleManager<IdentityRole> roleManager,
+            IEmailSender emailSender,
+            LinkGenerator links,
+            IWebHostEnvironment environment)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
+            _emailSender = emailSender;
+            _links = links;
+            _environment = environment;
         }
 
         // A supplier application enters Admin review only after its contact verifies the OTP.
@@ -975,7 +988,8 @@ namespace Orange_Tendering_System.Services
 
         public async Task<IdentityResult> CreateUserAsync(
             CreateUserViewModel model,
-            string adminId)
+            string adminId,
+            HttpContext httpContext)
         {
             var committeeSeat = CommitteeAccountSeats.Find(model.CommitteeSeat);
             if (model.CommitteeSeat != null && (committeeSeat == null || committeeSeat.Role != model.Role))
@@ -1031,6 +1045,7 @@ namespace Orange_Tendering_System.Services
                 });
             }
 
+            var hasTemporaryPassword = !string.IsNullOrEmpty(model.Password);
             var user = new ApplicationUser
             {
                 UserName = email,
@@ -1040,18 +1055,18 @@ namespace Orange_Tendering_System.Services
                 SupplierId = null,
                 IsActive = model.IsActive,
                 MustChangePassword = true,
-
-                // Admin-created employees use a temporary password and must replace it
-                // at first sign-in. Identity requires a confirmed account to sign in.
-                EmailConfirmed = true
+                // An emailed setup link confirms the account; a temporary password
+                // allows sign-in now but must be replaced at first sign-in.
+                EmailConfirmed = hasTemporaryPassword
             };
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
             // Create the account using Identity
-            var result = await _userManager.CreateAsync(
-                user, model.Password);
+            var result = hasTemporaryPassword
+                ? await _userManager.CreateAsync(user, model.Password!)
+                : await _userManager.CreateAsync(user);
 
             if (!result.Succeeded)
             {
@@ -1100,8 +1115,41 @@ namespace Orange_Tendering_System.Services
                 CreatedAt = DateTime.UtcNow
             });
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            try
+            {
+                if (!hasTemporaryPassword)
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+                    var passwordUrl = _links.GetUriByPage(httpContext, "/Account/ActivateEmployee",
+                        values: new { area = "Identity", email = user.Email, code });
+                    var loginUrl = _links.GetUriByPage(httpContext, "/Account/Login",
+                        values: new { area = "Identity" });
+                    if (passwordUrl == null || loginUrl == null)
+                        throw new InvalidOperationException("Could not generate account links.");
+
+                    await _emailSender.SendEmailAsync(email, "Welcome to Orange Tendering",
+                        $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
+                        "<p>Welcome to Orange Tendering. An administrator has created an account for you.</p>" +
+                        $"<p><a href=\"{HtmlEncoder.Default.Encode(passwordUrl)}\">Set your password</a> to activate your account. This secure link expires in one hour.</p>" +
+                        $"<p>After setting your password, <a href=\"{HtmlEncoder.Default.Encode(loginUrl)}\">sign in to Orange Tendering</a> using this email address.</p>" +
+                        "<p>If you were not expecting this invitation, please contact your administrator.</p>" +
+                        "<p>Kind regards,<br>Orange Tendering Team</p>");
+                }
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception exception) when (!hasTemporaryPassword && (exception is System.Net.Mail.SmtpException or InvalidOperationException))
+            {
+                await transaction.RollbackAsync();
+                return IdentityResult.Failed(new IdentityError
+                {
+                    Description = exception is InvalidOperationException &&
+                        exception.Message == "SMTP email delivery is not configured."
+                        ? "Email delivery is not configured. The account was not created."
+                        : "The welcome email could not be delivered. The account was not created. Please try again."
+                });
+            }
 
             return IdentityResult.Success;
         }
@@ -2015,41 +2063,74 @@ public async Task<string> UpdateUserAsync(
                 (supplier.Status == SupplierStatus.Approved &&
                  model.Decision == SupplierStatus.Suspended)
                 ||
-                (supplier.Status == SupplierStatus.Suspended &&
+                ((supplier.Status == SupplierStatus.Suspended ||
+                  supplier.Status == SupplierStatus.Rejected) &&
                  model.Decision == SupplierStatus.Approved);
 
             if (!allowed)
                 return "InvalidTransition";
 
+            var oldStatus = supplier.Status;
+            var reviewedAt = DateTime.UtcNow;
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
             if (model.Decision == SupplierStatus.Approved)
             {
                 var documents = await _context.Documents
-                    .AsNoTracking()
                     .Where(d => d.SupplierId == supplier.Id)
                     .ToListAsync();
 
                 if (documents.Count == 0)
                     return "DocumentsRequired";
 
-                var allVerified = documents.All(d =>
-                    d.VerificationStatus ==
-                        DocumentVerificationStatus.Verified &&
-                    (!d.ExpiresAt.HasValue ||
-                     d.ExpiresAt.Value.Date >= DateTime.UtcNow.Date));
+                if (!documents.Any(d => d.DocumentType == "CommercialRegistration"))
+                    return "DocumentsRequired";
 
-                if (!allVerified)
+                foreach (var document in documents)
+                {
+                    try
+                    {
+                        if (!File.Exists(PrivateDocumentPaths.Resolve(
+                            _environment.ContentRootPath, document.StoragePath)))
+                            return "DocumentsUnavailable";
+                    }
+                    catch (WorkflowException)
+                    {
+                        return "DocumentsUnavailable";
+                    }
+                }
+
+                if (documents.Any(d => d.VerificationStatus == DocumentVerificationStatus.Rejected))
+                    return "DocumentsRejected";
+
+                if (documents.Any(d => d.ExpiresAt.HasValue &&
+                    d.ExpiresAt.Value.Date < reviewedAt.Date))
                     return "DocumentsNotVerified";
+
+                // The Admin's approval also verifies documents still awaiting a decision.
+                foreach (var document in documents.Where(d =>
+                    d.VerificationStatus != DocumentVerificationStatus.Verified))
+                {
+                    document.VerificationStatus = DocumentVerificationStatus.Verified;
+                    document.VerifiedByUserId = adminId;
+                    document.VerifiedAt = reviewedAt;
+                    document.VerificationNotes = model.ReviewNotes?.Trim();
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        UserId = adminId,
+                        Action = "DocumentVerifiedWithSupplierApproval",
+                        EntityName = "Document",
+                        EntityId = document.Id.ToString(),
+                        CreatedAt = reviewedAt
+                    });
+                }
             }
-
-            var oldStatus = supplier.Status;
-
-            await using var transaction =
-                await _context.Database.BeginTransactionAsync();
 
             supplier.Status = model.Decision;
             supplier.ReviewNotes = model.ReviewNotes?.Trim();
             supplier.ReviewedByUserId = adminId;
-            supplier.ReviewedAt = DateTime.UtcNow;
+            supplier.ReviewedAt = reviewedAt;
 
             // Accounts linked to this supplier
             var accounts = await _context.Users
@@ -2067,9 +2148,14 @@ public async Task<string> UpdateUserAsync(
                     account.SecurityStamp = Guid.NewGuid().ToString();
                 }
             }
-
-            // Re-approving does not automatically reactivate
-            // accounts that might have been disabled separately.
+            else if (model.Decision == SupplierStatus.Approved)
+            {
+                foreach (var account in accounts.Where(a => a.EmailConfirmed))
+                {
+                    account.IsActive = true;
+                    account.SecurityStamp = Guid.NewGuid().ToString();
+                }
+            }
 
             foreach (var account in accounts)
             {

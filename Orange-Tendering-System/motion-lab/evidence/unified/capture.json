@@ -1,0 +1,134 @@
+{
+  "time": "2026-11-14T15:56:00.983Z",
+  "browser": "157.0.4341.60",
+  "url": "http://127.0.0.1:4173",
+  "screenshots": [
+    "paper-desktop-000.png",
+    "paper-desktop-000-stage.png",
+    "paper-desktop-007.png",
+    "paper-desktop-007-stage.png",
+    "paper-desktop-014.png",
+    "paper-desktop-014-stage.png",
+    "paper-desktop-025.png",
+    "paper-desktop-025-stage.png",
+    "paper-desktop-039.png",
+    "paper-desktop-039-stage.png",
+    "paper-desktop-065.png",
+    "paper-desktop-065-stage.png",
+    "paper-desktop-083.png",
+    "paper-desktop-083-stage.png",
+    "paper-desktop-100.png",
+    "paper-desktop-100-stage.png",
+    "signal-desktop-000.png",
+    "signal-desktop-000-stage.png",
+    "signal-desktop-007.png",
+    "signal-desktop-007-stage.png",
+    "signal-desktop-012.png",
+    "signal-desktop-012-stage.png",
+    "signal-desktop-032.png",
+    "signal-desktop-032-stage.png",
+    "signal-desktop-055.png",
+    "signal-desktop-055-stage.png",
+    "signal-desktop-078.png",
+    "signal-desktop-078-stage.png",
+    "signal-desktop-094.png",
+    "signal-desktop-094-stage.png",
+    "signal-desktop-100.png",
+    "signal-desktop-100-stage.png",
+    "paper-mobile-000.png",
+    "paper-mobile-007.png",
+    "paper-mobile-014.png",
+    "paper-mobile-025.png",
+    "paper-mobile-039.png",
+    "paper-mobile-065.png",
+    "paper-mobile-083.png",
+    "paper-mobile-100.png",
+    "signal-mobile-000.png",
+    "signal-mobile-007.png",
+    "signal-mobile-012.png",
+    "signal-mobile-032.png",
+    "signal-mobile-055.png",
+    "signal-mobile-078.png",
+    "signal-mobile-094.png",
+    "signal-mobile-100.png",
+    "signal-reduced.png"
+  ],
+  "errors": [],
+  "states": [
+    {
+      "label": "desktop",
+      "state": {
+        "mode": "signal",
+        "progress": 1,
+        "category": "IT & Electronics",
+        "categoryMix": 1,
+        "playing": false,
+        "reducedMotion": false,
+        "orbit": false,
+        "wireframe": false,
+        "lightingRig": "studio",
+        "materialMode": "authored",
+        "shadows": true,
+        "loginStage": "credentials"
+      },
+      "fingerprintDisabled": true,
+      "canvas": {
+        "pixelRatio": 1,
+        "calls": 254,
+        "triangles": 17783,
+        "points": 0,
+        "lines": 174,
+        "viewport": [
+          773,
+          600
+        ]
+      }
+    },
+    {
+      "label": "mobile",
+      "state": {
+        "mode": "signal",
+        "progress": 1,
+        "category": "IT & Electronics",
+        "categoryMix": 1,
+        "playing": false,
+        "reducedMotion": false,
+        "orbit": false,
+        "wireframe": false,
+        "lightingRig": "studio",
+        "materialMode": "authored",
+        "shadows": true,
+        "loginStage": "credentials"
+      },
+      "fingerprintDisabled": true,
+      "canvas": {
+        "pixelRatio": 1,
+        "calls": 254,
+        "triangles": 17783,
+        "points": 0,
+        "lines": 174,
+        "viewport": [
+          364,
+          365
+        ]
+      }
+    },
+    {
+      "label": "reduced",
+      "state": {
+        "mode": "signal",
+        "progress": 0.12,
+        "category": "IT & Electronics",
+        "categoryMix": 1,
+        "playing": false,
+        "reducedMotion": true,
+        "orbit": false,
+        "wireframe": false,
+        "lightingRig": "studio",
+        "materialMode": "authored",
+        "shadows": true,
+        "loginStage": "credentials"
+      }
+    }
+  ]
+}

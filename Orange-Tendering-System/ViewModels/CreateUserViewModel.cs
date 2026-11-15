@@ -25,10 +25,9 @@ namespace Orange_Tendering_System.ViewModels
         [StringLength(40)]
         public string? CommitteeSeat { get; set; }
 
-        [Required(ErrorMessage = "Password is required.")]
         [StringLength(100, MinimumLength = 8, ErrorMessage = "Temporary password must be 8 to 100 characters.")]
         [DataType(DataType.Password)]
-        public string Password { get; set; } = "";
+        public string? Password { get; set; }
 
         public bool IsActive { get; set; } = true;
 

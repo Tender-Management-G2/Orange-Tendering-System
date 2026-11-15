@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One world, two stories — side by side</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23FF7900'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="studio.css">
+  <style>
+    body { background: #FFFDF9; }
+    .cmp { max-width: 1500px; margin: 0 auto; padding: 28px 28px 40px; }
+    .cmp header { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 28px; margin-bottom: 18px; }
+    .cmp h1 { margin: 0; font-size: 26px; letter-spacing: -0.025em; font-weight: 680; }
+    .cmp header p { margin: 0; color: var(--warm-gray); font-size: 14px; max-width: 62ch; }
+    .cmp nav { margin-left: auto; display: flex; gap: 16px; font-size: 13.5px; }
+    .cmp nav a { color: var(--graphite); font-weight: 620; text-underline-offset: 3px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .pane { border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--stage); }
+    .pane h2 { margin: 0; padding: 10px 14px; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm-gray); background: var(--paper); border-bottom: 1px solid var(--rule); display: flex; justify-content: space-between; }
+    .pane h2 span { color: var(--orange-ink); }
+    .pane iframe { display: block; width: 100%; height: min(68vh, 760px); border: 0; }
+    .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 12px; }
+    .bar button { height: 34px; padding: 0 13px; font: inherit; font-size: 13px; font-weight: 620; color: var(--graphite); background: #fff; border: 1px solid var(--field); border-radius: 8px; cursor: pointer; }
+    .bar button:hover { border-color: #BFB1A0; }
+    .bar button[aria-pressed="true"] { background: var(--graphite); border-color: var(--graphite); color: #fff; }
+    .bar button:focus-visible, .bar input:focus-visible { outline: 2px solid var(--orange-ink); outline-offset: 2px; }
+    .bar input[type="range"] { flex: 1 1 240px; accent-color: var(--orange); }
+    .bar .sep { width: 1px; height: 22px; background: var(--rule); }
+    .note { margin: 12px 2px 0; font-size: 12.5px; color: var(--warm-gray); }
+    @media (max-width: 900px) { .pair { grid-template-columns: 1fr; } .pane iframe { height: 56vh; } }
+  </style>
+</head>
+<body>
+  <main class="cmp">
+    <header>
+      <div>
+        <p class="kicker">Motion Lab · G2A</p>
+        <h1>One world, two stories</h1>
+      </div>
+      <p>Both scenes are live, rendered by the same stage, light, stroke and camera code. Pick a matched moment or scrub both together; each side is a real scene, not an image.</p>
+      <nav aria-label="Lab pages"><a href="./?chapter=registration&inspector">Registration lab</a><a href="./?chapter=login&inspector">Login lab</a></nav>
+    </header>
+
+    <div class="pair">
+      <section class="pane" aria-label="Supplier Genesis">
+        <h2>Registration <span>Supplier Genesis · R00–R02</span></h2>
+        <iframe id="frame-registration" src="./?chapter=registration&embed=stage" title="Supplier Genesis scene"></iframe>
+      </section>
+      <section class="pane" aria-label="Orange Signal">
+        <h2>Login <span>Orange Signal · L00–L02</span></h2>
+        <iframe id="frame-login" src="./?chapter=login&embed=stage" title="Orange Signal scene"></iframe>
+      </section>
+    </div>
+
+    <div class="bar" role="group" aria-label="Matched moments">
+      <button type="button" data-moment="blank">Blank</button>
+      <button type="button" data-moment="line">The line</button>
+      <button type="button" data-moment="drawn">Drawing complete</button>
+      <button type="button" data-moment="developed">Line becomes material</button>
+      <button type="button" data-moment="detail">Email detail</button>
+      <button type="button" data-moment="final">End of gate</button>
+      <span class="sep"></span>
+      <button type="button" id="play">Play both</button>
+      <button type="button" id="play-slow">Play both at 0.5×</button>
+      <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scrub both showreels (normalised)">
+    </div>
+    <p class="note">The scrubber is normalised per chapter (0–100% of each showreel), so it compares structure, not identical timestamps. Matched moments compare like with like.</p>
+  </main>
+
+  <script>
+    const frames = ['registration', 'login'].map(id => document.getElementById('frame-' + id));
+    const ready = new Set();
+    let pending = { type: 'moment', value: 'developed' };
+    const send = message => {
+      pending = message;
+      for (const f of frames) f.contentWindow?.postMessage({ source: 'orange-auth-lab', ...message }, location.origin);
+    };
+    window.addEventListener('message', event => {
+      if (event.origin !== location.origin || event.data?.source !== 'orange-auth-lab' || event.data.type !== 'ready') return;
+      ready.add(event.data.chapter);
+      if (ready.size === 2) send(pending);
+    });
+    const buttons = [...document.querySelectorAll('[data-moment]')];
+    const mark = active => buttons.forEach(b => b.setAttribute('aria-pressed', String(b === active)));
+    buttons.forEach(b => b.addEventListener('click', () => { mark(b); send({ type: 'moment', value: b.dataset.moment }); }));
+    mark(buttons.find(b => b.dataset.moment === 'developed'));
+    document.getElementById('play').addEventListener('click', () => { mark(null); send({ type: 'play', value: 1 }); });
+    document.getElementById('play-slow').addEventListener('click', () => { mark(null); send({ type: 'play', value: 0.5 }); });
+    document.getElementById('scrub').addEventListener('input', e => { mark(null); send({ type: 'progress', value: Number(e.target.value) / 1000 }); });
+  </script>
+</body>
+</html>

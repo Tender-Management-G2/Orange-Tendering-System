@@ -1,0 +1,15 @@
+# G1 generated material studies
+
+Generated 14 November 2026 with the built-in imagegen tool. These are proposed material references only. They are not geometry, animation frames, website backgrounds, or authentication evidence. The original generated outputs remain in Codex's generated-images directory; project copies are the two PNGs beside this file.
+
+## `g1-paper-architecture-material.png`
+
+> Use case: stylized-concept. Asset type: G1 art-direction material reference for a future procedural 3D animation, NOT a website background. Create one isolated hero render of a paper-engineered miniature contemporary company building arising from a single ivory sheet. The base sheet, two wall leaves, roof leaf, and identity pocket are visibly connected by real crease hinges; show restrained but convincing paper thickness, beveled edges, clean folds, and a small Orange #FF7900 registration square anchored to the near edge. Three-quarter orthographic product-study view on a plain #F8F5EF studio field, generous negative space, disciplined dark-ink edge lines, soft key light and warm contact shadows. Sophisticated architectural maquette, precise geometry and editorial restraint. No people, no desk, no photoreal office background, no labels, no letters, no logos, no floating props, no unrelated objects. The composition should let a 3D artist identify actual pivots and paper continuity.
+
+Observation: useful paper surface, restrained light, and stable orange marker. Some wall/roof connections are visually suggested rather than mechanically proven; G2 must author actual hinges and validate by orbit and wireframe.
+
+## `g1-signal-core-material.png`
+
+> Use case: stylized-concept. Asset type: G1 art-direction material reference for a future modeled 3D authentication animation, NOT a website background. Create a single isolated compact telecom authentication device in a three-quarter orthographic product-study view on a plain near-black graphite studio field (#151515). One precision-machined square core with satin graphite housing; a visible copper SIM contact plate sliding into the same core on rails; fine etched circuit traces connecting the pads; a physical six-blade optical aperture centered in the core with real overlapping metal petals, partially open; one elegantly curved fiber-optic cable mechanically attached to the right side, with a restrained warm Orange #FF7900 light in the cable. One small orange square marker on the module, consistent with paper registration scene. Sophisticated industrial design, credible thickness and joint tolerances, polished copper and ivory optical inner ring, subtle studio lighting, no neon haze. No person, no face, no network nodes, no lock icons, no multiple devices, no loose wires, no labels, no letters, no logo, no interface controls. The rendering must emphasize a single coherent assembly and actual movable hardware.
+
+Observation: clear single assembly, precise rail/pad/cable relationships and restrained orange. Aperture petals look plausible in a still image, but their blade sweep and clear camera plane require modeled proof.

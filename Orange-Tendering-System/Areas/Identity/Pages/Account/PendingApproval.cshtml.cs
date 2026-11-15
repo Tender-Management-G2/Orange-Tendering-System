@@ -12,7 +12,7 @@ namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 [Authorize(Roles = SystemRoles.Supplier)]
 public class PendingApprovalModel(UserManager<ApplicationUser> users, ApplicationDbContext db) : PageModel
 {
-    // Both enrollment steps are required; company approval remains a separate decision.
+    // Face enrollment is available here; a device passkey is optional. Company approval is separate.
     public int FaceTemplateCount { get; private set; }
     public int PasskeyCount { get; private set; }
     public bool JustRegistered { get; private set; }

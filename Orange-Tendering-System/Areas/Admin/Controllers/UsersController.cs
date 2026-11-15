@@ -81,7 +81,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             var result = await _adminService.CreateUserAsync(
-                model, adminId);
+                model, adminId, HttpContext);
 
             if (!result.Succeeded)
             {
@@ -97,7 +97,9 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             TempData["SuccessMessage"] =
-                "User created. Share the temporary password securely; the user must change it at first sign-in.";
+                string.IsNullOrEmpty(model.Password)
+                    ? "User created. A welcome email with a password setup link has been sent."
+                    : "User created. Share the temporary password securely; the user must change it at first sign-in.";
 
             if (Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl!);
 

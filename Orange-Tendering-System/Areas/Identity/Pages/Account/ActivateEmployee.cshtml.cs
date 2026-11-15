@@ -34,7 +34,7 @@ public class ActivateEmployeeModel(UserManager<ApplicationUser> users, Applicati
     {
         if (!ModelState.IsValid) return Page();
         var user = await users.FindByEmailAsync(Input.Email.Trim());
-        if (user is not { DepartmentId: not null, MustChangePassword: true } || user.EmailConfirmed)
+        if (user is not { SupplierId: null, MustChangePassword: true } || user.EmailConfirmed)
         {
             ModelState.AddModelError(string.Empty, "Activation link is invalid or expired.");
             return Page();
