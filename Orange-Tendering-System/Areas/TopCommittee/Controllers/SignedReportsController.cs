@@ -14,12 +14,12 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 public sealed class SignedReportsController(IServiceProvider services) : ReportControllerBase(TopCommitteeWorkflow.Create(services))
 {
     [HttpPost]
-    public Task<IActionResult> Vote(int id, VoteDecision decision, string comment, string documentHash, bool confirmed) =>
+    public Task<IActionResult> Vote(int id, VoteDecision decision, string comment, string documentHash, bool confirmed, string? signatureImage = null) =>
         Execute(id, async () =>
         {
             var report = await Workflow.ReviewReport(id, User);
             TenderWorkflowService.Require(report.IsCurrent && report.CanVoteTop,
                 "Only the current Manager-approved report awaiting your Top Committee decision can be signed.");
-            await Workflow.TopVote(report.Tender.Id, decision, comment, User, documentHash, confirmed);
+            await Workflow.TopVote(report.Tender.Id, decision, comment, User, documentHash, confirmed, ReadSignature(signatureImage));
         });
 }

@@ -36,5 +36,33 @@
         message.textContent = 'Item removed.';
     });
     reindex();
+
+    const form = body.closest('form');
+    const pending = document.querySelector('[data-request-motion-pending]');
+    if (form && pending) {
+        let submitting = false;
+        form.addEventListener('submit', event => {
+            if (submitting) { event.preventDefault(); return; }
+            if (event.defaultPrevented || !form.checkValidity()) return;
+            const intent = document.createElement('input');
+            intent.type = 'hidden';
+            intent.name = 'intent';
+            intent.value = event.submitter?.value || 'submit';
+            form.appendChild(intent);
+            if (intent.value === 'save') {
+                pending.querySelector('h2').textContent = 'Saving your draft';
+                pending.querySelector('.dr-motion-copy p').textContent = 'Your draft is being saved. Please wait for confirmation.';
+            }
+            submitting = true;
+            form.querySelectorAll('button[type="submit"]').forEach(button => { button.disabled = true; });
+            pending.hidden = false;
+        });
+        window.addEventListener('pageshow', () => {
+            submitting = false;
+            pending.hidden = true;
+            form.querySelectorAll('button[type="submit"]').forEach(button => { button.disabled = false; });
+            form.querySelector('input[type="hidden"][name="intent"]')?.remove();
+        });
+    }
 })();
 </script>

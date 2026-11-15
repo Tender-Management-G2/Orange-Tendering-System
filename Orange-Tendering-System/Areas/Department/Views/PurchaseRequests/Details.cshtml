@@ -7,7 +7,24 @@
     ViewData["Description"] = "Request information, supporting files and preserved submission history.";
 }
 <partial name="_PageHeader" />
-@if (TempData["DepartmentMessage"] is string message) { <p class="pg-note" role="status">@message</p> }
+@{
+    var departmentMessage = TempData["DepartmentMessage"] as string;
+    var requestCreated = TempData["DepartmentRequestCreated"] as string;
+    var requestMotionStatus = RequestDisplay.Status(request);
+}
+@if (requestCreated is "submitted" or "draft")
+{
+    <dialog class="dr-motion-dialog" data-request-motion-success aria-labelledby="request-motion-title" aria-describedby="request-motion-description">
+        <button type="button" class="dr-motion-dismiss" data-request-motion-close aria-label="Close confirmation">&times;</button>
+        <partial name="_DepartmentRequestMotion" model='request.Id.ToString()' view-data='new ViewDataDictionary(ViewData) { ["RequestMotionStatus"] = requestMotionStatus }' />
+        <span class="dr-motion-time" aria-hidden="true"></span>
+    </dialog>
+    <noscript><p class="pg-note" role="status">@departmentMessage</p></noscript>
+}
+else if (departmentMessage is not null)
+{
+    <p class="pg-note" role="status">@departmentMessage</p>
+}
 <nav class="pg-links"><ul>
     <li><a asp-action="Index">Back to my requests</a></li>
     @if (Model.CanEdit) { <li><a asp-action="Edit" asp-route-id="@request.Id">Edit / resubmit</a></li> }
@@ -79,3 +96,6 @@
         </details>
     }
 </section>
+
+@section Styles { <link rel="stylesheet" href="~/css/department-request-motion.css" asp-append-version="true" /> }
+@section Scripts { <script src="~/js/department-request-motion.js" asp-append-version="true"></script> }

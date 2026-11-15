@@ -147,6 +147,7 @@ public class PurchaseRequestsController : Controller
             var savedId = await service.Save(user, form, intent == "submit", storageRoot);
             TempData["DepartmentMessage"] = intent == "submit"
                 ? "Request submitted directly to the Sourcing Officer." : "Changes saved.";
+            if (!edit) TempData["DepartmentRequestCreated"] = intent == "submit" ? "submitted" : "draft";
             return RedirectToAction(nameof(Details), new { id = savedId });
         }
         catch (InvalidOperationException ex)

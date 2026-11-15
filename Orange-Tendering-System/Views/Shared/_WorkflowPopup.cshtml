@@ -190,7 +190,7 @@
             <div class="wp-actions">
                 <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post" class="wp-form" data-close-bidding>
                     <h4>Close offer submissions</h4>
-                    <p>@round.Invitations.Count invited · @Model.Bids.Count(b => b.Status == BidStatus.Submitted) submitted · @round.Invitations.Count(i => i.Status == InvitationStatus.Declined) declined · @waitingInvitations.Count waiting</p>
+                    <p>@round.Invitations.Count invited · @round.Invitations.Count(i => i.Status == InvitationStatus.Accepted) accepted invitations · @submittedSupplierCount submitted offers · @Model.Bids.Count(b => b.Status == BidStatus.Draft) drafts · @round.Invitations.Count(i => i.Status == InvitationStatus.Declined) declined</p>
                     <button class="wp-primary" disabled="@(!canCloseBidding)">Close bidding &amp; continue <span aria-hidden="true">&rarr;</span></button>
                     @if (canCloseBidding)
                     {
@@ -199,14 +199,21 @@
                     else
                     {
                         <p class="wp-hint" role="status">@submittedSupplierCount of 3 distinct supplier offers received. Waiting for @waitingInvitations.Count invited supplier(s) to submit an offer or decline. Drafts and accepted invitations do not count as submitted offers.</p>
-                        <ul>
-                            @foreach (var invitation in waitingInvitations)
-                            {
-                                <li>@SupplierName(invitation.SupplierId) — @invitation.Status</li>
-                            }
-                        </ul>
                         <small>@(round.Deadline.HasValue ? $"You may also close bidding after the deadline: {round.Deadline.Value.ToLocalTime():d MMM yyyy HH:mm}." : "No deadline is configured. Every invited supplier must submit an offer or decline before bidding can close.")</small>
                     }
+                    <h5>All invited suppliers</h5>
+                    <ul>
+                        @foreach (var invitation in round.Invitations.OrderBy(i => SupplierName(i.SupplierId)))
+                        {
+                            var offer = Model.Bids.FirstOrDefault(b => b.TenderInvitationId == invitation.Id);
+                            var progress = invitation.Status == InvitationStatus.Declined ? "Declined invitation"
+                                : offer?.Status == BidStatus.Submitted ? "Submitted offer"
+                                : offer?.Status == BidStatus.Draft ? "Draft offer"
+                                : invitation.Status == InvitationStatus.Accepted ? "Accepted invitation — no offer yet"
+                                : "Invitation pending";
+                            <li>@SupplierName(invitation.SupplierId) — @progress</li>
+                        }
+                    </ul>
                 </form>
             </div>
         }
@@ -362,9 +369,9 @@
         @if (rv != null)
         {
             var mySigned = rv.Signatures.Any(x => x.UserId == rv.UserId && x.Stage == (rv.CanVoteTop ? ReportSigningStage.Top : ReportSigningStage.Evaluation));
-            var pdfUrl = Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id });
+            var pdfUrl = Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id });
             <div class="wp-actions wp-report">
-                <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@pdfUrl">Preview it here</button></div>
+                <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@pdfUrl">Preview it here</button></div>
                 <div class="wp-preview" hidden></div>
                 @if (s?.State == SessionState.ReportDraft && s.ReportSentAt != null)
                 {
@@ -395,7 +402,7 @@
                 }
                 @if (rv.CanVoteTop && !mySigned)
                 {
-                    <form asp-area="TopCommittee" asp-controller="Reports" asp-action="Vote" asp-route-id="@rv.Report.Id" method="post" class="wp-form wp-sign"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" />
+                    <form asp-area="TopCommittee" asp-controller="SignedReports" asp-action="Vote" asp-route-id="@rv.Report.Id" method="post" class="wp-form wp-sign"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" />
                         <div class="wp-cols"><label>Your vote<select name="decision"><option>Approve</option><option>Reject</option></select></label><label>Why?<textarea name="comment" maxlength="2000" required rows="2"></textarea></label></div>
                         <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
                         <label class="wp-check"><input type="checkbox" name="confirmed" value="true" required /> I reviewed the report. My vote is my signature.</label>
@@ -585,7 +592,7 @@
                 @if (rv != null)
                 {
                     <div class="wp-report">
-                        <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id })">Preview it here</button></div>
+                        <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id })">Preview it here</button></div>
                         <div class="wp-preview" hidden></div>
                     </div>
                 }
