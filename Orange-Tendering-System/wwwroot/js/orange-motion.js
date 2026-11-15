@@ -398,6 +398,7 @@
     }
 
     const sending = new WeakSet();
+    const NEXT_KEY = 'orange-motion:next';
     // Sends a form with fetch. The server answers a redirect with { redirect, feedback } (OrangeMotionResultFilter).
     async function submit(form, options = {}) {
         if (sending.has(form)) return;
@@ -432,7 +433,9 @@
         if (response.ok && type.includes('application/json')) {
             const body = await response.json().catch(() => ({}));
             if (body.redirect) {
-                if (body.feedback) await handle.finish(body.feedback); else handle.cancel();
+                // A popup finishes here, over the page that sent it. A toast never makes the user wait: it travels to the next page.
+                if (body.feedback && normalize(body.feedback, mode).mode === 'popup') await handle.finish(body.feedback);
+                else { handle.cancel(); if (body.feedback) { try { sessionStorage.setItem(NEXT_KEY, JSON.stringify(body.feedback)); } catch { } } }
                 window.location.assign(body.redirect);
                 return;
             }
@@ -446,7 +449,10 @@
             return;
         }
         let message = '';
-        try { message = type.includes('json') ? ((await response.json()).error || '') : (await response.text()); } catch { }
+        try {
+            const body = type.includes('json') ? await response.json() : await response.text();
+            message = typeof body === 'string' ? body : (body.error || body.detail || (body.errors && Object.values(body.errors).flat().join(' ')) || body.title || '');
+        } catch { }
         if (!message || message.length > 300 || /<html/i.test(message)) message = `The server did not accept the request (status ${response.status}). Nothing was changed.`;
         await handle.fail(message, 'Not completed');
         release();
@@ -461,11 +467,15 @@
     });
 
     // A one-time server signal rendered by Views/Shared/_OrangeMotion.cshtml (TempData, consumed on read: never replayed on refresh).
+    // A toast handed over by submit() is read once and removed, so it is not replayed either.
     function autoplay() {
+        let handed = null;
+        try { handed = sessionStorage.getItem(NEXT_KEY); sessionStorage.removeItem(NEXT_KEY); } catch { }
         const node = document.getElementById('om-feedback');
-        if (!node || node.dataset.played) return;
-        node.dataset.played = '1';
-        try { show(JSON.parse(node.textContent)); } catch { }
+        const json = node && !node.dataset.played ? node.textContent : handed;
+        if (node) node.dataset.played = '1';
+        if (!json) return;
+        try { show(JSON.parse(json)); } catch { }
     }
     window.addEventListener('pageshow', event => { if (event.persisted) document.querySelectorAll('form').forEach(f => sending.delete(f)); });
 

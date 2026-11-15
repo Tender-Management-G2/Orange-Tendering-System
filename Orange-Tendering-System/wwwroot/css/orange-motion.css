@@ -1,6 +1,6 @@
 /* Orange Motion: shared styles for the popup, toast and inline feedback (js/orange-motion.js, docs/ORANGE_MOTION.md). */
-:root{--om-orange:#ff7900;--om-surface:var(--ws-surface,#181b1e);--om-ink:var(--ws-ink,#f7f7f8);--om-muted:var(--ws-muted,#b9bcc1);--om-rule:var(--ws-rule,#ffffff24);--om-pith:#fff1e2;--om-pending:#ffd8b0;--om-leaf:#3f8a3a;--om-scrim:#05070999;--om-error:#e0452b}
-:root[data-theme="light"]{--om-scrim:#1b20253d;--om-leaf:#3a8034;--om-pending:#ffe2c4}
+:root{--om-orange:#ff7900;--om-surface:var(--ws-surface,#181b1e);--om-ink:var(--ws-ink,#f7f7f8);--om-muted:var(--ws-muted,#b9bcc1);--om-rule:var(--ws-rule,#ffffff24);--om-pith:#fff1e2;--om-pending:#ffe6cc;--om-leaf:#3f8a3a;--om-scrim:#05070999;--om-error:#e0452b}
+:root[data-theme="light"]{--om-scrim:#1b20253d;--om-leaf:#3a8034;--om-pending:#ffe9d4}
 
 /* The orange itself (shared by every surface) */
 .om-svg,.ws-shell .om-svg{display:block;width:100%;height:100%;overflow:visible;fill:none;stroke:none;stroke-width:0;flex-shrink:0}

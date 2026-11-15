@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
@@ -82,6 +83,7 @@ public class VerifyEmailModel(
         await transaction.CommitAsync();
         logger.LogInformation("Supplier email verified for user {UserId}.", user.Id);
         await signIn.SignInAsync(user, isPersistent: false);
+        TempData.Orange(OrangeFeedback.Popup("Registration complete!", "Your e-mail is verified. Enroll your face or a passkey, then wait for administrator approval.", OrangeVariant.Approve));
         return RedirectToPage("./PendingApproval");
     }
 
