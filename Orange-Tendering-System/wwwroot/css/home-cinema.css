@@ -469,7 +469,7 @@ html.hq3-static .hq3-panels,html.hq3-static .hq3-lines,html.hq3-static .hq-stage
 .hq3-mod p{color:#e6ddd3;font-size:15px;line-height:1.5;margin:0 0 16px}
 .hq3-mod ul{list-style:none;margin:0 0 20px;padding:0;display:grid;gap:10px}
 .hq3-mod li{position:relative;padding-left:28px;font-size:15px}
-.hq3-mod li::before{content:"¹3";position:absolute;left:0;top:-1px;color:#ff7900;font-weight:700}
+.hq3-mod li::before{content:"\2713";position:absolute;left:0;top:-1px;color:#ff7900;font-weight:700}
 .hq3-steps{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;gap:clamp(8px,3vw,64px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s,visibility .35s}
 .hq3-corridor-ui.is-on .hq3-steps{opacity:1;visibility:visible;pointer-events:auto}
 .hq3-steps button{display:flex;flex-direction:column;align-items:center;gap:8px;border:0;background:none;color:#ece5dd;font:500 13px/1.2 var(--hf);cursor:pointer;max-width:110px;text-align:center}
