@@ -557,7 +557,7 @@ function init() {
   let dismissed = -1, shownStation = -2;
   function applyCards() {
     tileEls.forEach((el, k) => { const o = mapQuad(el, tiles[k].g, tiles[k].corners, 260, 400, 30); tiles[k].mat.color.copy(ORANGE).multiplyScalar(1.2 + (station === k ? 3 : o)); el.classList.toggle("is-on", station === k); });
-    if (videoEl) mapQuad(videoEl, videoWall.g, videoWall.corners, 1300, 600, 60);
+    if (videoEl) { mapQuad(videoEl, videoWall.g, videoWall.corners, 1300, 600, 60); if ((!inGallery || station !== STATIONS.length) && (videoEl.classList.contains("is-playing") || videoEl.classList.contains("is-soon"))) stopWall(); }
     if (uiEl) uiEl.classList.toggle("is-on", inGallery);
     stepEls.forEach((b, k) => { b.classList.toggle("is-on", station === k); b.classList.toggle("is-done", station > k); });
     const show = inGallery && station >= 0 && station < STATIONS.length && dismissed !== station ? station : -1;
@@ -573,7 +573,14 @@ function init() {
   tileEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
   stepEls.forEach((el, k) => el.addEventListener("click", () => goStation(k)));
   const closeBtn = document.getElementById("hq3-info-close"); if (closeBtn) closeBtn.addEventListener("click", () => { dismissed = station; shownStation = -2; });
-  // the end wall's play button opens the shared platform video player (home-cinema.js)
+  // the end wall is a screen: its play button plays the platform video right on the wall; leaving the wall stops it
+  const wallVid = videoEl && videoEl.querySelector("video"), wallPlay = videoEl && videoEl.querySelector("[data-wall-play]"), wallStop = videoEl && videoEl.querySelector("[data-wall-stop]");
+  function stopWall() { if (!videoEl) return; videoEl.classList.remove("is-playing", "is-soon"); if (wallVid) wallVid.pause(); }
+  if (wallPlay) wallPlay.addEventListener("click", () => {
+    if (wallVid) { videoEl.classList.add("is-playing"); const pl = wallVid.play(); if (pl && pl.catch) pl.catch(() => {}); wallVid.focus({ preventScroll: true }); }
+    else videoEl.classList.add("is-soon");
+  });
+  if (wallStop) wallStop.addEventListener("click", () => { stopWall(); wallPlay.focus({ preventScroll: true }); });
 
   /* ---------------- cinematic intro: Orange welcome -> glowing connection -> building reveal ----------------
      A 2D canvas plus HTML layer above the 3D stage. Its state is a pure function of the intro progress p (scroll):

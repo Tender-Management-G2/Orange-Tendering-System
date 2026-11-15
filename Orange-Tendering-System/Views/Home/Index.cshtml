@@ -130,8 +130,18 @@ Nothing here calls an authenticated endpoint. Official reference: Sourcing.docx.
                 }
             </div>
             <div class="hq3-video" id="hq3-video">
+                @* The wall itself is the screen: the platform video plays here in the corridor (no popup). *@
+                @if (tourVideo != null)
+                {
+                    <video class="hq3-wall-video" controls playsinline preload="none" aria-label="Orange company overview video"><source src="@tourVideo" type="@tourType" /></video>
+                }
+                else
+                {
+                    <div class="hq3-wall-soon" role="status"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span><b>The overview video is coming soon.</b></div>
+                }
                 <div class="hq3-video-title"><span class="hq3-video-logo">orange</span><h3>Orange<br />Company Overview</h3><p>Sourcing &amp; Tender Management System</p></div>
-                <button type="button" class="hq3-video-play" data-tour-open aria-haspopup="dialog" aria-controls="hc-tour"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span><b>Watch the Overview</b></button>
+                <button type="button" class="hq3-video-play" data-wall-play><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" /></svg></span><b>Watch the Overview</b></button>
+                <button type="button" class="hq3-wall-stop" data-wall-stop aria-label="Stop the video">&times;</button>
             </div>
             <aside class="hq3-info" id="hq3-info" aria-live="polite" aria-label="Module details">
                 <button type="button" class="hq3-info-close" id="hq3-info-close" aria-label="Close module details">&times;</button>
