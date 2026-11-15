@@ -26,6 +26,9 @@ INTEGRATED. No business logic.
 *@
 @{
     var isIdentityPage = ViewData["IdentityPage"] is true;
+    var accountPath = Context.Request.Path.Value?.TrimEnd('/');
+    var hideFooter = string.Equals(accountPath, "/Identity/Account/Login", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(accountPath, "/Identity/Account/Register", StringComparison.OrdinalIgnoreCase);
 }
 <!doctype html>
 <html lang="en">
@@ -55,7 +58,7 @@ INTEGRATED. No business logic.
     <div id="main-content" class="@(isIdentityPage ? "identity-page" : null)">
         @RenderBody()
     </div>
-    @if (ViewData["HideFooter"] is not true)
+    @if (!hideFooter)
     {
         <partial name="_Footer" />
     }
