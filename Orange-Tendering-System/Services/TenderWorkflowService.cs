@@ -308,16 +308,19 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var meeting = zoomMeetingId != null ? $"Zoom meeting {zoomMeetingId} was created for this session. Use Join meeting in this notification."
             : input.MeetingUrl!.Contains("meet.jit.si") ? "The system created the video meeting room for this session. Use Join meeting in this notification at the scheduled time." : "The Zoom link was supplied by the officer; open it from the tender page.";
         await NotifyOfficerMeeting(id, $"Evaluation meeting scheduled for {session.StartsAt:u}. {meeting}");
-        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {session.StartsAt:u} and closes automatically at {session.EndsAt:u}. {meeting} The reviewed AI analysis #{ai.Id} and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s) are attached on the tender page.");
+        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {session.StartsAt:u} and remains available after the meeting ends until you submit your final evaluation. {meeting} The reviewed AI analysis #{ai.Id} and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s) are attached on the tender page.");
         Audit(a, id, "EvaluationScheduleEvidence", new { r.RoundNumber, session.StartsAt, session.EndsAt, ZoomMeetingId = zoomMeetingId, AiAnalysisId = ai.Id, EligibleBidIds = eligible.Select(x => x.Id), AttachedDocuments = attachedDocuments, InvitedMemberIds = members.Select(x => x.Id) });
     });
+    public static bool EvaluationOpen(EvaluationSession session, DateTime now) =>
+        session.ReportId == null && now >= session.StartsAt &&
+        (session.State == SessionState.Scheduled || session.State == SessionState.Incomplete && session.ClosureReason == "Scheduled deadline reached");
+
     public Task SubmitEvaluation(int id, List<ScoreInput> scores, ClaimsPrincipal principal)
     {
-        DateTime? limit = null;
         return Change(id, principal, "EvaluationSubmitted", async (t, a) =>
         {
-            var member = await Member(t, a, CommitteeType.Evaluation); var s = await Session(id); limit = s.EndsAt;
-            Require(s.State == SessionState.Scheduled && Now >= s.StartsAt && Now < s.EndsAt, "Evaluation is not open. Check the scheduled opening and closing times.");
+            var member = await Member(t, a, CommitteeType.Evaluation); var s = await Session(id);
+            Require(t.Status == TenderStatus.Evaluation && EvaluationOpen(s, Now), "Evaluation is not open yet or has already been finalized.");
             Require(s.Submissions.All(x => x.CommitteeMemberId != member.Id), "Your final evaluation was already submitted and is immutable.");
             Require(scores.Count == s.EligibleBids.Count && scores.Select(x => x.BidId).Distinct().Count() == scores.Count && scores.All(x => s.EligibleBids.Any(y => y.BidId == x.BidId)), "Score every eligible supplier exactly once.");
             foreach (var score in scores)
@@ -330,9 +333,14 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             var participation = s.Invitations.SingleOrDefault(x => x.CommitteeMemberId == member.Id);
             Require(participation != null, "A persisted evaluation invitation is required.");
             participation.SubmittedAt = Now;
+            if (s.State == SessionState.Incomplete)
+            {
+                Audit(a, id, "EvaluationResumedAfterMeeting", new { s.ClosedAt, s.ClosureReason });
+                s.State = SessionState.Scheduled; s.ClosedAt = null; s.ClosedByUserId = null; s.ClosureReason = null;
+            }
             // Touch rowversion so closure and final submission share the same concurrency boundary.
             db.Entry(s).Property(x => x.State).IsModified = true;
-        }, () => limit);
+        });
     }
     public Task EndEvaluation(int id, bool confirmed, string reason, ClaimsPrincipal principal) => Change(id, principal, "EvaluationClosed", async (t, a) =>
     {
@@ -365,7 +373,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     public Task GenerateReport(int id, string justification, ClaimsPrincipal principal) => Change(id, principal, "UnifiedReportGenerated", async (t, a) =>
     {
         await Member(t, a, CommitteeType.Evaluation); var s = await Session(id);
-        if (s.State == SessionState.Scheduled && Now >= s.EndsAt) Closed(s);
+        if (s.State == SessionState.Scheduled && Now >= s.EndsAt && s.Submissions.Count == 4) Closed(s);
         Require(s.State == SessionState.Closed && s.ReportId == null && !string.IsNullOrWhiteSpace(justification), "Close a complete evaluation first and provide the recommendation justification.");
         await GenerateReportCore(t, a, s, justification);
     });
@@ -598,12 +606,12 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         if (supplier) { foreach (var r in t!.Rounds) r.Invitations = r.Invitations.Where(x => x.SupplierId == a.SupplierId).ToList(); t.CommitteeMembers = []; }
         var w = await db.Set<WeightRound>().Include(x => x.Proposals).OrderByDescending(x => x.Version).FirstOrDefaultAsync(x => x.TenderId == id);
         var s = supplier ? null : await db.Set<EvaluationSession>().Include(x => x.WeightRound).Include(x => x.CommitteeRound).ThenInclude(x => x.Criteria).Include(x => x.EligibleBids).Include(x => x.Report).Include(x => x.Invitations).Include(x => x.TenderRound).SingleOrDefaultAsync(x => x.TenderRound.TenderId == id && x.TenderRound.RoundNumber == db.TenderRounds.Where(r => r.TenderId == id).Max(r => r.RoundNumber));
-        // Deadline is authoritative even without background processing. Persist the automatic closure under the same lock.
-        if (s?.State == SessionState.Scheduled && Now >= s.EndsAt)
+        // The meeting end does not discard missing evaluations. Finalize only after all four submit.
+        if (s?.State == SessionState.Scheduled && Now >= s.EndsAt && s.Submissions.Count == 4)
             await Change(id, principal, "EvaluationAutoClosed", async (tender, _) =>
             {
                 var current = await Session(id);
-                if (current.State == SessionState.Scheduled && Now >= current.EndsAt)
+                if (current.State == SessionState.Scheduled && Now >= current.EndsAt && current.Submissions.Count == 4)
                 {
                     Closed(current);
                     if (current.State == SessionState.Closed) await GenerateReportCore(tender, await GlobalOfficer(), current, "Automatically calculated at the scheduled deadline from all four independent evaluations and approved weights.");
@@ -665,18 +673,18 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     });
     public async Task CloseDueSessions(CancellationToken ct)
     {
-        var ids = await db.Set<EvaluationSession>().Where(x => x.State == SessionState.Scheduled && x.EndsAt <= Now).Select(x => x.TenderRound.TenderId).ToListAsync(ct);
+        var ids = await db.Set<EvaluationSession>().Where(x => x.State == SessionState.Scheduled && x.EndsAt <= Now && x.Invitations.Count(i => i.SubmittedAt != null) == 4).Select(x => x.TenderRound.TenderId).ToListAsync(ct);
         foreach (var id in ids)
         {
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             var tender = await db.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={id}").SingleAsync(ct);
             var s = await Session(id);
-            if (s.State == SessionState.Scheduled && Now >= s.EndsAt)
+            if (s.State == SessionState.Scheduled && Now >= s.EndsAt && s.Submissions.Count == 4)
             {
                 Closed(s);
                 if (s.State == SessionState.Closed)
                     await GenerateReportCore(tender, await GlobalOfficer(), s, "Automatically calculated from all four independent final evaluations at the scheduled deadline, using approved locked weights.");
-                await NotifyOfficer(id, "Evaluation closed at the deadline", $"Scoring closed automatically with {s.Submissions.Count} of 4 final submissions.");
+                await NotifyOfficer(id, "Evaluation completed", "All four final evaluations were submitted. The report is ready for signing.");
                 db.AuditLogs.Add(new AuditLog { EntityName = "Tender", EntityId = id.ToString(), Action = "EvaluationAutoClosed", CreatedAt = Now });
                 await db.SaveChangesAsync(ct);
             }

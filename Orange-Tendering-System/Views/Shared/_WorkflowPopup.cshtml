@@ -124,8 +124,8 @@
                 return Model.IsEvaluator ? ("Review and sign the report", "The system generated the report from the scores. Open it, check the ranking and sign it.", "action")
                     : Model.IsOfficer ? ("Report ready: waiting for the committee to sign", "The system generated the report automatically. When all four members have signed it, you forward it to the Sourcing Manager.", "wait")
                     : ("Report ready", "The committee is reviewing and signing the report.", "wait");
-            if (Model.IsEvaluator && !submitted && s.State == SessionState.Scheduled)
-                return Model.UtcNow >= s.StartsAt && Model.UtcNow < s.EndsAt ? ("Score the offers", "Give each supplier a financial and a technical score from 0 to 100. You submit once and cannot edit.", "action") : ("Evaluation is not open", "The scoring form is open only between the start and end time below.", "wait");
+            if (Model.IsEvaluator && !submitted && (s.State == SessionState.Scheduled || TenderWorkflowService.EvaluationOpen(s, Model.UtcNow)))
+                return TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? ("Score the offers", "Give each supplier a financial and a technical score from 0 to 100. You can submit after the meeting ends, once only.", "action") : ("Evaluation is not open", "Scoring opens at the meeting start and remains available until your final submission.", "wait");
             if (Model.IsOfficer && s.State == SessionState.Scheduled && s.Submissions.Count == 4) return ("End the evaluation", "All four evaluations are in. The system calculates the ranking and generates the report automatically.", "action");
             if (s.State == SessionState.Scheduled && Model.UtcNow < s.StartsAt) return ("Waiting for the meeting to start", "Scoring opens by itself at the start time shown below. Then the four members score the offers.", "wait");
             return ($"Committee evaluation: {s.Submissions.Count} of 4 submitted", submitted ? "Your evaluation is recorded and cannot be edited." : "Scoring is in progress.", "wait");
@@ -317,7 +317,7 @@
                             <div class="wp-cols"><label>AI analysis<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">Analysis #@ai.Id</option> }</select></label><label>Quick start<select class="wp-preset" data-preset="start"><option value="">Choose&hellip;</option><option value="15m">In 15 minutes</option><option value="1h">In 1 hour</option><option value="t10">Tomorrow 10:00</option><option value="d2">In 2 days 10:00</option></select></label><label>Duration<select class="wp-preset" data-preset="duration"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="90">90 minutes</option><option value="120">2 hours</option><option value="180">3 hours</option></select></label></div><div class="wp-cols"><label>Starts<input name="StartsAt" type="datetime-local" data-utc required /></label><label>Ends<input name="EndsAt" type="datetime-local" data-utc required /></label></div>
                             <label class="wp-check"><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> Create the video meeting automatically</label>
                             <details class="wp-opt"><summary>Use my own Zoom link instead</summary><label>Zoom link<input name="MeetingUrl" type="url" placeholder="https://zoom.us/j/..." /></label></details>
-                            <button class="wp-primary">Schedule and invite the committee</button><small>Scoring opens and closes automatically at these times. The four members get the invitation, the meeting link and the offers.</small></form>
+                            <button class="wp-primary">Schedule and invite the committee</button><small>The times schedule the meeting. Scoring stays available afterwards until each member submits. The four members get the invitation, the meeting link and the offers.</small></form>
                     }
                 </section>
                 <div class="wp-wnav"><button type="button" class="wp-ghost" data-wback>&larr; Back</button><span class="wp-wnote" data-wnote></span><button type="button" class="wp-primary" data-wnext>Next <span aria-hidden="true">&rarr;</span></button></div>
@@ -327,7 +327,7 @@
         {
             <div class="wp-actions"><form asp-area="SourcingManager" asp-controller="Workflow" asp-action="DecideProceed" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="decisionId" value="@pendingRequest.Id" /><p class="wp-text">@pendingRequest.Justification</p><label>Your comment<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Approved: the offers received are sufficient.</option><option>Approved: the purchase is time critical.</option><option>Rejected: please re-tender.</option></select><textarea name="comment" maxlength="2000" required rows="2"></textarea></label><button name="approve" value="true" class="wp-primary">Approve</button><button name="approve" value="false" class="wp-ghost">Reject</button></form></div>
         }
-        @if (Model.IsEvaluator && !submitted && s != null && s.State == SessionState.Scheduled && Model.UtcNow >= s.StartsAt && Model.UtcNow < s.EndsAt)
+        @if (Model.IsEvaluator && !submitted && s != null && TenderWorkflowService.EvaluationOpen(s, Model.UtcNow))
         {
             var scoreIndex = 0;
             <div class="wp-actions">
@@ -476,15 +476,15 @@
                 <span class="wp-dot">@(StageState(4) == "done" ? "\u2713" : "4")</span>
                 <div class="wp-stage-body">
                     <header><h4>Committee evaluation</h4><span class="wp-sum">@(s == null ? "Not scheduled yet" : $"{s.Submissions.Count} of 4 submitted")</span></header>
-                    @if (s == null) { <p class="wp-empty">The Officer schedules a meeting and a scoring window. Each member scores every supplier once, independently.</p> }
+                    @if (s == null) { <p class="wp-empty">The Officer schedules a meeting. Scoring opens at its start and remains available after its end. Each member scores every supplier once, independently.</p> }
                     else
                     {
                             var startIso = DateTime.SpecifyKind(s.StartsAt, DateTimeKind.Utc).ToString("O");
                             var endIso = DateTime.SpecifyKind(s.EndsAt, DateTimeKind.Utc).ToString("O");
                             var roomState = Model.UtcNow < s.StartsAt ? "before" : (Model.UtcNow < s.EndsAt && s.State == SessionState.Scheduled ? "open" : "closed");
                             var doneCount = s.Invitations.Count(x => x.SubmittedAt != null);
-                        <div class="wp-clock wp-clock-@roomState" data-countdown data-start="@startIso" data-end="@endIso" data-state="@roomState" data-final="@(s.State != SessionState.Scheduled ? "1" : null)">
-                            <div class="wp-clock-main"><small data-clock-label>@(roomState == "before" ? "Meeting and scoring start in" : roomState == "open" ? "Scoring is open, it closes in" : "Scoring is closed")</small><strong data-clock>--:--:--</strong></div>
+                        <div class="wp-clock wp-clock-@roomState" data-countdown data-start="@startIso" data-end="@endIso" data-state="@roomState" data-final="@(s.State != SessionState.Scheduled && !TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? "1" : null)">
+                            <div class="wp-clock-main"><small data-clock-label>@(roomState == "before" ? "Meeting and scoring start in" : roomState == "open" ? "Meeting ends in" : TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? "Meeting ended; evaluation remains open" : "Scoring is closed")</small><strong data-clock>--:--:--</strong></div>
                             <div class="wp-clock-times"><span>Starts <time data-local="@startIso">@s.StartsAt.ToString("u")</time></span><span>Ends <time data-local="@endIso">@s.EndsAt.ToString("u")</time></span></div>
                             @if (!string.IsNullOrWhiteSpace(s.MeetingUrl) && s.State == SessionState.Scheduled) { <a class="wp-primary wp-link" data-no-modal href="/Meetings/Join/@id">&#127909; Join the meeting</a> }
                         </div>

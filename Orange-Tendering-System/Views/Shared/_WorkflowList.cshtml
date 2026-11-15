@@ -197,9 +197,9 @@
                 var now = Date.now(), state = now < st ? 'before' : now < en ? 'open' : 'closed';
                 if (state !== shown && now - lastRefresh > 4000) { lastRefresh = now; refreshView(); return; }
                 if (state === 'before') { label.textContent = 'Meeting and scoring start in'; clock.textContent = fmt(st - now); }
-                else if (state === 'open') { label.textContent = 'Scoring is open, it closes in'; clock.textContent = fmt(en - now); }
-                else { label.textContent = 'Scoring is closed'; clock.textContent = '00:00:00'; }
-                if (state === 'open' && !body.querySelector('.wp-scores') && now - lastPoll > 15000) { lastPoll = now; refreshView(); }
+                else if (state === 'open') { label.textContent = 'Meeting ends in'; clock.textContent = fmt(en - now); }
+                else { label.textContent = 'Meeting ended; evaluation remains open'; clock.textContent = '00:00:00'; }
+                if (state !== 'before' && !body.querySelector('.wp-scores') && now - lastPoll > 15000) { lastPoll = now; refreshView(); }
             };
             tick(); var iv = setInterval(function () { if (!document.body.contains(el)) { clearInterval(iv); return; } tick(); }, 1000);
         });

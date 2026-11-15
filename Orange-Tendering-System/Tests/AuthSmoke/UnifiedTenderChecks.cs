@@ -244,15 +244,36 @@ public static class UnifiedTenderChecks
         committeeRound.Criteria.Add(new EvaluationCriterion { Name = "Technical", Type = CriterionType.Technical, MaxScore = 100, Weight = weightRound.ApprovedTechnical });
         var ai = new AiAnalysis { TenderRoundId = round.Id, Status = "Completed", Model = "TEST", EvidenceJson = "{}", Findings = "Test evidence", ReviewedAt = DateTime.UtcNow, ReviewedByUserId = officer.Id };
         var session = new EvaluationSession { TenderRoundId = round.Id, WeightRoundId = weightRound.Id, CommitteeRound = committeeRound, AiAnalysis = ai,
-            State = SessionState.Closed, StartsAt = DateTime.UtcNow.AddHours(-2), EndsAt = DateTime.UtcNow.AddHours(-1),
+            State = SessionState.Scheduled, StartsAt = DateTime.UtcNow.AddHours(-2), EndsAt = DateTime.UtcNow.AddHours(-1),
             EligibleBids = [new SessionBid { BidId = bid.Id }],
-            Invitations = seats.Select(x => new EvaluationParticipation { CommitteeMemberId = x.Id, SentAt = DateTime.UtcNow.AddHours(-2), SubmittedAt = DateTime.UtcNow.AddHours(-1) }).ToList() };
+            Invitations = seats.Select(x => new EvaluationParticipation { CommitteeMemberId = x.Id, SentAt = DateTime.UtcNow.AddHours(-2) }).ToList() };
         db.Add(session); await db.SaveChangesAsync();
-        foreach (var seat in seats)
-            foreach (var criterion in committeeRound.Criteria)
-                db.EvaluationScores.Add(new EvaluationScore { BidId = bid.Id, CommitteeMemberId = seat.Id, EvaluationCriterionId = criterion.Id, Score = 80, Comment = "Test justification", ScoredAt = DateTime.UtcNow.AddHours(-1) });
-        await db.SaveChangesAsync();
-        await flow.GenerateReport(id, "Test unified report", Principal(technical));
+        await flow.CloseDueSessions(CancellationToken.None);
+        Check(session.State == SessionState.Scheduled && session.ReportId == null, "meeting end does not close an incomplete evaluation");
+        using (var lateClient = await Login(financial))
+        {
+            var afterMeeting = await Ajax(lateClient, "/EvaluationCommittee/Workflow/Details/" + id);
+            Check(afterMeeting.Contains("wp-scores") && afterMeeting.Contains("Financial (0"), "financial and technical score inputs remain visible after the meeting ends");
+        }
+        var scores = new List<ScoreInput> { new() { BidId = bid.Id, Financial = 80, Technical = 80, Justification = "Test justification" } };
+        var beforeStart = new EvaluationSession { StartsAt = DateTime.UtcNow.AddHours(1), State = SessionState.Scheduled };
+        Check(!TenderWorkflowService.EvaluationOpen(beforeStart, DateTime.UtcNow), "evaluation stays closed before meeting start");
+        foreach (var scorer in new[] { technical, financial, evaluator, manager })
+        {
+            if (scorer.Id == financial.Id)
+            {
+                // Recover only sessions automatically closed by the old meeting-deadline rule.
+                session.State = SessionState.Incomplete; session.ClosedAt = DateTime.UtcNow; session.ClosureReason = "Scheduled deadline reached";
+                await db.SaveChangesAsync();
+            }
+            await flow.SubmitEvaluation(id, scores, Principal(scorer));
+            Check(session.Invitations.Any(x => x.CommitteeMemberId == seats.Single(m => m.UserId == scorer.Id).Id && x.SubmittedAt != null), scorer.FullName + " submits after meeting end");
+            var scoreRepeatRejected = false;
+            try { await flow.SubmitEvaluation(id, scores, Principal(scorer)); } catch (WorkflowException) { scoreRepeatRejected = true; }
+            Check(scoreRepeatRejected, scorer.FullName + " cannot overwrite submitted scores");
+        }
+        await flow.CloseDueSessions(CancellationToken.None);
+        Check(session.State == SessionState.ReportDraft && session.ReportId != null, "complete post-meeting evaluations automatically generate the report");
         var reportId = session.ReportId!.Value;
         var hash = session.Report!.PdfSha256!;
         var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=").Concat(new byte[250]).ToArray();
