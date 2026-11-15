@@ -6,6 +6,8 @@ namespace Orange_Tendering_System.Data
 {
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
+        public DbSet<AdminMaintenancePlan> AdminMaintenancePlans => Set<AdminMaintenancePlan>();
+
         // Organization
         public DbSet<Department> Departments => Set<Department>();
         public DbSet<Supplier> Suppliers => Set<Supplier>();
