@@ -1,21 +1,20 @@
 # AGENTS.md — repository rules for every agent (Codex, Claude, others)
 
-## Authoritative workspace (owner decision, 2026-11-15)
+## Authoritative workspace (owner decision, 2026-11-16)
 
-- Local repository: `C:\Users\user\Desktop\Orange\Projects\Orange-Tendering\Orange-Tendering-System-WorkV2`
-- Development branch: `WorkV2`, tracking `origin/WorkV2`
+- Local repository: `C:\Users\user\Desktop\Orange-Tendering-System`
+- Development branch: `tariq22222`
 - Visual Studio solution: `Orange-Tendering-System.slnx` in that folder
 - Application ports: `http://localhost:5254` and `https://localhost:7182` (`Orange-Tendering-System/Properties/launchSettings.json`)
 
-All development, builds, tests, commits and pushes happen here. Other folders (the original `Orange-Tendering-System`
-folder on `Ahmad`, `WorkV1`, `Orange-Tendering-System-AuthIntegration`, earlier test copies) are preserved but inactive:
+All development, builds, tests, commits and pushes happen here. Other folders (`Orange-Tendering-System-WorkV2`, `WorkV1`, `Orange-Tendering-System-AuthIntegration`, earlier test copies) are preserved but inactive:
 do not develop in them, delete them, reset them or discard their uncommitted changes.
 
 ## Before writing, building, committing or pushing
 
 ```powershell
-git rev-parse --show-toplevel   # must be ...\Orange-Tendering-System-WorkV2
-git branch --show-current       # must be WorkV2
+git rev-parse --show-toplevel   # must be C:\Users\user\Desktop\Orange-Tendering-System
+git branch --show-current       # must be tariq22222
 git status --short              # know what is already uncommitted
 ```
 
