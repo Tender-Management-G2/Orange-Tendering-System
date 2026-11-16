@@ -27,14 +27,6 @@ body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel select { b
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel button,
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-button { border-radius: 999px; }
 
-/* Live filter toolbars (History, Voting, Evaluation Summary) look like the Officer filter bar. */
-body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-toolbar {
-  padding: 16px 18px; border: 1px solid var(--sod-border); border-radius: 18px; background: var(--sod-card); box-shadow: var(--sod-shadow);
-}
-body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-field label { color: var(--sod-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-field input,
-body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-field select { min-height: 46px; border: 1px solid var(--sod-border); border-radius: 12px; background: var(--sod-card); color: var(--sod-ink); }
-
 /* Page headers that sit next to the banner. */
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-review .rv-page-links { justify-content: flex-start; }
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-decision .dc-page-head { justify-content: space-between; }
@@ -49,5 +41,36 @@ body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-table th { overf
 
 @media (max-width: 720px) {
   body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel { padding: 18px 14px; }
-  body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-toolbar { padding: 14px; }
 }
+
+/* Summary cards on Voting, Evaluation Summary and Decision History (_RoundKpis): links that filter by status. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-round-kpis > a.pg-card { color: inherit; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-round-kpis > a.pg-card:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(30, 40, 60, .12); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-round-kpis > a.pg-card:focus-visible { outline: 3px solid #ff7900; outline-offset: 3px; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-round-kpis > a.pg-card.is-current { border-width: 2px; border-color: var(--tone); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live > .pg-toolbar { margin: 0; }
+
+/* Cards without their own icon (Management Statistics, Reports & Analytics) get the chart icon in the card colour. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-cards > .pg-card:not([data-icon]):nth-child(4n + 1)::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff7900' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 17v-7h3v7M14 17V4h3v13'/%3E%3C/svg%3E"); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-cards > .pg-card:not([data-icon]):nth-child(4n + 2)::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231e88e5' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 17v-7h3v7M14 17V4h3v13'/%3E%3C/svg%3E"); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-cards > .pg-card:not([data-icon]):nth-child(4n + 3)::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d36e8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 17v-7h3v7M14 17V4h3v13'/%3E%3C/svg%3E"); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-cards > .pg-card:not([data-icon]):nth-child(4n + 4)::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317b26a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 17v-7h3v7M14 17V4h3v13'/%3E%3C/svg%3E"); }
+
+/* Reports & Analytics (shared Views/Analytics/Index): report cards with a title, description and export line.
+   Wider cards so the description is not squeezed into a narrow column; title first, description below. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards:has(> a.pg-card > small) { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 18px; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) { grid-template-rows: auto 1fr auto; row-gap: 8px; align-content: stretch; align-items: start; min-height: 190px; height: 100%; padding: 22px 22px 20px; color: inherit; text-decoration: none; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small)::before,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small)::after { grid-row: 1 / span 3; align-self: center; }
+@media (max-width: 1180px) { body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards:has(> a.pg-card > small) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards:has(> a.pg-card > small) { grid-template-columns: 1fr; grid-auto-rows: auto; } }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) > span { grid-row: 1; margin: 0; font-size: 20px; font-weight: 700; line-height: 1.25; color: var(--sod-ink); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) > strong { grid-row: 2; font-weight: 400; line-height: 1.5; letter-spacing: 0; color: var(--sod-muted); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) > small { grid-row: 3; font-size: 12px; color: var(--tone); font-weight: 600; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small):hover { transform: translateY(-2px); }
+
+/* Dashboard (Areas/TopCommittee/Views/Dashboard/Index.cshtml) uses the Officer dashboard (sod-*) with four committee stages. */
+.tcd .tcd-stages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 760px) { .tcd .tcd-stages li { flex: 1 0 110px; } }
+.tcd .tcd-ai-link { display: inline-block; margin-top: 8px; color: var(--sod-orange-deep); font-size: 13px; font-weight: 600; text-decoration: none; }
+.tcd .tcd-ai-link:hover { text-decoration: underline; }

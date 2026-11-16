@@ -20,6 +20,11 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 public sealed class DecisionsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
     IWebHostEnvironment environment, ILogger<DecisionsController> logger, IRazorViewEngine views) : TopCommitteeControllerBase(db, users)
 {
+    // Read-only counts for the summary cards on Voting, Evaluation Summary and Decision History.
+    private async Task<Dictionary<CommitteeRoundStatus, int>> RoundStatusCounts(string userId) =>
+        await Committee.RoundList(userId).AsNoTracking().GroupBy(r => r.Status)
+            .Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count);
+
     [HttpGet]
     public async Task<IActionResult> Search(string? q)
     {
@@ -88,7 +93,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
                     .Skip((page - 1) * 20).Take(20).AsSplitQuery().ToListAsync()
             }
         };
-        return Request.Headers["X-TopCommittee-Live"] == "1" ? PartialView("_RoundResults", model) : View("SelectRound", model);
+        if (Request.Headers["X-TopCommittee-Live"] == "1") return PartialView("_RoundResults", model);
+        model.Listing.StatusCounts = await RoundStatusCounts(userId);
+        return View("SelectRound", model);
     }
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Vote(VoteInput input)
@@ -432,7 +439,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             Rounds = await query.OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id)
                 .Skip((page - 1) * 20).Take(20).AsSplitQuery().ToListAsync()
         };
-        return Request.Headers["X-TopCommittee-Live"] == "1" ? PartialView("_HistoryResults", model) : View(model);
+        if (Request.Headers["X-TopCommittee-Live"] == "1") return PartialView("_HistoryResults", model);
+        model.StatusCounts = await RoundStatusCounts(user.Id);
+        return View(model);
     }
     [HttpGet]
     public async Task<IActionResult> Download(int id, int roundId)

@@ -11,11 +11,15 @@
 <div class="tc-live" data-live-root>
 <partial name="_PageHeader" />
 <partial name="_Messages" />
-<form asp-action="@Model.TargetAction" asp-route-id="" method="get" class="pg-toolbar tc-live-toolbar" data-live-form>
-<div class="tc-live-field"><label for="tc-live-search">Tender Search</label><input id="tc-live-search" name="search" type="search" maxlength="200" value="@listing.Search" placeholder="Tender title or reference (e.g. T-4)" aria-controls="tc-live-results" autocomplete="off" /></div>
-<div class="tc-live-field"><label for="tc-live-status">Round Status</label><select id="tc-live-status" name="status" aria-controls="tc-live-results"><option value="">All statuses</option>
+@{ ViewData["KpiAction"] = Model.TargetAction; }
+<partial name="_RoundKpis" model="listing" />
+<form asp-action="@Model.TargetAction" asp-route-id="" method="get" class="pg-toolbar" data-live-form aria-label="Search committee rounds">
+<input id="tc-live-search" name="search" type="search" maxlength="200" value="@listing.Search" placeholder="Tender title or reference (e.g. T-4)" aria-label="Tender search" aria-controls="tc-live-results" autocomplete="off" />
+<select id="tc-live-status" name="status" aria-label="Round status" aria-controls="tc-live-results"><option value="">All statuses</option>
 @foreach (var status in Enum.GetValues<CommitteeRoundStatus>()) { <option value="@status" selected="@(listing.Status == status)">@CommitteeDisplay.Status(status)</option> }
-</select></div>
+</select>
+<button type="submit" class="pg-btn pg-btn-primary">Search</button>
+<a class="pg-btn" asp-action="@Model.TargetAction" asp-route-id="">Reset</a>
 </form>
 <p class="tc-live-status" role="status" aria-live="polite" aria-atomic="true" data-live-status></p>
 <div id="tc-live-results" data-live-results><partial name="_RoundResults" model="Model" /></div>

@@ -93,6 +93,8 @@ public sealed class DecisionHistory
     public int Pages => Math.Max(1, (int)Math.Ceiling(Total / 20m));
     public List<CommitteeRound> Rounds { get; set; } = [];
     public RoundDetails? Selected { get; set; }
+    // Summary cards (all of the member's assigned rounds, not just the filtered page); empty on live-filter refreshes.
+    public IReadOnlyDictionary<CommitteeRoundStatus, int> StatusCounts { get; set; } = new Dictionary<CommitteeRoundStatus, int>();
 }
 
 public sealed class RoundSelection
