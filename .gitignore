@@ -503,3 +503,4 @@ Orange-Tendering-System/App_Data/SupplierUploads/
 
 # Local build outputs, execution logs and private working backups.
 /output/
+/Orange-Tendering-System/App_Data/ExecutiveAgentTest/

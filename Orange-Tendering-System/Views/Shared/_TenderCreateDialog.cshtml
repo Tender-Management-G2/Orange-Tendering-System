@@ -222,6 +222,9 @@
     dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
     var q = new URLSearchParams(window.location.search);
     if (q.get('request') || q.get('new')) { openDlg(q.get('request')); }
+    // ?title= comes from the Executive Agent hand-off; it only pre-fills the field, the user still reviews and submits.
+    var askedTitle = (q.get('title') || '').trim().slice(0, 200);
+    if (askedTitle) { $('Title').value = askedTitle; auto['Title'] = undefined; }
     showRequest(); seats(); progress();
 })();
 </script>

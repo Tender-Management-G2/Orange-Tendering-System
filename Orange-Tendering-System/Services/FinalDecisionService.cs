@@ -15,6 +15,8 @@ public sealed class FinalDecisionService(TenderWorkflowService workflow, IEmailS
     }
 
     public Task RetryEmails(int tenderId, ClaimsPrincipal principal) => SendEmails(tenderId, principal, retryOnly: true);
+    // Used after the Executive Agent has separately confirmed and committed the existing SQL notification action.
+    public Task SendPendingEmails(int tenderId, ClaimsPrincipal principal) => SendEmails(tenderId, principal, retryOnly: false);
 
     private async Task SendEmails(int tenderId, ClaimsPrincipal principal, bool retryOnly)
     {

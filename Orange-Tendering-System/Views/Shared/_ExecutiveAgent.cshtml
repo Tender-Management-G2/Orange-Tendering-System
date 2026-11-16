@@ -1,0 +1,19 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery AgentAntiforgery
+<div data-executive-agent data-area="@ViewContext.RouteData.Values["area"]" data-csrf="@AgentAntiforgery.GetAndStoreTokens(Context).RequestToken">
+    <dialog class="executive-agent" aria-labelledby="executive-agent-title">
+        <header><div><strong id="executive-agent-title">Orange AI Executive Agent</strong><small>qwen3.5:9b · Local processing</small></div><button type="button" data-agent-close aria-label="Close Executive Agent">×</button></header>
+        <p>الميكروفون العلوي يسمع وينفّذ التنقّل مباشرة بدون نافذة. يمكنك هنا كتابة الأوامر ومراجعة الإجراءات المحمية قبل تأكيدها. / The top microphone navigates directly; protected actions still require separate review and identity verification.</p>
+        <label>Speech language / لغة الصوت <select data-agent-language><option value="en-US">English</option><option value="ar-JO">العربية</option></select></label>
+        <p data-agent-speech-status role="status"></p>
+        <form data-agent-form>
+            <label>Command / الأمر<textarea data-agent-command maxlength="2000" rows="3" required dir="auto" placeholder="Find a tender, open its report, then prepare forwarding it."></textarea></label>
+            <div class="executive-agent-buttons"><button type="button" data-agent-mic>Start local microphone / الميكروفون</button><button type="submit" data-agent-run>Run reviewed command / تنفيذ الأمر</button></div>
+        </form>
+        <p data-agent-status role="status" aria-live="polite"></p>
+        <ol data-agent-steps aria-label="Execution steps"></ol>
+        <div data-agent-actions></div>
+        <details><summary>Capabilities and signing</summary><p>Find permitted records; read tender status; open current reports; prepare weight requests and approvals, evaluation signing, manager approval, Top voting, report forwarding, final decision forwarding and supplier notifications. Reject follows the existing cancellation workflow. Pending actions do not change records.</p><p>Passkeys authorize the exact action through the existing identity verifier. Report signatures still use the existing report signing policy; a passkey action receipt is not a certificate-backed PDF signature. Cloud speech is never used by this agent.</p></details>
+    </dialog>
+</div>
+<link rel="stylesheet" href="~/css/executive-agent.css" asp-append-version="true" />
+<script src="~/js/executive-agent.js" asp-append-version="true" defer></script>

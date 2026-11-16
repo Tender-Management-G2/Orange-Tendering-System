@@ -9,6 +9,10 @@ using Orange_Tendering_System.Services.Reports;
 var builder = WebApplication.CreateBuilder(args);
 // Development launch profiles select the isolated team database (Services/TeamDevDatabase.cs).
 TeamDevDatabase.Apply(builder);
+// One development browser origin for every role, Identity and Executive Agent.
+// Keep the historical HTTP listener only to redirect old links to HTTPS.
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddHttpsRedirection(options => options.HttpsPort = 7182);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("Default Connection") ?? throw new InvalidOperationException("Connection string 'Default Connection' not found.");
@@ -67,6 +71,12 @@ builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<InternalDashboardService>();
 builder.Services.AddScoped<FinalDecisionService>();
 builder.Services.AddScoped<AiChatService>();
+builder.Services.Configure<ExecutiveAgentOptions>(builder.Configuration.GetSection("ExecutiveAgent"));
+builder.Services.AddHttpClient<ExecutiveAgentClient>();
+builder.Services.AddScoped<ExecutiveAgentService>();
+builder.Services.AddScoped<ExecutiveNavigationService>();
+builder.Services.Configure<ExecutiveSpeechOptions>(builder.Configuration.GetSection("ExecutiveSpeech"));
+builder.Services.AddScoped<ExecutiveSpeechService>();
 builder.Services.AddScoped<ClarificationService>();
 builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<ReportExport>();

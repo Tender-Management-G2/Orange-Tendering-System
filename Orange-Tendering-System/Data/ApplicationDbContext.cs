@@ -6,6 +6,8 @@ namespace Orange_Tendering_System.Data
 {
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
+        public DbSet<ExecutiveAgentRun> ExecutiveAgentRuns => Set<ExecutiveAgentRun>();
+        public DbSet<ExecutiveAgentAction> ExecutiveAgentActions => Set<ExecutiveAgentAction>();
         public DbSet<AdminMaintenancePlan> AdminMaintenancePlans => Set<AdminMaintenancePlan>();
 
         // Organization

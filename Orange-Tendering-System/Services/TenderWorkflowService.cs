@@ -70,14 +70,17 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         Func<Tender, ApplicationUser, Task> operation, Func<DateTime?>? deadline = null)
     {
         var actor = await Actor(principal);
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        // Agent confirmation owns a serializable transaction so its receipt, idempotency marker
+        // and this existing workflow operation commit or roll back together.
+        await using var tx = db.Database.CurrentTransaction == null
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable) : null;
         var tender = await db.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={tenderId}").SingleOrDefaultAsync();
         Require(tender != null, "Tender not found.");
         await operation(tender!, actor);
         Audit(actor, tenderId, action);
         await db.SaveChangesAsync();
         if (deadline != null) Require(deadline() is { } end && Now < end, "The submission deadline has passed. Nothing was submitted.");
-        await tx.CommitAsync();
+        if (tx != null) await tx.CommitAsync();
     }
     private async Task<WeightRound> Weights(int tenderId) => await db.Set<WeightRound>().Include(x => x.Proposals)
         .OrderByDescending(x => x.Version).FirstOrDefaultAsync(x => x.TenderId == tenderId) ?? throw new WorkflowException("Send the weight request first.");

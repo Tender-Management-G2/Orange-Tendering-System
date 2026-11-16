@@ -22,6 +22,13 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
+if (args.Contains("--executive-agent-checks")) { await ExecutiveAgentChecks.Run(); return; }
+if (args.Contains("--executive-navigation-checks")) { ExecutiveNavigationChecks.Run(); return; }
+if (args.Contains("--executive-knowledge-checks")) { await ExecutiveKnowledgeChecks.Run(args.Contains("--live-model")); return; }
+if (args.Contains("--executive-model-diagnose")) { await ExecutiveModelDiagnosis.Run(); return; }
+if (args.Contains("--executive-model-failure-checks")) { await ExecutiveModelFailureChecks.Run(); return; }
+if (args.Contains("--executive-agent-csrf-probe")) { await ExecutiveAgentCsrfChecks.Run(args.Contains("--expect-fixed")); return; }
+if (args.Contains("--executive-agent-browser-host")) { await ExecutiveAgentBrowserHost.Run(); return; }
 if (args.Contains("--theme-browser-host")) { await ThemeBrowserHost.Run(); return; }
 if (args.Contains("--seed-saja-demo")) { await SajaDemoFixture.Run(); return; }
 if (args.Contains("--unified-tender-checks")) { await UnifiedTenderChecks.Run(); return; }
