@@ -166,10 +166,18 @@ if (app.Environment.IsDevelopment())
     {
         startup.LogInformation("Development database: {Database} (team database).", database);
         var teamAccounts = app.Configuration.GetValue("TeamAccounts:Enabled", true);
-        if (teamAccounts) await TeamAccountSeeder.EnsureAsync(app.Services, startup);
+        if (teamAccounts)
+        {
+            await TeamAccountSeeder.EnsureAsync(app.Services, startup);
+            await TeamSupplierSeeder.EnsureAsync(app.Services, startup);
+        }
         else startup.LogWarning("Team accounts were NOT provisioned: TeamAccounts:Enabled is false in this run's configuration (environment variable, User Secrets or appsettings). Remove that setting for normal team development.");
         if (app.Configuration.GetValue<bool>("DemoData:Enabled")) await DemoDataSeeder.SeedAsync(app.Services);
-        if (teamAccounts) await TeamAccountSeeder.VerifyAsync(app.Services, startup, database);
+        if (teamAccounts)
+        {
+            await TeamAccountSeeder.VerifyAsync(app.Services, startup, database);
+            await TeamSupplierSeeder.VerifyAsync(app.Services, startup, database);
+        }
     }
     else
     {

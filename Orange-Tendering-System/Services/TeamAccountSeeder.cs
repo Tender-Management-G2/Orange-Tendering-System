@@ -36,9 +36,10 @@ public static class TeamAccountSeeder
         public string[] Roles => SystemRoles.AccountRoles(Role);
     }
 
-    /// <summary>The ten canonical accounts. The Sourcing Manager is the fourth Evaluation Committee member.</summary>
+    /// <summary>The eleven canonical accounts. The Sourcing Manager is the fourth Evaluation Committee member.</summary>
     public static readonly IReadOnlyList<TeamAccount> Accounts =
     [
+        new("admin@orange-demo.local", "Orange Demo Administrator", SystemRoles.Admin, null, false, "Orange Demo Administrator"),
         new("department@orange-demo.local", "Team Requesting Department", SystemRoles.RequestingDepartment, null, true, "Team Requesting Department"),
         new("sourcing.officer@orange-demo.local", "Team Sourcing Officer", SystemRoles.SourcingOfficer, null, false, "Team Sourcing Officer"),
         new("sourcing.manager@orange-demo.local", "Team Sourcing Manager", SystemRoles.SourcingManager, "evaluation-manager", false, "Team Sourcing Manager"),

@@ -2,12 +2,13 @@
 
 ## Team development accounts (automatic)
 
-`git pull origin WorkV2`, open `Orange-Tendering-System.slnx`, run the **https** profile in Visual Studio. On every
+`git pull origin WorkV3`, open `Orange-Tendering-System.slnx`, run the **https** profile in Visual Studio. On every
 Development start the app migrates the team database and then `Services/TeamAccountSeeder.cs` creates or repairs these
-ten accounts and verifies that each one can sign in. Password for all: **`OrangeDemo2026!`**
+eleven internal accounts and six suppliers, and verifies that each one can sign in. Password for all: **`OrangeDemo2026!`**
 
 | Role | Email | Committee seat |
 | --- | --- | --- |
+| Admin | `admin@orange-demo.local` | — |
 | Requesting Department (Team Demo Department) | `department@orange-demo.local` | — |
 | Sourcing Officer | `sourcing.officer@orange-demo.local` | — |
 | Sourcing Manager (4th Evaluation Committee member) | `sourcing.manager@orange-demo.local` | `evaluation-manager` |
@@ -21,6 +22,10 @@ ten accounts and verifies that each one can sign in. Password for all: **`Orange
 
 Choose **Other User** on the sign-in page for these accounts.
 
+The six supplier accounts are `supplier1@orange-demo.local` through `supplier6@orange-demo.local`.
+Choose **Supplier** on the sign-in page. Each has an approved demo company and can sign in with the
+shared password. Supplier workspace access still follows the normal face or passkey enrollment step.
+
 What startup does (no manual SQL, resets, activation emails or database deletion):
 
 - Creates missing accounts; repairs managed ones: password (only when it no longer matches), email confirmation,
@@ -30,7 +35,7 @@ What startup does (no manual SQL, resets, activation emails or database deletion
   An unrelated account that uses one of these emails is never taken over: startup stops and says what to do.
 - Exactly one Sourcing Officer may be active. Synthetic `@orange-demo.local` officers ("Demo …"/"Team …") are
   deactivated; a real active officer is never changed, startup stops with instructions instead.
-- The log shows the database used, what was created or repaired, and "Team accounts ready … 10 accounts verified".
+- The log shows the database used, what was created or repaired, and verifies all 17 accounts.
   If anything cannot be fixed, startup fails with the reason; it never reports accounts that do not work.
 
 ## The team database and safety limits
