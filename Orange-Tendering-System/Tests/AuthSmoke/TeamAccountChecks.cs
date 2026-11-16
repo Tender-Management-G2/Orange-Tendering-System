@@ -35,6 +35,7 @@ static class TeamAccountChecks
 
     private static readonly Dictionary<string, string> Workspace = new()
     {
+        ["admin@orange-demo.local"] = "/Admin",
         ["department@orange-demo.local"] = "/Department",
         ["sourcing.officer@orange-demo.local"] = "/SourcingOfficer",
         ["sourcing.manager@orange-demo.local"] = "/SourcingManager",

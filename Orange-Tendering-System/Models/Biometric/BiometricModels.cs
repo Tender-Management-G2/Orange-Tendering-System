@@ -51,6 +51,26 @@ public class BiometricOptions
     public int MaxFaceTemplatesPerUser { get; set; } = 10;
     public int MaxPasskeysPerUser { get; set; } = 10;
 
+    /// <summary>
+    /// The public HTTPS address of this site (for example the ngrok URL), offered when a supplier opens the
+    /// "use my phone" setup on an address a phone cannot reach (http://localhost). A passkey belongs to the
+    /// host name it was created on (the WebAuthn RP ID), so changing this domain later means registering
+    /// phones again. Null: phone setup works only when the page itself is opened over a public HTTPS address.
+    /// </summary>
+    public string? PublicOrigin { get; set; }
+
+    /// <summary>Lifetime of a QR code / email link that registers a phone (single use).</summary>
+    public int PhoneEnrollSeconds { get; set; } = 600;
+
+    /// <summary>Lifetime of a QR code that approves a desktop sign-in from the phone (single use).</summary>
+    public int PhoneSignInSeconds { get; set; } = 180;
+
+    /// <summary>"Send setup link to my email" messages allowed per account inside the failure window.</summary>
+    public int PhoneLinkEmailsPerWindow { get; set; } = 3;
+
+    /// <summary>New phone QR codes (setup or sign-in) allowed per account inside the failure window.</summary>
+    public int PhoneLinksPerWindow { get; set; } = 10;
+
     /// <summary>Failed biometric attempts allowed per IP address / account name inside the window.</summary>
     public int MaxFailuresPerWindow { get; set; } = 10;
 
@@ -89,6 +109,24 @@ public class EnrollStartRequest
 public class PasskeyLoginRequest
 {
     public string? CredentialJson { get; set; }
+    public string? ReturnUrl { get; set; }
+}
+
+// ---------- Phone link (QR code / email link opened on a smartphone) ----------
+
+/// <summary>A request from the phone page. The token comes from the QR code or email link (URL fragment).</summary>
+public class PhoneLinkRequest
+{
+    public string? Token { get; set; }
+
+    /// <summary>Sign-in approval only: the two-digit number shown on the computer.</summary>
+    public string? Code { get; set; }
+
+    public string? CredentialJson { get; set; }
+}
+
+public class PhoneSignInCompleteRequest
+{
     public string? ReturnUrl { get; set; }
 }
 

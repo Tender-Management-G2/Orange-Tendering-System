@@ -1,0 +1,130 @@
+/* "Use my phone" (QR code) panels and the phone page. Used by Pending Approval, Biometrics/Fingerprint,
+   the Login identity step (Views/Shared/_PhonePasskeySetup.cshtml, Login.cshtml) and Views/PhonePasskey/Index.
+   Colours follow the Orange auth studio (wwwroot/css/auth-studio.css). */
+.pp {
+  --pp-orange: #FF7900;
+  --pp-orange-ink: #C25200;
+  --pp-ink-on-orange: #211A14;
+  --pp-paper: #FFFDF9;
+  --pp-ivory: #F8F4EE;
+  --pp-rule: #E6DDD1;
+  --pp-field: #D8CCBD;
+  --pp-warm-gray: #786E64;
+  --pp-graphite: #292521;
+  --pp-success: #28754D;
+  --pp-error: #B03A2E;
+  --pp-radius: 10px;
+  color: var(--pp-graphite);
+}
+
+.pp [hidden] { display: none !important; }
+
+/* Buttons (the same shapes as the auth studio, usable outside it) */
+.pp .pp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 18px; margin: 0;
+  font: inherit; font-size: 15px; font-weight: 650; line-height: 1.2; text-align: center; text-decoration: none;
+  border-radius: var(--pp-radius); cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+.pp .pp-btn--primary { width: 100%; color: var(--pp-ink-on-orange); background: var(--pp-orange); border: 0; }
+.pp .pp-btn--primary:hover { background: #FF8A1F; }
+.pp .pp-btn--secondary { color: var(--pp-graphite); background: #fff; border: 1px solid var(--pp-field); }
+.pp .pp-btn--secondary:hover { border-color: #BFB1A0; background: var(--pp-ivory); }
+.pp .pp-btn:active { transform: translateY(1px); }
+.pp .pp-btn:focus-visible { outline: 3px solid var(--pp-graphite); outline-offset: 2px; }
+.pp .pp-btn[disabled] { opacity: 0.6; cursor: default; transform: none; }
+.pp .pp-link {
+  min-height: 40px; padding: 0 2px; font: inherit; font-size: 13.5px; font-weight: 620; color: var(--pp-graphite);
+  background: transparent; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.pp .pp-link:hover { color: var(--pp-orange-ink); }
+.pp .pp-link:focus-visible { outline: 2px solid var(--pp-orange-ink); outline-offset: 2px; }
+.pp .pp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+
+.pp .pp-fine { margin: 10px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--pp-warm-gray); }
+.pp .pp-lead { margin: 0 0 12px; font-size: 14px; line-height: 1.55; }
+
+/* QR code with its instructions */
+.pp-qr { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; }
+.pp-qr-img {
+  width: 196px; height: 196px; padding: 8px; background: #fff; border: 1px solid var(--pp-rule); border-radius: 12px;
+  image-rendering: pixelated;
+}
+.pp-steps { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.6; }
+.pp-steps li + li { margin-top: 4px; }
+.pp-code { margin: 10px 0 0; font-size: 13.5px; }
+.pp-code strong {
+  display: inline-block; min-width: 2.6ch; margin-left: 6px; padding: 2px 10px; font-size: 26px; font-weight: 720;
+  letter-spacing: 0.08em; text-align: center; color: var(--pp-graphite); background: var(--pp-ivory);
+  border: 1px solid var(--pp-rule); border-radius: 8px; font-variant-numeric: tabular-nums;
+}
+@media (max-width: 520px) {
+  .pp-qr { grid-template-columns: 1fr; justify-items: center; }
+  .pp-steps { justify-self: stretch; }
+}
+
+/* Waiting for the phone */
+.pp-wait { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; font-size: 13.5px; line-height: 1.45; }
+.pp-wait-text { flex: 1 1 auto; }
+.pp-timer { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--pp-warm-gray); }
+.pp-spinner {
+  flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--pp-rule); border-top-color: var(--pp-orange-ink);
+  animation: pp-spin 0.9s linear infinite;
+}
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pp-spinner { animation-duration: 3s; } }
+
+.pp-result { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
+.pp-result::before {
+  content: ""; flex: 0 0 auto; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%;
+  background: var(--pp-success) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+}
+.pp-result--warn::before {
+  background: var(--pp-error) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 5.5v5.5M10 14.2v.3' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+}
+
+/* Registration step: the chosen identity method */
+.as-shell .as-method[aria-pressed="true"] {
+  border-color: var(--as-orange-ink, #C25200);
+  box-shadow: inset 0 0 0 1px var(--as-orange-ink, #C25200);
+  background: #FFF8F0;
+}
+
+/* Login identity step panel */
+.pp-panel { margin: 0 0 16px; padding: 16px; border: 1px solid var(--pp-field); border-radius: 14px; background: #fff; }
+
+/* ---------- Phone page ---------- */
+html.pp-page-html, .pp-page { margin: 0; min-height: 100%; background: #F6F1E9; }
+.pp-page {
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 100vh; min-height: 100dvh; padding: 24px 16px 32px; box-sizing: border-box;
+}
+.pp-page *, .pp-page *::before, .pp-page *::after { box-sizing: border-box; }
+.pp-brand { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 440px; margin: 0 0 18px; font-size: 14px; font-weight: 650; }
+.pp-brand-mark { width: 22px; height: 22px; border-radius: 4px; background: #FF7900; }
+.pp-card {
+  width: 100%; max-width: 440px; padding: 22px 20px; background: #FFFDF9;
+  border: 1px solid #E6DDD1; border-radius: 16px; box-shadow: 0 18px 40px -28px rgba(41, 37, 33, 0.45);
+}
+.pp-kicker { margin: 0 0 6px; font-size: 12px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: #C25200; }
+.pp-title { margin: 0 0 10px; font-size: 23px; line-height: 1.25; font-weight: 720; }
+.pp-account { margin: 14px 0; padding: 12px 14px; font-size: 14px; line-height: 1.5; background: #F8F4EE; border: 1px solid #E6DDD1; border-radius: 10px; }
+.pp-account strong { display: block; font-size: 15px; }
+.pp-account span { color: #786E64; overflow-wrap: anywhere; }
+.pp-field { display: grid; gap: 6px; margin: 14px 0; }
+.pp-field label { font-size: 14px; font-weight: 620; }
+.pp-field input {
+  width: 100%; height: 56px; padding: 0 14px; font: inherit; font-size: 28px; font-weight: 700; letter-spacing: 0.3em;
+  text-align: center; color: #292521; background: #fff; border: 1px solid #D8CCBD; border-radius: 10px;
+}
+.pp-field input:focus { outline: 3px solid #FF7900; outline-offset: 1px; }
+.pp-stack { display: grid; gap: 10px; margin-top: 16px; }
+.pp-message { min-height: 1.5em; margin: 14px 0 0; font-size: 14px; line-height: 1.5; }
+.pp-message:empty { display: none; }
+.pp-message--danger { padding: 10px 12px; color: #8E2D23; background: #FDF3F1; border: 1px solid #E3B7AE; border-left: 3px solid #B03A2E; border-radius: 8px; }
+.pp-expires { margin: 16px 0 0; font-size: 12.5px; color: #786E64; }
+.pp-loading { display: flex; align-items: center; gap: 10px; font-size: 14px; }

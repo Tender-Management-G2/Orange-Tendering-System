@@ -40,6 +40,7 @@ public static class TeamAccountSeeder
     /// <summary>The ten canonical accounts. The Sourcing Manager is the fourth Evaluation Committee member.</summary>
     public static readonly IReadOnlyList<TeamAccount> Accounts =
     [
+        new("admin@orange-demo.local", "Admin", SystemRoles.Admin, null, true, "Admin"),
         new("department@orange-demo.local", "Team Requesting Department", SystemRoles.RequestingDepartment, null, true, "Team Requesting Department"),
         new("sourcing.officer@orange-demo.local", "Team Sourcing Officer", SystemRoles.SourcingOfficer, null, false, "Team Sourcing Officer"),
         new("sourcing.manager@orange-demo.local", "Team Sourcing Manager", SystemRoles.SourcingManager, "evaluation-manager", false, "Team Sourcing Manager"),
@@ -129,8 +130,13 @@ public static class TeamAccountSeeder
                 throw new TeamAccountException($"The reserved team user name {account.Email} belongs to another account. Rename it in Admin > Users, then restart.");
             user = new ApplicationUser
             {
-                UserName = account.Email, Email = account.Email, EmailConfirmed = true, FullName = account.Name,
-                DepartmentId = account.InDepartment ? departmentId : null, IsActive = true, MustChangePassword = false
+                UserName = account.Email,
+                Email = account.Email,
+                EmailConfirmed = true,
+                FullName = account.Name,
+                DepartmentId = account.InDepartment ? departmentId : null,
+                IsActive = true,
+                MustChangePassword = false
             };
             Check(await users.CreateAsync(user, Password), $"create {account.Email}");
             Check(await users.AddClaimAsync(user, new Claim(MarkerClaimType, MarkerValue)), $"mark {account.Email}");

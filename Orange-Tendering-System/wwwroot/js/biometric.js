@@ -51,29 +51,27 @@
             failure.status = response.status;
             // The server ended the password step (expired, used, cancelled or locked): start again from the password.
             failure.restart = !!(data && data.restart);
+            failure.data = data;
             throw failure;
         }
         return data;
     }
 
     // The browser reports very different problems (cancelled, timed out, no Windows Hello set up,
-    // unsupported options) with the same few error names, so the technical detail is kept in the
-    // message and in the console to make the real cause visible.
+    // unsupported options) with the same few error names. The technical detail goes to the console;
+    // the page shows a plain sentence.
     function friendly(error) {
         console.error('Biometric error:', error);
-        var detail = error && error.name
-            ? ' [' + error.name + (error.message ? ': ' + error.message : '') + ']'
-            : '';
         if (error && (error.name === 'NotAllowedError' || error.name === 'AbortError')) {
-            var cancelled = new Error('Authentication Cancelled — the prompt was cancelled, timed out, or no compatible passkey was available. Try again and select a phone or tablet.' + detail);
+            var cancelled = new Error('The prompt was closed or timed out. Try again when you are ready.');
             cancelled.code = 'cancelled';
             return cancelled;
         }
         if (error && error.name === 'InvalidStateError') {
-            return new Error('This device is already registered.' + detail);
+            return new Error('This device is already registered for your account.');
         }
         if (error && error.name === 'NotSupportedError') {
-            return new Error('This device or browser does not support this kind of sign-in.' + detail);
+            return new Error('This device or browser does not support this kind of sign-in.');
         }
         return error instanceof Error ? error : new Error(String(error));
     }
@@ -105,44 +103,82 @@
             clientExtensionResults: credential.getClientExtensionResults() });
     }
 
-    async function passkeyLogin(returnUrl, base) {
+    // The two WebAuthn ceremonies on server-issued options (JSON from Identity). hints (WebAuthn level 3,
+    // ignored by older browsers) tell the browser which authenticator to offer first: 'client-device' for
+    // this device's own fingerprint / face unlock / PIN, 'hybrid' for a phone through the browser's QR code.
+    async function webauthnCreate(options, hints) {
         ensureWebAuthn();
-        var options = await post(base ? base + '/login-options' : '/Biometrics/PasskeyLoginOptions');
         options.challenge = dec(options.challenge);
-        (options.allowCredentials || []).forEach(function (c) { c.id = dec(c.id); });
-
-        var credential;
+        options.user.id = dec(options.user.id);
+        (options.excludeCredentials || []).forEach(function (c) { c.id = dec(c.id); });
+        if (hints) { options.hints = hints; }
         try {
-            credential = await navigator.credentials.get({ publicKey: options });
+            return credentialJson(await navigator.credentials.create({ publicKey: options }));
         } catch (e) {
             throw friendly(e);
         }
+    }
 
+    async function webauthnGet(options, hints) {
+        ensureWebAuthn();
+        options.challenge = dec(options.challenge);
+        (options.allowCredentials || []).forEach(function (c) { c.id = dec(c.id); });
+        if (hints) { options.hints = hints; }
+        try {
+            return credentialJson(await navigator.credentials.get({ publicKey: options }));
+        } catch (e) {
+            throw friendly(e);
+        }
+    }
+
+    async function passkeyLogin(returnUrl, base, hints) {
+        ensureWebAuthn();
+        var options = await post(base ? base + '/login-options' : '/Biometrics/PasskeyLoginOptions');
         return post(base ? base + '/verify' : '/Biometrics/PasskeyLogin', {
-            credentialJson: credentialJson(credential),
+            credentialJson: await webauthnGet(options, hints),
             returnUrl: returnUrl
         });
     }
 
-    async function passkeyRegister(label, password, base) {
+    // label: optional; without one the server names the device after the browser ("iPhone · Safari").
+    async function passkeyRegister(label, password, base, hints) {
         ensureWebAuthn();
         var options = await post(base ? base + '/register-options' : '/Biometrics/PasskeyRegisterOptions', { password: password });
-        options.challenge = dec(options.challenge);
-        options.user.id = dec(options.user.id);
-        (options.excludeCredentials || []).forEach(function (c) { c.id = dec(c.id); });
-
-        var credential;
-        try {
-            credential = await navigator.credentials.create({ publicKey: options });
-        } catch (e) {
-            throw friendly(e);
-        }
-
         return post(base ? base + '/register' : '/Biometrics/PasskeyRegister', {
-            credentialJson: credentialJson(credential),
+            credentialJson: await webauthnCreate(options, hints),
             label: label
         });
     }
+
+    // A phone or tablet (where "this device" is the phone itself, so no QR code is needed).
+    function isMobile() {
+        if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean' && navigator.userAgentData.mobile) { return true; }
+        var ua = navigator.userAgent || '';
+        return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    }
+
+    // True / false when the browser can tell, null when it cannot (older browsers).
+    async function platformAuthenticator() {
+        try {
+            return !!(window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable &&
+                await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+        } catch (e) { return null; }
+    }
+
+    // Whether the browser offers the standard "use a phone" (hybrid) sign-in; null when it cannot tell.
+    async function hybridSupported() {
+        try {
+            if (!window.PublicKeyCredential || !PublicKeyCredential.getClientCapabilities) { return null; }
+            var capabilities = await PublicKeyCredential.getClientCapabilities();
+            return typeof capabilities.hybridTransport === 'boolean' ? capabilities.hybridTransport : null;
+        } catch (e) { return null; }
+    }
+
+    // Shared with wwwroot/js/phone-passkey.js (the QR-code / phone flows). init() adds .page on pages with #bio-root.
+    window.OrangeBiometric = {
+        post: post, webauthnCreate: webauthnCreate, webauthnGet: webauthnGet, passkeyLogin: passkeyLogin,
+        isMobile: isMobile, platformAuthenticator: platformAuthenticator, hybridSupported: hybridSupported
+    };
 
     // ---------- Face recognition (seven-second capture, holding still) ----------
     // Detect a face, take a few descriptors from consecutive camera frames, send them. There are no liveness
@@ -435,16 +471,9 @@
             }
         }
 
-        // A device passkey signs in on its own; the button is offered beside the password form
-        // and again on the supplier's biometric step.
-        [$('btnPasskeyLogin'), $('btnPasskeyStep')].forEach(function (passkeyLoginButton) {
-            if (!passkeyLoginButton) { return; }
-            passkeyLoginButton.addEventListener('click', function () {
-                setStatus('Use your fingerprint, face or PIN when your device asks, or choose a phone and scan the QR code.');
-                announce('requesting', { method: 'passkey' });
-                guarded(function () { return passkeyLogin(returnUrl); }, 'Signed in.', 'passkey');
-            });
-        });
+        // Used by wwwroot/js/phone-passkey.js, which runs the supplier's Fingerprint sign-in
+        // (this device's fingerprint reader, the browser's own phone prompt, or a QR code from this site).
+        window.OrangeBiometric.page = { guarded: guarded, setStatus: setStatus, announce: announce, returnUrl: returnUrl };
 
         var faceLoginButton = $('btnFaceLogin');
         if (faceLoginButton) {
@@ -463,12 +492,13 @@
         var passkeyRegisterButton = $('btnPasskeyRegister');
         if (passkeyRegisterButton) {
             passkeyRegisterButton.addEventListener('click', function () {
-                var label = ($('passkeyLabel').value || '').trim() || 'My device';
+                // Registers this device itself (a smartphone, or a computer's fingerprint reader / Windows Hello);
+                // a phone for this computer goes through the QR code in phone-passkey.js instead.
                 var password = ($('bioPassword') || {}).value || '';
                 if (!password) { setStatus('Enter your current password to continue.', 'danger'); return; }
-                setStatus('Use your fingerprint, face or PIN when your device asks, or choose a phone and scan the QR code.');
+                setStatus('Confirm with your fingerprint, face or screen lock when your device asks.');
                 announce('requesting', { method: 'passkey' });
-                guarded(function () { return passkeyRegister(label, password); }, 'Fingerprint / Passkey Registered Successfully', 'passkey').then(function (ok) {
+                guarded(function () { return passkeyRegister('', password, null, ['client-device']); }, 'This device is registered for fingerprint / phone sign-in.', 'passkey').then(function (ok) {
                     // Let the Identity Station finish its confirmed sequence before the page shows the new state.
                     var delay = ok && scene && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1700 : 0;
                     if (ok) { window.setTimeout(function () { window.location.reload(); }, delay); }

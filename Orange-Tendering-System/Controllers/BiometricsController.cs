@@ -69,7 +69,9 @@ namespace Orange_Tendering_System.Controllers
         {
             var user = (await users.GetUserAsync(User))!;
             if (!await signIn.EnrollmentAllowedAsync(user)) return Unauthorized(new { error = GenericFailure });
-            var result = await passkeys.RegisterAsync(user, request.CredentialJson, request.Label);
+            // No name to type: the device is named after the browser that registered it ("iPhone · Safari").
+            var label = string.IsNullOrWhiteSpace(request.Label) ? PhoneLinkStore.DeviceLabel(Request.Headers.UserAgent) : request.Label;
+            var result = await passkeys.RegisterAsync(user, request.CredentialJson, label);
             await signIn.AuditAsync(user.Id, result.Succeeded ? "BiometricEnroll" : "BiometricEnrollFailed", "passkey", Ip(), result.Error);
             return result.Succeeded ? Json(new { succeeded = true }) : BadRequest(new { error = result.Error });
         }
@@ -260,6 +262,6 @@ namespace Orange_Tendering_System.Controllers
 
         // No live password step in this browser (never started, expired, cancelled, or already used).
         private UnauthorizedObjectResult PasswordStepRequired() =>
-            Unauthorized(new { restart = true, error = "Enter your email and password again to continue." });
+            Unauthorized(new { restart = true, error = "Your sign-in step ended. Choose Face ID or Fingerprint and enter your email again." });
     }
 }

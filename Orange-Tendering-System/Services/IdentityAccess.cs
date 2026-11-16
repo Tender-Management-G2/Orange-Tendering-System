@@ -59,7 +59,8 @@ public sealed class SupplierApprovalGate(RequestDelegate next)
     [
         "/Biometrics/FaceEnrollChallenge", "/Biometrics/FaceEnroll",
         "/Biometrics/FaceSetupChallenge", "/Biometrics/FaceSetupLogin",
-        "/Biometrics/PasskeyRegisterOptions", "/Biometrics/PasskeyRegister"
+        "/Biometrics/PasskeyRegisterOptions", "/Biometrics/PasskeyRegister",
+        "/Biometrics/Phone/EnrollStart", "/Biometrics/Phone/EnrollEmail"
     ];
 
     public async Task InvokeAsync(HttpContext context, ApplicationDbContext db)

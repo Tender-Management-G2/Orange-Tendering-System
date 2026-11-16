@@ -1,13 +1,14 @@
 // OWNER: Ahmad — Authentication.
 // Sign-in form of Areas/Identity/Pages/Account/Login.cshtml.
 //
-// Step 1 (every account): email and password are checked by Login?handler=Credentials. The server
-// answers with one of three outcomes and nothing else is trusted here:
-//   signedIn  → the session exists; go to the redirect the server chose
-//   biometric → an approved supplier: the password opened a short pre-auth step (SupplierPreAuth);
-//               the face check (biometric.js → /Biometrics/FaceLogin) or a passkey issues the session
-//   rejected  → one generic message, whatever the reason
-// Without JavaScript the same form posts normally and the server renders the same two steps.
+// A supplier first chooses one method (owner decision 2026-11-16); other users always use the password.
+//   Email & Password → Login?handler=Credentials. The server answers signedIn (go to its redirect),
+//                      mismatch (wrong account type, nobody signed in) or rejected (one generic message).
+//   Face ID          → Login?handler=IdentityStart (email only) opens the identity step for that account,
+//                      then biometric.js runs the camera check (/Biometrics/FaceChallenge + FaceLogin).
+//   Fingerprint      → the same IdentityStart, then phone-passkey.js asks this device's fingerprint reader
+//                      (or a phone through a QR code) and /Biometrics/PasskeyLogin issues the session.
+// Without JavaScript the form posts normally and only Email & Password works.
 //
 // The illustration (wwwroot/js/auth-studio/login-page.js) only listens. It receives a sanitised
 // state (email FORMAT, "a password was typed", focus) and the request phases, never a value.
@@ -21,23 +22,44 @@
 
     const email = document.getElementById('Input_Email');
     const password = document.getElementById('Input_Password');
+    const passwordFields = document.getElementById('passwordFields');
     const submit = document.getElementById('login-submit');
     const message = document.getElementById('signInMessage');
-    const credentials = document.getElementById('signInCredentials');
-    const biometric = document.getElementById('signInBiometric');
+    const ledeText = document.getElementById('signInLedeText');
+    const methods = document.getElementById('signInMethods');
+    const methodInputs = Array.from(form.querySelectorAll('input[name="method"]'));
     const faceButton = document.getElementById('btnFaceLogin');
-    const faceNote = document.getElementById('faceMethodNote');
+    const fingerprintButton = document.getElementById('btnPasskeyStep');
     const faceHint = document.getElementById('faceHint');
     const faceActions = document.getElementById('faceActions');
-    const passkeyButton = document.getElementById('btnPasskeyStep');
-    const passkeyNote = document.getElementById('fingerprintMethodNote');
     const bioStatus = document.getElementById('bio-status');
-    const back = document.getElementById('btnBiometricBack');
-    const passwordOnlyButton = document.getElementById('btnPasswordOnly');
+    const phoneOffer = document.getElementById('phoneQrOffer');
+    const phonePanel = document.getElementById('phoneSignIn');
+    const fine = document.getElementById('methodFine');
     const accountInputs = Array.from(form.querySelectorAll('input[name="Input.AccountType"]'));
     const ACCOUNT_KEY = 'orange.signin.accountType';
+    const METHOD_KEY = 'orange.signin.method';
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     const REQUEST_TIMEOUT_MS = 20000;
+    const isMobile = window.OrangeBiometric && window.OrangeBiometric.isMobile ? window.OrangeBiometric.isMobile() : false;
+
+    const TEXT = {
+        password: {
+            lede: 'Use the email and password for your account.',
+            button: 'Sign in',
+            fine: ''
+        },
+        face: {
+            lede: 'Enter your email, then look at the camera.',
+            button: 'Continue with Face ID',
+            fine: 'Your camera image stays on this device; only face measurements are sent to this application. This academic face check has no liveness or spoof protection, so it is not production-grade biometric proof. Set up Face ID once from your account menu (Face recognition sign-in).'
+        },
+        fingerprint: {
+            lede: 'Enter your email, then touch your fingerprint reader.',
+            button: 'Continue with Fingerprint',
+            fine: 'Your fingerprint never leaves your device: the device checks it and this application receives only a signed answer. Set up Fingerprint once from your account menu (Fingerprint sign-in), on this computer or on your phone.'
+        }
+    };
 
     let focusName = null;
     let touched = false;
@@ -86,24 +108,65 @@
         });
     });
 
-    // ---------- Account type: a remembered preference, checked by the server after the password ----------
+    // ---------- Account type and method: remembered preferences, checked by the server ----------
 
     function accountType() {
         const checked = accountInputs.find(input => input.checked);
         return checked ? checked.value : null;
     }
 
-    try {
-        const remembered = window.localStorage.getItem(ACCOUNT_KEY);
-        const match = accountInputs.find(input => input.value === remembered);
-        if (match && !form.querySelector('.validation-summary-errors')) match.checked = true;
-    } catch (e) { /* storage unavailable: keep the server's default */ }
+    // Other users always sign in with the password; a supplier uses the method chosen above.
+    function method() {
+        if (accountType() === 'other') return 'password';
+        const checked = methodInputs.find(input => input.checked);
+        return checked ? checked.value : 'password';
+    }
+
+    function remember(key, value) {
+        try { window.localStorage.setItem(key, value); } catch (e) { /* not essential */ }
+    }
+
+    function restore(key, inputs) {
+        try {
+            const remembered = window.localStorage.getItem(key);
+            const match = inputs.find(input => input.value === remembered);
+            if (match) match.checked = true;
+        } catch (e) { /* storage unavailable: keep the default */ }
+    }
+
+    if (!form.querySelector('.validation-summary-errors')) restore(ACCOUNT_KEY, accountInputs);
+    restore(METHOD_KEY, methodInputs);
+
+    // Shows the fields of the chosen method. Leaving Face ID / Fingerprint ends its step on the server.
+    function render() {
+        const current = method();
+        const text = TEXT[current];
+        if (methods) methods.hidden = accountType() === 'other';
+        passwordFields.hidden = current !== 'password';
+        password.disabled = current !== 'password';
+        if (ledeText) ledeText.textContent = text.lede;
+        submit.firstChild.textContent = text.button + ' ';
+        if (fine) { fine.textContent = text.fine; fine.hidden = !text.fine; }
+        if (phoneOffer) phoneOffer.hidden = true;
+        if (faceHint) faceHint.textContent = '';
+        setStatus('');
+        publish();
+    }
 
     accountInputs.forEach(input => input.addEventListener('change', () => {
-        try { window.localStorage.setItem(ACCOUNT_KEY, input.value); } catch (e) { /* not essential */ }
+        remember(ACCOUNT_KEY, input.value);
         setMessage('');
+        endStep();
+        render();
         emit('authstudio:account', { type: input.value });
-        publish();
+    }));
+
+    methodInputs.forEach(input => input.addEventListener('change', () => {
+        remember(METHOD_KEY, input.value);
+        setMessage('');
+        endStep();
+        render();
+        (input.value === 'password' ? password : email).focus();
     }));
 
     // ---------- Validation messages (same look as the server's) ----------
@@ -137,13 +200,20 @@
         if (summary && text !== undefined) summary.remove();
     }
 
-    function validate() {
+    function setStatus(text, kind) {
+        if (!bioStatus) return;
+        ['info', 'success', 'danger'].forEach(k => bioStatus.classList.remove('bio-status--' + k));
+        bioStatus.classList.add('bio-status--' + (kind || 'info'));
+        bioStatus.textContent = text || '';
+    }
+
+    function validate(needPassword) {
         let first = null;
         const text = email.value.trim();
         if (!text) { setFieldError(email, 'Enter your email address.'); first = first || email; }
         else if (!emailPattern.test(text)) { setFieldError(email, 'Enter a valid email address, for example name@company.com.'); first = first || email; }
         else setFieldError(email, '');
-        if (!password.value) { setFieldError(password, 'Enter your password.'); first = first || password; }
+        if (needPassword && !password.value) { setFieldError(password, 'Enter your password.'); first = first || password; }
         else setFieldError(password, '');
         touched = true;
         publish();
@@ -151,52 +221,70 @@
         return !first;
     }
 
-    // ---------- Step 1: the credential request ----------
+    // ---------- Requests ----------
 
-    function setBusy(on) {
+    function setBusy(on, label) {
         busy = on;
         submit.disabled = on;
         submit.setAttribute('aria-busy', String(on));
-        submit.firstChild.textContent = on ? 'Checking… ' : 'Continue ';
+        submit.firstChild.textContent = on ? (label || 'Checking… ') : TEXT[method()].button + ' ';
     }
 
-    form.addEventListener('submit', async event => {
+    function token() {
+        const input = form.querySelector('input[name="__RequestVerificationToken"]');
+        return input ? input.value : '';
+    }
+
+    async function postHandler(handler, body) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('handler', handler);
+        const abort = new AbortController();
+        const timer = window.setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
+        try {
+            const response = await fetch(url.pathname + url.search, {
+                method: 'POST',
+                credentials: 'same-origin',
+                body,
+                signal: abort.signal,
+                headers: { 'Accept': 'application/json', 'RequestVerificationToken': token() }
+            });
+            let data = null;
+            try { data = await response.json(); } catch (e) { data = null; }
+            return { response, data };
+        } catch (error) {
+            return { error: error && error.name === 'AbortError' ? 'timeout' : 'unavailable' };
+        } finally {
+            window.clearTimeout(timer);
+        }
+    }
+
+    function unreachable(kind) {
+        setMessage(kind === 'timeout'
+            ? 'The server took too long to answer. Check your connection and try again.'
+            : 'The sign-in service could not be reached. Check your connection and try again.');
+        emit('authstudio:signal', { phase: kind });
+    }
+
+    form.addEventListener('submit', event => {
         event.preventDefault();
         if (busy) return;
         setMessage('');
-        if (!validate()) {
+        const current = method();
+        if (!validate(current === 'password')) {
             emit('authstudio:signal', { phase: 'incomplete' });
             return;
         }
+        if (current === 'password') signInWithPassword();
+        else startIdentity(current);
+    });
 
+    // ---------- Email & Password ----------
+
+    async function signInWithPassword() {
         setBusy(true);
         emit('authstudio:signal', { phase: 'submitted' });
-        const abort = new AbortController();
-        const timer = window.setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
-        let response;
-        let data = null;
-        try {
-            const url = new URL(window.location.href);
-            url.searchParams.set('handler', 'Credentials');
-            response = await fetch(url.pathname + url.search, {
-                method: 'POST',
-                credentials: 'same-origin',
-                body: new FormData(form),
-                signal: abort.signal,
-                headers: { 'Accept': 'application/json' }
-            });
-            try { data = await response.json(); } catch (e) { data = null; }
-        } catch (error) {
-            window.clearTimeout(timer);
-            setBusy(false);
-            const timedOut = error && error.name === 'AbortError';
-            setMessage(timedOut
-                ? 'The server took too long to answer. Check your connection and try again.'
-                : 'The sign-in service could not be reached. Check your connection and try again.');
-            emit('authstudio:signal', { phase: timedOut ? 'timeout' : 'unavailable' });
-            return;
-        }
-        window.clearTimeout(timer);
+        const { response, data, error } = await postHandler('Credentials', new FormData(form));
+        if (error) { setBusy(false); unreachable(error); return; }
 
         if (response.ok && data && data.outcome === 'signedIn' && data.redirect) {
             emit('authstudio:signal', { phase: 'accepted' });
@@ -204,23 +292,23 @@
             navigate(data.redirect);
             return;
         }
-        if (response.ok && data && data.outcome === 'biometric') {
-            setBusy(false);
-            emit('authstudio:signal', { phase: 'biometric' });
-            showBiometric(!!data.face, !!data.passkey, !!data.passwordOnly);
-            return;
-        }
+        setBusy(false);
         if (response.status === 409 && data && data.outcome === 'mismatch') {
             // The password was right, the account type was not: nothing was signed in.
-            setBusy(false);
             setMessage(data.error);
             emit('authstudio:signal', { phase: 'mismatch' });
             const other = accountInputs.find(input => !input.checked);
             if (other) other.focus();
             return;
         }
-
-        setBusy(false);
+        if (response.status === 423 && data && data.outcome === 'locked') {
+            // Too many failed attempts: the right password will not work until the lockout ends.
+            setMessage(data.error);
+            emit('authstudio:signal', { phase: 'rejected' });
+            password.value = '';
+            publish();
+            return;
+        }
         if (response.status === 401 || (data && data.outcome === 'rejected')) {
             setMessage((data && data.error) || 'Invalid email or password. Please try again.');
             emit('authstudio:signal', { phase: 'rejected' });
@@ -232,7 +320,7 @@
             setMessage('Sign-in is temporarily unavailable (' + response.status + '). Please try again in a moment.');
             emit('authstudio:signal', { phase: 'unavailable' });
         }
-    });
+    }
 
     // The server has issued the session. The illustration may play a short closing transition: it
     // cancels this event and navigates itself (it is given the server's redirect, never chooses one).
@@ -241,124 +329,87 @@
         if (!handled) window.location.href = redirect;
     }
 
-    // ---------- Step 2: the supplier's biometric step ----------
+    // ---------- Face ID and Fingerprint ----------
 
-    function showBiometric(face, passkey, passwordOnly) {
-        credentials.hidden = true;
-        biometric.hidden = false;
+    async function startIdentity(current) {
+        setBusy(true, current === 'face' ? 'Opening Face ID… ' : 'Opening Fingerprint… ');
+        setStatus('');
+        emit('authstudio:signal', { phase: 'submitted' });
+        const body = new FormData();
+        body.append('Input.Email', email.value.trim());
+        body.append('method', current);
+        const { response, data, error } = await postHandler('IdentityStart', body);
+        setBusy(false);
+        if (error) { unreachable(error); return; }
+        if (!response.ok || !data || data.outcome !== 'ready') {
+            setMessage((data && data.error) || 'Sign-in is temporarily unavailable (' + response.status + '). Please try again in a moment.');
+            emit('authstudio:signal', { phase: 'rejected' });
+            email.focus();
+            return;
+        }
+
+        // The identity step is open for this account only; the server issues the session after the check.
         shell.dataset.step = 'biometric';
-        root.dataset.face = String(face);
-        root.dataset.passkey = String(passkey);
-        root.dataset.passwordOnly = String(!!passwordOnly);
-        if (passwordOnlyButton) passwordOnlyButton.hidden = !passwordOnly;
-        if (passkeyButton) {
-            passkeyButton.disabled = !passkey;
-            passkeyButton.toggleAttribute('data-bio-disabled', !passkey);
-            if (passkeyNote) passkeyNote.textContent = passkey ? "This device's fingerprint, or your phone via QR code" : "No passkey is set up for this account yet.";
+        emit('authstudio:signal', { phase: 'biometric' });
+        emit('authstudio:step', { step: 'biometric', face: current === 'face', passkey: current === 'fingerprint' });
+        startExpiry();
+        if (current === 'face') {
+            if (faceHint) faceHint.textContent = 'Look straight at the camera and hold still for a few seconds.';
+            faceButton.click();
+        } else {
+            if (phoneOffer && !isMobile) phoneOffer.hidden = false;
+            fingerprintButton.click();
         }
-        if (faceButton) {
-            faceButton.disabled = !face;
-            faceButton.toggleAttribute('data-bio-disabled', !face);
-            if (faceNote) faceNote.textContent = face ? "Verify with this device's camera" : 'No face is enrolled for this account. Use your device passkey.';
-        }
-        if (faceHint) faceHint.textContent = face ? 'Your camera opens only after you choose Face Recognition.' : '';
-        if (bioStatus) bioStatus.textContent = '';
-        const title = document.getElementById('biometricTitle');
-        if (title) title.focus();
-        startExpiry(face);
-        emit('authstudio:step', { step: 'biometric', face, passkey, passwordOnly: !!passwordOnly });
     }
 
-    function showCredentials(text) {
-        window.clearTimeout(expiryTimer);
-        biometric.hidden = true;
-        credentials.hidden = false;
-        shell.dataset.step = 'credentials';
-        if (faceActions) faceActions.hidden = true;
-        password.value = '';
-        setMessage(text || '');
-        publish();
-        emit('authstudio:step', { step: 'credentials' });
-        password.focus();
-    }
-
-    // The pre-auth step lives a few minutes on the server; the page says so before the server refuses.
-    function startExpiry(face) {
+    // The step lives a few minutes on the server; the page says so before the server refuses.
+    function startExpiry() {
         window.clearTimeout(expiryTimer);
         const seconds = parseInt(root.dataset.expiresIn || '0', 10);
-        if (!face || !seconds) return;
+        if (!seconds) return;
         expiryTimer = window.setTimeout(() => {
-            const cancel = document.getElementById('btnFaceCancel');
-            if (cancel && faceActions && !faceActions.hidden) cancel.click();
-            showCredentials('Your identity step expired. Enter your password again to continue.');
+            endStep();
+            setMessage('Your sign-in step expired. Choose a method and try again.');
         }, seconds * 1000);
     }
 
-    async function leaveBiometric() {
+    // Closes the camera / QR code and ends the identity step on the server (it also expires by itself).
+    function endStep() {
+        window.clearTimeout(expiryTimer);
+        if (shell.dataset.step !== 'biometric') return;
         const cancel = document.getElementById('btnFaceCancel');
         if (cancel && faceActions && !faceActions.hidden) cancel.click();
-        const url = new URL(window.location.href);
-        url.searchParams.set('handler', 'Cancel');
-        const token = form.querySelector('input[name="__RequestVerificationToken"]');
-        try {
-            await fetch(url.pathname + url.search, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'RequestVerificationToken': token ? token.value : '' }
-            });
-        } catch (e) { /* the step also expires on the server by itself */ }
-        emit('authstudio:face', { state: 'cancelled', method: 'face' });
-        showCredentials('');
+        shell.dataset.step = 'credentials';
+        if (faceActions) faceActions.hidden = true;
+        if (phoneOffer) phoneOffer.hidden = true;
+        emit('authstudio:step', { step: 'credentials' });
+        postHandler('Cancel', new FormData());
     }
 
-    if (back) back.addEventListener('click', leaveBiometric);
-
-    // "Continue with Email & Password": the server signs in only inside the pre-auth step the correct password
-    // opened in this browser; nothing here sends the password again.
-    if (passwordOnlyButton) {
-        passwordOnlyButton.addEventListener('click', async () => {
-            if (passwordOnlyButton.disabled) return;
-            passwordOnlyButton.disabled = true;
-            emit('authstudio:signal', { phase: 'password-choice' });
-            const url = new URL(window.location.href);
-            url.searchParams.set('handler', 'PasswordOnly');
-            const token = form.querySelector('input[name="__RequestVerificationToken"]');
-            let data = null;
-            let response = null;
-            try {
-                response = await fetch(url.pathname + url.search, {
-                    method: 'POST', credentials: 'same-origin',
-                    headers: { 'RequestVerificationToken': token ? token.value : '', 'Accept': 'application/json' }
-                });
-                try { data = await response.json(); } catch (e) { data = null; }
-            } catch (e) {
-                passwordOnlyButton.disabled = false;
-                if (bioStatus) { bioStatus.textContent = 'The sign-in service could not be reached. Try again.'; bioStatus.className = 'as-status bio-status bio-status--danger'; }
-                emit('authstudio:signal', { phase: 'unavailable' });
-                return;
-            }
-            if (response.ok && data && data.outcome === 'signedIn' && data.redirect) {
-                emit('authstudio:signal', { phase: 'accepted', method: 'password' });
-                navigate(data.redirect);
-                return;
-            }
-            passwordOnlyButton.disabled = false;
-            showCredentials((data && data.error) || 'Enter your email and password again to continue.');
-        });
-    }
-
-    // biometric.js reports what really happened during the face step; this script only keeps the
-    // form in step with it (camera controls shown while the camera is live, back to step 1 when
-    // the server ended the pre-auth step).
+    // biometric.js reports what really happened during the face or fingerprint check; this script only keeps
+    // the form in step with it (camera controls while the camera is live, a fresh start when the step ended).
     shell.addEventListener('authstudio:face', event => {
-        const state = event.detail && event.detail.state;
-        if (faceActions) faceActions.hidden = !['requesting', 'camera', 'capturing', 'processing'].includes(state);
-        if (state === 'restart') showCredentials(event.detail.message || 'Enter your email and password again to continue.');
+        const detail = event.detail || {};
+        const state = detail.state;
+        const live = ['requesting', 'camera', 'capturing', 'processing'].includes(state);
+        if (faceActions && detail.method !== 'passkey') faceActions.hidden = !live;
+        if (state === 'failed' || state === 'cancelled') {
+            if (faceHint) faceHint.textContent = method() === 'face'
+                ? 'Press "Continue with Face ID" to try again.'
+                : 'Press "Continue with Fingerprint" to try again' + (isMobile ? '.' : ', or use the QR code for your phone.');
+        }
+        if (state === 'restart') {
+            window.clearTimeout(expiryTimer);
+            shell.dataset.step = 'credentials';
+            if (faceActions) faceActions.hidden = true;
+            if (phoneOffer) phoneOffer.hidden = true;
+            if (phonePanel) phonePanel.hidden = true;
+            if (faceHint) faceHint.textContent = '';
+            setStatus('');
+            emit('authstudio:step', { step: 'credentials' });
+            setMessage(detail.message || 'Your sign-in step ended. Choose a method and try again.');
+        }
     });
 
-    // A plain post may have rendered the page already on step 2.
-    if (shell.dataset.step === 'biometric') {
-        showBiometric(root.dataset.face === 'true', root.dataset.passkey === 'true', root.dataset.passwordOnly === 'true');
-    }
-    publish();
+    render();
 })();

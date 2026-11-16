@@ -1,0 +1,50 @@
+@*
+  OWNER: Ahmad — Authentication.
+  "Fingerprint / Phone" setup: a QR code that opens /Biometrics/Phone on the supplier's smartphone (or the same link by
+  email), a waiting state that updates by itself, and direct registration when the page is already open on a phone or
+  on a computer with its own fingerprint reader / Windows Hello. Script: wwwroot/js/phone-passkey.js (after
+  biometric.js). Needs a #bioPassword field and an anti-forgery token on the page; the server re-checks the password.
+  No device name to type: the server names the device after the browser ("iPhone · Safari").
+*@
+<div class="pp" id="phoneSetup">
+    <div data-pp-view="start">
+        <p class="pp-lead">Scan a QR code with your phone, then confirm with its fingerprint, face unlock or screen lock.</p>
+        <button id="btnPhoneQr" type="button" class="pp-btn pp-btn--primary">Show QR code for my phone</button>
+        <div class="pp-row">
+            <button id="btnPasskeyRegister" type="button" class="pp-link" hidden>Use this computer's fingerprint reader instead</button>
+        </div>
+        <p class="pp-fine" id="ppDeviceNote"></p>
+    </div>
+
+    <div data-pp-view="qr" hidden>
+        <div class="pp-qr">
+            <img id="ppQr" class="pp-qr-img" alt="QR code that opens the phone setup page" width="196" height="196" />
+            <ol class="pp-steps">
+                <li>Open your phone's camera and point it at the code.</li>
+                <li>Tap the link, then tap <strong>Register this phone</strong>.</li>
+                <li>Confirm with your fingerprint, face or screen lock. This page updates by itself.</li>
+            </ol>
+        </div>
+        <p class="pp-wait" role="status" aria-live="polite">
+            <span class="pp-spinner" aria-hidden="true"></span>
+            <span class="pp-wait-text" id="ppWaitText">Waiting for your phone…</span>
+            <span class="pp-timer" aria-label="Time left"><span id="ppTimer"></span></span>
+        </p>
+        <div class="pp-row">
+            <button id="btnPhoneEmail" type="button" class="pp-btn pp-btn--secondary" data-bio-keep>Send setup link to my email</button>
+            <button id="btnPhoneCancel" type="button" class="pp-link" data-bio-keep>Cancel</button>
+        </div>
+        <p class="pp-fine" id="ppEmailNote" role="status" aria-live="polite"></p>
+    </div>
+
+    <div data-pp-view="ended" hidden>
+        <p class="pp-result pp-result--warn" id="ppEndedText" role="status"></p>
+        <div class="pp-row">
+            <button id="btnPhoneRetry" type="button" class="pp-btn pp-btn--primary" data-bio-keep>Create a new QR code</button>
+        </div>
+    </div>
+
+    <div data-pp-view="done" hidden>
+        <p class="pp-result" role="status">Phone registered: <strong id="ppDevice"></strong></p>
+    </div>
+</div>
