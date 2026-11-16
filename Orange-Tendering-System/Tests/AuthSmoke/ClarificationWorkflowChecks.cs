@@ -89,7 +89,7 @@ public static class ClarificationWorkflowChecks
    var client=app.CreateClient(new(){BaseAddress=new Uri("https://localhost"),AllowAutoRedirect=false});clients[role]=client;var token=await Token(client,"/Identity/Account/Login");
    var i=Array.IndexOf(roles,role);if(i<0)i=7;
    var login=await client.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","u"+i+"@clarification.invalid"},{"Input.Password",pw},{"__RequestVerificationToken",token}}));
-   if(role is SystemRoles.Supplier or "SupplierTwo"){Check(login.StatusCode==HttpStatusCode.OK,role+": password accepted before identity step");var step=await client.PostAsync("/Identity/Account/Login?handler=PasswordOnly",new FormUrlEncodedContent(new Dictionary<string,string>{{"__RequestVerificationToken",token}}));Check(step.IsSuccessStatusCode && (await step.Content.ReadAsStringAsync()).Contains("signedIn"),role+": password-only identity step completed");}
+   if(role is SystemRoles.Supplier or "SupplierTwo"){Check(login.StatusCode==HttpStatusCode.Redirect&&login.Headers.Location?.ToString()=="/Supplier",role+": approved supplier signs in with Email & Password");}
    else Check(login.StatusCode==HttpStatusCode.Redirect,role+": actual Identity login");
    csrf[role]=await Token(client, role == SystemRoles.Supplier || role == "SupplierTwo" ? "/Supplier/Clarifications" : "/Clarifications");
   }

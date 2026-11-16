@@ -28,7 +28,7 @@
     .ws-supplier .wfl-hero { padding: 0; min-height: 220px; }
     .ws-supplier .wfl-hero .dash-welcome-copy { padding: 22px; }
     .ws-supplier .wfl-hero .dash-welcome-copy h1 { font-size: 24px; }
-    .ws-supplier .wfl-hero .dash-welcome-copy p { font-size: 12px; max-width: 100%; }
+    .ws-supplier .wfl-hero .dash-welcome-copy p { font-size: var(--fs-micro); max-width: 100%; }
     .ws-supplier .wfl-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .ws-supplier .wfl-metrics .dash-metric { padding: 14px 13px 25px; }
     .ws-supplier .wfl-metrics .dash-metric-copy > strong { font-size: 28px; }

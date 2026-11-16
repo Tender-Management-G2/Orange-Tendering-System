@@ -1,0 +1,90 @@
+/* ==========================================================================================
+   ORANGE — central typography system (loaded LAST by every layout).
+   English: Inter (variable, local).  Arabic: IBM Plex Sans Arabic (local, Arabic subset only, OFL).
+   One font stack serves mixed text: Inter has no Arabic glyphs and Plex Arabic is limited by unicode-range,
+   so Latin IDs, prices, e-mails and dates render in Inter and Arabic words in Plex, inside the same line.
+   Orange's corporate typeface (Helvetica Neue) is proprietary and not licensed in this project; Inter is the
+   closest neutral grotesque and is used instead. Scale follows Carbon productive/expressive sets; contrast WCAG 2.2 AA.
+   ========================================================================================== */
+
+@font-face{font-family:"Inter";src:url("../assets/auth-studio/fonts/inter-latin-wght-normal.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"IBM Plex Sans Arabic";src:url("../fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC}
+@font-face{font-family:"IBM Plex Sans Arabic";src:url("../fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC}
+@font-face{font-family:"IBM Plex Sans Arabic";src:url("../fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC}
+@font-face{font-family:"IBM Plex Sans Arabic";src:url("../fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2");font-weight:700 900;font-style:normal;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC}
+
+:root{
+  /* families */
+  --font-sans:"Inter","IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --font-arabic:"IBM Plex Sans Arabic","Inter",system-ui,"Segoe UI",Tahoma,Arial,sans-serif;
+  --font-mono:ui-monospace,"Cascadia Mono",Consolas,"Liberation Mono",monospace;
+  /* size scale (px values keep layouts predictable; clamp() only for headings) */
+  --fs-display:clamp(40px,2.4vw + 26px,72px);   /* homepage / hero */
+  --fs-h1:clamp(28px,1vw + 22px,40px);          /* main page heading */
+  --fs-h2:clamp(22px,.5vw + 19px,30px);         /* section heading */
+  --fs-h3:clamp(18px,.25vw + 16px,22px);        /* card heading */
+  --fs-lg:18px;
+  --fs-body:16px;                               /* main body */
+  --fs-body-sm:15px;                            /* secondary body */
+  --fs-sm:14px;                                 /* tables, labels, buttons in dense UI */
+  --fs-caption:13px;                            /* captions, meta */
+  --fs-micro:12px;                              /* the smallest readable text: badges, overlines */
+  /* line heights */
+  --lh-display:1.05; --lh-heading:1.22; --lh-snug:1.4; --lh-body:1.55; --lh-arabic:1.8; --lh-arabic-heading:1.4;
+  /* weights (Inter variable; Plex Arabic 400–700) */
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+  /* tracking */
+  --ls-heading:-.012em; --ls-display:-.025em; --ls-overline:.08em;
+  /* focus */
+  --focus-ring:0 0 0 3px #ff790066;
+}
+
+/* legacy font variables of the existing themes now resolve to the one system */
+:root{--hf:var(--font-sans);--bf:var(--font-sans);--sod-font:var(--font-sans);--as-font:var(--font-sans)}
+body.so-shell.ws-shell[data-workspace-role]{--sod-font:var(--font-sans)}
+.as-shell{--as-font:var(--font-sans)}
+.hc-nav{--hf:var(--font-sans)}
+
+/* ---------- base ---------- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:var(--lh-body);font-weight:var(--fw-regular);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;font-optical-sizing:auto;
+  font-feature-settings:"cv05" 1,"cv08" 1}
+button,input,select,textarea,optgroup{font-family:inherit;letter-spacing:inherit}
+input,select,textarea{font-size:max(var(--fs-sm),1em)}
+h1,h2,h3,h4,h5,h6{text-wrap:balance;overflow-wrap:break-word}
+p,li,dd,td,th,label,figcaption,blockquote{overflow-wrap:break-word}
+p{text-wrap:pretty}
+code,kbd,samp,pre{font-family:var(--font-mono);font-size:.92em}
+small{font-size:var(--fs-caption)}
+
+/* numbers align in tables, KPIs and money */
+table,.wfl-table,.pg-table,.so-items,.dash-metric strong,.sod-kpi strong,[data-num],.so-num,time{font-variant-numeric:tabular-nums lining-nums}
+
+/* dense operational tables: readable but compact */
+.pg-table,.wfl-table{font-size:var(--fs-sm);line-height:var(--lh-snug)}
+.pg-table th,.wfl-table th{font-size:var(--fs-micro);font-weight:var(--fw-semibold);letter-spacing:var(--ls-overline)}
+
+/* form labels and validation messages */
+.pg-field label,.auc-field label,.form-label,.pg-form label{font-size:var(--fs-sm);line-height:var(--lh-snug)}
+.field-validation-error,.text-danger,.auc-error,.fv-error{font-size:var(--fs-caption);line-height:var(--lh-snug)}
+
+/* buttons */
+.pg-btn,.wfl-open,.wfl-new,.wfl-reset,.btn,.es-btn,.so-actions .pg-btn{font-size:var(--fs-sm);font-weight:var(--fw-semibold);line-height:1.2}
+
+/* keyboard focus is always visible */
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid #ff7900;outline-offset:2px}
+
+/* ---------- Arabic / RTL ---------- */
+html[lang|="ar"] body,[dir="rtl"] body,body[dir="rtl"],:lang(ar){font-family:var(--font-arabic)}
+html[lang|="ar"] body,[dir="rtl"] body{line-height:var(--lh-arabic)}
+:where(html[lang|="ar"],[dir="rtl"]) :is(h1,h2,h3,h4,h5,h6){line-height:var(--lh-arabic-heading)}
+/* Letter-spacing breaks Arabic joining; uppercase does not exist in Arabic. */
+:where(html[lang|="ar"],[dir="rtl"],:lang(ar)) *{letter-spacing:normal!important;text-transform:none}
+/* Latin fragments inside Arabic text (IDs, e-mails, prices) keep Latin metrics and direction. */
+:where(html[lang|="ar"],[dir="rtl"]) :is(input[type=email],input[type=url],input[type=tel],code,kbd,.wfl-ref,[data-ltr]){direction:ltr;unicode-bidi:isolate}
+:where(html[lang|="ar"],[dir="rtl"]) input[type=email]{text-align:end}
+
+/* ---------- respect user preferences ---------- */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important}}
+@media print{body{font-size:11pt;line-height:1.45;color:#000}}

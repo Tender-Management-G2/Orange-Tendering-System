@@ -21,13 +21,14 @@
         "TeamDev__Database": "OrangeTenderingTeamDev"
       }
     },
-    "https (existing OrangeTenderingSystem database)": {
+    "https (hosted shared database)": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7182;http://localhost:5254",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "HostedDatabase__Enabled": "true"
       }
     }
   }

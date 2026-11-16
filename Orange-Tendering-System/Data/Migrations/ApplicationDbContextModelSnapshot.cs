@@ -1534,6 +1534,40 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.ToTable("Notifications");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.NotificationAcknowledgement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AcknowledgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("NotificationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationId");
+
+                    b.HasIndex("UserId", "NotificationId")
+                        .IsUnique();
+
+                    b.ToTable("NotificationAcknowledgements");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.PurchaseRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -3060,6 +3094,17 @@ namespace Orange_Tendering_System.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.NotificationAcknowledgement", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.Notification", "Notification")
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Notification");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.PurchaseRequest", b =>

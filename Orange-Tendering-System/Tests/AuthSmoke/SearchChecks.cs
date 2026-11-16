@@ -66,7 +66,7 @@ public static class SearchChecks
    var login=await c.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","role"+i+"@notification.invalid"},{"Input.Password",password},{"__RequestVerificationToken",token}}));Check(login.StatusCode==HttpStatusCode.Redirect,roles[i]+": actual Identity login");
    var page=await c.GetAsync("/"+areas[i]);var html=await page.Content.ReadAsStringAsync();// Top Committee's top bar searches only its assigned committee rounds (data-tc-search, own microphone); every other role,
    // Admin included, uses the shared global search. All roles have the shared language selector.
-   var searchControls=roles[i]==SystemRoles.TopCommittee?html.Contains("data-tc-search")&&html.Contains("data-tc-voice"):html.Contains("global-search.js")&&html.Contains("data-voice-search");
+   var searchControls=html.Contains("global-search.js")&&html.Contains("data-voice-search"); // Top Committee moved onto the shared search bar (b4a2ac1); results stay scoped server-side
    Check(page.IsSuccessStatusCode&&searchControls&&html.Contains("data-voice-language")&&html.Contains("ar-JO"),roles[i]+": search, microphone and language selector present");
    var results=await Query(i,"Search");var titles=results.EnumerateArray().Select(x=>x.GetProperty("title").GetString()!).ToList();
    if(i==0)Check(!results.EnumerateArray().Any(x=>x.GetProperty("type").GetString()=="Tender"),"Admin does not receive inaccessible confidential tender links");

@@ -38,6 +38,8 @@ if (args.Contains("--clarification-workflow-checks")) { await ClarificationWorkf
 if (args.Contains("--top-decision-checks")) { await TopDecisionChecks.Run(); return; }
 if (args.Contains("--search-checks")) { await SearchChecks.Run(); return; }
 if (args.Contains("--notification-checks")) { await NotificationChecks.Run(); return; }
+if (args.Contains("--spotlight-checks")) { await SpotlightChecks.Run(); return; }
+if (args.Contains("--admin-account-checks")) { await AdminAccountChecks.Run(); return; }
 if (args.Contains("--retender-checks")) { await RetenderChecks.Run(); return; }
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }

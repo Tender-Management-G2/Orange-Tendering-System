@@ -3,6 +3,7 @@
 (() => {
   if (document.body.dataset.workspaceRole !== 'Admin') return;
   const form = document.querySelector('[data-admin-search]');
+  if (!form) return; // list pages only
   const input = form.querySelector('input');
   const voice = document.querySelector('[data-admin-voice]');
   const status = document.querySelector('#admin-search-status');

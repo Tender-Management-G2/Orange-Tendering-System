@@ -19,14 +19,14 @@
 .om-ripple{fill:none;stroke:var(--om-orange);stroke-width:2.4;opacity:0}
 
 /* Popup: important operations */
-.om-dialog{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:16px;border:0;background:var(--om-scrim);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:grid;place-items:center;overflow:hidden;color:var(--om-ink);font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}
+.om-dialog{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:16px;border:0;background:var(--om-scrim);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:grid;place-items:center;overflow:hidden;color:var(--om-ink);font-family:var(--font-sans);box-sizing:border-box}
 .om-dialog:not([open]){display:none}
 .om-dialog::backdrop{background:transparent}
 .om-card{position:relative;width:min(400px,100%);padding:30px 32px;border-radius:26px;background:linear-gradient(160deg,color-mix(in srgb,var(--om-orange) 7%,var(--om-surface)),var(--om-surface) 55%);border:1px solid var(--om-rule);box-shadow:0 30px 80px #0007,0 2px 0 #ffffff0d inset;text-align:center;overflow:hidden;isolation:isolate;box-sizing:border-box}
 :root[data-theme="light"] .om-card{box-shadow:0 30px 70px #142a3b2e,0 1px 0 #fff inset}
 .om-stage{width:188px;height:188px;margin:-4px auto 2px}
 .om-copy h2{margin:6px 0 8px;font-size:24px;line-height:1.2;letter-spacing:-.03em;font-weight:700;color:var(--om-ink)}
-.om-copy p{margin:0 auto;max-width:310px;font-size:14px;line-height:1.6;color:var(--om-muted);min-height:1lh}
+.om-copy p{margin:0 auto;max-width:310px;font-size:var(--fs-sm);line-height:1.6;color:var(--om-muted);min-height:1lh}
 .om-close{margin-top:18px;min-height:40px;padding:8px 22px;border-radius:12px;border:1px solid var(--om-orange);background:transparent;color:var(--om-ink);font:inherit;font-weight:600;cursor:pointer}
 .om-close:hover{background:color-mix(in srgb,var(--om-orange) 14%,transparent)}
 .om-close:focus-visible,.om-toast-close:focus-visible{outline:2px solid var(--om-orange);outline-offset:3px}
@@ -35,12 +35,12 @@
 .om-card[data-phase="complete"] .om-countdown{opacity:1}
 
 /* Toast: frequent, lightweight operations (top layer through the Popover API, so it also shows above open dialogs) */
-.om-toast{position:fixed;inset:auto 24px 24px auto;margin:0;width:min(380px,calc(100vw - 32px));box-sizing:border-box;display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:12px;padding:12px 12px 14px;border-radius:18px;border:1px solid var(--om-rule);background:var(--om-surface);color:var(--om-ink);box-shadow:0 18px 50px #0006;overflow:hidden;font-family:Arial,Helvetica,sans-serif;z-index:2147483000}
+.om-toast{position:fixed;inset:auto 24px 24px auto;margin:0;width:min(380px,calc(100vw - 32px));box-sizing:border-box;display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:12px;padding:12px 12px 14px;border-radius:18px;border:1px solid var(--om-rule);background:var(--om-surface);color:var(--om-ink);box-shadow:0 18px 50px #0006;overflow:hidden;font-family:var(--font-sans);z-index:2147483000}
 :root[data-theme="light"] .om-toast{box-shadow:0 16px 40px #142a3b26}
 .om-toast-fruit{width:46px;height:46px}
 .om-toast-copy{min-width:0;display:grid;gap:2px}
-.om-toast-copy strong{font-size:14px;line-height:1.3;font-weight:700}
-.om-toast-copy span{font-size:12.5px;line-height:1.45;color:var(--om-muted)}
+.om-toast-copy strong{font-size:var(--fs-sm);line-height:1.3;font-weight:700}
+.om-toast-copy span{font-size:var(--fs-caption);line-height:1.45;color:var(--om-muted)}
 .om-toast-copy span:empty{display:none}
 .om-toast-close{align-self:start;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--om-muted);font-size:20px;line-height:1;cursor:pointer}
 .om-toast-close:hover{background:color-mix(in srgb,var(--om-orange) 12%,transparent);color:var(--om-ink)}
@@ -52,8 +52,8 @@
 .om-inline{display:flex;align-items:center;gap:10px;margin:10px 0;padding:8px 12px 8px 8px;border-radius:14px;border:1px solid var(--om-rule);background:color-mix(in srgb,var(--om-orange) 6%,transparent);color:var(--om-ink);max-width:100%;box-sizing:border-box}
 .om-inline-fruit{flex:0 0 36px;width:36px;height:36px}
 .om-inline-copy{display:grid;gap:1px;min-width:0}
-.om-inline-copy strong{font-size:13px;line-height:1.3}
-.om-inline-copy span{font-size:12px;line-height:1.4;color:var(--om-muted)}
+.om-inline-copy strong{font-size:var(--fs-caption);line-height:1.3}
+.om-inline-copy span{font-size:var(--fs-micro);line-height:1.4;color:var(--om-muted)}
 .om-inline-copy span:empty{display:none}
 .om-inline.is-error{border-color:color-mix(in srgb,var(--om-error) 55%,var(--om-rule))}
 

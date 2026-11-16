@@ -10,8 +10,8 @@ body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-page > * { min-w
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] button.ws-bell-open { width: 100%; border: 0; background: transparent; font: inherit; text-align: start; cursor: pointer; }
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] button.ws-bell-open:hover,
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] button.ws-bell-open:focus-visible { background: #ff79001a; outline: none; }
-body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-bell-count { color: var(--sod-muted); font-size: 12px; }
-body.so-shell.ws-shell[data-workspace-role="Top Committee"] [data-tc-bell-error] { margin: 10px 16px; color: #d64545; font-size: 13px; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-bell-count { color: var(--sod-muted); font-size: var(--fs-micro); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] [data-tc-bell-error] { margin: 10px 16px; color: #d64545; font-size: var(--fs-caption); }
 
 /* Cards: review, decision, report-review and live-filter panels share the Officer panel surface. */
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-review .rv-card,
@@ -66,11 +66,11 @@ body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-card
 @media (max-width: 720px) { body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards:has(> a.pg-card > small) { grid-template-columns: 1fr; grid-auto-rows: auto; } }
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) > span { grid-row: 1; margin: 0; font-size: 20px; font-weight: 700; line-height: 1.25; color: var(--sod-ink); }
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) > strong { grid-row: 2; font-weight: 400; line-height: 1.5; letter-spacing: 0; color: var(--sod-muted); }
-body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) > small { grid-row: 3; font-size: 12px; color: var(--tone); font-weight: 600; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small) > small { grid-row: 3; font-size: var(--fs-micro); color: var(--tone); font-weight: 600; }
 body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-panel > .pg-cards > a.pg-card:has(> small):hover { transform: translateY(-2px); }
 
 /* Dashboard (Areas/TopCommittee/Views/Dashboard/Index.cshtml) uses the Officer dashboard (sod-*) with four committee stages. */
 .tcd .tcd-stages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 760px) { .tcd .tcd-stages li { flex: 1 0 110px; } }
-.tcd .tcd-ai-link { display: inline-block; margin-top: 8px; color: var(--sod-orange-deep); font-size: 13px; font-weight: 600; text-decoration: none; }
+.tcd .tcd-ai-link { display: inline-block; margin-top: 8px; color: var(--sod-orange-deep); font-size: var(--fs-caption); font-weight: 600; text-decoration: none; }
 .tcd .tcd-ai-link:hover { text-decoration: underline; }

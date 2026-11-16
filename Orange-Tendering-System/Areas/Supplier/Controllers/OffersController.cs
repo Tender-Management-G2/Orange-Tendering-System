@@ -103,7 +103,14 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         public async Task<IActionResult> Details(int id)
         {
             var model = await offerService.GetOfferAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id);
-            return model == null ? NotFound() : View(model);
+            if (model == null) return NotFound();
+            // The My Offers page opens details in a popup; direct links (notifications, bookmarks) keep the full page.
+            if (string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                Response.Headers.CacheControl = "no-store";
+                return PartialView("_OfferDetailsPopup", model);
+            }
+            return View(model);
         }
 
         // Supplier Offer History — Owner: Saja · No Trello card

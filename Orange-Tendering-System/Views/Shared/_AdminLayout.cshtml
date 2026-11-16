@@ -40,6 +40,7 @@ through WorkspaceNavigation.LayoutFor.
     <link rel="stylesheet" href="~/css/admin-pages.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
     <link rel="stylesheet" href="~/css/theme-surfaces.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/typography.css" asp-append-version="true" />
 </head>
 <body class="ws-shell ws-internal so-shell @ViewData["BodyClass"]" data-bilingual="true" data-workspace-role="Admin">
     <a class="ws-skip" href="#workspace-main">@UiText.T(Context, "Skip to main content")</a>
@@ -78,11 +79,15 @@ through WorkspaceNavigation.LayoutFor.
             <div class="pg-page">
                 @* Admin page search: filters this page's records (server search on Users, Suppliers, Departments, Audit Logs).
                    The top bar now holds the same global search as every role (restored after the WorkV3 merge). *@
+                @* Shown on list pages only; forms and detail pages have nothing to filter. *@
+                @if (routeAction.Equals("Index", StringComparison.OrdinalIgnoreCase))
+                {
                 <form class="pg-toolbar admin-page-search" data-admin-search data-server-search="@(serverSearch ? "true" : "false")" role="search">
                     <input type="search" name="search" placeholder="Search @pageTitle…" aria-label="Search @pageTitle" aria-describedby="admin-search-status" autocomplete="off" />
                     <button type="button" class="ws-icon-button" data-admin-voice aria-pressed="false" aria-label="Start voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
                     <button type="submit" class="pg-btn pg-btn-primary">Search</button>
                 </form>
+                }
                 @RenderBody()
             </div>
         </main>

@@ -61,7 +61,7 @@ public static class NotificationChecks
 
    var page=await c.GetAsync("/"+areas[i]);var html=await page.Content.ReadAsStringAsync();// Top Committee keeps its own bell: it opens notifications only through TopCommittee/Notifications/Open, which checks the
    // destination is a round assigned to the member (AuthorizedDestination). Every other role uses the shared live bell.
-   var bellRendered=roles[i]==SystemRoles.TopCommittee?html.Contains("tc-bell-host")&&html.Contains("data-preview-url")&&html.Contains("data-open-url"):html.Contains("data-notification-bell")&&html.Contains("notification-bell.js");
+   var bellRendered=roles[i]==SystemRoles.TopCommittee?html.Contains("data-tc-bell")&&html.Contains("data-preview-url")&&html.Contains("data-open-url"):html.Contains("data-notification-bell")&&html.Contains("notification-bell.js");
    Check(page.IsSuccessStatusCode&&bellRendered,roles[i]+": dashboard bell and script rendered");
    tokens.Add(await Token(c,"/"+areas[i]));
    var negotiated=await c.PostAsync("/hubs/notifications/negotiate?negotiateVersion=1",new StringContent(""));negotiated.EnsureSuccessStatusCode();using var data=JsonDocument.Parse(await negotiated.Content.ReadAsStringAsync());

@@ -72,7 +72,7 @@ body.so-shell.ws-shell[data-workspace-role] .ws-role-label:before {
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7'%3E%3Ccircle cx='12' cy='8' r='4.2'/%3E%3Cpath d='M4.5 21c.4-4.4 3.5-7 7.5-7s7.1 2.6 7.5 7z'/%3E%3C/svg%3E") center/contain no-repeat;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7'%3E%3Ccircle cx='12' cy='8' r='4.2'/%3E%3Cpath d='M4.5 21c.4-4.4 3.5-7 7.5-7s7.1 2.6 7.5 7z'/%3E%3C/svg%3E") center/contain no-repeat;
 }
-body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-bottom > a { font-size: 12px; color: #ffb36a; margin-inline-start: 52px; }
+body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-bottom > a { font-size: var(--fs-micro); color: #ffb36a; margin-inline-start: 52px; }
 body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-architecture,
 :root[data-theme="light"] body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-architecture {
   height: 320px; opacity: 1;
@@ -117,7 +117,7 @@ body.so-shell.ws-shell[data-workspace-role] .ws-account .ws-chevron { width: 20p
 /* The AI chat is opened from the dashboard card; the floating button would overlap the bottom row. */
 body.so-home.so-shell.ws-shell[data-workspace-role] .ai-fab { display: none; }
 body.so-shell.ws-shell[data-workspace-role] .ws-main { padding: 16px 17px 28px 18px; }
-body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: Arial, sans-serif; }
+body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: var(--font-sans); }
 
 /* ---------- Dashboard grid ---------- */
 .sod { display: flex; flex-direction: column; color: var(--sod-ink); font-family: var(--sod-font); }
@@ -171,28 +171,28 @@ body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: A
 :root[data-theme="dark"] .sod-assigned .sod-card-head { border-color: #ff790033; background: #2a1b10; }
 .sod-assigned .sod-card-head h2 { display: flex; align-items: center; gap: 12px; font-size: 23px; }
 .sod-head-icon { width: 32px; height: 32px; color: var(--sod-orange); stroke-width: 2.2 !important; flex: none; }
-.sod-badge { flex: none; padding: 4px 16px; border-radius: 14px; background: linear-gradient(180deg, #ff8f2a, #ff6a00); color: #fff; font-size: 16px; font-weight: 700; line-height: 1.25; box-shadow: 0 3px 8px #ff6a0040; }
+.sod-badge { flex: none; padding: 4px 16px; border-radius: 14px; background: linear-gradient(180deg, #ff8f2a, #ff6a00); color: #fff; font-size: var(--fs-body); font-weight: 700; line-height: 1.25; box-shadow: 0 3px 8px #ff6a0040; }
 .sod-assigned-body { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; align-items: center; column-gap: 14px; padding: 10px 18px 0 22px; flex: 1; min-height: 0; }
 .sod-assigned-icon { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 35%, #fff, #ffe3cc 70%); color: var(--sod-orange); box-shadow: 0 3px 10px #ff790026; }
 :root[data-theme="dark"] .sod-assigned-icon { background: #3a2414; }
 .sod-assigned-icon svg { width: 42px; height: 42px; stroke-width: 2 !important; }
 .sod-assigned-copy { min-width: 0; }
 .sod-assigned-copy h3 { font-size: 21px; font-weight: 700; color: var(--sod-ink); line-height: 1.2; margin-bottom: 4px; }
-.sod-assigned-tender { font-size: 16px; color: var(--sod-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sod-assigned-tender { font-size: var(--fs-body); color: var(--sod-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .is-empty .sod-assigned-tender { white-space: normal; line-height: 1.35; }
-.sod-assigned-reason { display: flex; align-items: center; gap: 6px; margin-top: 10px !important; font-size: 16px; color: var(--sod-ink-2); min-width: 0; }
-.sod-assigned-reason mark { display: inline-block; max-width: 100%; padding: 3px 12px; border-radius: 12px; background: #fde0de; color: #e00b0b; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sod-assigned-reason { display: flex; align-items: center; gap: 6px; margin-top: 10px !important; font-size: var(--fs-body); color: var(--sod-ink-2); min-width: 0; }
+.sod-assigned-reason mark { display: inline-block; max-width: 100%; padding: 3px 12px; border-radius: 12px; background: #fde0de; color: #b00808; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root[data-theme="dark"] .sod-assigned-reason mark { background: #4a1a1a; color: #ff9a9a; }
 .sod-assigned-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding-top: 4px; }
-.sod-round { padding: 4px 14px; border-radius: 14px; background: #e4e8ee; color: var(--sod-ink); font-size: 16px; white-space: nowrap; }
+.sod-round { padding: 4px 14px; border-radius: 14px; background: #e4e8ee; color: var(--sod-ink); font-size: var(--fs-body); white-space: nowrap; }
 :root[data-theme="dark"] .sod-round { background: #2c3136; }
 .sod-required { display: inline-flex; align-items: center; gap: 10px; font-size: 17px; color: var(--sod-ink); white-space: nowrap; }
 .sod-required svg { width: 26px; height: 26px; color: var(--sod-orange); stroke-width: 2 !important; }
 .sod-primary { align-self: center; display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: min(300px, 80%); height: 38px; margin: 6px 0 14px; border-radius: 19px; background: linear-gradient(180deg, #ff8a1e 0%, #ff6a00 100%); color: #fff !important; font-size: 19px; font-weight: 700; box-shadow: 0 6px 14px #ff6a0055, inset 0 1px 0 #ffffff55; transition: transform .18s ease, box-shadow .18s ease; }
 .sod-primary svg { width: 22px; height: 22px; stroke-width: 2.4 !important; }
 .sod-primary:hover { transform: translateY(-1px); box-shadow: 0 9px 20px #ff6a0066; }
-.sod-primary.is-quiet { background: #fff; color: var(--sod-orange-deep) !important; border: 1.5px solid #ffb37a; box-shadow: none; }
-:root[data-theme="dark"] .sod-primary.is-quiet { background: transparent; }
+.sod-primary.is-quiet { background: #fff; color: #a84700 !important; border: 1.5px solid #ffb37a; box-shadow: none; }
+:root[data-theme="dark"] .sod-primary.is-quiet { background: transparent; color: #ffad66 !important; }
 
 .sod-workflow { padding: 14px 22px 10px 20px; display: flex; flex-direction: column; }
 .sod-workflow .sod-card-head h2 { font-size: 25px; }
@@ -213,24 +213,24 @@ body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: A
 :root[data-theme="dark"] .sod-stage-dot { border-color: #ffffff2e; }
 .sod-stage-label { font-size: 18px; line-height: 1.15; color: var(--sod-ink); font-weight: 600; }
 .is-current .sod-stage-label { color: var(--sod-orange-deep); font-weight: 700; }
-.sod-caption { margin-top: auto !important; font-size: 13px; color: var(--sod-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sod-caption { margin-top: auto !important; font-size: var(--fs-caption); color: var(--sod-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Bottom row: four columns, the last one stacking Ongoing Tender above the AI Assistant */
 .sod-bottom-row { display: grid; grid-template-columns: minmax(0, 342fr) minmax(0, 324fr) minmax(0, 340fr) minmax(0, 313fr); gap: 14px; margin-top: 20px; height: 244px; }
 .sod-bottom-row > .sod-card { padding: 16px 18px 12px; display: flex; flex-direction: column; min-height: 0; }
 .sod-bottom-row .sod-card-head h2 { font-size: 22px; }
-.sod-bottom-row .sod-link { font-size: 16px; }
-.sod-empty { margin: auto 0 !important; text-align: center; color: var(--sod-muted); font-size: 15px; padding: 10px 0; }
+.sod-bottom-row .sod-link { font-size: var(--fs-body); }
+.sod-empty { margin: auto 0 !important; text-align: center; color: var(--sod-muted); font-size: var(--fs-body-sm); padding: 10px 0; }
 
 .sod-tender-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .sod-tender-list a { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 18px; align-items: center; column-gap: 14px; padding: 7px 4px 7px 2px; border-radius: 10px; transition: background .15s ease; }
 .sod-tender-list a:hover { background: #ff790010; }
 .sod-doc { width: 26px; height: 26px; color: var(--sod-ink); stroke-width: 1.7 !important; }
 .sod-tender-copy { display: flex; flex-direction: column; min-width: 0; }
-.sod-tender-copy strong { font-size: 15px; font-weight: 700; color: var(--sod-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.2px; }
-.sod-tender-copy small { font-size: 15px; color: var(--sod-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sod-pill { padding: 4px 13px; border-radius: 14px; font-size: 15px; font-weight: 700; white-space: nowrap; }
-.sod-pill.is-orange { background: #ffe5cf; color: #f05f00; }
+.sod-tender-copy strong { font-size: var(--fs-body-sm); font-weight: 700; color: var(--sod-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.2px; }
+.sod-tender-copy small { font-size: var(--fs-body-sm); color: var(--sod-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sod-pill { padding: 4px 13px; border-radius: 14px; font-size: var(--fs-body-sm); font-weight: 700; white-space: nowrap; }
+.sod-pill.is-orange { background: #ffe5cf; color: #a84700; } /* AA 5.1:1 */
 .sod-pill.is-blue { background: #dcecfd; color: #1765c1; }
 .sod-pill.is-green { background: #d8f5e6; color: #0d7a43; }
 .sod-pill.is-purple { background: #efe2fd; color: #7a20d6; }
@@ -249,10 +249,10 @@ body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: A
 .sod-donut strong { font-size: 34px; line-height: 1; font-weight: 700; color: var(--sod-ink); }
 .sod-donut small { font-size: 17px; font-weight: 700; color: var(--sod-ink); margin-top: 4px; }
 .sod-legend { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.sod-legend li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: var(--sod-ink); }
+.sod-legend li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: var(--fs-body); font-weight: 600; color: var(--sod-ink); }
 .sod-legend i { width: 13px; height: 13px; border-radius: 50%; background: var(--dot); }
 .sod-legend span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sod-legend b { font-size: 16px; }
+.sod-legend b { font-size: var(--fs-body); }
 
 .sod-timeline { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; position: relative; }
 .sod-timeline li { position: relative; display: grid; grid-template-columns: 14px 46px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-height: 52px; }
@@ -263,10 +263,10 @@ body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: A
 :root[data-theme="dark"] .sod-activity-icon { background: #3a2414; }
 .sod-activity-icon svg { width: 24px; height: 24px; }
 .sod-activity-copy { display: flex; flex-direction: column; min-width: 0; }
-.sod-activity-copy strong { font-size: 14px; font-weight: 700; color: var(--sod-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.2px; }
+.sod-activity-copy strong { font-size: var(--fs-sm); font-weight: 700; color: var(--sod-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.2px; }
 .sod-activity-copy a:hover strong { color: var(--sod-orange-deep); text-decoration: underline; }
-.sod-activity-copy small { font-size: 13px; color: var(--sod-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sod-timeline time { font-size: 13px; color: var(--sod-ink-2); white-space: nowrap; align-self: start; padding-top: 8px; }
+.sod-activity-copy small { font-size: var(--fs-caption); color: var(--sod-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sod-timeline time { font-size: var(--fs-caption); color: var(--sod-ink-2); white-space: nowrap; align-self: start; padding-top: 8px; }
 
 .sod-side-stack { display: grid; grid-template-rows: minmax(0, 1fr) 82px; gap: 14px; min-width: 0; min-height: 0; }
 .sod-ongoing { padding: 14px 18px; overflow: hidden; isolation: isolate; background: linear-gradient(110deg, #fffdfb 0%, #fff4ea 100%); border-color: #f1ddd0; }
@@ -275,10 +275,10 @@ body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: A
 .sod-tower { position: absolute; inset-inline-end: 12px; top: 10px; width: 74px; height: 108px; color: var(--sod-orange); stroke-width: 4.5 !important; z-index: 0; filter: drop-shadow(0 0 5px #ff790055); }
 .sod-ongoing-copy { position: relative; z-index: 1; margin-top: 10px; padding-inline-end: 80px; }
 .sod-ongoing-copy > strong { display: block; font-size: 19px; line-height: 1; color: var(--sod-ink); }
-.sod-ongoing-copy > p { margin-top: 10px !important; font-size: 16px; color: var(--sod-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sod-ongoing-copy > p { margin-top: 10px !important; font-size: var(--fs-body); color: var(--sod-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sod-progress { height: 5px; margin-top: 10px; border-radius: 3px; background: linear-gradient(90deg, #ffd2ad, #ffe5cf); overflow: hidden; margin-inline-end: -60px; }
 .sod-progress i { display: block; height: 100%; background: linear-gradient(90deg, #ff9a2e, #ff6a00); border-radius: 3px; }
-.sod-progress-caption { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 15px; color: var(--sod-ink); }
+.sod-progress-caption { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: var(--fs-body-sm); color: var(--sod-ink); }
 .sod-progress-caption b { color: var(--sod-orange-deep); }
 
 .sod-ai { display: grid; grid-template-columns: 50px minmax(0, 1fr) 38px; align-items: center; gap: 14px; width: 100%; padding: 10px 16px 10px 14px; text-align: start; font: inherit; color: var(--sod-ink); cursor: pointer; background: linear-gradient(110deg, #ffffff, #fff7f0); border: 1px solid #f3dfd1; box-shadow: 0 6px 18px #ff790024; transition: transform .18s ease, box-shadow .18s ease; }
@@ -289,7 +289,7 @@ body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: A
 .sod-ai-copy { display: flex; flex-direction: column; min-width: 0; }
 .sod-ai-copy strong { display: inline-flex; align-items: center; gap: 6px; font-size: 19px; font-weight: 700; line-height: 1.15; }
 .sod-spark { width: 20px; height: 20px; fill: #ffb300 !important; stroke: #ff9a00 !important; stroke-width: 1 !important; }
-.sod-ai-copy small { font-size: 14px; line-height: 1.25; color: var(--sod-ink-2); margin-top: 2px; }
+.sod-ai-copy small { font-size: var(--fs-sm); line-height: 1.25; color: var(--sod-ink-2); margin-top: 2px; }
 .sod-ai-go { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(180deg, #ff8a1e, #ff6a00); color: #fff; box-shadow: 0 4px 10px #ff6a0055; }
 .sod-ai-go svg { width: 22px; height: 22px; stroke-width: 2.6 !important; }
 
@@ -309,15 +309,15 @@ body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { font-family: A
 [dir="rtl"] .sod-progress { background: linear-gradient(270deg, #ffd2ad, #ffe5cf); }
 [dir="rtl"] .sod-progress i { background: linear-gradient(270deg, #ff9a2e, #ff6a00); }
 [dir="rtl"] body.so-shell.ws-shell[data-workspace-role] .ai-panel { right: auto; left: 22px; }
-body.so-shell.ws-shell[data-workspace-role][dir="rtl"], [dir="rtl"] .sod { font-family: "Segoe UI", Tahoma, "Arial", sans-serif; }
+body.so-shell.ws-shell[data-workspace-role][dir="rtl"], [dir="rtl"] .sod { font-family: var(--font-arabic); }
 [dir="rtl"] .sod-hero h2 strong { font-size: 44px; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
-  .sod-hero h2 { font-size: 28px; } .sod-hero h2 strong { font-size: 38px; } .sod-hero p { font-size: 16px; }
+  .sod-hero h2 { font-size: 28px; } .sod-hero h2 strong { font-size: 38px; } .sod-hero p { font-size: var(--fs-body); }
   .sod-kpi { gap: 18px; padding-inline: 18px; } .sod-kpi-icon { width: 64px; height: 64px; } .sod-kpi-icon svg { width: 34px; height: 34px; }
   .sod-kpi-copy strong { font-size: 36px; } .sod-kpi-copy span { font-size: 18px; }
-  .sod-stage-label { font-size: 15px; }
+  .sod-stage-label { font-size: var(--fs-body-sm); }
   .sod-bottom-row { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
   .sod-bottom-row > .sod-card { min-height: 236px; }
   .sod-side-stack { grid-template-rows: auto auto; }
@@ -346,35 +346,35 @@ body.so-shell.ws-shell[data-workspace-role][dir="rtl"], [dir="rtl"] .sod { font-
   .sod-hero { height: auto; min-height: 150px; padding-bottom: 46px; }
   .sod-hero-copy { max-width: 100%; padding: 16px 18px 0; }
   .sod-hero-photo { width: 100%; opacity: .45; }
-  .sod-hero h2 { font-size: 24px; } .sod-hero h2 strong { font-size: 32px; } .sod-hero p { font-size: 15px; }
+  .sod-hero h2 { font-size: 24px; } .sod-hero h2 strong { font-size: 32px; } .sod-hero p { font-size: var(--fs-body-sm); }
   .sod-kpis { gap: 10px; margin-top: 14px; }
   .sod-kpi { height: auto; min-height: 96px; padding: 14px; gap: 12px; flex-wrap: wrap; }
   .sod-kpi-icon { width: 46px; height: 46px; } .sod-kpi-icon svg { width: 26px; height: 26px; }
-  .sod-kpi-copy strong { font-size: 30px; } .sod-kpi-copy span { font-size: 15px; white-space: normal; }
+  .sod-kpi-copy strong { font-size: 30px; } .sod-kpi-copy span { font-size: var(--fs-body-sm); white-space: normal; }
   .sod-kpi-arrow { position: absolute; top: 14px; inset-inline-end: 14px; margin: 0; width: 20px; height: 20px; }
   .sod-main-row, .sod-bottom-row { margin-top: 14px; gap: 14px; grid-template-columns: 1fr; }
   .sod-assigned-body { grid-template-columns: 56px minmax(0, 1fr); row-gap: 10px; padding: 12px 16px 4px; }
   .sod-assigned-icon { width: 54px; height: 54px; } .sod-assigned-icon svg { width: 32px; height: 32px; }
   .sod-assigned-meta { grid-column: 2; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; }
   .sod-assigned .sod-card-head h2 { font-size: 19px; } .sod-head-icon { width: 26px; height: 26px; }
-  .sod-badge { font-size: 14px; padding-inline: 12px; }
+  .sod-badge { font-size: var(--fs-sm); padding-inline: 12px; }
   .sod-primary { width: calc(100% - 32px); margin-top: 10px; }
-  .sod-workflow .sod-card-head h2 { font-size: 21px; } .sod-link { font-size: 15px; }
+  .sod-workflow .sod-card-head h2 { font-size: 21px; } .sod-link { font-size: var(--fs-body-sm); }
   .sod-stages { display: flex; overflow-x: auto; padding: 8px 4px 10px; margin-top: 14px; gap: 0; scrollbar-width: thin; }
   .sod-stages li { flex: 0 0 86px; }
   .sod-stages li + li:before { width: calc(100% - 46px); }
-  .sod-stage-label { font-size: 14px; }
+  .sod-stage-label { font-size: var(--fs-sm); }
   .sod-status-body { flex-direction: column; gap: 16px; padding: 10px 0; }
   .sod-legend { width: 100%; max-width: 280px; }
   .sod-side-stack { grid-template-rows: auto auto; }
   .sod-ai { min-height: 82px; }
   body.so-shell.ws-shell[data-workspace-role] .ws-topbar-actions { gap: 8px; }
-  body.so-shell.ws-shell[data-workspace-role] .ws-language > select { font-size: 15px; }
+  body.so-shell.ws-shell[data-workspace-role] .ws-language > select { font-size: var(--fs-body-sm); }
   body.so-shell.ws-shell[data-workspace-role] .ws-language-globe { width: 24px; height: 24px; }
 }
 @media (max-width: 420px) {
   .sod-kpis { grid-template-columns: 1fr 1fr; }
-  .sod-kpi-copy span { font-size: 14px; }
+  .sod-kpi-copy span { font-size: var(--fs-sm); }
 }
 @media (prefers-reduced-motion: reduce) {
   .sod-kpi, .sod-primary, .sod-ai, .sod-tender-list a, .ws-theme-switch > span { transition: none; }
@@ -413,10 +413,10 @@ body.so-shell.ws-shell[data-workspace-role] .ws-account-label strong { font-size
   body.so-shell.ws-shell[data-workspace-role] .ws-avatar { width: 36px; height: 36px; }
   body.so-shell.ws-shell[data-workspace-role] .ws-account { margin: 0; }
   body.so-shell.ws-shell[data-workspace-role] .ws-account .ws-chevron { width: 16px; height: 16px; }
-  body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: 16px; }
+  body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: var(--fs-body); }
   .sod-kpi { flex-wrap: nowrap; align-items: center; padding: 14px 30px 14px 12px; gap: 10px; }
   .sod-kpi-copy strong { font-size: 28px; }
-  .sod-kpi-copy span { font-size: 15px; white-space: normal; line-height: 1.15; }
+  .sod-kpi-copy span { font-size: var(--fs-body-sm); white-space: normal; line-height: 1.15; }
   .sod-bottom-row > .sod-card { min-height: 0; }
   .sod-empty { padding: 28px 0; }
   .sod-side-stack { grid-template-rows: auto 82px; }
@@ -432,7 +432,7 @@ body.so-shell.ws-shell[data-workspace-role] .ws-account-label strong { font-size
 body.so-shell.ws-shell[data-workspace-role] .pg-page { gap: 20px; }
 body.so-shell.ws-shell[data-workspace-role] .so-page { gap: 20px; }
 body.so-shell.ws-shell[data-workspace-role]:not(.so-home) .ws-main { padding-bottom: 96px; } /* room for the AI assistant button */
-body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { padding-inline-end: 96px; font-family: Arial, sans-serif; }
+body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { padding-inline-end: 96px; font-family: var(--font-sans); }
 body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer a { color: var(--sod-orange-deep); }
 
 /* Hero banners (officer page header and the Tender list hero) */
@@ -518,7 +518,7 @@ body.so-shell.ws-shell[data-workspace-role] .wfl-heading { display: flex; align-
 body.so-shell.ws-shell[data-workspace-role] .pg-panel h2,
 body.so-shell.ws-shell[data-workspace-role] .wfl-heading h2 { font-family: var(--sod-font); font-size: 30px; line-height: 1.15; font-weight: 700; color: var(--sod-ink); letter-spacing: -.3px; margin: 0; }
 body.so-shell.ws-shell[data-workspace-role] .pg-panel h3 { font-family: var(--sod-font); font-size: 21px; color: var(--sod-ink); }
-body.so-shell.ws-shell[data-workspace-role] .pg-hint { color: var(--sod-muted); font-size: 14px; }
+body.so-shell.ws-shell[data-workspace-role] .pg-hint { color: var(--sod-muted); font-size: var(--fs-sm); }
 body.so-shell.ws-shell[data-workspace-role] .wfl-count { display: inline-flex; align-items: center; height: 48px; padding: 0 18px; border-radius: 24px; border: 1px solid var(--sod-border); background: var(--sod-card); color: var(--sod-ink); font-size: 17px; font-weight: 700; box-shadow: 0 2px 6px rgba(20, 30, 50, .06); font-family: var(--sod-font); }
 
 /* Buttons */
@@ -537,7 +537,7 @@ body.so-shell.ws-shell[data-workspace-role] .pg-btn:focus-visible, body.so-shell
 body.so-shell.ws-shell[data-workspace-role] .wfl-filters,
 body.so-shell.ws-shell[data-workspace-role] .pg-toolbar { display: grid; grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr) auto; gap: 16px; align-items: end; margin: 0 0 18px; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--sod-border); background: var(--sod-card); box-shadow: 0 2px 8px rgba(20, 30, 50, .04); }
 body.so-shell.ws-shell[data-workspace-role] .pg-toolbar { grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) auto auto; align-items: center; }
-body.so-shell.ws-shell[data-workspace-role] .wfl-field > span { font-family: var(--sod-font); font-size: 15px; font-weight: 700; letter-spacing: .08em; color: var(--sod-ink-2); }
+body.so-shell.ws-shell[data-workspace-role] .wfl-field > span { font-family: var(--sod-font); font-size: var(--fs-body-sm); font-weight: 700; letter-spacing: .08em; color: var(--sod-ink-2); }
 body.so-shell.ws-shell[data-workspace-role] .wfl-field input, body.so-shell.ws-shell[data-workspace-role] .wfl-field select,
 body.so-shell.ws-shell[data-workspace-role] .pg-toolbar input, body.so-shell.ws-shell[data-workspace-role] .pg-toolbar select { height: 50px; padding: 0 14px; border-radius: 12px; border: 1px solid #d5dae1; background-color: var(--sod-card); color: var(--sod-ink); font-family: var(--sod-font); font-size: 18px; box-shadow: inset 0 1px 2px rgba(20, 30, 50, .04); }
 :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .wfl-field input, :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .wfl-field select,
@@ -549,10 +549,10 @@ body.so-shell.ws-shell[data-workspace-role] .pg-toolbar .pg-btn { height: 50px; 
 /* Tables */
 body.so-shell.ws-shell[data-workspace-role] .wfl-table-wrap,
 body.so-shell.ws-shell[data-workspace-role] .pg-table-wrap { border: 1px solid var(--sod-border); border-radius: 16px; overflow: auto; background: var(--sod-card); }
-body.so-shell.ws-shell[data-workspace-role] .wfl-table, body.so-shell.ws-shell[data-workspace-role] .pg-table { width: 100%; border-collapse: collapse; font-family: var(--sod-font); font-size: 16px; color: var(--sod-ink); }
-body.so-shell.ws-shell[data-workspace-role] .wfl-table th, body.so-shell.ws-shell[data-workspace-role] .pg-table th { padding: 16px 20px; text-align: start; font-size: 15px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sod-ink-2); background: #f8f9fb; border-bottom: 1px solid var(--sod-border); white-space: nowrap; }
+body.so-shell.ws-shell[data-workspace-role] .wfl-table, body.so-shell.ws-shell[data-workspace-role] .pg-table { width: 100%; border-collapse: collapse; font-family: var(--sod-font); font-size: var(--fs-body); color: var(--sod-ink); }
+body.so-shell.ws-shell[data-workspace-role] .wfl-table th, body.so-shell.ws-shell[data-workspace-role] .pg-table th { padding: 16px 20px; text-align: start; font-size: var(--fs-body-sm); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sod-ink-2); background: #f8f9fb; border-bottom: 1px solid var(--sod-border); white-space: nowrap; }
 :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .wfl-table th, :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .pg-table th { background: #ffffff08; }
-body.so-shell.ws-shell[data-workspace-role] .wfl-table td, body.so-shell.ws-shell[data-workspace-role] .pg-table td { padding: 15px 20px; text-align: start; font-size: 16px; border-bottom: 1px solid var(--sod-border); vertical-align: middle; }
+body.so-shell.ws-shell[data-workspace-role] .wfl-table td, body.so-shell.ws-shell[data-workspace-role] .pg-table td { padding: 15px 20px; text-align: start; font-size: var(--fs-body); border-bottom: 1px solid var(--sod-border); vertical-align: middle; }
 body.so-shell.ws-shell[data-workspace-role] .wfl-table tbody tr:last-child td, body.so-shell.ws-shell[data-workspace-role] .pg-table tbody tr:last-child td { border-bottom: 0; }
 body.so-shell.ws-shell[data-workspace-role] .wfl-table tbody tr:hover, body.so-shell.ws-shell[data-workspace-role] .pg-table tbody tr:hover { background: #ff79000a; }
 body.so-shell.ws-shell[data-workspace-role] .wfl-table .wfl-actions-col { text-align: end; }
@@ -569,8 +569,8 @@ body.so-shell.ws-shell[data-workspace-role] .ui-empty, body.so-shell.ws-shell[da
 body.so-shell.ws-shell[data-workspace-role] .so-forward-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px 24px; border-radius: 16px; border: 1.5px solid #ffc9a3; background: linear-gradient(180deg, #fff9f4, #fff1e6); box-shadow: var(--sod-shadow); font-family: var(--sod-font); }
 :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .so-forward-shortcut { border-color: #ff790055; background: linear-gradient(180deg, #24180f, #1d140d); }
 body.so-shell.ws-shell[data-workspace-role] .so-forward-shortcut strong { display: block; font-size: 21px; color: var(--sod-ink); margin: 4px 0; }
-body.so-shell.ws-shell[data-workspace-role] .so-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .1em; color: var(--sod-orange-deep); }
-body.so-shell.ws-shell[data-workspace-role] .so-alert, body.so-shell.ws-shell[data-workspace-role] .pg-note { border-radius: 14px; padding: 14px 18px; border: 1px solid #ffc9a3; background: var(--sod-orange-tint); color: var(--sod-ink); font-family: var(--sod-font); font-size: 16px; }
+body.so-shell.ws-shell[data-workspace-role] .so-eyebrow { font-size: var(--fs-caption); font-weight: 700; letter-spacing: .1em; color: var(--sod-orange-deep); }
+body.so-shell.ws-shell[data-workspace-role] .so-alert, body.so-shell.ws-shell[data-workspace-role] .pg-note { border-radius: 14px; padding: 14px 18px; border: 1px solid #ffc9a3; background: var(--sod-orange-tint); color: var(--sod-ink); font-family: var(--sod-font); font-size: var(--fs-body); }
 body.so-shell.ws-shell[data-workspace-role] .ui-timeline strong { font-family: var(--sod-font); font-size: 17px; }
 body.so-shell.ws-shell[data-workspace-role] .pg-form input, body.so-shell.ws-shell[data-workspace-role] .pg-form select, body.so-shell.ws-shell[data-workspace-role] .pg-form textarea { border-radius: 12px; border: 1px solid #d5dae1; min-height: 46px; font-family: var(--sod-font); font-size: 17px; background: var(--sod-card); color: var(--sod-ink); }
 :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .pg-form input, :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .pg-form select, :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] .pg-form textarea { border-color: #ffffff2a; }
@@ -587,12 +587,12 @@ body.so-shell.ws-shell[data-workspace-role] .pg-form input, body.so-shell.ws-she
   body.so-shell.ws-shell[data-workspace-role] .officer-page-hero, body.so-shell.ws-shell[data-workspace-role] .wfl-hero { min-height: 170px; padding: 0 20px; }
   body.so-shell.ws-shell[data-workspace-role] .officer-page-hero .dash-welcome-copy, body.so-shell.ws-shell[data-workspace-role] .wfl-hero .dash-welcome-copy { max-width: 100%; padding: 22px 0 40px; }
   body.so-shell.ws-shell[data-workspace-role] .officer-page-hero h1, body.so-shell.ws-shell[data-workspace-role] .wfl-hero h1, body.so-shell.ws-shell[data-workspace-role] .officer-page-hero h1 strong, body.so-shell.ws-shell[data-workspace-role] .wfl-hero h1 strong { font-size: 32px; }
-  body.so-shell.ws-shell[data-workspace-role] .officer-page-hero p, body.so-shell.ws-shell[data-workspace-role] .wfl-hero p { font-size: 15px; }
+  body.so-shell.ws-shell[data-workspace-role] .officer-page-hero p, body.so-shell.ws-shell[data-workspace-role] .wfl-hero p { font-size: var(--fs-body-sm); }
   body.so-shell.ws-shell[data-workspace-role] .pg-cards { grid-template-columns: 1fr; gap: 10px; }
   body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card { min-height: 96px; grid-template-columns: 48px minmax(0, 1fr) 22px; column-gap: 14px; padding: 14px 16px; }
   body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card::before { width: 48px; height: 48px; background-size: 26px 26px; }
   body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card > strong, body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric-copy > strong { font-size: 32px; }
-  body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card > span, body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric-copy > span { font-size: 15px; }
+  body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card > span, body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric-copy > span { font-size: var(--fs-body-sm); }
   body.so-shell.ws-shell[data-workspace-role] .dash-metrics { grid-template-columns: 1fr 1fr; gap: 10px; }
   body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric { min-height: 96px; gap: 10px; padding: 14px 12px; }
   body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric-icon { width: 42px; height: 42px; }
@@ -601,14 +601,14 @@ body.so-shell.ws-shell[data-workspace-role] .pg-form input, body.so-shell.ws-she
   body.so-shell.ws-shell[data-workspace-role] .ws-panel.pg-panel, body.so-shell.ws-shell[data-workspace-role] .dash-panel.wfl-panel { padding: 18px 14px; }
   body.so-shell.ws-shell[data-workspace-role] .pg-panel h2, body.so-shell.ws-shell[data-workspace-role] .wfl-heading h2 { font-size: 24px; }
   body.so-shell.ws-shell[data-workspace-role] .wfl-filters, body.so-shell.ws-shell[data-workspace-role] .pg-toolbar { grid-template-columns: 1fr; padding: 14px; }
-  body.so-shell.ws-shell[data-workspace-role] .wfl-count { height: 40px; font-size: 15px; }
-  body.so-shell.ws-shell[data-workspace-role] .pg-btn-primary, body.so-shell.ws-shell[data-workspace-role] .wfl-new { min-height: 42px; font-size: 16px; }
-  body.so-shell.ws-shell[data-workspace-role] .wfl-table th, body.so-shell.ws-shell[data-workspace-role] .pg-table th, body.so-shell.ws-shell[data-workspace-role] .wfl-table td, body.so-shell.ws-shell[data-workspace-role] .pg-table td { padding: 12px 14px; font-size: 14px; }
+  body.so-shell.ws-shell[data-workspace-role] .wfl-count { height: 40px; font-size: var(--fs-body-sm); }
+  body.so-shell.ws-shell[data-workspace-role] .pg-btn-primary, body.so-shell.ws-shell[data-workspace-role] .wfl-new { min-height: 42px; font-size: var(--fs-body); }
+  body.so-shell.ws-shell[data-workspace-role] .wfl-table th, body.so-shell.ws-shell[data-workspace-role] .pg-table th, body.so-shell.ws-shell[data-workspace-role] .wfl-table td, body.so-shell.ws-shell[data-workspace-role] .pg-table td { padding: 12px 14px; font-size: var(--fs-sm); }
   body.so-shell.ws-shell[data-workspace-role] .ws-internal-footer { padding-inline-end: 16px; padding-bottom: 84px; }
 }
 
 /* Reference typography and sidebar rhythm (Segoe UI semibold, 56px item rhythm) */
-body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-brand .ws-brand { font-size: 16.5px; font-weight: 600; }
+body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-brand .ws-brand { font-size: var(--fs-body); font-weight: 600; }
 body.so-shell.ws-shell[data-workspace-role] .ws-sidebar > .ws-primary-nav { gap: 4px; padding-top: 0; }
 body.so-shell.ws-shell[data-workspace-role] .ws-nav-item { min-height: 52px; font-size: 18px; font-weight: 600; gap: 24px; }
 body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-bottom { margin: 14px 36px 0 38px; padding: 18px 0 0; }
@@ -625,24 +625,24 @@ body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-architecture,
     url('../assets/building.webp') 88% 100% / auto 400px no-repeat;
   -webkit-mask-image: none; mask-image: none;
 }
-body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: 16px; }
+body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: var(--fs-body); }
 body.so-shell.ws-shell[data-workspace-role] .ws-language { font-size: 17px; font-weight: 600; }
 body.so-shell.ws-shell[data-workspace-role] .ws-account-label strong { font-size: 17px; font-weight: 600; }
 @media (min-width: 1281px) { body.so-shell.ws-shell[data-workspace-role] .ws-account-label { max-width: 220px; } }
 body.so-shell.ws-shell[data-workspace-role] .officer-page-hero h1, body.so-shell.ws-shell[data-workspace-role] .wfl-hero h1, body.so-shell.ws-shell[data-workspace-role] .officer-page-hero h1 strong, body.so-shell.ws-shell[data-workspace-role] .wfl-hero h1 strong { font-size: 46px; font-weight: 700; letter-spacing: -.8px; }
 body.so-shell.ws-shell[data-workspace-role] .officer-page-hero p, body.so-shell.ws-shell[data-workspace-role] .wfl-hero p { font-size: 17px; }
 body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card > strong, body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric-copy > strong { font-size: 42px; }
-body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card > span, body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric-copy > span { font-size: 16.5px; font-weight: 500; }
+body.so-shell.ws-shell[data-workspace-role] .pg-cards > .pg-card > span, body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric-copy > span { font-size: var(--fs-body); font-weight: 500; }
 body.so-shell.ws-shell[data-workspace-role] .pg-panel h2, body.so-shell.ws-shell[data-workspace-role] .wfl-heading h2 { font-size: 28px; }
-body.so-shell.ws-shell[data-workspace-role] .wfl-table th, body.so-shell.ws-shell[data-workspace-role] .pg-table th { font-size: 14px; }
-body.so-shell.ws-shell[data-workspace-role] .wfl-field > span { font-size: 14px; }
-body.so-shell.ws-shell[data-workspace-role] .wfl-field input, body.so-shell.ws-shell[data-workspace-role] .wfl-field select, body.so-shell.ws-shell[data-workspace-role] .pg-toolbar input, body.so-shell.ws-shell[data-workspace-role] .pg-toolbar select { font-size: 16px; }
-body.so-shell.ws-shell[data-workspace-role] .pg-btn, body.so-shell.ws-shell[data-workspace-role] .wfl-reset, body.so-shell.ws-shell[data-workspace-role] .wfl-count { font-size: 16px; }
+body.so-shell.ws-shell[data-workspace-role] .wfl-table th, body.so-shell.ws-shell[data-workspace-role] .pg-table th { font-size: var(--fs-sm); }
+body.so-shell.ws-shell[data-workspace-role] .wfl-field > span { font-size: var(--fs-sm); }
+body.so-shell.ws-shell[data-workspace-role] .wfl-field input, body.so-shell.ws-shell[data-workspace-role] .wfl-field select, body.so-shell.ws-shell[data-workspace-role] .pg-toolbar input, body.so-shell.ws-shell[data-workspace-role] .pg-toolbar select { font-size: var(--fs-body); }
+body.so-shell.ws-shell[data-workspace-role] .pg-btn, body.so-shell.ws-shell[data-workspace-role] .wfl-reset, body.so-shell.ws-shell[data-workspace-role] .wfl-count { font-size: var(--fs-body); }
 body.so-shell.ws-shell[data-workspace-role] .pg-btn-primary, body.so-shell.ws-shell[data-workspace-role] .wfl-new { font-size: 17px; }
-body.so-shell.ws-shell[data-workspace-role] .wfl-empty p, body.so-shell.ws-shell[data-workspace-role] .pg-table tbody tr:only-child > td[colspan] { font-size: 16.5px; }
+body.so-shell.ws-shell[data-workspace-role] .wfl-empty p, body.so-shell.ws-shell[data-workspace-role] .pg-table tbody tr:only-child > td[colspan] { font-size: var(--fs-body); }
 
-body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-brand .ws-brand { font-size: 16px; font-weight: 400; line-height: 1.38; }
-body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: 15px; }
+body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-brand .ws-brand { font-size: var(--fs-body); font-weight: 400; line-height: 1.38; }
+body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: var(--fs-body-sm); }
 body.so-shell.ws-shell[data-workspace-role] .ws-topbar-actions { gap: 22px; }
 /* Dashboard type scale for the reference font */
 .sod-hero h2 { font-size: 32px; } .sod-hero h2 strong { font-size: 42px; } .sod-hero p { font-size: 17px; }
@@ -650,44 +650,44 @@ body.so-shell.ws-shell[data-workspace-role] .ws-topbar-actions { gap: 22px; }
 .sod-kpi-icon { width: 66px; height: 66px; }
 .sod .sod-kpi-icon svg { width: 34px; height: 34px; }
 .sod-kpi-copy strong { font-size: 40px; }
-.sod-kpi-copy span { font-size: 16.5px; font-weight: 500; white-space: normal; }
+.sod-kpi-copy span { font-size: var(--fs-body); font-weight: 500; white-space: normal; }
 .sod svg.sod-kpi-arrow { align-self: center; margin: 0; width: 24px; height: 24px; }
 .sod-card-head h2, .sod-bottom-row .sod-card-head h2, .sod-ongoing h2 { font-size: 20px; }
 .sod-workflow .sod-card-head h2, .sod-assigned .sod-card-head h2 { font-size: 21px; }
-.sod-link, .sod-bottom-row .sod-link { font-size: 15px; }
-.sod-badge { font-size: 14px; }
+.sod-link, .sod-bottom-row .sod-link { font-size: var(--fs-body-sm); }
+.sod-badge { font-size: var(--fs-sm); }
 .sod-assigned-copy h3 { font-size: 18px; }
-.sod-assigned-tender, .sod-assigned-reason, .sod-assigned-reason mark, .sod-round { font-size: 14px; }
-.sod-required { font-size: 14.5px; }
+.sod-assigned-tender, .sod-assigned-reason, .sod-assigned-reason mark, .sod-round { font-size: var(--fs-sm); }
+.sod-required { font-size: var(--fs-body-sm); }
 .sod-assigned-body { grid-template-columns: 64px minmax(0, 1fr) auto; }
 .sod-assigned-icon { width: 62px; height: 62px; }
 .sod .sod-assigned-icon svg { width: 36px; height: 36px; }
-.sod-primary { font-size: 16px; height: 36px; margin: 4px 0 12px; }
-.sod-stage-label { font-size: 15px; }
-.sod-tender-copy strong { font-size: 13.5px; } .sod-tender-copy small { font-size: 13px; } .sod-pill { font-size: 12.5px; padding: 3px 11px; }
-.sod-legend li, .sod-legend b { font-size: 14px; } .sod-donut strong { font-size: 30px; } .sod-donut small { font-size: 14px; }
-.sod-activity-copy strong { font-size: 12.5px; } .sod-activity-copy small, .sod-timeline time { font-size: 11.5px; }
-.sod-ongoing-copy > strong { font-size: 17px; } .sod-ongoing-copy > p { font-size: 14px; } .sod-progress-caption { font-size: 13.5px; }
-.sod-ai-copy strong { font-size: 17px; } .sod-ai-copy small { font-size: 12.5px; }
-.sod-empty { font-size: 14px; }
-.sod-caption { font-size: 12px; }
+.sod-primary { font-size: var(--fs-body); height: 36px; margin: 4px 0 12px; }
+.sod-stage-label { font-size: var(--fs-body-sm); }
+.sod-tender-copy strong { font-size: var(--fs-sm); } .sod-tender-copy small { font-size: var(--fs-caption); } .sod-pill { font-size: var(--fs-caption); padding: 3px 11px; }
+.sod-legend li, .sod-legend b { font-size: var(--fs-sm); } .sod-donut strong { font-size: 30px; } .sod-donut small { font-size: var(--fs-sm); }
+.sod-activity-copy strong { font-size: var(--fs-caption); } .sod-activity-copy small, .sod-timeline time { font-size: var(--fs-micro); }
+.sod-ongoing-copy > strong { font-size: 17px; } .sod-ongoing-copy > p { font-size: var(--fs-sm); } .sod-progress-caption { font-size: var(--fs-sm); }
+.sod-ai-copy strong { font-size: 17px; } .sod-ai-copy small { font-size: var(--fs-caption); }
+.sod-empty { font-size: var(--fs-sm); }
+.sod-caption { font-size: var(--fs-micro); }
 @media (min-width: 1181px) and (max-width: 1520px) {
   .sod-kpi { gap: 14px; padding: 0 16px; }
   .sod-kpi-icon { width: 58px; height: 58px; }
   .sod .sod-kpi-icon svg { width: 30px; height: 30px; }
   .sod-kpi-copy strong { font-size: 36px; }
-  .sod-kpi-copy span { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sod-kpi-copy span { font-size: var(--fs-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sod-bottom-row { gap: 12px; }
   .sod-bottom-row > .sod-card { padding: 14px 14px 10px; }
   .sod-bottom-row .sod-card-head h2, .sod-ongoing h2 { font-size: 18px; white-space: nowrap; }
-  .sod-bottom-row .sod-link { font-size: 14px; }
+  .sod-bottom-row .sod-link { font-size: var(--fs-sm); }
   .sod-status-body { gap: 10px; }
   .sod-donut { width: 112px; }
   .sod-donut:before { inset: 16px; }
   .sod-donut strong { font-size: 26px; }
-  .sod-donut small { font-size: 13px; }
+  .sod-donut small { font-size: var(--fs-caption); }
   .sod-legend { gap: 12px; }
-  .sod-legend li { gap: 7px; grid-template-columns: 11px minmax(0, 1fr) auto; font-size: 13px; }
+  .sod-legend li { gap: 7px; grid-template-columns: 11px minmax(0, 1fr) auto; font-size: var(--fs-caption); }
   .sod-legend i { width: 11px; height: 11px; }
   .sod-legend span { overflow: hidden; text-overflow: ellipsis; }
   .sod-tender-list a { column-gap: 10px; grid-template-columns: 22px minmax(0, 1fr) auto 16px; }
@@ -699,19 +699,19 @@ body.so-shell.ws-shell[data-workspace-role] .ws-topbar-actions { gap: 22px; }
   .sod-ai-icon { width: 40px; height: 40px; }
   .sod .sod-ai-icon svg { width: 24px; height: 24px; }
   .sod-ai-go { width: 30px; height: 30px; }
-  .sod-ai-copy strong { font-size: 15.5px; }
-  .sod-ai-copy small { font-size: 12px; }
+  .sod-ai-copy strong { font-size: var(--fs-body); }
+  .sod-ai-copy small { font-size: var(--fs-micro); }
 }
 @media (min-width: 1181px) and (max-width: 1520px) {
   .sod-kpi-copy span { white-space: normal; overflow: visible; line-height: 1.15; }
   body.so-shell.ws-shell[data-workspace-role] .ws-topbar-actions { gap: 16px; }
-  body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: 14.5px; }
+  body.so-shell.ws-shell[data-workspace-role] .ws-search input { font-size: var(--fs-body-sm); }
 }
 body.so-shell.ws-shell[data-workspace-role] .pg-toolbar > * { margin: 0; width: 100%; max-width: none; min-width: 0; box-sizing: border-box; }
 body.so-shell.ws-shell[data-workspace-role] .pg-toolbar > .pg-btn { width: auto; height: 50px; min-height: 50px; padding: 0 22px; }
 body.so-shell.ws-shell[data-workspace-role] .pg-empty { display: grid; justify-items: center; gap: 12px; padding: 30px 16px; text-align: center; }
 body.so-shell.ws-shell[data-workspace-role] .pg-empty svg { width: 46px; height: 46px; color: var(--sod-ink-2); stroke-width: 1.7; }
-body.so-shell.ws-shell[data-workspace-role] .pg-empty p { margin: 0; font-size: 16.5px; color: var(--sod-ink); }
+body.so-shell.ws-shell[data-workspace-role] .pg-empty p { margin: 0; font-size: var(--fs-body); color: var(--sod-ink); }
 @media (max-width: 767px) { body.so-shell.ws-shell[data-workspace-role] .pg-toolbar > .pg-btn { width: 100%; } }
 body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric { flex-direction: row; text-align: start; }
 @media (max-width: 767px) {
@@ -742,7 +742,7 @@ body.so-shell.ws-shell[data-workspace-role] .ws-sidebar-architecture,
 /* Every role's dashboard KPI cards use the approved card: whole card clickable when it has a link. */
 body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric { position: relative; transition: transform .18s ease, box-shadow .18s ease; }
 body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-metric:has(.dash-card-link):hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(30, 40, 60, .12); }
-body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-trend { position: absolute; inset-inline-end: 16px; bottom: 10px; font-size: 12px; font-weight: 700; }
+body.so-shell.ws-shell[data-workspace-role] .dash-metrics .dash-trend { position: absolute; inset-inline-end: 16px; bottom: 10px; font-size: var(--fs-micro); font-weight: 700; }
 @media (max-width: 1180px) { body.so-shell.ws-shell[data-workspace-role] .dash-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* Filter bars: one wrapping row whatever the number of fields (pages have 3–5 controls). */
@@ -761,14 +761,14 @@ body.so-shell.ws-shell[data-workspace-role] :is(.admin-user-stat, .admin-departm
 :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] :is(.admin-user-stat, .admin-department-stat):nth-child(4n + 3) { --tint: #221632; --tint-2: #1a1126; --edge: #8d36e866; }
 :root[data-theme="dark"] body.so-shell.ws-shell[data-workspace-role] :is(.admin-user-stat, .admin-department-stat):nth-child(4n + 4) { --tint: #11261c; --tint-2: #0d1d16; --edge: #17b26a66; }
 body.so-shell.ws-shell[data-workspace-role] :is(.admin-user-stat-value, .admin-department-stat-value) { font-family: var(--sod-font); font-size: 40px; font-weight: 700; line-height: 1.05; color: var(--sod-ink); }
-body.so-shell.ws-shell[data-workspace-role] :is(.admin-user-stat-label, .admin-department-stat-label) { font-family: var(--sod-font); font-size: 16.5px; font-weight: 600; color: var(--sod-ink-2); }
+body.so-shell.ws-shell[data-workspace-role] :is(.admin-user-stat-label, .admin-department-stat-label) { font-family: var(--sod-font); font-size: var(--fs-body); font-weight: 600; color: var(--sod-ink-2); }
 /* Report pages under the shared banner: the report's own title row stays (export buttons), with the banner's spacing. */
 body.so-shell.ws-shell[data-workspace-role] .officer-page-hero + .tc-reports { margin-top: 0; }
 /* RTL: every banner (dashboards included) puts the photo on the left, opposite the text. */
 [dir="rtl"] body.so-shell.ws-shell[data-workspace-role] .dash-welcome .dash-welcome-photo { right: auto; left: 0; -webkit-mask-image: linear-gradient(to left, transparent, #000 28%); mask-image: linear-gradient(to left, transparent, #000 28%); }
 [dir="rtl"] body.so-shell.ws-shell[data-workspace-role] .dash-welcome .dash-welcome-copy { max-width: 62%; }
 /* Admin page search (filters the current list) sits under the page banner; the top bar has the shared global search. */
-body.so-shell.ws-shell[data-workspace-role="Admin"] .pg-page:has(> .admin-page-search) > * { order: 3; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] .pg-page > * { order: 3; } /* hero (1) and page search (2, list pages only) first, content after */
 body.so-shell.ws-shell[data-workspace-role="Admin"] .pg-page > .officer-page-hero { order: 1; }
 body.so-shell.ws-shell[data-workspace-role="Admin"] .pg-page > .admin-page-search { order: 2; margin: 0; }
 body.so-shell.ws-shell[data-workspace-role="Admin"] .admin-page-search .ws-icon-button { width: 46px; height: 46px; border: 1px solid var(--sod-border); background: var(--sod-card); border-radius: 50%; flex: 0 0 auto; }
