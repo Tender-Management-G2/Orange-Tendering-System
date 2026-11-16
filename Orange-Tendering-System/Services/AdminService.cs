@@ -716,20 +716,18 @@ namespace Orange_Tendering_System.Services
             departmentFilter = departmentFilter?.Trim();
             statusFilter = statusFilter?.Trim();
 
-            // =========================================
-            // KPI CARDS - ALL USERS
-            // =========================================
+            // Supplier accounts belong to the Suppliers workspace even when their
+            // SupplierId is missing in older data. Exclude them by relationship and role.
+            var internalUsers = _context.Users
+                .AsNoTracking()
+                .Where(u => u.SupplierId == null &&
+                    !_context.UserRoles.Any(ur => ur.UserId == u.Id &&
+                        _context.Roles.Any(r => r.Id == ur.RoleId && r.Name == SystemRoles.Supplier)));
 
-            var totalUsers = await _context.Users.CountAsync();
-
-            var activeUsers = await _context.Users
-                .CountAsync(u => u.IsActive);
-
-            var inactiveUsers = await _context.Users
-                .CountAsync(u => !u.IsActive);
-
-            var departmentUsers = await _context.Users
-                .CountAsync(u => u.DepartmentId != null);
+            var totalUsers = await internalUsers.CountAsync();
+            var activeUsers = await internalUsers.CountAsync(u => u.IsActive);
+            var inactiveUsers = await internalUsers.CountAsync(u => !u.IsActive);
+            var departmentUsers = await internalUsers.CountAsync(u => u.DepartmentId != null);
 
             // =========================================
             // DEPARTMENT FILTER OPTIONS
@@ -749,9 +747,7 @@ namespace Orange_Tendering_System.Services
             // USERS QUERY
             // =========================================
 
-            var query = _context.Users
-                .AsNoTracking()
-                .AsQueryable();
+            var query = internalUsers;
 
             // Search by name or email
             if (!string.IsNullOrWhiteSpace(search))
@@ -769,7 +765,7 @@ namespace Orange_Tendering_System.Services
             if (!string.IsNullOrWhiteSpace(roleFilter) &&
                 roleFilter != "All")
             {
-                if (SystemRoles.PublicRoles.Contains(roleFilter))
+                if (roleFilter != SystemRoles.Supplier && SystemRoles.PublicRoles.Contains(roleFilter))
                 {
                     query = query.Where(u =>
                         _context.UserRoles.Any(ur =>
@@ -870,17 +866,9 @@ namespace Orange_Tendering_System.Services
                     Email = u.Email ?? "",
                     IsActive = u.IsActive,
 
-                    // Keep supplier status from Main
-                    SupplierStatus = u.Supplier != null
-                        ? (SupplierStatus?)u.Supplier.Status
-                        : null,
-
-                    DepartmentOrCompany =
-                        u.Department != null
-                            ? u.Department.Name
-                            : u.Supplier != null
-                                ? u.Supplier.CompanyName
-                                : "—"
+                    DepartmentOrCompany = u.Department != null
+                        ? u.Department.Name
+                        : "—"
                 })
                 .ToListAsync();
 

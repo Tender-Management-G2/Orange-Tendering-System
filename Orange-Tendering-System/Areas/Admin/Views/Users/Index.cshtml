@@ -154,7 +154,7 @@ FEATURES:
             All Roles
         </option>
 
-        @foreach (var role in SystemRoles.PublicRoles)
+        @foreach (var role in SystemRoles.PublicRoles.Where(role => role != SystemRoles.Supplier))
         {
             <option value="@role"
                     selected="@(Model.RoleFilter == role)">

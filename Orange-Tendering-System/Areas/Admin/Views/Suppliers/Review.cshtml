@@ -1,3 +1,43 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Supplier Registration Review
+
+DEVELOPER OWNER: Rjoub
+MODULE: Administration
+TRELLO TASK: Supplier Administration
+TRELLO URL: https://trello.com/c/zvMwn4LD
+
+PURPOSE:
+Review a pending supplier registration and its legal
+documents, then approve, reject or suspend it.
+
+BUSINESS ACCESS:
+Admin
+
+ROUTE: /Admin/Suppliers/Review/{id?}
+
+FUTURE IMPLEMENTATION:
+- Load the supplier with its Documents (SupplierId).
+- POST Approve / Reject / Suspend: set Status, ReviewNotes,
+  ReviewedByUserId, ReviewedAt (UTC).
+- Verify documents: Documents.VerificationStatus,
+  VerifiedByUserId, VerifiedAt.
+- Notify the supplier account(s) and write AuditLogs.
+
+DEPENDENCIES:
+Suppliers, Documents, AspNetUsers (SupplierId),
+Notifications, AuditLogs.
+
+STATUS:
+UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+
+IMPORTANT:
+Only Approved, active suppliers may be invited or submit
+offers.
+===========================================================
+*@
+
 @using Orange_Tendering_System.Models.Entities
 @model SupplierDetailsViewModel
 
@@ -8,7 +48,6 @@
         "Verify legal documents and manage supplier approval.";
 }
 
-<div class="supplier-review">
 <partial name="_PageHeader" />
 
 @if (TempData["SuccessMessage"] != null)
@@ -26,15 +65,11 @@
 }
 
 <!-- Company Information -->
-<section class="ws-panel pg-panel supplier-review-company" aria-labelledby="supplier-review-company-title">
+<section class="ws-panel pg-panel">
     <div class="pg-panel-head">
-        <div>
-            <span class="supplier-review-eyebrow">Registration profile</span>
-            <h2 id="supplier-review-company-title">@Model.CompanyName</h2>
-            <p>Check the company details against the submitted documents.</p>
-        </div>
+        <h2>Supplier Registration</h2>
 
-        <span class="supplier-review-status supplier-review-status--@Model.Status.ToLowerInvariant()">@Model.Status</span>
+        <span class="pg-status">@Model.Status</span>
     </div>
 
     <dl class="pg-dl">
@@ -86,95 +121,143 @@
 </section>
 
 <!-- Legal Documents -->
-<section class="ws-panel pg-panel supplier-review-documents" aria-labelledby="supplier-review-documents-title">
+<section class="ws-panel pg-panel">
     <div class="pg-panel-head">
-        <div>
-            <span class="supplier-review-eyebrow">Step 01 · Evidence</span>
-            <h2 id="supplier-review-documents-title">Legal documents</h2>
-            <p>Open each file, compare it with the company profile, then record your findings.</p>
-        </div>
-        <span class="supplier-review-count">@Model.Documents.Count @(Model.Documents.Count == 1 ? "document" : "documents")</span>
+        <h2>Legal Document Verification</h2>
+        <p>Review company registration and legal documents.</p>
     </div>
 
-    @if (!Model.Documents.Any())
-    {
-        <div class="supplier-review-empty">No legal documents have been uploaded for this supplier.</div>
-    }
-    else
-    {
-        <div class="supplier-review-document-list">
-            @foreach (var document in Model.Documents)
-            {
-                var documentLabel = document.DocumentType switch
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th>Document</th>
+                    <th>Type</th>
+                    <th>Expiry</th>
+                    <th>Status</th>
+                    <th>Verification</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (!Model.Documents.Any())
                 {
-                    "CommercialRegistration" => "Commercial registration",
-                    "TaxCertificate" => "Tax certificate",
-                    "BusinessLicense" => "Business license",
-                    _ => document.DocumentType ?? "Legal document"
-                };
-                var documentUrl = Url.Action("Document", "Suppliers", new { area = "Admin", id = document.Id });
-                <article class="supplier-review-document" aria-labelledby="supplier-document-@document.Id">
-                    <div class="supplier-review-document-main">
-                        <div class="supplier-review-file-icon" aria-hidden="true">@(System.IO.Path.GetExtension(document.FileName).TrimStart('.').ToUpperInvariant())</div>
-                        <div class="supplier-review-file-info">
-                            <span class="supplier-review-type">@documentLabel</span>
-                            <h3 id="supplier-document-@document.Id">@document.FileName</h3>
-                            <p>Uploaded @document.UploadedAt.ToString("dd MMM yyyy") · @((document.SizeBytes / 1024.0).ToString("0.#")) KB · Expires @(document.ExpiresAt?.ToString("dd MMM yyyy") ?? "not specified")</p>
-                        </div>
-                        <span class="supplier-review-status supplier-review-status--@document.VerificationStatus.ToLowerInvariant().Replace(" ", "-")">@document.VerificationStatus</span>
-                    </div>
-                    <div class="supplier-review-document-actions">
-                        <button type="button" class="pg-btn supplier-review-view" data-document-preview="@documentUrl" data-document-name="@document.FileName">View document <span aria-hidden="true">↗</span></button>
-                        <a class="pg-btn supplier-review-download" data-no-modal asp-area="Admin" asp-controller="Suppliers" asp-action="Document" asp-route-id="@document.Id" asp-route-download="true">Download</a>
-                    </div>
-                    @if (Model.Status != "Approved")
+                    <tr>
+                        <td colspan="5">
+                            No documents uploaded.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var document in Model.Documents)
                     {
-                        <form asp-area="Admin" asp-controller="Suppliers" asp-action="VerifyDocument" method="post" class="pg-form supplier-review-verify">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="SupplierId" value="@Model.Id" />
-                            <input type="hidden" name="DocumentId" value="@document.Id" />
-                            <div class="pg-field">
-                                <label for="document-status-@document.Id">Verification status</label>
-                                <select id="document-status-@document.Id" name="Status" required>
-                                    <option value="Pending" selected="@(document.VerificationStatus == "Pending")">Pending review</option>
-                                    <option value="Verified" selected="@(document.VerificationStatus == "Verified")">Verified</option>
-                                    <option value="Rejected" selected="@(document.VerificationStatus == "Rejected")">Rejected</option>
-                                </select>
-                            </div>
-                            <div class="pg-field supplier-review-notes">
-                                <label for="document-notes-@document.Id">Review notes</label>
-                                <textarea id="document-notes-@document.Id" name="Notes" data-fv-required-when="Status=Rejected" data-fv-label="Verification notes" data-fv-msg="Please give the reason for rejecting this document." data-fv-msg-ar="يرجى ذكر سبب رفض هذا المستند." maxlength="1000" rows="2" placeholder="Record what you checked">@document.VerificationNotes</textarea>
-                            </div>
-                            <button type="submit" class="pg-btn pg-btn-primary">Save review</button>
-                        </form>
+                        <tr>
+                            <td>
+                                <a asp-area="Admin"
+                                   asp-controller="Suppliers"
+                                   asp-action="Document"
+                                   asp-route-id="@document.Id"
+                                   data-no-modal
+                                   target="_blank"
+                                   rel="noopener noreferrer">@document.FileName</a>
+                            </td>
+
+                            <td>@(document.DocumentType ?? "—")</td>
+
+                            <td>
+                                @(document.ExpiresAt?.ToString("yyyy-MM-dd")
+                                    ?? "—")
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @document.VerificationStatus
+                                </span>
+                            </td>
+
+                            <td>
+                                @if (Model.Status != "Approved")
+                                {
+                                    <form asp-area="Admin"
+                                          asp-controller="Suppliers"
+                                          asp-action="VerifyDocument"
+                                          method="post"
+                                          class="pg-form">
+
+                                        @Html.AntiForgeryToken()
+
+                                        <input type="hidden"
+                                               name="SupplierId"
+                                               value="@Model.Id" />
+
+                                        <input type="hidden"
+                                               name="DocumentId"
+                                               value="@document.Id" />
+
+                                        <div class="pg-field">
+                                            <label>
+                                                Verification Status
+                                            </label>
+
+                                            <select name="Status"
+                                                    class="form-control"
+                                                    required>
+                                                <option value="Pending" selected="@(document.VerificationStatus == "Pending")">
+                                                    Pending
+                                                </option>
+                                                <option value="Verified" selected="@(document.VerificationStatus == "Verified")">
+                                                    Verified
+                                                </option>
+                                                <option value="Rejected" selected="@(document.VerificationStatus == "Rejected")">
+                                                    Rejected
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="pg-field">
+                                            <label>Verification Notes</label>
+
+                                            <textarea name="Notes"
+                                                      data-fv-required-when="Status=Rejected"
+                                                      data-fv-label="Verification notes"
+                                                      data-fv-msg="Please give the reason for rejecting this document."
+                                                      data-fv-msg-ar="يرجى ذكر سبب رفض هذا المستند."
+                                                      class="form-control"
+                                                      maxlength="1000"
+                                                      rows="2"
+                                                      placeholder="Add review notes">@document.VerificationNotes</textarea>
+                                        </div>
+
+                                        <button type="submit"
+                                                class="pg-btn pg-btn-primary">
+                                            Save Verification
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span>
+                                        Verification locked while approved.
+                                    </span>
+                                }
+                            </td>
+                        </tr>
                     }
-                    else
-                    {
-                        <p class="supplier-review-locked">Document review is locked while this supplier is approved.</p>
-                    }
-                </article>
-            }
-        </div>
-    }
+                }
+            </tbody>
+        </table>
+    </div>
 </section>
 
-<dialog class="supplier-review-preview" id="supplier-document-preview" aria-labelledby="supplier-document-preview-title">
-    <div class="supplier-review-preview-head">
-        <div><span class="supplier-review-eyebrow">Document preview</span><h2 id="supplier-document-preview-title"></h2></div>
-        <button type="button" class="supplier-review-preview-close" data-document-close aria-label="Close document preview">×</button>
-    </div>
-    <iframe title="Supplier document preview"></iframe>
-    <div class="supplier-review-preview-actions">
-        <a class="pg-btn" data-no-modal target="_blank" rel="noopener noreferrer" data-document-open>Open in new tab ↗</a>
-        <button type="button" class="pg-btn pg-btn-primary" data-document-close>Close preview</button>
-    </div>
-</dialog>
-
 <!-- Supplier Decision -->
-<section class="ws-panel pg-panel supplier-review-decision">
+<section class="ws-panel pg-panel">
     <div class="pg-panel-head">
-        <div><span class="supplier-review-eyebrow">Step 02 · Outcome</span><h2>Supplier decision</h2>
-            <p>Review the documents before deciding. Approval also verifies pending, unexpired documents and records the outcome in the audit history.</p></div>
+        <h2>Supplier Decision</h2>
+        <p>
+            Open the documents before making a decision. Approving also verifies
+            pending, unexpired documents and records the decision in the audit history.
+        </p>
     </div>
 
     <form asp-area="Admin"
@@ -228,14 +311,19 @@
             </div>
 
             <div class="pg-field pg-field-wide">
-                <label for="reviewNotes">Decision notes</label>
+                <label for="reviewNotes">
+                    Review Notes / Reason
+                </label>
 
                 <textarea id="reviewNotes"
-                          name="ReviewNotes" data-fv-required-when="Decision=Rejected|Suspended" data-fv-msg="Please give the reason for this rejection or suspension." data-fv-msg-ar="يرجى ذكر سبب الرفض أو الإيقاف."
+                          name="ReviewNotes"
+                          data-fv-required-when="Decision=Rejected|Suspended"
+                          data-fv-msg="Please give the reason for this rejection or suspension."
+                          data-fv-msg-ar="يرجى ذكر سبب الرفض أو الإيقاف."
                           class="form-control"
                           rows="4"
                           maxlength="1000"
-                          placeholder="Record the findings and reason for this decision"></textarea>
+                          placeholder="Record the reason or justification"></textarea>
 
                 <small class="pg-hint">
                     A reason is required for rejection
@@ -252,7 +340,7 @@
             <div class="pg-actions">
                 <button type="submit"
                         class="pg-btn pg-btn-primary">
-                    Save decision
+                    Submit Decision
                 </button>
             </div>
         }
@@ -278,8 +366,3 @@
         </li>
     </ul>
 </nav>
-</div>
-
-@section Scripts {
-    <script src="~/js/admin-supplier-review.js" asp-append-version="true"></script>
-}
