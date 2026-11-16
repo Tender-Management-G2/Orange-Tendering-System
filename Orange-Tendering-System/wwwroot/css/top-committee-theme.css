@@ -1,0 +1,53 @@
+/*
+  Top Committee pages in the approved Sourcing Officer design. Loaded only by Views/Shared/_TopCommitteeLayout.cshtml,
+  after officer-theme.css, and scoped to the Top Committee shell so no other role is affected.
+  It maps the Top Committee's own cards (rv-, dc-, rl-, tc-) onto the Officer card tokens (--sod-*), for Light and Dark mode.
+*/
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-page { display: grid; gap: 22px; min-width: 0; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-page > * { min-width: 0; }
+
+/* Secure bell (top-committee-bell.js): rows are buttons, reset them to the Officer row look. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] button.ws-bell-open { width: 100%; border: 0; background: transparent; font: inherit; text-align: start; cursor: pointer; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] button.ws-bell-open:hover,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] button.ws-bell-open:focus-visible { background: #ff79001a; outline: none; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-bell-count { color: var(--sod-muted); font-size: 12px; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] [data-tc-bell-error] { margin: 10px 16px; color: #d64545; font-size: 13px; }
+
+/* Cards: review, decision, report-review and live-filter panels share the Officer panel surface. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-review .rv-card,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-decision .dc-card,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel {
+  border: 1px solid var(--sod-border); border-radius: 18px; background: var(--sod-card); box-shadow: var(--sod-shadow); color: var(--sod-ink);
+}
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel { padding: 24px 22px; margin: 0; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel h2,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-title { font-family: var(--sod-font); font-size: 24px; font-weight: 700; color: var(--sod-ink); margin: 0 0 12px; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel textarea,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel select { border-color: var(--sod-border); border-radius: 12px; background: var(--sod-search); }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel button,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-button { border-radius: 999px; }
+
+/* Live filter toolbars (History, Voting, Evaluation Summary) look like the Officer filter bar. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-toolbar {
+  padding: 16px 18px; border: 1px solid var(--sod-border); border-radius: 18px; background: var(--sod-card); box-shadow: var(--sod-shadow);
+}
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-field label { color: var(--sod-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-field input,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-field select { min-height: 46px; border: 1px solid var(--sod-border); border-radius: 12px; background: var(--sod-card); color: var(--sod-ink); }
+
+/* Page headers that sit next to the banner. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-review .rv-page-links { justify-content: flex-start; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-decision .dc-page-head { justify-content: space-between; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-review > .officer-page-hero,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live > .officer-page-hero,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-history > .officer-page-hero { margin: 0; }
+
+/* Tables: no clipped text; scroll inside the card on narrow screens. */
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-table-wrap { overflow-x: auto; }
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-table td,
+body.so-shell.ws-shell[data-workspace-role="Top Committee"] .pg-table th { overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  body.so-shell.ws-shell[data-workspace-role="Top Committee"] .rl-panel { padding: 18px 14px; }
+  body.so-shell.ws-shell[data-workspace-role="Top Committee"] .tc-live-toolbar { padding: 14px; }
+}

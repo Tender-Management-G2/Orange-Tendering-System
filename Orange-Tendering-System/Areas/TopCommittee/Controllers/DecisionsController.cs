@@ -32,7 +32,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             .OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).Take(8)
             .Select(r => new { r.Id, r.TenderRound.TenderId, r.TenderRound.Tender.Title }).ToListAsync();
         return Json(new { items = rounds.Select(r => new {
-            title = r.Title, subtitle = $"T-{r.TenderId:0000}",
+            type = Orange_Tendering_System.ViewModels.UiText.T(HttpContext, "Committee rounds"), title = r.Title, subtitle = $"T-{r.TenderId:0000}",
             url = Url.Action(nameof(Decision), "Decisions", new { area = "TopCommittee", id = r.Id })
         }) });
     }
