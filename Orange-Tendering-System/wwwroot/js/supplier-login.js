@@ -235,7 +235,27 @@
         return input ? input.value : '';
     }
 
-    async function postHandler(handler, body) {
+    // The anti-forgery token in this page goes stale when the app restarts or another tab signs in or out. The server
+    // then refuses the post (400, shown as 405 by the status-code page) without JSON. Only the steps that start a
+    // sign-in may fetch a fresh token and try once more: reloading the page ends an open identity step.
+    const RENEWABLE = ['Credentials', 'IdentityStart'];
+
+    async function renewToken() {
+        try {
+            const response = await fetch(window.location.pathname + window.location.search, { credentials: 'same-origin' });
+            if (!response.ok) return false;
+            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const fresh = page.querySelector('#account input[name="__RequestVerificationToken"]');
+            const input = form.querySelector('input[name="__RequestVerificationToken"]');
+            if (!fresh || !input || !fresh.value) return false;
+            input.value = fresh.value;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function postHandler(handler, body, renewed) {
         const url = new URL(window.location.href);
         url.searchParams.set('handler', handler);
         const abort = new AbortController();
@@ -250,6 +270,11 @@
             });
             let data = null;
             try { data = await response.json(); } catch (e) { data = null; }
+            if (!data && (response.status === 400 || response.status === 405) && !renewed &&
+                RENEWABLE.includes(handler) && await renewToken()) {
+                if (body.has('__RequestVerificationToken')) body.set('__RequestVerificationToken', token());
+                return postHandler(handler, body, true);
+            }
             return { response, data };
         } catch (error) {
             return { error: error && error.name === 'AbortError' ? 'timeout' : 'unavailable' };
