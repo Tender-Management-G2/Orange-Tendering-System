@@ -1952,6 +1952,8 @@ public async Task<string> UpdateUserAsync(
                     d.Id,
                     d.FileName,
                     d.DocumentType,
+                    d.SizeBytes,
+                    d.UploadedAt,
                     d.ExpiresAt,
                     d.VerificationStatus,
                     d.VerificationNotes
@@ -1964,6 +1966,8 @@ public async Task<string> UpdateUserAsync(
                     Id = d.Id,
                     FileName = d.FileName,
                     DocumentType = d.DocumentType,
+                    SizeBytes = d.SizeBytes,
+                    UploadedAt = d.UploadedAt,
                     ExpiresAt = d.ExpiresAt,
                     VerificationStatus =
                         d.VerificationStatus?.ToString()

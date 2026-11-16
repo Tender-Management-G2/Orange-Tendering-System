@@ -35,7 +35,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Document(int id)
+        public async Task<IActionResult> Document(int id, bool download = false)
         {
             try
             {
@@ -48,8 +48,12 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     _ => "application/octet-stream"
                 };
                 Response.Headers["X-Content-Type-Options"] = "nosniff";
-                Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
-                return PhysicalFile(path, contentType, enableRangeProcessing: false);
+                Response.Headers["Content-Security-Policy"] = "default-src 'none'; object-src 'none'; base-uri 'none'";
+                Response.Headers["Cache-Control"] = "private, no-store";
+                Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
+                return download
+                    ? PhysicalFile(path, contentType, Path.GetFileName(name))
+                    : PhysicalFile(path, contentType, enableRangeProcessing: true);
             }
             catch (WorkflowException)
             {

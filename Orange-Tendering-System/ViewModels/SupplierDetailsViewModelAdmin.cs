@@ -44,6 +44,8 @@ namespace Orange_Tendering_System.ViewModels
         public int Id { get; set; }
         public string FileName { get; set; } = "";
         public string? DocumentType { get; set; }
+        public long SizeBytes { get; set; }
+        public DateTime UploadedAt { get; set; }
         public DateTime? ExpiresAt { get; set; }
         public string VerificationStatus { get; set; } = "";
         public string? VerificationNotes { get; set; }
