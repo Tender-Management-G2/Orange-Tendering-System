@@ -33,7 +33,7 @@
                 <h1 class="as-title">Sign in to your workspace</h1>
                 <p class="as-lede"><span class="as-lede-tagline">Every connection begins with a signal. </span>Use the email and password for your account.</p>
 
-                <form id="account" method="post" novalidate>
+                <form id="account" method="post" novalidate data-fv-skip>
                     <div id="signInMessage" class="as-summary" role="alert"></div>
                     <div asp-validation-summary="ModelOnly" class="as-summary" role="alert"></div>
                     @* A preference only: the server checks it against the account's real role after the password. *@

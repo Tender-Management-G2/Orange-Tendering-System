@@ -20,7 +20,7 @@
 .about-hero-note{max-width:320px;padding-bottom:5px}
 .about-hero-note p{font-size:16px;line-height:1.8;margin:24px 0}
 .editorial-rule{display:block;width:50px;height:3px;background:#ff7900}
-.about-panorama{height:clamp(300px,34vw,540px);margin-top:75px;background:linear-gradient(0deg,#000b,transparent 65%),url('../assets/building.png') center 50%/cover;display:flex;align-items:end;justify-content:space-between;gap:20px;padding:35px;color:#fff;overflow:hidden}
+.about-panorama{height:clamp(300px,34vw,540px);margin-top:75px;background:linear-gradient(0deg,#000b,transparent 65%),url('../assets/building.webp') center 50%/cover;display:flex;align-items:end;justify-content:space-between;gap:20px;padding:35px;color:#fff;overflow:hidden}
 .about-panorama span{font-size:9px;letter-spacing:.18em;line-height:1.7}
 .editorial-story{display:grid;grid-template-columns:1fr 2fr;gap:8%;padding-block:90px;border-top:1px solid var(--rule)}
 .editorial-story>div{max-width:780px}

@@ -128,17 +128,9 @@ STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
   </dialog>
 </main>
 @section Scripts {
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script>
-    /* Same pinned version served locally when the CDN is unreachable. */
-    (function () {
-      if (window.gsap && window.ScrollTrigger) return;
-      function add(src) { document.write('<script src="' + src + '"><\/script>'); }
-      add('@Url.Content("~/js/vendor/gsap.min.js")');
-      add('@Url.Content("~/js/vendor/ScrollTrigger.min.js")');
-    })();
-  </script>
+  @* GSAP 3.12.5 served locally (same pinned version): no wait on an external CDN. *@
+  <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
+  <script src="~/js/vendor/ScrollTrigger.min.js" asp-append-version="true"></script>
   @* Emitted raw: the .NET importmap tag helper would replace this map with its own. *@
   @Html.Raw("<script type=\"importmap\">{ \"imports\": { \"three\": \"" + Url.Content("~/js/vendor/three/build/three.module.min.js") + "\" } }</script>")
   <script type="module" src="~/js/team-scene.js" asp-append-version="true"></script>

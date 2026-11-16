@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -93,6 +94,25 @@ public static class TeamAccountSeeder
             other.IsActive = false;
             Check(await users.UpdateAsync(other), $"deactivate synthetic officer {other.Email}");
             results.Add($"{other.Email}: synthetic Sourcing Officer deactivated (only one may be active)");
+        }
+
+        // Team database only: when the Admin has never saved a Top Committee, save the four seeded Chiefs as the standing
+        // Top Committee so a Manager approval can seat it. An existing roster (the Admin's choice) is never changed.
+        var topRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == SystemRoles.TopCommittee);
+        if (topRole != null && !await db.RoleClaims.AnyAsync(c => c.RoleId == topRole.Id && c.ClaimType == TenderWorkflowService.StandingClaim))
+        {
+            var chiefs = new Dictionary<string, string>();
+            foreach (var seat in CommitteeAccountSeats.All.Where(x => x.Committee == "Top"))
+            {
+                var chief = await users.FindByEmailAsync(Accounts.Single(a => a.Seat == seat.Key).Email);
+                if (chief is { IsActive: true }) chiefs[seat.Key] = chief.Id;
+            }
+            if (chiefs.Count == 4)
+            {
+                db.RoleClaims.Add(new IdentityRoleClaim<string> { RoleId = topRole.Id, ClaimType = TenderWorkflowService.StandingClaim, ClaimValue = JsonSerializer.Serialize(chiefs) });
+                await db.SaveChangesAsync();
+                results.Add("standing Top Committee saved with the four team Chiefs (it was empty)");
+            }
         }
 
         await transaction.CommitAsync();

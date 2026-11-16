@@ -9,9 +9,9 @@
 <div class="so-page">
     <partial name="_PageHeader" />
     <div class="pg-cards">
-        <article class="pg-card"><span>Waiting for review</span><strong>@rows.Count(r => r.Status == PurchaseRequestStatus.Submitted)</strong></article>
-        <article class="pg-card"><span>Accepted, without a tender</span><strong>@rows.Count(r => r.Status == PurchaseRequestStatus.Accepted && !r.Tenders.Any())</strong></article>
-        <article class="pg-card"><span>Returned or rejected</span><strong>@rows.Count(r => r.Status is PurchaseRequestStatus.Returned or PurchaseRequestStatus.Rejected)</strong></article>
+        <article class="pg-card" data-icon="clipboard"><span>Waiting for review</span><strong>@rows.Count(r => r.Status == PurchaseRequestStatus.Submitted)</strong></article>
+        <article class="pg-card" data-icon="check"><span>Accepted, without a tender</span><strong>@rows.Count(r => r.Status == PurchaseRequestStatus.Accepted && !r.Tenders.Any())</strong></article>
+        <article class="pg-card" data-icon="return"><span>Returned or rejected</span><strong>@rows.Count(r => r.Status is PurchaseRequestStatus.Returned or PurchaseRequestStatus.Rejected)</strong></article>
     </div>
     <section class="ws-panel pg-panel">
         <div class="pg-panel-head"><h2>All requests</h2><span class="pg-hint">Open Details to review a request and record your decision.</span></div>

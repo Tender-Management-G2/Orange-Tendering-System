@@ -14,6 +14,8 @@ body{padding-top:var(--nav)}
 .hc-nav .hc-btn-ghost:hover{border-color:var(--o);color:var(--o)}
 .hc-nav .hc-btn-text{color:var(--tx);padding:0 10px}
 .hc-nav .hc-btn-text:hover{color:var(--o)}
+.overlay{background:rgba(255,255,255,0.8);
+}
 .hc-nav{position:fixed;inset:0 0 auto 0;height:var(--nav);z-index:100;display:flex;align-items:center;gap:20px;padding:0 max(20px,3.2vw);background:transparent;border-bottom:1px solid transparent;transition:background .3s,border-color .3s}
 .hc-nav.is-solid{background:rgba(9,9,9,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom-color:var(--line)}
 .hc-brand{display:flex;align-items:center;gap:12px;text-decoration:none;flex:none;align-self:flex-start;margin-top:clamp(8px,.8vw,14px)}

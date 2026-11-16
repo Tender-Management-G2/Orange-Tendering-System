@@ -29,6 +29,7 @@ public class PurchaseRequestsController(ApplicationDbContext db) : Controller
         if (request.Status != PurchaseRequestStatus.Submitted || decision is not (ReviewDecision.Accepted or ReviewDecision.Returned or ReviewDecision.Rejected)) return BadRequest();
         if (decision is ReviewDecision.Returned or ReviewDecision.Rejected && string.IsNullOrWhiteSpace(comment))
             return BadRequest("Record the reason or the additional documents required before returning or rejecting the request.");
+        if (comment?.Trim().Length > 2000) return BadRequest("The comment must be 2000 characters or fewer.");
         request.Status = decision switch { ReviewDecision.Accepted => PurchaseRequestStatus.Accepted, ReviewDecision.Returned => PurchaseRequestStatus.Returned, _ => PurchaseRequestStatus.Rejected };
         var submittedSnapshot = System.Text.Json.JsonSerializer.Serialize(new { request.Title, request.Justification, request.Priority, request.NeededBy, Items = request.Items.Select(i => new { i.Name, i.Specifications, i.Quantity, i.Unit }) });
         var reviewerId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value;

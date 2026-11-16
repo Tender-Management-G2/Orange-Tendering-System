@@ -163,7 +163,7 @@ nav .selected:after {
   top: 0;
   width: 64%;
   height: 27vw;
-  background: url("../assets/building.png") right top/100% 100% no-repeat;
+  background: url("../assets/building.webp") right top/100% 100% no-repeat;
   mask-image: linear-gradient(to bottom, #000 75%, transparent);
   opacity: 0.98;
   transform: translate3d(0, var(--parallax, 0px), 0) scale(1.015);

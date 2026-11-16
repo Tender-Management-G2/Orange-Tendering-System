@@ -6,6 +6,8 @@ namespace Orange_Tendering_System.Models.Entities
     // Final-decision relay: Top Committee approvals (3 of 4) -> assigned Sourcing Manager acknowledges and forwards ->
     // the single Sourcing Officer confirms and notifies suppliers. Suppliers are never notified before the last step.
     public enum FinalDecisionStatus { AwaitingManager, ForwardedToOfficer, SuppliersNotified }
+    // What the relay carries out: the approved award, or the outcome of a Top Committee rejection (reason 1 cancels, reason 2 re-tenders).
+    public enum FinalDecisionOutcome { Award, Cancel, Retender }
 
     [Index(nameof(TenderId), nameof(TenderReportId), IsUnique = true)]
     public class FinalDecisionNotice
@@ -18,6 +20,14 @@ namespace Orange_Tendering_System.Models.Entities
         public int TopApprovals { get; set; }
         public int TopVotes { get; set; }
         public DateTime CreatedAt { get; set; }
+
+        // A single Top Committee rejection stops the approval and replaces the award with the reason's outcome.
+        public FinalDecisionOutcome Outcome { get; set; } = FinalDecisionOutcome.Award;
+        public TopRejectionReason? RejectionReason { get; set; }
+        [MaxLength(450)] public string? RejectedByUserId { get; set; }
+        public DateTime? RejectedAt { get; set; }
+        [MaxLength(2000)] public string? DecisionReason { get; set; } // The documented reason of the stopping Reject / Re-Tender.
+        public int? NewRoundNumber { get; set; }
 
         public string? ManagerUserId { get; set; }
         public DateTime? ManagerAcknowledgedAt { get; set; }

@@ -22,6 +22,7 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
+if (args.Contains("--theme-browser-host")) { await ThemeBrowserHost.Run(); return; }
 if (args.Contains("--seed-saja-demo")) { await SajaDemoFixture.Run(); return; }
 if (args.Contains("--unified-tender-checks")) { await UnifiedTenderChecks.Run(); return; }
 if (args.Contains("--verify-saja-demo")) { await SajaDemoFixture.Run(verifyExisting: true); return; }

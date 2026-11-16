@@ -24,12 +24,13 @@
             if (!matchMedia("(prefers-reduced-motion: reduce)").matches) r.classList.add("hc-anim");
         })(document.documentElement);
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+    @* Inter served locally (variable font already in the project) instead of Google Fonts: no render-blocking external request. *@
+    <link rel="preload" href="~/assets/auth-studio/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <style>@@font-face{font-family:"Inter";src:url("@Url.Content("~/assets/auth-studio/fonts/inter-latin-wght-normal.woff2")") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}</style>
     <link rel="stylesheet" href="~/css/home-cinema.css" asp-append-version="true" />
     @* Emitted raw: the .NET importmap tag helper would replace this map with its own. *@
     @Html.Raw("<script type=\"importmap\">{ \"imports\": { \"three\": \"" + Url.Content("~/js/vendor/three/build/three.module.min.js") + "\" } }</script>")
+    <link rel="stylesheet" href="~/css/theme-surfaces.css" asp-append-version="true" />
 </head>
 <body class="hc">
     <a class="hc-skip" href="#main-content">Skip to content</a>
@@ -78,17 +79,9 @@
             <a href="#home">Back to top &uarr;</a>
         </div>
     </footer>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script>
-        /* Same pinned version served locally when the CDN is unreachable. */
-        (function () {
-            if (window.gsap && window.ScrollTrigger) return;
-            function add(src) { document.write('<script src="' + src + '"><\/script>'); }
-            add('@Url.Content("~/js/vendor/gsap.min.js")');
-            add('@Url.Content("~/js/vendor/ScrollTrigger.min.js")');
-        })();
-    </script>
+    @* GSAP 3.12.5 served locally (same pinned version): no wait on an external CDN. *@
+    <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
+    <script src="~/js/vendor/ScrollTrigger.min.js" asp-append-version="true"></script>
     <script src="~/js/home-cinema.js" asp-append-version="true"></script>
     <script type="module" src="~/js/home-hq3d.js" asp-append-version="true"></script>
 </body>

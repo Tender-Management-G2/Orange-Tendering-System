@@ -35,7 +35,8 @@ namespace Orange_Tendering_System.Models.Entities
 
     public enum CriterionType { Technical, Financial }
 
-    public enum VoteDecision { Approve, Reject }
+    // Top Committee final decision: Approve, Reject (company no longer needs the tender) or Retender (reissue as a new round).
+    public enum VoteDecision { Approve, Reject, Retender }
 
     public enum ReportType { OfficerComparison, FullEvaluation, ExecutiveSummary }
 

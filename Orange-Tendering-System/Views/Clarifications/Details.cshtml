@@ -1,34 +1,99 @@
 @model Orange_Tendering_System.Models.Entities.Clarification
+@using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.Services
+@inject Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> ChatUsers
+@*
+  Role-Based Clarification Chat: one conversation between two approved roles, linked to a request, tender or bid.
+  Rules: Services/ClarificationService.cs (ClarificationPolicy). Styles: wwwroot/css/clarification-chat.css.
+*@
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Clarification Thread";
     ViewData["WorkspaceSection"] = "Clarifications";
     var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-    var other = Model.FromUserId == userId ? Model.ToUser?.UserName : Model.FromUser?.UserName;
-    var linked = Model.Bid?.TenderInvitation?.TenderRound?.Tender?.Title ?? Model.Tender?.Title ?? Model.PurchaseRequest?.Title ?? "General";
+    async Task<string> RoleOf(ApplicationUser? u) => u == null ? "" : ClarificationPolicy.ChatRole(await ChatUsers.GetRolesAsync(u)) ?? "";
+    string NameOf(ApplicationUser? u) => u == null ? "—" : !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName : u.Email ?? u.UserName ?? "—";
+    var fromRole = await RoleOf(Model.FromUser);
+    var toRole = await RoleOf(Model.ToUser);
+    var mine = Model.FromUserId == userId ? fromRole : toRole;
+    var theirs = Model.FromUserId == userId ? toRole : fromRole;
+    var other = Model.FromUserId == userId ? Model.ToUser : Model.FromUser;
+    var linkedType = Model.BidId != null ? "Bid" : Model.TenderId != null ? "Tender" : Model.PurchaseRequestId != null ? "Request" : "Record";
+    var linked = Model.Bid?.TenderInvitation?.TenderRound?.Tender?.Title ?? Model.Tender?.Title ?? Model.PurchaseRequest?.Title ?? "—";
+    var statusTone = Model.Status switch { ClarificationStatus.Open => "pending", ClarificationStatus.Answered => "answered", _ => "resolved" };
+    string Icon(string role) => role switch
+    {
+        "Requesting Department" => "<path d=\"M4 21V5l8-3 8 3v16\"/><path d=\"M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4\"/>",
+        "Supplier" => "<path d=\"M3 21V9l9-6 9 6v12\"/><path d=\"M8 21v-7h8v7M10 17h4\"/>",
+        "Evaluation Committee" or "Top Committee" => "<circle cx=\"12\" cy=\"7.5\" r=\"3\"/><circle cx=\"5.5\" cy=\"10\" r=\"2.3\"/><circle cx=\"18.5\" cy=\"10\" r=\"2.3\"/><path d=\"M7 20c0-3.8 2.2-6 5-6s5 2.2 5 6M1.8 19c0-2.8 1.5-4.4 3.7-4.4M22.2 19c0-2.8-1.5-4.4-3.7-4.4\"/>",
+        _ => "<circle cx=\"12\" cy=\"8\" r=\"4.2\"/><path d=\"M4.5 21c.4-4.4 3.5-7 7.5-7s7.1 2.6 7.5 7\"/>"
+    };
+    var canWrite = Model.Status != ClarificationStatus.Closed;
 }
 <partial name="_PageHeader" />
+@* Inside the content (not the Styles section) so the chat styles also load when the page opens in a pop-up. *@
+<link rel="stylesheet" href="~/css/clarification-chat.css" asp-append-version="true" />
 @if (TempData["ClarificationError"] is string error) { <p class="pg-note" role="alert">@error</p> }
 @if (TempData["ClarificationMessage"] is string notice) { <p class="pg-note" role="status">@notice</p> }
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>@Model.Subject</h2><span class="pg-hint">With @other · @linked · <span class="ui-pill ui-pill--@(Model.Status == Orange_Tendering_System.Models.Entities.ClarificationStatus.Closed ? "good" : Model.Status == Orange_Tendering_System.Models.Entities.ClarificationStatus.Open ? "warn" : "info")">@Orange_Tendering_System.Services.ClarificationPolicy.Label(Model.Status)</span></span></div><a asp-action="Index" class="pg-btn">Back to clarifications</a></div>
-    <div class="so-chat">
-    @foreach (var item in Model.Messages.OrderBy(m => m.SentAt))
-    {
-        var own = item.SenderUserId == userId;
-        <article class="so-message @(own ? "is-own" : "")"><small><strong>@(own ? "You" : item.SenderUser?.UserName)</strong> · @item.SentAt.ToLocalTime().ToString("d MMM yyyy h:mm tt")</small><p style="white-space:pre-wrap">@item.Message</p>
-            @if (item.Documents.Count > 0) { <ul>@foreach (var document in item.Documents) { <li><a asp-area="" asp-controller="Clarifications" asp-action="Download" asp-route-id="@document.Id">@document.FileName</a></li> }</ul> }
-        </article>
-    }
-    @if (Model.Messages.Count == 0) { <p>No messages yet.</p> }
+
+<section class="cc" aria-labelledby="cc-title">
+    <header class="cc-head">
+        <h2 id="cc-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4z" /><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01" /></svg>Clarification Chat</h2>
+        <a asp-action="Index" class="cc-back">← All clarifications</a>
+    </header>
+    <div class="cc-pair" aria-label="Participants"><span>@mine</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4" /></svg><span>@theirs</span></div>
+    <div class="cc-subject">
+        <p><strong>Subject:</strong> <bdi>@Model.Subject</bdi></p>
+        <span class="cc-status is-@statusTone">Status: @ClarificationPolicy.Label(Model.Status)</span>
+        <p class="cc-meta">With <strong>@NameOf(other)</strong> · Linked @linkedType: <bdi>@linked</bdi> · Opened @Model.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</p>
     </div>
+
+    <ol class="cc-messages" aria-label="Messages" aria-live="polite">
+        @foreach (var item in Model.Messages.OrderBy(m => m.SentAt))
+        {
+            var own = item.SenderUserId == userId;
+            var role = item.SenderUserId == Model.FromUserId ? fromRole : toRole;
+            var tone = role == "Supplier" ? "is-green" : own ? "is-own" : "";
+            <li class="cc-msg @tone">
+                <span class="cc-avatar" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(Icon(role))</svg></span>
+                <div class="cc-body">
+                    <div class="cc-who"><strong>@role</strong><span>@(own ? "You" : NameOf(item.SenderUser))</span><time datetime="@item.SentAt.ToString("o")">@item.SentAt.ToLocalTime().ToString("d MMM, h:mm tt")</time></div>
+                    <p class="cc-bubble">@item.Message</p>
+                    @if (item.Documents.Count > 0)
+                    {
+                        <ul class="cc-files">@foreach (var document in item.Documents) { <li><a asp-area="" asp-controller="Clarifications" asp-action="Download" asp-route-id="@document.Id">📎 @document.FileName</a></li> }</ul>
+                    }
+                </div>
+            </li>
+        }
+        @if (Model.Messages.Count == 0) { <li class="cc-empty">No messages yet.</li> }
+    </ol>
+
+    @if (canWrite)
+    {
+        <form asp-action="Reply" method="post" class="cc-compose">
+            <input type="hidden" name="id" value="@Model.Id" />
+            <label for="cc-message" class="ws-sr-only">Message</label>
+            <textarea id="cc-message" name="message" rows="1" maxlength="10000" required placeholder="Type a message..."></textarea>
+            <button type="submit" class="cc-send" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z" /></svg></button>
+        </form>
+        <form asp-action="Resolve" asp-route-id="@Model.Id" method="post" class="cc-resolve">
+            <span>Question answered? Close the conversation for both participants.</span>
+            <button type="submit" class="pg-btn">Mark as resolved</button>
+        </form>
+    }
+    else
+    {
+        <p class="cc-closed">This conversation was resolved@(Model.ClosedAt is { } closed ? " on " + closed.ToLocalTime().ToString("d MMM yyyy") : "") and is read-only.</p>
+    }
 </section>
-@if (Model.Status != Orange_Tendering_System.Models.Entities.ClarificationStatus.Closed)
-{
-    <section class="ws-panel pg-panel"><h2>Reply</h2><form asp-action="Reply" method="post" class="pg-form">
-        <input type="hidden" name="id" value="@Model.Id" />
-        <div class="pg-field"><label for="message">Message</label><textarea id="message" name="message" rows="4" maxlength="10000" required></textarea></div>
-        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Send reply</button></div>
-    </form>
-    <form asp-action="Resolve" asp-route-id="@Model.Id" method="post" class="pg-form"><div class="pg-actions"><button type="submit" class="pg-btn">Mark as resolved</button></div></form></section>
+@section Scripts {
+    <script>
+        (() => {
+            const box = document.getElementById('cc-message'); if (!box) return;
+            const list = document.querySelector('.cc-messages'); if (list) list.scrollTop = list.scrollHeight;
+            box.addEventListener('input', () => { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 160) + 'px'; });
+            box.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); box.form.requestSubmit(); } });
+        })();
+    </script>
 }

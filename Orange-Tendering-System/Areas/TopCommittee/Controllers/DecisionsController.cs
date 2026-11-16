@@ -43,8 +43,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         if (user is null) return Forbid();
         if (!id.HasValue) return await SelectRound(user.Id, nameof(ReviewEvaluation), search, status, page);
         var details = await Committee.Load(user.Id, id.Value);
-        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation } report)
-            return RedirectToAction("Review", "SignedReports", new { area = "TopCommittee", id = report.Id });
+        // Signed tender reports are reviewed and voted on inside the tender's workflow popup.
+        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation })
+            return RedirectToAction("Index", "Workflow", new { area = "TopCommittee", open = details.Round.TenderRound.TenderId });
         return details is null ? NotFound() : View(details);
     }
     public async Task<IActionResult> Decision(int? id, string? search = null, CommitteeRoundStatus? status = null, int page = 1)
@@ -63,8 +64,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             }
             catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
         }
-        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation } report)
-            return RedirectToAction("Review", "SignedReports", new { area = "TopCommittee", id = report.Id });
+        // Signed tender reports are reviewed and voted on inside the tender's workflow popup.
+        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation })
+            return RedirectToAction("Index", "Workflow", new { area = "TopCommittee", open = details.Round.TenderRound.TenderId });
         return details is null ? NotFound() : View(details);
     }
 

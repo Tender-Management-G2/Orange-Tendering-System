@@ -3,29 +3,7 @@
   const body = document.querySelector('.ws-shell');
   if (!body) return;
   body.classList.add('ws-enhanced');
-  const root = document.documentElement;
-  const key = 'orange-ui-theme';
-  const system = matchMedia('(prefers-color-scheme: light)');
-  const toggle = body.querySelector('.ws-theme-toggle');
-  let explicit = false;
-  try { explicit = ['dark','light'].includes(localStorage.getItem(key)); } catch { /* OS preference remains available. */ }
-  function apply(theme, announce = false) {
-    root.dataset.theme = theme; root.style.colorScheme = theme;
-    const light = theme === 'light';
-    toggle.setAttribute('aria-pressed', String(light));
-    toggle.setAttribute('aria-label', `Switch to ${light?'dark':'light'} mode`);
-    toggle.title = light?'Dark mode':'Light mode';
-    document.querySelector('meta[name="theme-color"]').content = light?'#f3f4f3':'#101010';
-    if(announce) document.querySelector('#workspace-theme-status').textContent = `${light?'Light':'Dark'} mode enabled`;
-  }
-  apply(root.dataset.theme === 'light'?'light':'dark');
-  toggle.addEventListener('click',()=>{
-    const theme=root.dataset.theme==='light'?'dark':'light';explicit=true;
-    try { localStorage.setItem(key,theme); } catch { /* Switching still works without storage. */ }
-    apply(theme,true);
-  });
-  system.addEventListener('change',event=>{if(!explicit)apply(event.matches?'light':'dark');});
-  addEventListener('storage',event=>{if(event.key===key||event.key===null){let saved=null;try{saved=localStorage.getItem(key);}catch{}explicit=['light','dark'].includes(saved);apply(explicit?saved:system.matches?'light':'dark');}});
+  // Theme switching is owned by theme-init.js.
 
   const sidebar=body.querySelector('.ws-sidebar');
   if(sidebar){

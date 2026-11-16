@@ -1,47 +1,6 @@
 "use strict";
 (() => {
-  const root = document.documentElement;
-  const toggle = document.querySelector("#theme-toggle");
-  const system = matchMedia("(prefers-color-scheme: light)");
-  let explicit = false;
-  try {
-    explicit = ["light", "dark"].includes(
-      localStorage.getItem("orange-ui-theme"),
-    );
-  } catch (_) {}
-  function apply(theme, announce = false) {
-    root.dataset.theme = theme;
-    root.style.colorScheme = theme;
-    toggle.setAttribute(
-      "aria-label",
-      `Switch to ${theme === "dark" ? "light" : "dark"} mode`,
-    );
-    toggle.setAttribute("aria-pressed", String(theme === "light"));
-    toggle.title = theme === "dark" ? "Light mode" : "Dark mode";
-    document.querySelector('meta[name="theme-color"]').content =
-      theme === "light" ? "#f7f7f4" : "#101010";
-    if (announce)
-      document.querySelector("#theme-status").textContent =
-        `${theme === "light" ? "Light" : "Dark"} mode enabled`;
-  }
-  apply(root.dataset.theme);
-  requestAnimationFrame(() => root.classList.add("theme-ready"));
-  toggle.addEventListener("click", () => {
-    const theme = root.dataset.theme === "dark" ? "light" : "dark";
-    explicit = true;
-    try {
-      localStorage.setItem("orange-ui-theme", theme);
-    } catch (_) {}
-    apply(theme, true);
-  });
-  system.addEventListener("change", (event) => {
-    if (!explicit) apply(event.matches ? "light" : "dark");
-  });
-  addEventListener("storage", (event) => {
-    if (event.key !== "orange-ui-theme") return;
-    explicit = ["light", "dark"].includes(event.newValue);
-    apply(explicit ? event.newValue : system.matches ? "light" : "dark");
-  });
+  // Theme switching is owned by theme-init.js on every layout.
   // New cards are inserted by sections.js after the shared reveal observer starts.
   document
     .querySelectorAll(".benefit-card")

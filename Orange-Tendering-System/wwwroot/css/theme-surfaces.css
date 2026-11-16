@@ -1,0 +1,61 @@
+/* Shared theme surfaces, loaded after page styles. Photos, video and brand artwork retain their original colours. */
+:root{--success:#7bd5a2;--danger:#ffb4a7;--warning:#f4cb72}
+:root[data-theme="light"]{--success:#176b42;--danger:#b32421;--warning:#7b5200}
+body.ws-shell{--page:var(--ws-bg);--surface:var(--ws-surface);--surface-raised:var(--ws-raised);--ink:var(--ws-ink);--secondary:var(--ws-muted);--rule:var(--ws-rule);--input:var(--ws-surface)}
+:root[data-theme] input,:root[data-theme] select,:root[data-theme] textarea{color-scheme:inherit}
+:root[data-theme] .bio-status--success{color:var(--success)}
+:root[data-theme] .bio-status--danger{color:var(--danger)}
+:root[data-theme] .ui-pill--good{color:var(--success)}
+:root[data-theme] .ui-pill--warn{color:var(--warning)}
+:root[data-theme] .ui-pill--bad{color:var(--danger)}
+
+/* Orange Auth Studio: form paper and native fields follow the same choice as the site navbar. */
+:root[data-theme] .as-shell{color-scheme:inherit}
+:root[data-theme="dark"] .as-shell{
+ --as-stage:#11151b;--as-paper:#1b2027;--as-ivory:#242b34;--as-beige:#343d48;
+ --as-rule:#43505e;--as-field:#536170;--as-warm-gray:#bdc6d0;--as-graphite:#f3f5f7;
+ --as-orange-ink:#ffb170;--as-success:#8be0b0;--as-warning:#f4cb72;--as-error:#ffb4a7
+}
+:root[data-theme] .as-shell .as-field input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme] .as-shell .as-field select,:root[data-theme] .as-shell .as-field textarea,
+:root[data-theme] .as-shell .as-secondary,:root[data-theme] .as-shell .as-method,
+:root[data-theme] .as-shell .as-review,:root[data-theme] .as-shell .as-card,
+:root[data-theme] .as-shell .as-field input[type="file"]::file-selector-button{
+ background:var(--as-paper);color:var(--as-graphite);border-color:var(--as-field)
+}
+:root[data-theme] .as-shell .as-field input::placeholder{color:var(--as-warm-gray)}
+:root[data-theme] .as-shell .as-seg input:checked + span{background:var(--as-paper);color:var(--as-graphite)}
+:root[data-theme="dark"] .as-shell .as-summary.validation-summary-errors,
+:root[data-theme="dark"] .as-shell .as-summary.is-error,
+:root[data-theme="dark"] .as-shell .as-status.is-danger,
+:root[data-theme="dark"] .as-shell .as-status.bio-status--danger{background:#362320;color:var(--as-error);border-color:#a86156}
+:root[data-theme="dark"] .as-shell .as-status.is-success,
+:root[data-theme="dark"] .as-shell .as-status.bio-status--success{background:#183227;color:var(--as-success);border-color:#488267}
+:root[data-theme="dark"] .as-shell .as-status.is-warning{background:#352d1d;color:var(--as-warning);border-color:#8e7542}
+:root[data-theme] .as-shell input:-webkit-autofill{-webkit-text-fill-color:var(--as-graphite);-webkit-box-shadow:0 0 0 1000px var(--as-paper) inset}
+:root[data-theme] .ws-shell input:-webkit-autofill{-webkit-text-fill-color:var(--ws-ink);-webkit-box-shadow:0 0 0 1000px var(--ws-surface) inset}
+
+/* Legacy Identity registration/verification panels still use Living Dossier. */
+:root[data-theme="dark"] .ld-shell{--ld-ink:#f3f5f7;--ld-paper:#1b2027;--ld-muted:#bdc6d0;--ld-orange:#ffad69;background:#11151b;color:var(--ld-ink)}
+:root[data-theme="dark"] .ld-interface{background:linear-gradient(153deg,#1c222a,#161c23);box-shadow:20px 0 60px #0003}
+:root[data-theme="dark"] .ld-interface:before{border-color:#ffffff16}
+:root[data-theme="dark"] :is(.ld-intro h1,.ld-step legend,.ld-fields label,.ld-face-controls label,.ld-login-option h2){color:var(--ld-ink)}
+:root[data-theme="dark"] :is(.ld-brand small,.ld-kicker,.ld-footer-links a,.ld-option-number){color:var(--ld-orange)}
+:root[data-theme="dark"] :is(.ld-intro p,.ld-step-copy,.ld-fields small,.ld-review dt,.ld-dev-note,.ld-face-controls small,.ld-face-hint,.ld-face-passkey p,.ld-face-passkey small,.ld-login-note,.ld-remember){color:var(--ld-muted)}
+:root[data-theme="dark"] .ld-login-option p{color:var(--ld-muted)!important}
+:root[data-theme="dark"] :is(.ld-fields input,.ld-fields select,.ld-face-controls input,.ld-review,.ld-secondary,.ld-face-passkey button,.ld-login-option){background:var(--ld-paper);color:var(--ld-ink);border-color:#536170;box-shadow:none}
+:root[data-theme="dark"] .ld-fields input[type="file"]{background:var(--ld-paper)}
+:root[data-theme="dark"] .ld-progress li{color:var(--ld-muted)}
+:root[data-theme="dark"] .ld-progress li span{background:#29323d;color:var(--ld-muted);border-color:#536170}
+:root[data-theme="dark"] .ld-progress li.is-current{background:#ff790025;color:var(--ld-ink)}
+:root[data-theme="dark"] .ld-progress li.is-current span{background:#ff7900;color:#21160c;border-color:#ff7900}
+:root[data-theme="dark"] .ld-progress li.is-done span{background:#183227;color:#8be0b0;border-color:#488267}
+:root[data-theme="dark"] :is(.ld-process-note,.ld-privacy){background:#ff790018;color:var(--ld-muted)!important;border-color:#ff790044}
+:root[data-theme="dark"] :is(.ld-notice,.ld-interface .validation-summary-errors){background:#362320;color:#ffb4a7;border-color:#a86156}
+:root[data-theme="dark"] :is(.ld-fields .field-error,.ld-fields .input-validation-error){color:#ffb4a7}
+:root[data-theme="dark"] :is(.ld-visual,.ld-scene){background:#202833}
+:root[data-theme="dark"] :is(.ld-story-card,.ld-verification-letter,.ld-id-card,.ld-story-envelope){background:linear-gradient(145deg,#2a323d,#1b222b);color:#e4d6c7;border-color:#617080}
+:root[data-theme="dark"] :is(.ld-paper-label,.ld-document-markers span){background:#27313dec;color:#f4d6b3}
+:root[data-theme="dark"] :is(.ld-paper-label span,.ld-verification-letter>span,.ld-id-card b){color:#ffba7a}
+:root[data-theme="dark"] .ld-face-success{background:#183227;color:#8be0b0;border-color:#488267}
+:root[data-theme="dark"] .ld-portrait-base{background:#27313d}

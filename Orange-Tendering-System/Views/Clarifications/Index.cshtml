@@ -1,4 +1,11 @@
 @model IReadOnlyList<Orange_Tendering_System.Models.Entities.Clarification>
+@*
+  Clarifications list: summary cards (New replies is orange when there are unread messages, with who sent them),
+  the conversations table (orange "N new" badge per conversation), and the Create window next to the table
+  (_ClarificationCreateForm: pick people, write the message, Create). Unread = the user's unread notifications that
+  point at a conversation (ClarificationsController.Index); opening a conversation marks them read.
+  When a reply arrives (notification-bell.js raises "orange:notification"), the cards and table refresh in place.
+*@
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
     ViewData["Title"] = "Clarifications";
@@ -6,35 +13,113 @@
     ViewData["Description"] = "Messages and questions connected to your work.";
     var search = ViewData["Search"]?.ToString();
     var status = ViewData["Status"]?.ToString();
+    var unread = ViewBag.Unread as Dictionary<int, int> ?? new();
+    var unreadFrom = ViewBag.UnreadFrom as List<string> ?? [];
+    var unreadTotal = unread.Values.Sum();
+    var createForm = ViewBag.CreateForm as Orange_Tendering_System.ViewModels.ClarificationCreateModel;
+    var canCreate = createForm != null && !User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Supplier);
+    var openCreate = canCreate && Context.Request.Query["compose"] == "1";
+    var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    string Name(Orange_Tendering_System.Models.Entities.ApplicationUser? u) => u == null ? "—" : !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName : u.Email ?? u.UserName ?? "—";
 }
+<link rel="stylesheet" href="~/css/clarification-chat.css" asp-append-version="true" />
 <partial name="_PageHeader" />
 @if (TempData["ClarificationMessage"] is string message) { <p class="pg-note" role="status">@message</p> }
-@if (TempData["ClarificationError"] is string cerror) { <p class="pg-note" role="alert">@cerror</p> }
-<form asp-area="" asp-controller="Clarifications" asp-action="Index" method="get" class="pg-toolbar" aria-label="Search clarifications">
-    <input type="search" name="search" value="@search" maxlength="200" placeholder="Search subject, message or person" aria-label="Search clarifications" />
-    <select name="status" aria-label="Filter by status">
-        <option value="">All statuses</option>
-        @foreach (var item in Enum.GetValues<Orange_Tendering_System.Models.Entities.ClarificationStatus>())
-        {
-            <option value="@item" selected="@(status == item.ToString())">@Orange_Tendering_System.Services.ClarificationPolicy.Label(item)</option>
-        }
-    </select>
-    <button type="submit" class="pg-btn pg-btn-primary">Search</button>
-    <a asp-area="" asp-controller="Clarifications" asp-action="Index" class="pg-btn">Reset</a>
-</form>
-<section class="ws-panel pg-panel" aria-labelledby="tbl-my-clarifications">
-    <div class="pg-panel-head"><h2 id="tbl-my-clarifications">My clarifications</h2>@if (!User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Supplier) && !User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Admin)) { <a class="pg-btn pg-btn-primary" asp-action="New">+ New clarification</a> }</div>
-    <div class="pg-table-wrap"><table class="pg-table">
-        <thead><tr><th>Subject</th><th>With</th><th>Linked to</th><th>Status</th><th>Opened</th><th>Last message</th><th></th></tr></thead>
-        <tbody>
-        @foreach (var thread in Model)
-        {
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var other = thread.FromUserId == userId ? thread.ToUser?.UserName : thread.FromUser?.UserName;
-            var linked = thread.Bid?.TenderInvitation?.TenderRound?.Tender?.Title ?? thread.Tender?.Title ?? thread.PurchaseRequest?.Title ?? "General";
-            <tr><td>@thread.Subject</td><td>@other</td><td>@linked</td><td>@Orange_Tendering_System.Services.ClarificationPolicy.Label(thread.Status)</td><td>@thread.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</td><td>@(thread.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault()?.SentAt.ToLocalTime().ToString("d MMM yyyy h:mm tt") ?? "—")</td><td><a asp-area="" asp-controller="Clarifications" asp-action="Details" asp-route-id="@thread.Id" class="pg-btn">Open</a></td></tr>
-        }
-        @if (Model.Count == 0) { <tr><td colspan="7">No clarification threads found.</td></tr> }
-        </tbody>
-    </table></div>
-</section>
+@if (!openCreate && TempData["ClarificationError"] is string cerror) { <p class="pg-note" role="alert">@cerror</p> }
+
+<div data-cc-live>
+    @if (ViewBag.Counts is int[] counts)
+    {
+        <section class="pg-cards cc-cards" aria-label="Clarification summary">
+            <article class="pg-card cc-new-replies @(unreadTotal > 0 ? "is-alert" : null)" data-icon="inbox" aria-live="polite">
+                <span>@(unreadTotal == 1 ? "New message" : "New messages")@if (unreadFrom.Count > 0) { <small class="cc-from">From: @string.Join(", ", unreadFrom)</small> }</span>
+                <strong>@unreadTotal</strong>
+            </article>
+            <article class="pg-card" data-icon="clipboard"><span>Pending</span><strong>@counts[0]</strong></article>
+            <article class="pg-card" data-icon="return"><span>Answered</span><strong>@counts[1]</strong></article>
+            <article class="pg-card" data-icon="check"><span>Resolved</span><strong>@counts[2]</strong></article>
+        </section>
+    }
+
+    <form asp-area="" asp-controller="Clarifications" asp-action="Index" method="get" class="pg-toolbar" aria-label="Search clarifications">
+        <input type="search" name="search" value="@search" maxlength="200" placeholder="Search subject, message or person" aria-label="Search clarifications" />
+        <select name="status" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            @foreach (var item in Enum.GetValues<Orange_Tendering_System.Models.Entities.ClarificationStatus>())
+            {
+                <option value="@item" selected="@(status == item.ToString())">@Orange_Tendering_System.Services.ClarificationPolicy.Label(item)</option>
+            }
+        </select>
+        <button type="submit" class="pg-btn pg-btn-primary">Search</button>
+        <a asp-area="" asp-controller="Clarifications" asp-action="Index" class="pg-btn">Reset</a>
+    </form>
+
+    <section class="ws-panel pg-panel" aria-labelledby="tbl-my-clarifications">
+        <div class="pg-panel-head"><h2 id="tbl-my-clarifications">My clarifications</h2>
+            @if (canCreate) { <a class="pg-btn pg-btn-primary" asp-action="Index" asp-route-compose="1" data-cc-open data-no-modal>+ Create</a> }</div>
+        <div class="pg-table-wrap"><table class="pg-table cc-threads">
+            <thead><tr><th>Subject</th><th>With</th><th>Linked to</th><th>Status</th><th>Opened</th><th>Last message</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var thread in Model)
+            {
+                var other = thread.FromUserId == userId ? thread.ToUser : thread.FromUser;
+                var linked = thread.Bid?.TenderInvitation?.TenderRound?.Tender?.Title ?? thread.Tender?.Title ?? thread.PurchaseRequest?.Title ?? "General";
+                var fresh = unread.TryGetValue(thread.Id, out var n) ? n : 0;
+                <tr class="@(fresh > 0 ? "is-unread" : null)">
+                    <td><strong>@thread.Subject</strong>@if (fresh > 0) { <span class="cc-new-badge">@fresh new</span> }</td>
+                    <td>@Name(other)</td>
+                    <td>@linked</td>
+                    <td>@Orange_Tendering_System.Services.ClarificationPolicy.Label(thread.Status)</td>
+                    <td>@thread.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</td>
+                    <td>@(thread.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault()?.SentAt.ToLocalTime().ToString("d MMM yyyy h:mm tt") ?? "—")</td>
+                    <td><a asp-area="" asp-controller="Clarifications" asp-action="Details" asp-route-id="@thread.Id" class="pg-btn" data-no-modal>Open</a></td>
+                </tr>
+            }
+            @if (Model.Count == 0) { <tr><td colspan="7">No clarification threads found.</td></tr> }
+            </tbody>
+        </table></div>
+    </section>
+</div>
+
+@if (canCreate)
+{
+    <dialog class="cc-create" id="cc-create" aria-labelledby="cc-create-title" data-open="@(openCreate ? "1" : null)">
+        <div class="cc-create-head"><h2 id="cc-create-title">Create clarification</h2><button type="button" class="cc-create-x" data-cc-close aria-label="Close">×</button></div>
+        <div class="cc-create-body">
+            @if (openCreate && TempData["ClarificationError"] is string createError) { <p class="cc-error" role="alert">@createError</p> }
+            <partial name="_ClarificationCreateForm" model="createForm" />
+        </div>
+    </dialog>
+}
+
+@section Scripts {
+<script>
+(() => {
+    const dialog = document.getElementById('cc-create');
+    if (dialog) {
+        const open = ev => { ev?.preventDefault(); if (!dialog.open) dialog.showModal(); dialog.querySelector('input[type=checkbox]')?.focus(); };
+        document.addEventListener('click', ev => {
+            if (ev.target.closest('[data-cc-open]')) open(ev);
+            else if (ev.target.closest('[data-cc-close]') && dialog.contains(ev.target)) { ev.preventDefault(); dialog.close(); }
+        });
+        dialog.addEventListener('click', ev => { if (ev.target === dialog) dialog.close(); });
+        // Razor always renders data-* attributes (empty when false), so check the value, not its presence.
+        if (dialog.dataset.open === '1') open();
+    }
+    // A reply or a new conversation arrived (real-time notification): refresh the cards and the table in place.
+    let busy = false;
+    window.addEventListener('orange:notification', async ev => {
+        const link = ev.detail?.link || '';
+        if (!link.includes('/Clarifications/Details/') || busy) return;
+        busy = true;
+        try {
+            const html = await (await fetch(location.href, { credentials: 'same-origin' })).text();
+            const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-cc-live]');
+            const live = document.querySelector('[data-cc-live]');
+            if (fresh && live) live.replaceWith(fresh);
+        } catch { /* The page still works; the next visit shows the counts. */ }
+        finally { busy = false; }
+    });
+})();
+</script>
+}

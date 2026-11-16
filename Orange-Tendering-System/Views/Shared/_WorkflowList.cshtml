@@ -20,6 +20,8 @@
     var statuses = Model.Select(r => r.Status).Distinct().OrderBy(x => x).ToList();
     int Count(params string[] s) => Model.Count(r => s.Contains(Stage(r.Status)));
     int.TryParse(Context.Request.Query["created"], out var createdId);
+    // Arabic hero text only in the Sourcing Officer workspace (its layout renders RTL); other roles are unchanged.
+    var officerArabic = area == "SourcingOfficer" && Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
 }
 <link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
 <div class="dash-board @(area == "Supplier" ? "dash-supplier" : "dash-internal") wfl">
@@ -33,9 +35,10 @@
             }
             else
             {
-                @if (area == "SourcingOfficer") { <h1 id="wfl-title">Tender<strong>Management</strong></h1> } else { <h1 id="wfl-title">Weighted Tender<strong>Evaluation</strong></h1> }
+                @if (area == "SourcingOfficer" && officerArabic) { <h1 id="wfl-title"><strong>إدارة العطاءات</strong></h1> }
+                else if (area == "SourcingOfficer") { <h1 id="wfl-title">Tender<strong>Management</strong></h1> } else { <h1 id="wfl-title">Weighted Tender<strong>Evaluation</strong></h1> }
             }
-            <p>@(area == "Supplier" ? "Review your invitations, read the tender requirements and manage your own offers." : "Requirements, four weight proposals, bidding, committee scoring, recommendation, final approval and award.")</p>
+            <p>@(area == "Supplier" ? "Review your invitations, read the tender requirements and manage your own offers." : officerArabic ? "المتطلبات، ومقترحات الأوزان الأربعة، وتقديم العروض، وتقييم اللجنة، والتوصية، والاعتماد النهائي والترسية." : "Requirements, four weight proposals, bidding, committee scoring, recommendation, final approval and award.")</p>
         </div>
     </section>
 
@@ -207,6 +210,15 @@
                 if (!box.hidden) { box.hidden = true; box.textContent = ''; btn.textContent = 'Preview it here'; return; }
                 var fr = document.createElement('iframe'); fr.title = 'Report PDF'; fr.src = btn.dataset.preview; box.appendChild(fr); box.hidden = false; btn.textContent = 'Hide the preview';
             });
+        });
+        // The server only accepts a signature after this person opened the exact PDF version: open it here and unlock signing once it has loaded.
+        body.querySelectorAll('[data-needs-view="1"]').forEach(function (box) {
+            var btn = box.querySelector('[data-preview]'); if (!btn) return;
+            var locked = Array.prototype.slice.call(box.querySelectorAll('form button:not([type=button])'));
+            locked.forEach(function (b) { b.disabled = true; });
+            btn.click();
+            var frame = box.querySelector('.wp-preview iframe'), note = box.querySelector('[data-view-note]');
+            if (frame) frame.addEventListener('load', function () { locked.forEach(function (b) { b.disabled = false; }); if (note) note.textContent = 'You opened the report. You can sign now.'; });
         });
         body.querySelectorAll('[data-wizard]').forEach(function (w) {
             var cur = Number(w.dataset.current), view = cur, panels = Array.prototype.slice.call(w.querySelectorAll('.wp-wpanel')), tabs = Array.prototype.slice.call(w.querySelectorAll('[data-goto]'));

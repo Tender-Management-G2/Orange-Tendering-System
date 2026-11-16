@@ -15,7 +15,7 @@ namespace Orange_Tendering_System.Services;
 
 public partial class TenderWorkflowService
 {
-    private const string StandingClaim = "orange:standing-committee";
+    internal const string StandingClaim = "orange:standing-committee";
     private sealed record StandingRoster(string RoleId, string Version, Dictionary<string, string> Members);
     private async Task<StandingRoster> ReadStanding(string committee, bool locked = false)
     {
@@ -49,6 +49,9 @@ public partial class TenderWorkflowService
         "top-coo" => CommitteeResponsibility.ChiefOperationsOfficer,
         _ => throw new WorkflowException("Unknown Chief seat.")
     };
+
+    // Read-only: true when the Admin has saved all four Chief seats (needed before a Manager approval can seat the Top Committee).
+    public async Task<bool> TopRosterReady() => (await ReadStanding("Top")).Members.Count == 4;
 
     // Older tenders may not yet have a Top Committee. Seat the roster once, without changing any existing assignment.
     private async Task CaptureStandingTop(Tender tender, ApplicationUser actor)

@@ -1,0 +1,42 @@
+@*
+  Workspace page banner (orange architectural banner) for every role: same design as the approved Sourcing Officer pages. Reads ViewData["Title"] and ViewData["Description"].
+  Arabic: the top-bar language selector (ViewModels/UiLanguage.cs); unknown titles fall back to English.
+*@
+@{
+    var arabic = UiLanguage.IsArabic(Context);
+    var title = ViewData["Title"]?.ToString() ?? "Workspace";
+    var description = ViewData["Description"]?.ToString();
+    var arTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Request"] = "الطلبات", ["Request details"] = "تفاصيل الطلب", ["Received offers"] = "العروض المستلمة",
+        ["Committee reports"] = "تقارير اللجنة", ["Final decisions"] = "القرارات النهائية", ["Clarifications"] = "الاستيضاحات",
+        ["Clarification Thread"] = "محادثة الاستيضاح", ["New clarification"] = "استيضاح جديد", ["Offer details"] = "تفاصيل العرض",
+        ["Check offer requirements"] = "التحقق من متطلبات العرض", ["Choose offers for evaluation"] = "اختيار العروض للتقييم",
+        ["Committee forwarding"] = "الإحالة إلى اللجنة", ["Bid Comparison"] = "مقارنة العروض", ["Bid & Clarification History"] = "سجل العروض والاستيضاحات",
+        ["Report details"] = "تفاصيل التقرير", ["Report Versions"] = "إصدارات التقرير", ["Tender rounds"] = "جولات العطاء",
+        ["Supplier Invitations"] = "دعوات الموردين", ["Tender details"] = "تفاصيل العطاء", ["My Tasks"] = "مهامي", ["Notifications"] = "الإشعارات"
+    };
+    var arDescriptions = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["Review department requests here. Create and manage tenders from the Tender page."] = "راجع طلبات الإدارات هنا. أنشئ العطاءات وأدرها من صفحة العطاءات.",
+        ["Check each supplier offer and record whether it meets the tender requirements."] = "افحص كل عرض مورد وسجّل ما إذا كان يستوفي متطلبات العطاء.",
+        ["Read the evaluation committee's report. Forward submitted reports to the Sourcing Manager, and check returned or decided reports here."] = "اقرأ تقرير لجنة التقييم. أحِل التقارير المقدمة إلى مدير التوريد، وتابع التقارير المعادة أو المحسومة هنا.",
+        ["Top Committee, then Sourcing Manager, then you. Only you can announce results to suppliers."] = "اللجنة العليا، ثم مدير التوريد، ثم أنت. أنت وحدك من يعلن النتائج للموردين.",
+        ["Messages and questions connected to your work."] = "الرسائل والأسئلة المرتبطة بعملك.",
+        ["Choose who to message. Every conversation is linked to a request, tender or bid you share."] = "اختر من تريد مراسلته. كل محادثة مرتبطة بطلب أو عطاء أو عرض مشترك بينكما."
+    };
+    if (arabic)
+    {
+        if (arTitles.TryGetValue(title, out var t)) title = t;
+        if (description != null && arDescriptions.TryGetValue(description, out var d)) description = d;
+    }
+    var words = arabic ? new[] { title } : title.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+}
+<header class="dash-welcome officer-page-hero">
+    <div class="dash-welcome-photo" aria-hidden="true"></div>
+    <div class="dash-welcome-waves" aria-hidden="true"></div>
+    <div class="dash-welcome-copy">
+        <h1>@if (words.Length > 1) { @words[0]<text> </text><strong>@words[1]</strong> } else { <strong>@title</strong> }</h1>
+        @if (!string.IsNullOrWhiteSpace(description)) { <p>@description</p> }
+    </div>
+</header>

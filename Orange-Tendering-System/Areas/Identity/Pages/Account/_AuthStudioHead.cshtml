@@ -10,7 +10,8 @@
     {
         imports = new Dictionary<string, string>
         {
-            ["three"] = Url.Content("~/lib/three/three.module.js"),
+            // Minified Three.js r187 (same code as three.module.js / three.core.js, minified by jsDelivr/Terser): ~0.8 MB instead of ~2.2 MB.
+            ["three"] = Url.Content("~/lib/three/three.module.min.js"),
             ["gsap"] = Url.Content("~/lib/gsap/index.js"),
             ["gsap/CustomEase"] = Url.Content("~/lib/gsap/CustomEase.js")
         }

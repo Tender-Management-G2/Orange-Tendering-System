@@ -23,7 +23,7 @@ through WorkspaceNavigation.LayoutFor.
     var pageTitle = ViewData["Title"]?.ToString() ?? $"{label} workspace";
 }
 <!doctype html>
-<html lang="en">
+<html lang="@UiText.Lang(Context)" dir="@UiText.Dir(Context)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -35,45 +35,54 @@ through WorkspaceNavigation.LayoutFor.
     <link rel="stylesheet" href="~/css/workspace-pages.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/orange-ui.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/officer-topbar.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/officer-theme.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin-pages.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
+    <link rel="stylesheet" href="~/css/theme-surfaces.css" asp-append-version="true" />
 </head>
-<body class="ws-shell ws-internal" data-workspace-role="Admin">
-    <a class="ws-skip" href="#workspace-main">Skip to main content</a>
+<body class="ws-shell ws-internal so-shell @ViewData["BodyClass"]" data-bilingual="true" data-workspace-role="Admin">
+    <a class="ws-skip" href="#workspace-main">@UiText.T(Context, "Skip to main content")</a>
     <aside class="ws-sidebar" id="workspace-navigation" aria-label="@label workspace navigation">
         <div class="ws-sidebar-brand">
-            <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span><span>Sourcing &amp; Tender<br />Management System</span></a>
+            <a class="ws-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing public homepage"><span class="ws-logo" aria-hidden="true">orange<sup>®</sup></span><span>@if (UiText.IsArabic(Context)) { <text>نظام إدارة<br />التوريد والعطاءات</text> } else { <text>Sourcing &amp; Tender<br />Management System</text> }</span></a>
             <button class="ws-icon-button ws-nav-close" type="button" aria-label="Close navigation">×</button>
         </div>
         <nav class="ws-primary-nav" aria-label="Admin navigation">
-            <a class="ws-nav-item @Active("Admin", new[] { "Dashboard" })" asp-area="Admin" asp-controller="Dashboard" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("home"))</svg><span>Dashboard</span></a>
-            <a class="ws-nav-item @Active("Admin", new[] { "Users" })" asp-area="Admin" asp-controller="Users" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg><span>Users</span></a>
-            <a class="ws-nav-item @Active("Admin", new[] { "Departments" })" asp-area="Admin" asp-controller="Departments" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("building"))</svg><span>Departments</span></a>
-            <a class="ws-nav-item @Active("Admin", new[] { "Suppliers" })" asp-area="Admin" asp-controller="Suppliers" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("layers"))</svg><span>Suppliers</span></a>
-            <a class="ws-nav-item @Active("Admin", new[] { "AuditLogs" })" asp-area="Admin" asp-controller="AuditLogs" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg><span>Audit Logs</span></a>
-            <a class="ws-nav-item @Active("", new[] { "Analytics" })" asp-area="" asp-controller="Analytics" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chart"))</svg><span>Business &amp; Maintenance</span></a>
-            <a class="ws-nav-item @Active("Admin", new[] { "Committees" })" asp-area="Admin" asp-controller="Committees" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg><span>Committees</span></a>
+            <a class="ws-nav-item @Active("Admin", new[] { "Dashboard" })" asp-area="Admin" asp-controller="Dashboard" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("home"))</svg><span>@UiText.T(Context, "Dashboard")</span></a>
+            <a class="ws-nav-item @Active("Admin", new[] { "Users" })" asp-area="Admin" asp-controller="Users" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg><span>@UiText.T(Context, "Users")</span></a>
+            <a class="ws-nav-item @Active("Admin", new[] { "Departments" })" asp-area="Admin" asp-controller="Departments" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("building"))</svg><span>@UiText.T(Context, "Departments")</span></a>
+            <a class="ws-nav-item @Active("Admin", new[] { "Suppliers" })" asp-area="Admin" asp-controller="Suppliers" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("layers"))</svg><span>@UiText.T(Context, "Suppliers")</span></a>
+            <a class="ws-nav-item @Active("Admin", new[] { "AuditLogs" })" asp-area="Admin" asp-controller="AuditLogs" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg><span>@UiText.T(Context, "Audit Logs")</span></a>
+            <a class="ws-nav-item @Active("", new[] { "Analytics" })" asp-area="" asp-controller="Analytics" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chart"))</svg><span>@UiText.T(Context, "Business &amp; Maintenance")</span></a>
+            <a class="ws-nav-item @Active("Admin", new[] { "Committees" })" asp-area="Admin" asp-controller="Committees" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg><span>@UiText.T(Context, "Committees")</span></a>
         </nav>
-        <div class="ws-sidebar-bottom"><span class="ws-role-label">@label</span><a asp-area="" asp-controller="Home" asp-action="Contact">Contact support <span aria-hidden="true">↗</span></a></div>
+        <div class="ws-sidebar-bottom"><span class="ws-role-label">@UiText.T(Context, label)</span><a asp-area="" asp-controller="Home" asp-action="Contact">Contact support <span aria-hidden="true">↗</span></a></div>
         <div class="ws-sidebar-architecture" aria-hidden="true"></div>
     </aside>
     <button class="ws-backdrop" type="button" aria-label="Close navigation" hidden></button>
     <div class="ws-stage">
         <header class="ws-topbar">
             <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
-            <form class="ws-search" data-admin-search data-server-search="@(serverSearch ? "true" : "false")" role="search" style="margin:0">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg>
-                <input type="text" name="search" placeholder="Search @pageTitle…" aria-label="Search @pageTitle" aria-describedby="admin-search-status" autocomplete="off" />
-            </form>
+            <div class="ws-search" data-global-search data-search-url="@Url.Action("Query", "Search", new { area = "" })"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="@UiText.T(Context, "Search for requests, tenders, bids, suppliers...")" aria-label="Search users and suppliers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
             <div class="ws-topbar-actions">
-                <button type="button" class="ws-icon-button" data-admin-voice aria-pressed="false" aria-label="Start voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                <partial name="_LanguageSelector" />
+                <span data-search-feedback class="ws-sr-only" role="status" aria-live="polite"></span>
+                <partial name="_VoiceSearchButton" />
                 <partial name="_NotificationBell" />
-                <a class="ws-icon-button" asp-area="" asp-controller="Home" asp-action="HowItWorks" aria-label="View procurement workflow and help" title="Workflow &amp; help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 4M12 17h.01" /></svg></a>
+                <partial name="_ThemeSwitch" />
                 <partial name="_WorkspaceAccountMenu" />
             </div>
         </header>
         <main id="workspace-main" class="ws-main" tabindex="-1">
             <div class="pg-page">
+                @* Admin page search: filters this page's records (server search on Users, Suppliers, Departments, Audit Logs).
+                   The top bar now holds the same global search as every role (restored after the WorkV3 merge). *@
+                <form class="pg-toolbar admin-page-search" data-admin-search data-server-search="@(serverSearch ? "true" : "false")" role="search">
+                    <input type="search" name="search" placeholder="Search @pageTitle…" aria-label="Search @pageTitle" aria-describedby="admin-search-status" autocomplete="off" />
+                    <button type="button" class="ws-icon-button" data-admin-voice aria-pressed="false" aria-label="Start voice search" title="Voice search"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8" /></svg></button>
+                    <button type="submit" class="pg-btn pg-btn-primary">Search</button>
+                </form>
                 @RenderBody()
             </div>
         </main>
@@ -91,6 +100,7 @@ through WorkspaceNavigation.LayoutFor.
     <script src="~/js/ai-chat.js" asp-append-version="true"></script>
     <script src="~/js/admin-page-search.js" asp-append-version="true"></script>
     <partial name="_OrangeMotion" />
+    <script src="~/js/ui-language.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -9,9 +9,10 @@
     var sectionLabel = ViewData["WorkspaceSection"] as string;
     var description = ViewData["Description"] as string;
 }
-@if (workspace?.Area == "SourcingOfficer")
+@* Every role workspace (and the Supplier portal) uses the same banner as the approved Sourcing Officer pages. *@
+@if (workspace is not null || User.IsInRole(SystemRoles.Supplier))
 {
-    <partial name="~/Areas/SourcingOfficer/Views/Shared/_PageHeader.cshtml" />
+    <partial name="~/Views/Shared/_WorkspaceHero.cshtml" />
 }
 else
 {
