@@ -12,6 +12,7 @@ using Orange_Tendering_System.Areas.TopCommittee.ViewModels;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
@@ -107,7 +108,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         try
         {
             await Committee.Vote(user.Id, input);
-            TempData["TopMessage"] = "Your vote was saved. The final result is processed automatically after all four members vote.";
+            TempData.Orange(OrangeFeedback.Popup("Rejection recorded", "Your decision and reason are recorded. The final result is processed after all four members vote.", OrangeVariant.Return));
         }
         catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
         catch (Exception exception) when (exception is DbUpdateException or System.Data.Common.DbException)
@@ -147,7 +148,8 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
                     if (bodyEnd < 0) throw new InvalidOperationException("The preserved original report is malformed.");
                     return await BrowserReportPdf.Create(sourceHtml.Insert(bodyEnd, appendix), environment.ContentRootPath, token);
                 }, reportStorageRoot: ReportStorageRoot);
-            TempData["TopMessage"] = "Your signature and approval were recorded for this exact report version.";
+            TempData.Orange(OrangeFeedback.CommitteeApproval("Top Committee",
+                await db.CommitteeVotes.CountAsync(v => v.CommitteeRoundId == roundId && v.Decision == VoteDecision.Approve, cancellationToken)));
         }
         catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
         catch (Exception exception) when (exception is DbUpdateException or System.Data.Common.DbException or IOException)

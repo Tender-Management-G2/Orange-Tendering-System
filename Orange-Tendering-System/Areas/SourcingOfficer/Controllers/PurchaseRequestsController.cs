@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
@@ -40,6 +41,12 @@ public class PurchaseRequestsController(ApplicationDbContext db) : Controller
         db.Notifications.Add(new Notification { UserId = request.CreatedByUserId, Title = "Purchase request decision", Message = $"{decision}: {comment?.Trim()}", Link = $"/Department/PurchaseRequests/Details/{id}", CreatedAt = now });
         db.AuditLogs.Add(new AuditLog { UserId = reviewerId, EntityName = "PurchaseRequest", EntityId = id.ToString(), Action = "PurchaseRequestReview" + decision, CreatedAt = now });
         await db.SaveChangesAsync();
+        TempData.Orange(decision switch
+        {
+            ReviewDecision.Accepted => OrangeFeedback.Popup("Request accepted!", $"PR-{id} is accepted and can now become a tender.", OrangeVariant.Approve),
+            ReviewDecision.Returned => OrangeFeedback.Popup("Request returned for correction", $"PR-{id} went back to the department with your comments.", OrangeVariant.Return),
+            _ => OrangeFeedback.Popup("Request rejected", $"The rejection of PR-{id} and its reason are recorded.", OrangeVariant.Return)
+        });
         return RedirectToAction(nameof(Index));
     }
 }

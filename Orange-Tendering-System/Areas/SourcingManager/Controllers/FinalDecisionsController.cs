@@ -21,7 +21,13 @@ public sealed class FinalDecisionsController(TenderWorkflowService workflow) : C
     public async Task<IActionResult> Acknowledge(int id, string? comment)
     {
         var ajax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
-        try { await workflow.ManagerAcknowledge(id, comment, User); TempData["Flash"] = "Decision acknowledged and forwarded to the Sourcing Officer."; if (ajax) return Json(new { ok = true }); }
+        try
+        {
+            await workflow.ManagerAcknowledge(id, comment, User);
+            var forwarded = OrangeFeedback.Popup("Decision forwarded", "Acknowledged and forwarded to the Sourcing Officer.", OrangeVariant.Send);
+            if (ajax) return Json(new { ok = true, feedback = forwarded.ToJsonElement() });
+            TempData.Orange(forwarded);
+        }
         catch (WorkflowException e) { if (ajax) return BadRequest(new { error = e.Message }); TempData["FlashError"] = e.Message; }
         return RedirectToAction(nameof(Index));
     }

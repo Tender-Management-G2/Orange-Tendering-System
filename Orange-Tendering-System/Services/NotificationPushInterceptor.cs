@@ -12,7 +12,12 @@ namespace Orange_Tendering_System.Services;
 // the bell updates in real time without touching any of those workflows. Failures never affect the save.
 public sealed class NotificationPushInterceptor(IHubContext<NotificationHub> hub, ILogger<NotificationPushInterceptor> logger) : SaveChangesInterceptor
 {
-    private readonly ConditionalWeakTable<DbContext, List<Notification>> pending = new();
+    private sealed class Batch
+    {
+        public Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? Transaction { get; set; }
+        public List<Notification> Rows { get; } = [];
+    }
+    private readonly ConditionalWeakTable<DbContext, Batch> pending = new();
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
@@ -26,12 +31,12 @@ public sealed class NotificationPushInterceptor(IHubContext<NotificationHub> hub
     }
     public override async ValueTask<int> SavedChangesAsync(SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
     {
-        await Push(eventData.Context);
+        if (eventData.Context?.Database.CurrentTransaction == null) await Push(eventData.Context);
         return result;
     }
     public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
     {
-        Push(eventData.Context).GetAwaiter().GetResult();
+        if (eventData.Context?.Database.CurrentTransaction == null) Push(eventData.Context).GetAwaiter().GetResult();
         return result;
     }
     public override void SaveChangesFailed(DbContextErrorEventData eventData) => Clear(eventData.Context);
@@ -40,16 +45,22 @@ public sealed class NotificationPushInterceptor(IHubContext<NotificationHub> hub
     private void Collect(DbContext? context)
     {
         if (context == null) return;
+        var batch = pending.GetOrCreateValue(context);
+        if (!ReferenceEquals(batch.Transaction, context.Database.CurrentTransaction)) batch.Rows.Clear();
+        batch.Transaction = context.Database.CurrentTransaction;
         var added = context.ChangeTracker.Entries<Notification>().Where(e => e.State == EntityState.Added).Select(e => e.Entity).ToList();
-        if (added.Count > 0) pending.AddOrUpdate(context, added);
+        if (added.Count > 0)
+        {
+            foreach (var row in added) if (!batch.Rows.Contains(row)) batch.Rows.Add(row);
+        }
     }
-    private void Clear(DbContext? context) { if (context != null) pending.Remove(context); }
+    public void Clear(DbContext? context) { if (context != null) pending.Remove(context); }
 
-    private async Task Push(DbContext? context)
+    public async Task Push(DbContext? context)
     {
         if (context == null || !pending.TryGetValue(context, out var rows)) return;
         pending.Remove(context);
-        foreach (var n in rows)
+        foreach (var n in rows.Rows)
         {
             try { await hub.Clients.User(n.UserId).SendAsync("notification", NotificationDto.From(n)); }
             catch (Exception ex) { logger.LogWarning(ex, "Notification push failed for notification {Id}.", n.Id); }

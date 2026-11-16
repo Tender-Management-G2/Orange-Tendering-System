@@ -7,12 +7,12 @@ using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Services;
 
-public sealed class SupplierCommunicationService(ApplicationDbContext context)
+public sealed class SupplierCommunicationService(ApplicationDbContext context, ClarificationService clarifications)
 {
     public IQueryable<ApplicationUser> Accounts(string userId) => context.Users.Where(u =>
         u.Id == userId && u.IsActive && u.Supplier != null && u.Supplier.Status == SupplierStatus.Approved);
 
-    private IQueryable<string> Officers() => context.UserRoles.Where(ur => context.Roles
+    private IQueryable<string> Officers() => context.UserRoles.Where(ur => context.Users.Any(u => u.Id == ur.UserId && u.IsActive) && context.Roles
         .Any(r => r.Id == ur.RoleId && r.Name == SystemRoles.SourcingOfficer)).Select(ur => ur.UserId);
 
     // مورد مسجل في المحادثة، وموظف مرتبط بنفس المعاملة؛ لا تواصل مع اللجان أو المدير.
@@ -80,6 +80,8 @@ public sealed class SupplierCommunicationService(ApplicationDbContext context)
 
     public async Task<int?> CreateAsync(string userId, SupplierClarificationInputModel input)
     {
+        if (string.IsNullOrWhiteSpace(input.Subject) || input.Subject.Trim().Length > 200 || string.IsNullOrWhiteSpace(input.Message) || input.Message.Trim().Length > 10000) return null;
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         if (!await CanCreateAsync(userId, input.BidId, input.InvitationId)) return null;
         var invitation = input.BidId.HasValue
             ? await context.Bids.Where(b => b.Id == input.BidId)
@@ -94,7 +96,6 @@ public sealed class SupplierCommunicationService(ApplicationDbContext context)
             Subject = input.Subject.Trim(), Status = ClarificationStatus.Open, CreatedAt = DateTime.UtcNow
         };
         thread.Messages.Add(new ClarificationMessage { SenderUserId = userId, Message = input.Message.Trim(), SentAt = DateTime.UtcNow });
-        await using var transaction = await context.Database.BeginTransactionAsync();
         context.Clarifications.Add(thread);
         await context.SaveChangesAsync();
         AddNoticeAndAudit(userId, officerId, thread.Id, "CreateClarification");
@@ -105,18 +106,12 @@ public sealed class SupplierCommunicationService(ApplicationDbContext context)
 
     public async Task<bool> ReplyAsync(string userId, int id, string message)
     {
-        if (string.IsNullOrWhiteSpace(message) || message.Length > 10000) return false;
-        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var thread = await Threads(userId).SingleOrDefaultAsync(c => c.Id == id && c.Status != ClarificationStatus.Closed);
-        if (thread == null) return false;
-        context.ClarificationMessages.Add(new ClarificationMessage
-        { ClarificationId = id, SenderUserId = userId, Message = message.Trim(), SentAt = DateTime.UtcNow });
-        thread.Status = ClarificationStatus.Answered;
-        AddNoticeAndAudit(userId, thread.FromUserId == userId ? thread.ToUserId : thread.FromUserId, id, "ReplyToClarification");
-        await context.SaveChangesAsync();
-        await transaction.CommitAsync();
-        return true;
+        if (!await Threads(userId).AnyAsync(x => x.Id == id)) return false;
+        return await clarifications.ReplyAsync(userId, id, message);
     }
+
+    public async Task<bool> ResolveAsync(string userId, int id) =>
+        await Threads(userId).AnyAsync(x => x.Id == id) && await clarifications.ResolveAsync(userId, id);
 
     private void AddNoticeAndAudit(string userId, string officerId, int id, string action)
     {

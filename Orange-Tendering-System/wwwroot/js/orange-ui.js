@@ -30,60 +30,7 @@
   window.orangeUi = { toast };
   try { const flash = sessionStorage.getItem('orange-flash'); if (flash) { sessionStorage.removeItem('orange-flash'); toast(flash); } } catch { /* storage optional */ }
 
-  /* ---------- Global search ---------- */
-  const search = $('[data-global-search]');
-  if (search) {
-    const input = $('input', search), results = $('.ws-search-results', search);
-    let timer = 0, seq = 0, active = -1;
-    const close = () => { results.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; };
-    const show = items => {
-      results.replaceChildren();
-      if (!items.length) { results.append(el('p', 'ws-search-empty', 'No matching records you can access.')); }
-      let last = '';
-      items.forEach(i => {
-        if (i.type !== last) { results.append(el('span', 'ws-search-group', i.type)); last = i.type; }
-        const a = el('a', 'ws-search-item'); a.href = i.url; a.setAttribute('role', 'option');
-        a.append(el('strong', null, i.title), el('small', null, i.subtitle));
-        results.append(a);
-      });
-      results.hidden = false; input.setAttribute('aria-expanded', 'true');
-    };
-    input.addEventListener('input', () => {
-      clearTimeout(timer);
-      const q = input.value.trim();
-      if (q.length < 2) { close(); return; }
-      timer = setTimeout(async () => {
-        const mine = ++seq;
-        try {
-          const r = await fetch(search.dataset.searchUrl + '?q=' + encodeURIComponent(q), { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-          if (r.ok && mine === seq) show((await r.json()).items);
-        } catch { /* keep previous results */ }
-      }, 220);
-    });
-    input.addEventListener('keydown', ev => {
-      const links = $$('.ws-search-item', results);
-      if (ev.key === 'Escape') { close(); return; }
-      if (!links.length || (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp')) return;
-      ev.preventDefault();
-      active = (active + (ev.key === 'ArrowDown' ? 1 : -1) + links.length) % links.length;
-      links.forEach((l, i) => l.classList.toggle('is-active', i === active)); links[active].scrollIntoView({ block: 'nearest' });
-    });
-    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { const a = $('.ws-search-item.is-active', results) || $('.ws-search-item', results); if (a) { ev.preventDefault(); location.href = a.href; } } });
-    document.addEventListener('click', ev => { if (!search.contains(ev.target)) close(); });
-    const voice = $('[data-voice-search]');
-    if (voice) {
-      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      voice.addEventListener('click', () => {
-        if (!Recognition) { toast('Voice search is not supported by this browser. Type your search instead.', 'info'); input.focus(); return; }
-        const rec = new Recognition(); rec.lang = document.documentElement.lang || 'en-US'; rec.interimResults = false;
-        voice.classList.add('is-listening');
-        rec.onresult = e => { input.value = e.results[0][0].transcript; input.dispatchEvent(new Event('input')); input.focus(); };
-        rec.onerror = () => toast('Voice search could not hear you. Check the microphone permission.', 'info');
-        rec.onend = () => voice.classList.remove('is-listening');
-        try { rec.start(); } catch { voice.classList.remove('is-listening'); }
-      });
-    }
-  }
+  // Global search and microphone lifecycle are handled by global-search.js.
 
   /* ---------- Popup-first modals and drawers ---------- */
   const ACTION = /\/(Create|Edit|Details|Review|Approve|Reject|Return|Forward|Upload|Sign|Confirm|Respond|Submit|Decide|Delete|Remove|Add|New|Compliance|Compare|Acknowledge)(\/|\?|$)/i;
@@ -262,6 +209,6 @@
     draw();
   }
   // Reuse the table kit after an Admin list refresh; existing workspace initialization stays unchanged.
-  window.orangeUi.enhanceTables = container => $('table', container).forEach(enhance);
-  $('main table').forEach(enhance);
+  window.orangeUi.enhanceTables = container => $$('table', container).forEach(enhance);
+  $$('main table').forEach(enhance);
 })();

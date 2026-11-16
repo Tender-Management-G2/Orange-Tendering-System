@@ -100,9 +100,9 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
                 return RedirectToAction("Details", new { id });
             }
 
-            TempData["InvitationSuccess"] = decision == InvitationStatus.Accepted
-                ? "Invitation accepted. Submitting an offer is a separate step."
-                : "Invitation declined.";
+            TempData.Orange(decision == InvitationStatus.Accepted
+                ? OrangeFeedback.Popup("Invitation accepted!", "Submitting an offer is a separate step.", OrangeVariant.Approve)
+                : OrangeFeedback.Toast("Invitation declined", "Your response is recorded.", OrangeVariant.Return));
             return RedirectToAction("Details", new { id });
         }
     }

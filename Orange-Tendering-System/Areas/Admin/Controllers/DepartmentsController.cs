@@ -76,8 +76,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                 return View(model);
             }
 
-            TempData["SuccessMessage"] =
-                "Department created successfully.";
+            TempData.Orange(OrangeFeedback.Toast("Department created", $"{model.Name} is ready to use."));
 
             return RedirectToAction(nameof(Index));
         }
@@ -131,8 +130,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                 return View(model);
             }
 
-            TempData["SuccessMessage"] =
-                "Department updated successfully.";
+            TempData.Orange(OrangeFeedback.Toast("Department updated", "Your changes were saved."));
 
             return RedirectToAction(nameof(Index));
         }

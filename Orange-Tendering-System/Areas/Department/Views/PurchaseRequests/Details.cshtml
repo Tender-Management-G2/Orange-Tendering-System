@@ -9,19 +9,8 @@
 <partial name="_PageHeader" />
 @{
     var departmentMessage = TempData["DepartmentMessage"] as string;
-    var requestCreated = TempData["DepartmentRequestCreated"] as string;
-    var requestMotionStatus = RequestDisplay.Status(request);
 }
-@if (requestCreated is "submitted" or "draft")
-{
-    <dialog class="dr-motion-dialog" data-request-motion-success aria-labelledby="request-motion-title" aria-describedby="request-motion-description">
-        <button type="button" class="dr-motion-dismiss" data-request-motion-close aria-label="Close confirmation">&times;</button>
-        <partial name="_DepartmentRequestMotion" model='request.Id.ToString()' view-data='new ViewDataDictionary(ViewData) { ["RequestMotionStatus"] = requestMotionStatus }' />
-        <span class="dr-motion-time" aria-hidden="true"></span>
-    </dialog>
-    <noscript><p class="pg-note" role="status">@departmentMessage</p></noscript>
-}
-else if (departmentMessage is not null)
+@if (departmentMessage is not null)
 {
     <p class="pg-note" role="status">@departmentMessage</p>
 }
@@ -97,5 +86,3 @@ else if (departmentMessage is not null)
     }
 </section>
 
-@section Styles { <link rel="stylesheet" href="~/css/department-request-motion.css" asp-append-version="true" /> }
-@section Scripts { <script src="~/js/department-request-motion.js" asp-append-version="true"></script> }

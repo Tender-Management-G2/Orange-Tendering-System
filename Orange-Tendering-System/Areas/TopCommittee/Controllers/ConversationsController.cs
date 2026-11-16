@@ -7,6 +7,7 @@ using Orange_Tendering_System.Areas.TopCommittee.ViewModels;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 [Area("TopCommittee"),Authorize(Roles=TopExecutiveRoles.Allowed+","+SystemRoles.SourcingManager)]
 [PrivateFormFeedback]
@@ -30,7 +31,8 @@ public sealed class ConversationsController(ApplicationDbContext db,UserManager<
             file=await store.Save(input.Attachment,cancellationToken);
             var saved=await Conversations.Send(user.Id,item.Details.Round.Id,input.ThreadId,null,input.Message,input.SubmissionId,file);
             if(saved.Duplicate) await ClarificationUploadCleanup.UnlessSaved(Db,store,file,logger);
-            TempData["TopMessage"]=saved.Duplicate?"This reply was already sent.":"Your private reply was sent.";
+            if(saved.Duplicate) TempData["TopMessage"]="This reply was already sent.";
+            else TempData.Orange(OrangeFeedback.Toast("Reply sent","Your private reply was sent.",OrangeVariant.Send));
             return RedirectToAction(nameof(Details),new{id=input.ThreadId});
         }
         catch(Exception e) when(e is InvalidOperationException or DbUpdateException or System.Data.Common.DbException or IOException or UnauthorizedAccessException)

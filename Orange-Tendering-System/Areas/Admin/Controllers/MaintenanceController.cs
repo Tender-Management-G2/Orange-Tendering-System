@@ -29,7 +29,7 @@ public sealed class MaintenanceController(AdminService admin, UserManager<Applic
         {
             var actorId = users.GetUserId(User);
             if (actorId == null) return Challenge();
-            try { await admin.SaveMaintenanceAsync(input, actorId); TempData["SuccessMessage"] = "Maintenance record saved."; return RedirectToAction("Index", "Analytics", new { area = "" }); }
+            try { await admin.SaveMaintenanceAsync(input, actorId); TempData.Orange(OrangeFeedback.Toast("Maintenance record saved", null)); return RedirectToAction("Index", "Analytics", new { area = "" }); }
             catch (WorkflowException error) { ModelState.AddModelError("", error.Message); }
         }
         return View("Form", input);

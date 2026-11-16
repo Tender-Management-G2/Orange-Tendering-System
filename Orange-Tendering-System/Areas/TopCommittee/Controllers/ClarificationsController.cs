@@ -7,6 +7,7 @@ using Orange_Tendering_System.Areas.TopCommittee.ViewModels;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 
@@ -29,7 +30,8 @@ public sealed class ClarificationsController(ApplicationDbContext db, UserManage
             file=await store.Save(input.Attachment,cancellationToken);
             var result=await new PrivateClarificationService(Db,Users).Send(user.Id,input.RoundId,null,input.Subject,input.Message,input.SubmissionId,file);
             if(result.Duplicate) await ClarificationUploadCleanup.UnlessSaved(Db,store,file,logger);
-            TempData["TopMessage"]=result.Duplicate?"This request was already sent. No duplicate was created.":"Private message sent to the responsible Sourcing Manager.";
+            if(result.Duplicate) TempData["TopMessage"]="This request was already sent. No duplicate was created.";
+            else TempData.Orange(OrangeFeedback.Toast("Message sent","Your private message went to the responsible Sourcing Manager.",OrangeVariant.Send));
             return RedirectToAction("ReviewEvaluation","Decisions",new{id=input.RoundId},"clarifications");
         }
         catch(Exception e) when(e is InvalidOperationException or DbUpdateException or System.Data.Common.DbException or IOException or UnauthorizedAccessException)
@@ -57,7 +59,9 @@ public sealed class ClarificationsController(ApplicationDbContext db, UserManage
             try
             {
                 await Committee.Clarify(user.Id, roundId, question, reply, resolve);
-                TempData["TopMessage"] = resolve ? "Clarification resolved." : "Clarification saved and the responsible Manager notified.";
+                TempData.Orange(resolve
+                    ? OrangeFeedback.Toast("Clarification resolved", "The question is marked as resolved.", OrangeVariant.Approve)
+                    : OrangeFeedback.Toast("Clarification sent", "The responsible Manager was notified.", OrangeVariant.Send));
             }
             catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
             catch (Exception exception) when (exception is DbUpdateException or System.Data.Common.DbException)

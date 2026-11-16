@@ -28,7 +28,7 @@ public sealed class CommitteesController(TenderWorkflowService workflow) : Contr
             try
             {
                 await workflow.SaveStandingCommittee(input, User);
-                TempData["SuccessMessage"] = "committee members saved. New tenders will use this configuration.";
+                TempData.Orange(OrangeFeedback.Toast("Committee saved", $"{input.Committee} Committee members are saved. New tenders will use them."));
                 return RedirectToAction(nameof(Members), new { committee = input.Committee });
             }
             catch (WorkflowException error) { ModelState.AddModelError("", error.Message); }
@@ -55,7 +55,7 @@ public sealed class CommitteesController(TenderWorkflowService workflow) : Contr
             try
             {
                 await workflow.SaveAdminCommittee(input, User);
-                TempData["SuccessMessage"] = "Committee members saved successfully.";
+                TempData.Orange(OrangeFeedback.Toast("Committee saved", "The committee members for this tender are saved."));
                 return RedirectToAction(nameof(Manage), new { id });
             }
             catch (WorkflowException error) { ModelState.AddModelError("", error.Message); }

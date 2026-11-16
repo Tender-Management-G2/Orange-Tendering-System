@@ -15,6 +15,8 @@ public class OllamaSettings
     public string? BaseUrl { get; set; }
     public string? Model { get; set; }
     public int TimeoutSeconds { get; set; } = 120;
+    public int NumGpu { get; set; } = 99;
+    public int ContextLength { get; set; } = 4096;
 }
 public class OllamaBidAnalysisService(OllamaChatClient ollama, ApplicationDbContext db, TenderWorkflowService workflow,
     ProtectedDocumentStore documents, IOptions<OllamaSettings> settings, ILogger<OllamaBidAnalysisService> logger)
@@ -95,9 +97,11 @@ public sealed class OllamaChatClient(HttpClient http, IOptions<OllamaSettings> s
         if (!IsConfigured) throw new InvalidOperationException("Configure Ollama:BaseUrl and Ollama:Model. No service address or model is assumed.");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         linked.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(config.TimeoutSeconds, 5, 300)));
+        // Request all model layers on the GPU; bound the context's VRAM allocation.
+        var options = new { temperature, num_gpu = config.NumGpu, num_ctx = config.ContextLength };
         object body = json
-            ? new { model = config.Model, stream = false, format = "json", messages, options = new { temperature } }
-            : new { model = config.Model, stream = false, messages, options = new { temperature } };
+            ? new { model = config.Model, stream = false, format = "json", messages, options }
+            : new { model = config.Model, stream = false, messages, options };
         using var response = await client.PostAsJsonAsync(new Uri(new Uri(config.BaseUrl!), "api/chat"), body, linked.Token);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(linked.Token);

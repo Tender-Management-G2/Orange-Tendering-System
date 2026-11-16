@@ -49,7 +49,7 @@ function init(section) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0705);
-  scene.fog = new THREE.Fog(0x0a0705, 46, 120);
+  scene.fog = new THREE.Fog(0x0a0705, 70, 190);
   const camera = new THREE.PerspectiveCamera(36, 1, .1, 300);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), .04).texture;
@@ -83,7 +83,7 @@ function init(section) {
   }, [10, 1]);
 
   /* ---------------- lights ---------------- */
-  scene.add(new THREE.HemisphereLight(0x8a7464, 0x1a0b04, .55));
+  const hemi = new THREE.HemisphereLight(0x8a7464, 0x1a0b04, .55); scene.add(hemi);
   const key = new THREE.DirectionalLight(0xffe2c4, 1.6); key.position.set(9, 20, 14); key.castShadow = true;
   key.shadow.mapSize.set(lowPower ? 1024 : 2048, lowPower ? 1024 : 2048); Object.assign(key.shadow.camera, { left: -20, right: 20, top: 16, bottom: -12, near: 2, far: 70 }); key.shadow.bias = -.0005; key.shadow.normalBias = .02;
   scene.add(key);
@@ -117,6 +117,26 @@ function init(section) {
     add(new THREE.CylinderGeometry(1, .8, 1.6, 20), M.pot, x, .8, z);
     const n = 6 + (i % 3); for (let k = 0; k < n; k++) { const m = add(new THREE.IcosahedronGeometry(.9 + rnd() * .5, 1), M.leaf, x + (rnd() - .5) * 1.6, 2 + rnd() * 3.2, z + (rnd() - .5) * 1.6); m.scale.y = 1.3; }
   });
+
+  /* ---------------- day / night: follows the site theme ---------------- */
+  const windowsDay = canvasTex(512, 256, (g, w, h) => {
+    g.fillStyle = "#c9d3dc"; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 64) for (let y = 0; y < h; y += 32) { const k = rnd(); g.fillStyle = k > .7 ? "rgba(255,255,255,.75)" : k > .35 ? "rgba(170,200,228,.7)" : "rgba(140,168,196,.6)"; g.fillRect(x + 4, y + 4, 56, 24); }
+    g.strokeStyle = "rgba(90,96,104,.9)"; g.lineWidth = 6; for (let x = 0; x <= w; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  }, [10, 1]);
+  const windowsNight = M.wall.map;
+  let dayMode = null;
+  function applyDayNight() {
+    const day = document.documentElement.dataset.theme === "light"; if (day === dayMode) return false; dayMode = day;
+    scene.background.set(day ? 0xece7e0 : 0x0a0705); scene.fog.color.set(day ? 0xece7e0 : 0x0a0705);
+    hemi.color.set(day ? 0xf2f0ec : 0x8a7464); hemi.groundColor.set(day ? 0xb3a796 : 0x1a0b04); hemi.intensity = day ? 1.5 : .55;
+    key.intensity = day ? 2.4 : 1.6; glowA.intensity = day ? 25 : 70; glowB.intensity = day ? 12 : 40;
+    M.floor.color.set(day ? 0xd9d2c8 : 0x0f0b09); M.floor.roughness = day ? .3 : .16; M.floor.metalness = day ? .25 : .75;
+    M.wall.map = M.wall.emissiveMap = day ? windowsDay : windowsNight; M.wall.color.set(day ? 0xffffff : 0x15100d); M.wall.emissiveIntensity = day ? .35 : .55; M.wall.needsUpdate = true;
+    M.column.color.set(day ? 0xe7e2da : 0x1b1512); M.stone.color.set(day ? 0xcfc8be : 0x1d1714);
+    renderer.toneMappingExposure = day ? 1 : 1.05;
+    return true;
+  }
 
   /* ---------------- miniature Orange HQ on a glowing platform ---------------- */
   function rrect(w, d, r, ox = 0) { const s = new THREE.Shape(), x = -w / 2 + ox, y = -d / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d); s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
@@ -167,13 +187,13 @@ function init(section) {
 
   /* ---------------- camera ---------------- */
   const camTgt = V(0, 0, 0);
-  let W = 1, H = 1, portrait = false;
+  let W = 1, H = 1, portrait = false, camAz = 0;
   function poseCamera(p) {
     const fi = focusIndex(p);
     let dist = lerp(58, 47, smooth(seg(p, 0, A))), elev = lerp(.3, .24, smooth(seg(p, 0, A))), az = lerp(-.32, .32, smooth(seg(p, A, B)));
     let ty = 3.2;
     if (fi >= 0) { const lv = levelOf(fi).anchor.y, w = smooth(seg(localT(p, fi), .05, .4)) * (1 - smooth(seg(localT(p, fi), .9, 1))); ty = lerp(3.2, lv, .25 * w); dist -= 2.2 * w; }
-    const out = smooth(seg(p, B, C)); dist = lerp(dist, 56, out); elev = lerp(elev, .3, out); az = lerp(az, 0, out);
+    const out = smooth(seg(p, B, C)); dist = lerp(dist, 56, out); elev = lerp(elev, .3, out); az = lerp(az, 0, out); camAz = az;
     if (portrait) dist *= 1.55;
     camTgt.set(0, ty, 0);
     camera.position.set(Math.sin(az) * Math.cos(elev) * dist, ty + Math.sin(elev) * dist, Math.cos(az) * Math.cos(elev) * dist);
@@ -204,23 +224,33 @@ function init(section) {
     info.querySelector(".tx-info-section").textContent = `Connected to HQ section ${String(i + 1).padStart(2, "0")} · ${levelOf(i).name}`;
     info.dataset.member = String(i);
   }
-  function rowOffset(p) {
-    const wrapW = ui.wrap.clientWidth; if (ui.row.scrollWidth <= wrapW + 1) return 0;
-    const li = ui.row.children, step = li.length > 1 ? li[1].offsetLeft - li[0].offsetLeft : 0;
-    let c;
-    if (p >= B) c = lerp(N - 1, (N - 1) / 2, smooth(seg(p, B, C)));
-    else { const x = clamp01((p - A) / (B - A)) * N - .5, f = Math.floor(x); c = Math.min(N - 1, Math.max(0, f + smooth(clamp01((x - f) * 1.6 - .3)))); }
-    return -c * step;
+  /* the cards orbit the building on a ring above the roof: they spin on their own before the first scroll and
+     again after all seven are introduced; while scrolling through the members the scroll turns the ring so the
+     current member comes to the front */
+  const TAU = Math.PI * 2, RING = { rx: 21, rz: 12.5, y: 11.8 }, SPIN = .2; // an ellipse, wider than deep; rad/s
+  const ringPt = V(0, 0, 0);
+  const wrapAngle = a => { a %= TAU; return a < -Math.PI ? a + TAU : a > Math.PI ? a - TAU : a; };
+  const lerpAngle = (a, b, t) => a + wrapAngle(b - a) * t;
+  function ringBase(p, now) {
+    const idle = now / 1000 * SPIN;
+    const x = clamp01((p - A) / (B - A)) * N - .5, f = Math.floor(x), c = Math.min(N - 1, Math.max(0, f + smooth(clamp01((x - f) * 1.6 - .3))));
+    const scroll = camAz - c * TAU / N;
+    return lerpAngle(lerpAngle(idle, scroll, smooth(seg(p, 0, A))), idle, smooth(seg(p, B, C)));
   }
-  function poseOverlay(p) {
+  let cardW = 0, cardH = 0;
+  function measureCards() { const c = cards[0]; if (c) { cardW = c.offsetWidth; cardH = c.offsetHeight; } }
+  function poseOverlay(p, now = performance.now()) {
     const fi = focusIndex(p), stage = p < A ? 0 : p < B ? (fi < N / 2 ? 1 : 2) : 3;
     ui.journey.forEach((li, k) => { li.classList.toggle("is-on", k === stage); li.classList.toggle("is-done", k < stage); });
-    ui.row.style.transform = `translateX(${rowOffset(p).toFixed(1)}px)`;
     const sr = section.querySelector(".tx-sticky").getBoundingClientRect();
+    if (!cardW) measureCards();
+    const base = ringBase(p, now), sc = portrait ? .82 : 1;
     cards.forEach((c, i) => {
       const t = localT(p, i), e = fi >= 0 && Math.abs(i - fi) <= 1 ? smooth(seg(t, -.08, .12)) * (1 - smooth(seg(t, .9, 1.08))) : 0;
-      const dim = p < A || p >= B ? 1 : .62 + .38 * e;
-      c.style.transform = `translateY(${(-12 * e).toFixed(2)}px) scale(${(1 + .22 * e).toFixed(4)})`; c.style.opacity = dim.toFixed(3); c.style.zIndex = e > .5 ? "2" : "1";
+      const th = base + i * TAU / N, front = (Math.cos(th - camAz) + 1) / 2;
+      ringPt.set(Math.sin(th) * RING.rx * (portrait ? .62 : 1), RING.y, Math.cos(th) * RING.rz); const [cx, cy] = toScreen(ringPt);
+      const s = sc * (.6 + .4 * front) * (1 + .22 * e), dim = Math.max(.3 + .7 * front, e);
+      c.style.transform = `translate(${(cx - cardW / 2).toFixed(1)}px,${(cy - cardH / 2).toFixed(1)}px) scale(${s.toFixed(4)})`; c.style.opacity = dim.toFixed(3); c.parentElement.style.zIndex = String(Math.round(front * 100) + (e > .5 ? 200 : 0));
       c.classList.toggle("is-on", e > .5 || p >= B + .02);
       // the connection line from this card to its building section
       const draw = Math.max(i === fi ? smooth(seg(t, .1, .38)) * (1 - smooth(seg(t, .9, 1))) : 0, smooth(seg(p, B + .005, C - .03)));
@@ -263,10 +293,18 @@ function init(section) {
     renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera); api.frames++;
     poseOverlay(p);
   }
+  new MutationObserver(() => { if (applyDayNight()) { dirty = true; request(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  applyDayNight();
+  let spinning = false, onScreen = true;
+  const needsSpin = () => !reduced && onScreen && !document.hidden && (api.p < A || api.p > B);
+  function spinTick(now) { if (!needsSpin()) { spinning = false; return; } poseOverlay(api.p, now); requestAnimationFrame(spinTick); }
+  function startSpin() { if (!spinning && needsSpin()) { spinning = true; requestAnimationFrame(spinTick); } }
+  new IntersectionObserver(es => { onScreen = es[0].isIntersecting; startSpin(); }).observe(section);
+  document.addEventListener("visibilitychange", startSpin);
   let queued = false;
   const request = () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; draw(); }); } };
-  addEventListener("resize", () => { resize(); request(); });
-  function setProgress(v) { api.p = Math.round(clamp01(v) * 1e5) / 1e5; request(); }
+  addEventListener("resize", () => { cardW = 0; resize(); request(); });
+  function setProgress(v) { api.p = Math.round(clamp01(v) * 1e5) / 1e5; request(); startSpin(); }
 
   let toP = () => {};
   if (reduced) {
@@ -297,6 +335,8 @@ function init(section) {
     glow: levels.map(L => r4(L.led.emissiveIntensity)), info: { op: +ui.info.style.opacity, member: +ui.info.style.opacity > 0 ? ui.info.dataset.member : null },
     finale: +ui.finale.style.opacity, selected: cards.map(c => c.classList.contains("is-on"))
   });
+  api.ring = () => cards.map(c => { const m = new DOMMatrix(getComputedStyle(c).transform); return [+m.e.toFixed(1), +m.f.toFixed(1), +m.a.toFixed(3)]; });
+  api.spinning = () => spinning;
   api.ready = true;
 }
 

@@ -27,7 +27,13 @@ public sealed class FinalDecisionsController(TenderWorkflowService workflow, Fin
     public async Task<IActionResult> Notify(int id)
     {
         var ajax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
-        try { await decisions.NotifySuppliers(id, User); TempData["Flash"] = "Suppliers were notified of the final result."; if (ajax) return Json(new { ok = true }); }
+        try
+        {
+            await decisions.NotifySuppliers(id, User);
+            var notified = OrangeFeedback.Popup("Suppliers notified!", "Every participating supplier was told the final result.", OrangeVariant.Send);
+            if (ajax) return Json(new { ok = true, feedback = notified.ToJsonElement() });
+            TempData.Orange(notified);
+        }
         catch (WorkflowException e) { if (ajax) return BadRequest(new { error = e.Message }); TempData["FlashError"] = e.Message; }
         return RedirectToAction(nameof(Index));
     }
@@ -35,7 +41,7 @@ public sealed class FinalDecisionsController(TenderWorkflowService workflow, Fin
     [HttpPost]
     public async Task<IActionResult> Retry(int id)
     {
-        try { await decisions.RetryEmails(id, User); TempData["Flash"] = "Failed e-mail deliveries were retried."; }
+        try { await decisions.RetryEmails(id, User); TempData.Orange(OrangeFeedback.Toast("Deliveries retried", "Failed e-mails were sent again.", OrangeVariant.Send)); }
         catch (WorkflowException e) { TempData["FlashError"] = e.Message; }
         return RedirectToAction(nameof(Index));
     }

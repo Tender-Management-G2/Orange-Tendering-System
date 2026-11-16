@@ -8,11 +8,13 @@ namespace Orange_Tendering_System.Controllers
 {
     // JSON backend of the top-bar search box (internal workspaces). Results are role-scoped by InternalDashboardService.
     [Authorize]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public class SearchController(InternalDashboardService service) : Controller
     {
         [HttpGet]
         public async Task<IActionResult> Query(string? q)
         {
+            if ((q?.Length ?? 0) > 100) return BadRequest(new { error = "Search text must not exceed 100 characters." });
             if (User.IsInRole(SystemRoles.Supplier))
                 return Json(new { items = await service.SearchSupplierAsync(User, q ?? string.Empty) });
             var workspace = WorkspaceNavigation.Workspaces.FirstOrDefault(w => User.IsInRole(w.Role) && w.Area != "Supplier");

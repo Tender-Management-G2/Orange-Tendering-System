@@ -5,9 +5,8 @@
     ViewData["Description"] = "Save a draft or submit your department's request directly to the Sourcing Officer.";
 }
 <partial name="_PageHeader" />
-<form asp-action="Create" method="post" enctype="multipart/form-data" class="pg-form department-form">
+<form asp-action="Create" method="post" enctype="multipart/form-data" class="pg-form department-form" data-om="popup">
     <partial name="_RequestForm" model="Model" />
 </form>
-<partial name="_DepartmentRequestMotion" model="string.Empty" view-data='new ViewDataDictionary(ViewData) { ["RequestMotionPending"] = true }' />
-@section Styles { <link rel="stylesheet" href="~/css/department-request-motion.css" asp-append-version="true" /><style>.department-form{display:grid;gap:20px}.department-form [role=alert],.department-form .field-validation-error{color:#b43e24}.department-form [role=alert]:empty{display:none}.department-form .pg-table input{min-width:110px}</style> }
+@section Styles { <style>.department-form{display:grid;gap:20px}.department-form [role=alert],.department-form .field-validation-error{color:#b43e24}.department-form [role=alert]:empty{display:none}.department-form .pg-table input{min-width:110px}</style> }
 @section Scripts { <partial name="_FormScripts" /> }

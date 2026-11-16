@@ -1,6 +1,6 @@
 /* Our Team — "The Minds Behind Orange" (wwwroot/js/team-scene.js) */
 .tx { position: relative; height: calc((3 + var(--tx-n, 7) * 1.25) * 100vh); background: #0a0705; color: #fff; }
-.tx-sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; isolation: isolate; background: radial-gradient(120% 80% at 50% 60%, #2a170b, #0a0705 70%); }
+.tx-sticky { position: sticky; top: var(--nav, 84px); height: calc(100vh - var(--nav, 84px)); height: calc(100svh - var(--nav, 84px)); overflow: hidden; isolation: isolate; background: radial-gradient(120% 80% at 50% 60%, #2a170b, #0a0705 70%); }
 .tx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
 .tx-vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(140% 100% at 50% 55%, transparent 52%, #000a 100%), linear-gradient(#0a0705e6, transparent 22%, transparent 80%, #0a0705cc); }
 .tx-eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #ff7900; }
@@ -136,3 +136,42 @@
   .tx-dlg-photo { min-height: 300px; }
 }
 @media (prefers-reduced-motion: reduce) { .tx-card, .tx-steps button span, .tx-journey li { transition: none; } }
+
+/* ---------- day theme ---------- */
+html[data-theme="light"] .tx{background:#ece7e0;color:#1c1a17}
+html[data-theme="light"] .tx-sticky{background:radial-gradient(120% 80% at 50% 60%,#fff4e8,#ece7e0 70%)}
+html[data-theme="light"] .tx-vignette{background:radial-gradient(140% 100% at 50% 55%,transparent 55%,rgba(120,100,80,.18) 100%),linear-gradient(rgba(236,231,224,.92),transparent 22%,transparent 80%,rgba(236,231,224,.85))}
+html[data-theme="light"] .tx-head .tx-eyebrow{color:#2a2622}
+html[data-theme="light"] .tx .tx-head h1{color:#1c1a17;text-shadow:0 2px 20px rgba(255,255,255,.8)}
+html[data-theme="light"] .tx .tx-head p{color:#4a443d}
+html[data-theme="light"] .tx-journey,html[data-theme="light"] .tx-info{background:linear-gradient(160deg,rgba(255,255,255,.88),rgba(250,246,240,.92));border-color:rgba(0,0,0,.1);box-shadow:0 24px 50px -28px rgba(80,50,20,.45)}
+html[data-theme="light"] .tx-info{border-color:rgba(255,121,0,.45)}
+html[data-theme="light"] .tx-journey h2,html[data-theme="light"] .tx-journey b,html[data-theme="light"] .tx-info h3{color:#1c1a17}
+html[data-theme="light"] .tx-journey span,html[data-theme="light"] .tx-info-role,html[data-theme="light"] .tx-info-section{color:#5b554d}
+html[data-theme="light"] .tx-journey li::before{background:#fff}
+html[data-theme="light"] .tx-journey li.is-on{background:rgba(255,121,0,.08)}
+html[data-theme="light"] .tx-info-head{border-bottom-color:rgba(0,0,0,.1)}
+html[data-theme="light"] .tx-info-list li{color:#2a2622}
+html[data-theme="light"] .tx-card{background:linear-gradient(170deg,rgba(255,255,255,.92),rgba(246,241,234,.95));border-color:rgba(255,121,0,.35);box-shadow:0 18px 36px -22px rgba(80,50,20,.5)}
+html[data-theme="light"] .tx-card-photo::after{background:linear-gradient(transparent,rgba(250,246,240,.97))}
+html[data-theme="light"] .tx-card strong{color:#1c1a17}
+html[data-theme="light"] .tx-card-body>span{color:#5b554d}
+html[data-theme="light"] .tx-steps button{color:#2a2622;text-shadow:0 1px 6px rgba(255,255,255,.9)}
+html[data-theme="light"] .tx-steps button span{background:#fff;color:#c45a00}
+html[data-theme="light"] .tx-steps button.is-done span{background:#ffe9d6}
+html[data-theme="light"] .tx-finale{color:#1c1a17;text-shadow:0 4px 30px rgba(255,255,255,.9)}
+html[data-theme="light"] .tx-progress{background:rgba(0,0,0,.08)}
+html[data-theme="light"] .tx-dlg{background:linear-gradient(160deg,#ffffff,#f6f1ea);color:#1c1a17}
+html[data-theme="light"] .tx-dlg-copy h2{color:#1c1a17}
+html[data-theme="light"] .tx-dlg-role{color:#4a443d}
+html[data-theme="light"] .tx-dlg-text{color:#2a2622}
+html[data-theme="light"] .tx-dialog::backdrop{background:rgba(236,231,224,.8)}
+html[data-theme="light"] .tx-dlg-close{background:rgba(0,0,0,.55)}
+
+/* cards on a ring around the building (positions come from team-scene.js) */
+.tx-row-wrap{top:0;bottom:0}
+.tx-row{position:absolute;inset:0;display:block;margin:0;padding:0;gap:0}
+.tx-row li{position:absolute;left:0;top:0}
+.tx-row .tx-card{transform-origin:50% 50%;will-change:transform,opacity}
+@media (max-width:760px){.tx-row{padding:0}}
+.tx-journey,.tx-info{z-index:5}

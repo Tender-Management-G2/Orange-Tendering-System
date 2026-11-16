@@ -76,7 +76,7 @@
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&account?.open){account.open=false;account.querySelector('summary').focus();}});
 
   // The shared header search filters records on every workspace page.
-  const searches=[...body.querySelectorAll('input[type="search"]')];
+  const searches=[...body.querySelectorAll('input[type="search"]')].filter(input=>!input.closest('[data-global-search]'));
   const searchStatus=document.querySelector('#workspace-search-status');
   if(searches.length){
     const candidates=[...document.querySelectorAll('.pg-table tbody tr, .pg-card, .pg-links li, article.ws-panel, .dash-activity-item, .dash-task-item, [data-search-item]')];

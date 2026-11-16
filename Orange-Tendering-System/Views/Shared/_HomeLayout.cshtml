@@ -7,15 +7,16 @@
     var signedIn = User.Identity?.IsAuthenticated == true;
 }
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" class="hc-root">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#090909" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="description" content="Orange Sourcing & Tender Management System: one transparent digital journey from purchase request to final award." />
     <title>@(ViewData["Title"] ?? "Orange Sourcing & Tender Management System")</title>
     <link rel="icon" href="~/favicon.ico" />
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
     <script>
         /* Before first paint: mark JS/animation support. home-hq3d.js and home-cinema.js re-check. */
         (function (r) {
@@ -32,33 +33,8 @@
 </head>
 <body class="hc">
     <a class="hc-skip" href="#main-content">Skip to content</a>
-    <header class="hc-nav" id="hc-nav">
-        <a class="hc-brand" asp-area="" asp-controller="Home" asp-action="Index" aria-label="Orange Sourcing and Tender Management home">
-            <span class="hc-logo" aria-hidden="true">orange</span>
-        </a>
-        <button class="hc-burger" type="button" aria-expanded="false" aria-controls="hc-links" aria-label="Open navigation"><span></span><span></span></button>
-        <nav class="hc-links" id="hc-links" aria-label="Main navigation">
-            <a href="#platform">Platform</a>
-            <a href="#how-it-works">How It Works</a>
-            <a href="#evaluation">Weighted Evaluation</a>
-            <a href="#analysis">AI Analysis</a>
-            <a href="#suppliers">Suppliers</a>
-            <a asp-area="" asp-controller="Home" asp-action="Team">Our Team</a>
-            <a asp-area="" asp-controller="Home" asp-action="About">About</a>
-            <a asp-area="" asp-controller="Home" asp-action="Contact">Contact</a>
-            <span class="hc-links-cta">
-                @if (signedIn)
-                {
-                    <a class="hc-btn hc-btn-solid" asp-area="" asp-controller="Workspace" asp-action="Index">My Workspace</a>
-                }
-                else
-                {
-                    <a class="hc-btn hc-btn-text" asp-area="Identity" asp-page="/Account/Register">Supplier Registration</a>
-                    <a class="hc-btn hc-btn-solid" asp-area="Identity" asp-page="/Account/Login">Log in</a>
-                }
-            </span>
-        </nav>
-    </header>
+    @{ ViewData["NavHome"] = true; }
+    <partial name="_SiteNav" />
     <main id="main-content" tabindex="-1">
         @RenderBody()
     </main>
