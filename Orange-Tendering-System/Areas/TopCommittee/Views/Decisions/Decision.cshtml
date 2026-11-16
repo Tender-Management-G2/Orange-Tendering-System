@@ -1,12 +1,14 @@
 @model RoundDetails
 @{
  ViewData["Title"]=$"T-{Model.Tender.Id} — Committee Decision"; ViewData["WorkspaceSection"]="Voting";
+ ViewData["HeroTitle"]="Committee Decision"; ViewData["Description"]=$"T-{Model.Tender.Id} · {Model.Tender.Title} · committee round {Model.Round.RoundNumber}. Each member's saved vote is visible to the other assigned members.";
  var report=Model.Round.TenderReport;
  var finalSignedReady=Model.FinalSignedPdfReady;
  var paragraphs=System.Text.RegularExpressions.Regex.Split(report?.Content??"",@"(?:\r?\n){2,}").Where(p=>!string.IsNullOrWhiteSpace(p)).ToList();
 }
+<partial name="_PageHeader" />
 <div class="tc-decision" data-signature-progress-url="@Url.Action("SignatureProgress", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })" data-final-pdf-url="@Url.Action("FinalSignedPdf", "Decisions", new { area = "TopCommittee", roundId = Model.Round.Id })">
-<header class="dc-page-head"><div class="dc-breadcrumb">Top Committee <span>›</span> Voting <span>›</span> T-@Model.Tender.Id — Committee Decision</div><div class="dc-page-title"><partial name="_ReviewIcon" model='"report"' /><div><h1>T-@Model.Tender.Id — Committee Decision</h1><p>@Model.Tender.Title · committee round @Model.Round.RoundNumber. Each member's saved vote is visible to the other assigned members.</p></div></div><div class="dc-final-status @(Model.Round.Status==CommitteeRoundStatus.Approved?"is-approved":Model.Round.Status==CommitteeRoundStatus.Rejected?"is-rejected":"is-pending")"><span class="dc-status-mark" aria-hidden="true">@(Model.Round.Status==CommitteeRoundStatus.Approved?"✓":Model.Round.Status==CommitteeRoundStatus.Rejected?"×":"◷")</span><div><strong data-round-status>@CommitteeDisplay.Status(Model.Round.Status)</strong><span data-status-progress>@Model.SignedCount of 4 members signed</span></div></div></header>
+<header class="dc-page-head"><div class="dc-breadcrumb">Top Committee <span>›</span> Voting <span>›</span> T-@Model.Tender.Id — Committee Decision</div><div class="dc-final-status @(Model.Round.Status==CommitteeRoundStatus.Approved?"is-approved":Model.Round.Status==CommitteeRoundStatus.Rejected?"is-rejected":"is-pending")"><span class="dc-status-mark" aria-hidden="true">@(Model.Round.Status==CommitteeRoundStatus.Approved?"✓":Model.Round.Status==CommitteeRoundStatus.Rejected?"×":"◷")</span><div><strong data-round-status>@CommitteeDisplay.Status(Model.Round.Status)</strong><span data-status-progress>@Model.SignedCount of 4 members signed</span></div></div></header>
 <partial name="_Messages" /><div asp-validation-summary="All" class="dc-validation" role="alert"></div>
 <section class="dc-card dc-official"><header class="dc-card-title"><partial name="_ReviewIcon" model='"award"' /><h2>Official Recommendation</h2></header>
 <dl class="dc-metadata">
