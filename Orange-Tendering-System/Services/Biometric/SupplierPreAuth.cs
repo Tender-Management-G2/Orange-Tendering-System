@@ -7,11 +7,12 @@ using Orange_Tendering_System.Models.Entities;
 namespace Orange_Tendering_System.Services.Biometric;
 
 /// <summary>
-/// The step between a correct password and a supplier's face check. The Login page opens it once the
-/// password is accepted for an approved supplier with biometrics enrolled; /Biometrics/FaceChallenge and
-/// /Biometrics/FaceLogin work only inside it, for that account, so a face alone can never start a sign-in.
+/// The supplier's Face ID / Fingerprint step. The Login page (handler IdentityStart) opens it when a supplier
+/// chooses Face ID or Fingerprint and types the email of an approved supplier with that method set up
+/// (owner decision 2026-11-16: the method is chosen first, no password before it). /Biometrics/FaceChallenge,
+/// /Biometrics/FaceLogin, the passkey sign-in and the phone QR code work only inside it, for that account.
 ///
-/// It is not a session: nothing is signed in until the face check succeeds. The account id stays on the
+/// It is not a session: nothing is signed in until the face or fingerprint check succeeds. The account id stays on the
 /// server (ChallengeStore, a few minutes); the browser only holds a random HttpOnly cookie that points to it.
 /// It ends on success, on cancel, on account lockout, when the Login page is opened again, or when it expires.
 /// </summary>
@@ -22,7 +23,7 @@ public class SupplierPreAuth(ChallengeStore challenges, IOptions<BiometricOption
 
     public void Begin(HttpContext http, ApplicationUser user)
     {
-        // A second password step in the same browser replaces the first.
+        // A second step in the same browser replaces the first.
         challenges.Remove(http.Request.Cookies[CookieName], Purpose);
         var lifetime = TimeSpan.FromSeconds(options.Value.PreAuthSeconds);
         var token = challenges.Create(Purpose, RandomNumberGenerator.GetBytes(16), user.Id, lifetime: lifetime);

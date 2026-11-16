@@ -29,7 +29,7 @@ public class FaceService(
     private const string TemplatePurpose = "Orange.Biometric.FaceTemplate.v1";
 
     /// <summary>Shown after the password step when no stored face can be read under any known key scope.</summary>
-    public const string ReEnrollRequired = "Your saved face record could not be opened on this server, so it could not be compared. This is not a face mismatch. Use Email & Password or Fingerprint / Passkey to sign in, then enroll your face again.";
+    public const string ReEnrollRequired = "Your saved face record could not be opened on this server, so it could not be compared. This is not a face mismatch. Use Email & Password or Fingerprint to sign in, then enroll your face again.";
 
     public const string LoginPurpose = "face-login";
     public const string EnrollPurpose = "face-enroll";

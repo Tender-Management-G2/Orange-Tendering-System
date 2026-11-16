@@ -52,6 +52,12 @@ builder.Services.AddSingleton<AccountLinkGenerator>();
 
 builder.Services.AddControllersWithViews(options => options.Filters.Add<OrangeMotionResultFilter>());
 builder.Services.AddBiometrics(builder.Configuration);
+// A tunnel such as ngrok ends HTTPS and forwards plain HTTP to Kestrel on this machine. Its X-Forwarded-For /
+// X-Forwarded-Proto are trusted only from the loopback proxy (the framework's default known proxies), so passkeys
+// see the real https:// origin and throttling sees the real client address. Host names: AllowedHosts.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+        Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto);
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierProfileService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierInvitationService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierOfferService>();
@@ -96,6 +102,7 @@ builder.Services.AddHostedService<EvaluationDeadlineWorker>();
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -355,7 +355,15 @@
 .as-seg input:checked + span { background: #fff; color: var(--as-graphite); box-shadow: 0 1px 2px rgba(41, 37, 33, 0.1), inset 0 -2px 0 var(--as-orange); }
 .as-seg input:focus-visible + span { outline: 2px solid var(--as-orange-ink); outline-offset: 1px; }
 
-/* Three identity methods after the supplier's password. */
+/* Sign-in: the supplier's three methods, chosen first (Email & Password, Face ID, Fingerprint). */
+.as-account--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.as-account--three[hidden] { display: none; }
+.as-account--three .as-seg span { height: auto; min-height: 58px; flex-direction: column; gap: 4px; padding: 6px 4px; text-align: center; line-height: 1.2; font-size: 12.5px; }
+.as-shell .as-seg-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.as-shell .as-seg input:checked + span .as-seg-icon { stroke: var(--as-orange-ink); }
+#passwordFields[hidden] { display: none; }
+
+/* Three identity methods (older layout, kept for other pages). */
 .as-methods--three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .as-methods--three .as-method { min-height: 150px; padding: 14px; }
 .as-methods--three .as-method[hidden] { display: none !important; }
