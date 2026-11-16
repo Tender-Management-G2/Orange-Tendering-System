@@ -7,10 +7,11 @@ using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Services;
 
-/// <summary>Six repeatable supplier logins for the local team development database.</summary>
+/// <summary>Repeatable supplier logins for the local team development database.</summary>
 public static class TeamSupplierSeeder
 {
-    public const int Count = 6;
+    public const int Count = 13;
+    private static readonly int[] Numbers = [.. Enumerable.Range(1, 6), .. Enumerable.Range(20, 7)];
 
     private static readonly string[] Categories =
     [
@@ -19,12 +20,19 @@ public static class TeamSupplierSeeder
         SupplierCategories.Furniture,
         SupplierCategories.ProfessionalServices,
         SupplierCategories.Construction,
-        SupplierCategories.Transport
+        SupplierCategories.Transport,
+        SupplierCategories.Medical,
+        SupplierCategories.Food,
+        SupplierCategories.Facilities,
+        SupplierCategories.Telecommunications,
+        SupplierCategories.InformationTechnology,
+        SupplierCategories.OfficeSupplies,
+        SupplierCategories.ProfessionalServices
     ];
 
-    private static string Email(int i) => $"supplier{i}@orange-demo.local";
-    private static string Registration(int i) => $"DEMO-REG-{i:000}";
-    private static string Name(int i) => $"DEMO Supplier {i}";
+    private static string Email(int i) => i <= 6 ? $"supplier{i}@orange-demo.local" : $"supplierA{i}@orange-demo.local";
+    private static string Registration(int i) => i <= 6 ? $"DEMO-REG-{i:000}" : $"TEAM-A{i:00}";
+    private static string Name(int i) => i <= 6 ? $"DEMO Supplier {i}" : $"Team Supplier A{i}";
 
     public static async Task EnsureAsync(IServiceProvider services, ILogger logger)
     {
@@ -33,8 +41,9 @@ public static class TeamSupplierSeeder
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         await using var transaction = await db.Database.BeginTransactionAsync();
 
-        for (var i = 1; i <= Count; i++)
+        for (var index = 0; index < Numbers.Length; index++)
         {
+            var i = Numbers[index];
             var email = Email(i);
             var registration = Registration(i);
             var supplier = await db.Suppliers.SingleOrDefaultAsync(s => s.RegistrationNumber == registration);
@@ -45,7 +54,7 @@ public static class TeamSupplierSeeder
                 supplier = new Supplier
                 {
                     CompanyName = Name(i), RegistrationNumber = registration, Email = email,
-                    Category = Categories[i - 1], Status = SupplierStatus.Approved,
+                    Category = Categories[index], Status = SupplierStatus.Approved,
                     CreatedAt = DateTime.UtcNow
                 };
                 db.Suppliers.Add(supplier);
@@ -78,7 +87,7 @@ public static class TeamSupplierSeeder
                     $"mark {email}");
 
             supplier.Status = SupplierStatus.Approved;
-            supplier.Category = Categories[i - 1];
+            supplier.Category = Categories[index];
             user.IsActive = true;
             user.EmailConfirmed = true;
             user.MustChangePassword = false;
@@ -107,7 +116,7 @@ public static class TeamSupplierSeeder
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var signIn = scope.ServiceProvider.GetRequiredService<SignInManager<ApplicationUser>>();
         var problems = new List<string>();
-        for (var i = 1; i <= Count; i++)
+        foreach (var i in Numbers)
         {
             var email = Email(i);
             var user = await users.FindByEmailAsync(email);
