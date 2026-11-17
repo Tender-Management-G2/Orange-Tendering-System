@@ -113,7 +113,7 @@
                         </div>
                         <div class="as-field">
                             <label asp-for="Input.CompanyPhone">Company telephone</label>
-                            <input asp-for="Input.CompanyPhone" type="tel" autocomplete="tel" />
+                            <input asp-for="Input.CompanyPhone" type="tel" autocomplete="tel" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="07XXXXXXXX" title="Exactly 10 digits" data-digits-only />
                             <span asp-validation-for="Input.CompanyPhone" class="as-field-error"></span>
                         </div>
                         <div class="as-field as-wide">

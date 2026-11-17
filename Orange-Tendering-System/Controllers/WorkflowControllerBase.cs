@@ -24,6 +24,19 @@ public abstract class WorkflowControllerBase(TenderWorkflowService workflow, Pro
         Response.Headers.CacheControl = "no-store";
         return PartialView("~/Views/Shared/_WorkflowPopup.cshtml", model);
     }
+    // The reviewed AI analysis attached to the evaluation meeting, as a PDF for the Officer and the tender's committees.
+    [HttpGet]
+    public async Task<IActionResult> AiAnalysisPdf(int id)
+    {
+        var model = await workflow.Details(id, User);
+        var session = model.Session;
+        var ai = session == null ? null : model.Analyses.FirstOrDefault(x => x.Id == session.AiAnalysisId);
+        if (session == null || ai == null) return NotFound();
+        var pdf = Services.Reports.AiAnalysisPdf.Build(ai, model.Tender.Title, model.Tender.Id, session);
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers.CacheControl = "no-store";
+        return File(pdf, "application/pdf", $"AI-analysis-T-{model.Tender.Id:0000}.pdf");
+    }
     public async Task<IActionResult> Download(int id)
     {
         var (document, _) = await workflow.AuthorizedDocument(id, User);

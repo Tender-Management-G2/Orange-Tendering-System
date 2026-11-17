@@ -174,11 +174,11 @@ public partial class TenderWorkflowService
         }
         // Previous participants hear that the tender is reissued (with or without a new invitation); new suppliers get their invitation.
         await NotifyParticipants(t, notice, round.Id, previous, "Tender reissued", "Reissued", "", supplierId => supplierIds.Contains(supplierId)
-            ? $"This tender was reissued as round {next.RoundNumber}. You are invited again: accept the invitation and submit a NEW offer before {next.Deadline:u}. Your earlier offer stays on record but is not evaluated."
+            ? $"This tender was reissued as round {next.RoundNumber}. You are invited again: accept the invitation and submit a NEW offer before {(next.Deadline.HasValue ? JordanTime.Display(next.Deadline.Value) : "the deadline")}. Your earlier offer stays on record but is not evaluated."
             : $"This tender was reissued as round {next.RoundNumber}. Your company was not invited to the new round. Your earlier offer stays on record.");
         foreach (var supplierId in supplierIds.Except(previous))
             foreach (var userId in await db.Users.Where(u => u.SupplierId == supplierId && u.IsActive).Select(u => u.Id).ToListAsync())
-                Notify(userId, id, "Tender invitation", $"You are invited to round {next.RoundNumber} of this tender. Review the requirements, accept or decline, and submit your offer before {next.Deadline:u}.");
+                Notify(userId, id, "Tender invitation", $"You are invited to round {next.RoundNumber} of this tender. Review the requirements, accept or decline, and submit your offer before {(next.Deadline.HasValue ? JordanTime.Display(next.Deadline.Value) : "the deadline")}.");
         notice.Status = FinalDecisionStatus.SuppliersNotified; notice.SuppliersNotifiedAt = Now; notice.OfficerUserId = a.Id; notice.NewRoundNumber = next.RoundNumber;
         if (notice.ManagerUserId != null) Notify(notice.ManagerUserId, id, "Tender reissued", $"Round {next.RoundNumber} of {MaxRounds} is open with {supplierIds.Count} invited suppliers. Compliance, AI review, evaluation and approvals start again.");
         Audit(a, id, "TopRetenderExecuted", new { notice.Id, FailedRound = round.RoundNumber, NewRound = next.RoundNumber, next.Deadline, Invited = supplierIds, Previous = previous });

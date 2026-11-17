@@ -4,7 +4,7 @@
 @if (TempData["ClarificationMessage"] is string notice) { <p class="pg-note" role="status">@notice</p> }
 <section class="ws-panel pg-panel"><h2>@Model.Subject</h2><p>Status: @Model.Status</p></section>
 @foreach (var message in Model.Messages) {
-<section class="ws-panel pg-panel"><h3>@message.Sender</h3><p>@message.At.ToString("yyyy-MM-dd HH:mm") UTC</p><p style="white-space:pre-wrap">@message.Message</p>
+<section class="ws-panel pg-panel"><h3>@message.Sender</h3><p>@message.At.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</p><p style="white-space:pre-wrap">@message.Message</p>
 <ul>@foreach (var doc in message.Documents) { <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a></li> }</ul>
 @if (Model.CanReply && message.Sender == "You") {
 <form asp-controller="Documents" asp-action="UploadClarification" method="post" enctype="multipart/form-data">

@@ -283,7 +283,7 @@
     function fmtDate(v, type) {
         const d = new Date(v);
         if (isNaN(d)) return v;
-        const opts = type === 'date' ? { dateStyle: 'medium' } : { dateStyle: 'medium', timeStyle: 'short' };
+        const opts = type === 'date' ? { dateStyle: 'medium', timeZone: 'Asia/Amman' } : { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Amman' };
         try { return d.toLocaleString(AR ? 'ar-JO' : 'en-GB', opts); } catch { return d.toLocaleString(); }
     }
     function acceptLabel(accept) {

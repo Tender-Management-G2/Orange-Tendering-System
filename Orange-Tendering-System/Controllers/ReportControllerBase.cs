@@ -42,7 +42,7 @@ public abstract class ReportControllerBase(TenderWorkflowService workflow) : Con
         return RedirectToAction(nameof(Review), new { id = report.Versions.First().Id });
     }
     // The signature drawn on the pad arrives as a PNG data URL. It is required, must be a real PNG and must not be huge.
-    protected static byte[] ReadSignature(string? dataUrl)
+    public static byte[] ReadSignature(string? dataUrl)
     {
         const string prefix = "data:image/png;base64,";
         TenderWorkflowService.Require(!string.IsNullOrWhiteSpace(dataUrl) && dataUrl!.StartsWith(prefix, StringComparison.Ordinal) && dataUrl.Length < 400_000, "Draw your signature in the box first.");

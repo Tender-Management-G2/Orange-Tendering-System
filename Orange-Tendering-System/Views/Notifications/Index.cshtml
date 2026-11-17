@@ -37,7 +37,7 @@
                     <tr>
                         <td><strong>@notification.Title</strong></td>
                         <td>@notification.Message</td>
-                        <td>@notification.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                        <td>@notification.CreatedAt.ToLocalTime().ToJordan("dd MMM yyyy, HH:mm")</td>
                         <td>@(notification.IsRead ? "Read" : "Unread")</td>
                         <td>
                             @if (!string.IsNullOrWhiteSpace(notification.Link) && Url.IsLocalUrl(notification.Link))

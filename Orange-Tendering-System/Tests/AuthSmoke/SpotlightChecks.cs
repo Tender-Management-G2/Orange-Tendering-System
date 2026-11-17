@@ -115,6 +115,25 @@ public static class SpotlightChecks
   var lpopHtml=await(await l.SendAsync(lpop)).Content.ReadAsStringAsync();Check(lpopHtml.Contains("data-so-state=\"lost\"")&&lpopHtml.Contains("حظاً أوفر"),"not-awarded offer popup shows the 'better luck next time' state");
   var llist=await(await l.GetAsync("/Supplier/Offers")).Content.ReadAsStringAsync();Check(llist.Contains("data-result=\"Not awarded\"")&&!llist.Contains("so-row-won"),"other supplier's list shows 'Not awarded' only");
 
+  // Offer attachments: chosen files upload immediately (no button) and a draft cannot be submitted without one.
+  int draft;using(var scope=app.Services.CreateScope()){var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+   var pr=await db.Tenders.Where(x=>x.Id==tenderId).Select(x=>x.PurchaseRequestId).SingleAsync();
+   var dt=new Tender{Title="Draft attachment tender",Description="fixture",PurchaseRequestId=pr,CreatedByUserId=officer,CreatedAt=DateTime.UtcNow,Status=TenderStatus.Bidding};db.Add(dt);await db.SaveChangesAsync();
+   var dr=new TenderRound{TenderId=dt.Id,RoundNumber=1,Status=TenderRoundStatus.Open,OpensAt=DateTime.UtcNow.AddDays(-1),Deadline=DateTime.UtcNow.AddDays(5),CreatedByUserId=officer,CreatedAt=DateTime.UtcNow};db.Add(dr);await db.SaveChangesAsync();var inv=dr.Id;
+   var di=new TenderInvitation{TenderRoundId=inv,SupplierId=await db.Suppliers.Where(x=>x.CompanyName=="Winner Co").Select(x=>x.Id).FirstAsync(),InvitedByUserId=officer,InvitedAt=DateTime.UtcNow,Status=InvitationStatus.Accepted};db.Add(di);await db.SaveChangesAsync();
+   var b=new Bid{TenderInvitationId=di.Id,Status=BidStatus.Draft,CreatedAt=DateTime.UtcNow};db.Add(b);await db.SaveChangesAsync();draft=b.Id;}
+  var draftPage=await(await w2.GetAsync($"/Supplier/Offers/Details/{draft}")).Content.ReadAsStringAsync();
+  Check(draftPage.Contains("data-auto-upload")&&!draftPage.Contains(">Upload attachment<")&&draftPage.Contains("name=\"file\" type=\"file\"")&&draftPage.Contains(" required"),"draft details: file uploads on selection, no upload button, attachment required");
+  Check(draftPage.Contains("Add at least one attachment above")&&!draftPage.Contains($"action=\"/Supplier/Offers/Submit/{draft}\""),"submit is blocked on the page while there is no attachment");
+  var subTok=Regex.Match(draftPage,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+  var sub=await w2.PostAsync($"/Supplier/Offers/Submit/{draft}",new FormUrlEncodedContent(new Dictionary<string,string>{{"__RequestVerificationToken",WebUtility.HtmlDecode(subTok)}}));
+  var afterSub=await(await w2.GetAsync($"/Supplier/Offers/Details/{draft}")).Content.ReadAsStringAsync();
+  using(var scope=app.Services.CreateScope()){var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+   Check(sub.StatusCode==HttpStatusCode.Redirect&&afterSub.Contains("Add at least one attachment (PDF, PNG or JPEG) before submitting")&&await db.Bids.Where(x=>x.Id==draft).Select(x=>x.Status).SingleAsync()==BidStatus.Draft,"server refuses to submit a draft without an attachment");
+   db.Add(new Document{FileName="offer.pdf",StoragePath="test/offer.pdf",ContentType="application/pdf",SizeBytes=10,UploadedByUserId=winner,UploadedAt=DateTime.UtcNow,BidId=draft});await db.SaveChangesAsync();}
+  var withDoc=await(await w2.GetAsync($"/Supplier/Offers/Details/{draft}")).Content.ReadAsStringAsync();
+  Check(withDoc.Contains($"action=\"/Supplier/Offers/Submit/{draft}\"")&&!withDoc.Contains("Add at least one attachment above"),"submit is offered once an attachment exists");
+
   // Other roles: calm events, window and read filter, Arabic/RTL host language
   var o=await Login("officer@spot.invalid");var po=await Pending(o);
   Check(po.EnumerateArray().Any(e=>e.GetProperty("id").GetInt32()==officerNote&&e.GetProperty("kind").GetString()=="approval"),"officer: approval event card");

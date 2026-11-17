@@ -30,7 +30,7 @@ else
             <div><dt>Phone</dt><dd>@(Model.Phone ?? "—")</dd></div>
             <div><dt>Address</dt><dd>@(Model.Address ?? "—")</dd></div>
             <div><dt>Approval status</dt><dd>@Model.Status</dd></div>
-            <div><dt>Reviewed at</dt><dd>@(Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+            <div><dt>Reviewed at</dt><dd>@(Model.ReviewedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
         </dl>
     </section>
 

@@ -424,7 +424,7 @@
         function signIn(info) {
             var options = null;
             $('ppRequestedFrom').textContent = (info.requestedFrom || 'A computer') + ' · ' +
-                new Date(info.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                new Date(info.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Amman' });
             show(root, 'signin');
             var input = $('ppCode');
             input.focus();

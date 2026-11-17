@@ -169,10 +169,10 @@
             .then(function (events) {
                 if (!Array.isArray(events) || !events.length) return;
                 var win = events.filter(function (e) { return e.kind === 'win' && e.link; })[0];
-                queue = events.filter(function (e) { return e.kind !== 'win'; });
-                if (win && isDashboard()) { celebrate(win); return; }
-                if (win) { var wc = card(win, function () { celebrate(win); }); wc.classList.add('es-wincard'); ensureRegion().appendChild(wc); }
-                setTimeout(showCards, reduce ? 0 : 700);
+                // Ordinary events live only in the navbar bell (owner decision): no corner cards are shown.
+                // Only a verified tender win is celebrated, once, on the dashboard.
+                queue = [];
+                if (win && isDashboard()) celebrate(win);
             }).catch(function () { });
     }
     // Wait until the page is idle so the first paint and critical scripts are never delayed.

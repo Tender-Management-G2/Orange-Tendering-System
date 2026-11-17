@@ -1,0 +1,145 @@
+@*
+  Project presentation as a web slide deck (/presentation). Same four slides and speaker notes as
+  "Sourcing & Tender Management System.pptx", in the site's visual language (charcoal, Orange #FF7900, Inter).
+  Keys: ← → / Space / PageUp PageDown, Home / End, F = full screen, N = speaker notes. Prints one slide per page.
+*@
+@{
+    Layout = null;
+    var problems = new[] {
+        ("Manual, fragmented processes", "<path d=\"M4 6h7v5H4zM13 13h7v5h-7zM11 8.5h3a2 2 0 0 1 2 2V13\"/>"),
+        ("Communication scattered across channels", "<path d=\"M4 5h11v8H8l-4 3zM15 9h5v8l-3-2h-6v-2\"/>"),
+        ("Limited visibility into tender progress", "<path d=\"M2 12s3.5-6 10-6c2.2 0 4 .7 5.5 1.6M22 12s-3.5 6-10 6c-2.2 0-4-.7-5.5-1.6M4 20 20 4\"/>"),
+        ("Delayed reviews and approvals", "<circle cx=\"12\" cy=\"13\" r=\"8\"/><path d=\"M12 9v4l2.5 2.5M9 2h6\"/>"),
+        ("Inconsistent supplier evaluation", "<path d=\"M12 3v18M6 21h12M4 7h16M6 7l-3 7h6zM18 7l-3 7h6z\"/>"),
+        ("Hard to track versions and decisions", "<path d=\"M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h3\"/>"),
+        ("Weak accountability and auditability", "<path d=\"M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6zM9.5 12.5h5\"/>")
+    };
+    var flow = new[] { "Request", "Tender", "Bidding", "Evaluation", "Approval", "Award" };
+    var capabilities = new[] {
+        "Centralized platform", "Structured workflow from request to award", "Role-based access, separation of duties",
+        "Standardized technical and financial evaluation", "Automated notifications and status tracking",
+        "Version-controlled reports", "Audit logs and decision history" };
+    var stack = new[] {
+        ("Framework", "ASP.NET Core MVC", "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 9h18M8 4v5\"/>"),
+        ("Language", "C#", "<path d=\"m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14\"/>"),
+        ("Data access", "Entity Framework Core", "<path d=\"M4 7h16M4 12h16M4 17h10\"/><circle cx=\"18\" cy=\"17\" r=\"2\"/>"),
+        ("Database", "Microsoft SQL Server", "<ellipse cx=\"12\" cy=\"5.5\" rx=\"7.5\" ry=\"2.5\"/><path d=\"M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5\"/>"),
+        ("Authentication", "ASP.NET Core Identity", "<rect x=\"5\" y=\"10.5\" width=\"14\" height=\"10\" rx=\"2.5\"/><path d=\"M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2\"/>"),
+        ("User interface", "Razor Views, responsive web interface", "<rect x=\"2.5\" y=\"4\" width=\"14\" height=\"11\" rx=\"1.5\"/><rect x=\"16.5\" y=\"9\" width=\"5\" height=\"10\" rx=\"1.2\"/><path d=\"M6 19h7\"/>"),
+        ("Access control", "Role-based authorization", "<circle cx=\"9\" cy=\"8\" r=\"3.5\"/><path d=\"M2.5 20a6.5 6.5 0 0 1 13 0M17 11l2 2 3.5-4\"/>"),
+        ("Services", "Notification and audit services", "<path d=\"M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4\"/>")
+    };
+    var notes = new[] {
+        "Procurement often runs on emails and spreadsheets. That makes progress hard to see, evaluation inconsistent and decisions hard to audit. These are the seven problems our project addresses.",
+        "Our system replaces scattered tools with one workflow, from purchase request to award. Each problem on the previous slide has a matching capability: tracking, standard evaluation, versioning and a full audit trail.",
+        "We built the system on the Microsoft stack. ASP.NET Core MVC with C# and Entity Framework handles the logic and data, SQL Server stores it, and Identity with role-based authorization controls who can do what.",
+        "This is how the system could be offered as a product. Customers are organizations needing controlled procurement, revenue comes from subscriptions, licenses and services. It is conceptual: no prices or projections."
+    };
+    string Icon(string paths) => $"<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">{paths}</svg>";
+}
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Sourcing &amp; Tender Management System · Presentation</title>
+    <link rel="preload" href="~/assets/auth-studio/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="~/css/typography.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/presentation.css" asp-append-version="true" />
+</head>
+<body class="pz">
+    <a class="pz-skip" href="#pz-deck">Skip to the slides</a>
+    <header class="pz-top">
+        <a class="pz-brand" href="~/" aria-label="Orange Sourcing home"><span class="pz-logo" aria-hidden="true">orange</span><span class="pz-brand-text">Sourcing &amp; Tender<br />Management System</span></a>
+        <p class="pz-eyebrow">Academic project · Presentation</p>
+        <div class="pz-tools">
+            <button type="button" class="pz-tool" data-pz-notes aria-pressed="false" title="Speaker notes (N)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12H9l-4 4z" /><path d="M9 9h6M9 12h4" /></svg><span>Notes</span></button>
+            <button type="button" class="pz-tool" data-pz-full title="Full screen (F)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg><span>Full screen</span></button>
+        </div>
+    </header>
+
+    <main class="pz-deck" id="pz-deck" aria-roledescription="carousel" aria-label="Project presentation">
+        @* ---------- 1. The Procurement Challenge ---------- *@
+        <section class="pz-slide is-active" aria-roledescription="slide" aria-label="1 of 4: The Procurement Challenge" data-notes="@notes[0]">
+            <div class="pz-frame">
+                <p class="pz-kicker">Sourcing &amp; Tender Management System · Academic project</p>
+                <h1 class="pz-title">The Procurement <em>Challenge</em></h1>
+                <ol class="pz-problems">
+                    @for (var i = 0; i < problems.Length; i++)
+                    {
+                        <li style="--d:@i"><span class="pz-num">@(i + 1)</span><span class="pz-ico">@Html.Raw(Icon(problems[i].Item2))</span><span class="pz-txt">@problems[i].Item1</span></li>
+                    }
+                </ol>
+            </div>
+        </section>
+
+        @* ---------- 2. The Solution ---------- *@
+        <section class="pz-slide" aria-roledescription="slide" aria-label="2 of 4: One Connected Tender Platform" data-notes="@notes[1]">
+            <div class="pz-frame">
+                <p class="pz-kicker">The solution</p>
+                <h2 class="pz-title">One Connected <em>Tender Platform</em></h2>
+                <ol class="pz-flow" aria-label="Workflow">
+                    @for (var i = 0; i < flow.Length; i++)
+                    {
+                        <li style="--d:@i"><span class="pz-step">@(i + 1)</span>@flow[i]</li>
+                    }
+                </ol>
+                <ul class="pz-caps">
+                    @for (var i = 0; i < capabilities.Length; i++)
+                    {
+                        <li style="--d:@i"><span class="pz-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg></span><span><b class="pz-cap-num">@(i + 1)</b>@capabilities[i]</span></li>
+                    }
+                </ul>
+            </div>
+        </section>
+
+        @* ---------- 3. Technology Stack ---------- *@
+        <section class="pz-slide" aria-roledescription="slide" aria-label="3 of 4: Technology Stack" data-notes="@notes[2]">
+            <div class="pz-frame">
+                <p class="pz-kicker">What we used</p>
+                <h2 class="pz-title">Technology <em>Stack</em></h2>
+                <dl class="pz-stack">
+                    @for (var i = 0; i < stack.Length; i++)
+                    {
+                        <div style="--d:@i"><span class="pz-ico">@Html.Raw(Icon(stack[i].Item3))</span><dt>@stack[i].Item1</dt><dd>@stack[i].Item2</dd></div>
+                    }
+                </dl>
+            </div>
+        </section>
+
+        @* ---------- 4. Business Model ---------- *@
+        <section class="pz-slide" aria-roledescription="slide" aria-label="4 of 4: Business Model" data-notes="@notes[3]">
+            <div class="pz-frame">
+                <p class="pz-kicker">Business model</p>
+                <h2 class="pz-title">Business Model <em>Canvas</em></h2>
+                <div class="pz-canvas">
+                    <article class="bm-partners" style="--d:0"><h3>Key Partners</h3><p>Hosting, ERP, identity, e-signature, documents</p></article>
+                    <article class="bm-activities" style="--d:1"><h3>Key Activities</h3><p>Development, security, support</p></article>
+                    <article class="bm-resources" style="--d:2"><h3>Key Resources</h3><p>Secure platform, teams, infrastructure</p></article>
+                    <article class="bm-value" style="--d:3"><h3>Value Proposition</h3><p>Faster cycles, transparent evaluation, traceability</p></article>
+                    <article class="bm-relations" style="--d:4"><h3>Customer Relationships</h3><p>Onboarding, training, support</p></article>
+                    <article class="bm-channels" style="--d:5"><h3>Channels</h3><p>Enterprise sales, partners, digital-transformation programs</p></article>
+                    <article class="bm-segments" style="--d:6"><h3>Customer Segments</h3><p>Medium and large organizations, public institutions</p></article>
+                    <article class="bm-cost" style="--d:7"><h3>Cost Structure</h3><p>Development, hosting, security, support</p></article>
+                    <article class="bm-revenue" style="--d:8"><h3>Revenue Streams</h3><p>SaaS subscriptions, licensing, implementation and support</p></article>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <aside class="pz-notes" data-pz-notes-panel hidden aria-label="Speaker notes"><h2>Speaker notes</h2><p data-pz-notes-text></p></aside>
+
+    <nav class="pz-nav" aria-label="Slide navigation">
+        <button type="button" class="pz-arrow" data-pz-prev aria-label="Previous slide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg></button>
+        <ol class="pz-dots">
+            @for (var i = 1; i <= 4; i++) { <li><button type="button" data-pz-go="@(i - 1)" aria-label="Go to slide @i"></button></li> }
+        </ol>
+        <span class="pz-count" aria-live="polite"><b data-pz-current>1</b> / 4</span>
+        <button type="button" class="pz-arrow" data-pz-next aria-label="Next slide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
+    </nav>
+    <div class="pz-progress" aria-hidden="true"><i data-pz-bar></i></div>
+
+    <script src="~/js/presentation.js" asp-append-version="true"></script>
+</body>
+</html>

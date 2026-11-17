@@ -6,7 +6,7 @@
 }
 <partial name="_PageHeader" />
 <section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">Scheduled <time data-local="@DateTime.SpecifyKind(Model.StartsAt, DateTimeKind.Utc).ToString("O")">@Model.StartsAt.ToString("u")</time> – <time data-local="@DateTime.SpecifyKind(Model.EndsAt, DateTimeKind.Utc).ToString("O")">@Model.EndsAt.ToString("u")</time></span></div>
+    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">Scheduled <time data-local="@DateTime.SpecifyKind(Model.StartsAt, DateTimeKind.Utc).ToString("O")">@Model.StartsAt.ToJordan("yyyy-MM-dd HH:mm")</time> – <time data-local="@DateTime.SpecifyKind(Model.EndsAt, DateTimeKind.Utc).ToString("O")">@Model.EndsAt.ToJordan("yyyy-MM-dd HH:mm")</time></span></div>
         <div class="pg-actions"><a class="pg-btn" data-no-modal target="_blank" rel="noopener noreferrer" href="@Model.Url">Open in a new tab</a>
             <a class="pg-btn" data-no-modal asp-area="" asp-controller="Workflow" asp-action="Details" asp-route-id="@Model.TenderId">Back to the tender</a></div></div>
     <div id="meet" data-room="@Model.Room" data-name="@Model.DisplayName" style="width:100%;height:640px;border-radius:14px;overflow:hidden;background:#000"></div>

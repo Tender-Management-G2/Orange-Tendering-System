@@ -108,6 +108,9 @@ public sealed partial class SupplierOfferService
 
     public async Task<string?> SubmitAsync(string userId, int id)
     {
+        // Supplier portal rule: an offer is submitted only with at least one supporting attachment.
+        if (!await context.Documents.AnyAsync(d => d.BidId == id && OwnOffers(userId).Any(b => b.Id == id)))
+            return "Add at least one attachment (PDF, PNG or JPEG) before submitting the offer.";
         try
         {
             await workflow.SubmitDraft(id, new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(

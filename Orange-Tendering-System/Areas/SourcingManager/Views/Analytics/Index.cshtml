@@ -141,9 +141,9 @@
                     <tr>
                         <td>@row.TenderTitle</td>
                         <td>v@(row.VersionNumber)</td>
-                        <td>@row.SubmittedBy<br /><span class="pg-muted">@row.SubmittedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
-                        <td>@row.Status<br /><span class="pg-muted">@row.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
-                        <td>@(row.TopCommitteeStatus?.ToString() ?? "Not forwarded")<br /><span class="pg-muted">@row.TopCommitteeDecidedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@row.SubmittedBy<br /><span class="pg-muted">@row.SubmittedAt?.ToJordan("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@row.Status<br /><span class="pg-muted">@row.ReviewedAt?.ToJordan("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@(row.TopCommitteeStatus?.ToString() ?? "Not forwarded")<br /><span class="pg-muted">@row.TopCommitteeDecidedAt?.ToJordan("yyyy-MM-dd HH:mm")</span></td>
                         <td><a class="pg-btn" asp-area="SourcingManager" asp-controller="Reports" asp-action="Review" asp-route-id="@row.ReportId">Open report</a></td>
                     </tr>
                 }

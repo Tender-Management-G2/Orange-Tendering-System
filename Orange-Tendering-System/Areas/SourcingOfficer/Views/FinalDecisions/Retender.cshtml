@@ -14,7 +14,7 @@
         <a class="pg-btn" asp-action="Index">← Final decisions</a></div>
     <dl class="ui-facts">
         <div><dt>Reason from the Top Committee</dt><dd>@(Model.Reason ?? "—")</dd></div>
-        <div><dt>Requested</dt><dd>@(Model.RequestedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Requested</dt><dd>@(Model.RequestedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
     </dl>
     @if (Model.Blocked != null) { <p class="pg-hint" role="alert"><strong>@Model.Blocked</strong></p> }
 </section>

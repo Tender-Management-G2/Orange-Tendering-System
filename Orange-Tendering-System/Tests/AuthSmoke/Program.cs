@@ -158,7 +158,7 @@ foreach (var field in new Dictionary<string, string>
     ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
     ["Input.RegistrationNumber"] = "CR-" + suffix,
     ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
-    ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
+    ["Input.CompanyPhone"] = "0790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
     ["__RequestVerificationToken"] = registerToken
 }) registration.Add(new StringContent(field.Value), field.Key);
 var pdf = Encoding.ASCII.GetBytes("%PDF-1.7\nTest legal document\n%%EOF");
@@ -974,7 +974,7 @@ static MultipartFormDataContent RegistrationContent(string email, string passwor
         ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
         ["Input.RegistrationNumber"] = "CR-" + suffix,
         ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
-        ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
+        ["Input.CompanyPhone"] = "0790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
         ["__RequestVerificationToken"] = token
     }) content.Add(new StringContent(field.Value), field.Key);
     var pdf = Encoding.ASCII.GetBytes("%PDF-1.7\nTest legal document\n%%EOF");

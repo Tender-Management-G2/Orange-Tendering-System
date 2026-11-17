@@ -51,13 +51,13 @@
             <section class="so-card so-result-card">
                 <h3>Approved result message</h3>
                 <p class="so-message so-pre">@System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(Model.ResultMessage.Replace("</p>", "\n"), "<[^>]+>", "")).Trim()</p>
-                <p class="so-muted">Notified @Model.NotifiedAt?.ToString("yyyy-MM-dd HH:mm") UTC</p>
+                <p class="so-muted">Notified @Model.NotifiedAt?.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</p>
             </section>
         }
 
         <section class="so-facts" aria-label="Offer summary">
-            <div><span>Deadline (UTC)</span><strong>@(Model.Deadline?.ToString("yyyy-MM-dd HH:mm") ?? "—")</strong></div>
-            <div><span>Submitted (UTC)</span><strong>@(Model.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not submitted")</strong></div>
+            <div><span>Deadline (Jordan time)</span><strong>@(Model.Deadline?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</strong></div>
+            <div><span>Submitted (Jordan time)</span><strong>@(Model.SubmittedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "Not submitted")</strong></div>
             <div><span>Delivery</span><strong>@Model.Terms.DeliveryDays days</strong></div>
             <div><span>Payment terms</span><strong>@(string.IsNullOrWhiteSpace(Model.Terms.PaymentTerms) ? "—" : Model.Terms.PaymentTerms)</strong></div>
             <div><span>Valid until</span><strong>@(Model.Terms.ValidUntil?.ToString("yyyy-MM-dd") ?? "—")</strong></div>

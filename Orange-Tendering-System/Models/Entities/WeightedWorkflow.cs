@@ -103,6 +103,9 @@ public class EvaluationParticipation
     public CommitteeMember CommitteeMember { get; set; } = null!;
     public DateTime SentAt { get; set; }
     public DateTime? SubmittedAt { get; set; }
+    // Hand-drawn signature (PNG) given in the meeting together with the final scores for every supplier.
+    public byte[]? SignatureImage { get; set; }
+    public DateTime? SignedAt { get; set; }
 }
 
 public class AiAnalysis

@@ -1040,6 +1040,12 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Property<DateTime>("SentAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<byte[]>("SignatureImage")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTime?>("SignedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("SubmittedAt")
                         .HasColumnType("datetime2");
 

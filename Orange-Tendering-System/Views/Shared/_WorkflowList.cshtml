@@ -155,7 +155,7 @@
         if (sl) { var tl = body.querySelector('#wp-tech'), fl = body.querySelector('#wp-fin-label'), tt = body.querySelector('#wp-tech-label'); var sync = function () { var v = Number(sl.value); tl.value = 100 - v; fl.textContent = v + '%'; tt.textContent = (100 - v) + '%'; sl.style.setProperty('--p', v + '%'); }; sl.addEventListener('input', sync); sync(); }
         var f = body.querySelector('#financial-weight'), t = body.querySelector('#technical-weight');
         if (f && t) { f.addEventListener('input', function () { t.value = (100 - Number(f.value)).toFixed(4); }); t.addEventListener('input', function () { f.value = (100 - Number(t.value)).toFixed(4); }); }
-        body.querySelectorAll('time[data-local]').forEach(function (el) { var d = new Date(el.dataset.local); if (!isNaN(d)) el.textContent = d.toLocaleString(); });
+        body.querySelectorAll('time[data-local]').forEach(function (el) { var d = new Date(el.dataset.local); if (!isNaN(d)) el.textContent = d.toLocaleString('en-GB', { timeZone: 'Asia/Amman', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' (Jordan)'; });
         body.querySelectorAll('form').forEach(function (form) { form.addEventListener('submit', submit); });
         body.querySelectorAll('form[data-picker]').forEach(function (f) {
             var all = f.querySelector('[data-select-all]'), btn = f.querySelector('[data-pick-btn]'), cnt = f.querySelector('[data-count]');
@@ -278,7 +278,7 @@
         var signatureRequired = !decisionSel || decisionSel.value === 'Approve' || form.action.indexOf('/TopCommittee/') >= 0;
         if (pad && signatureRequired) { if (!pad._drawn) { showError('Draw your signature in the box first.'); return; } fd.set('signatureImage', pad.querySelector('canvas').toDataURL('image/png')); }
         if (btn && btn.name) fd.set(btn.name, btn.value);
-        form.querySelectorAll('input[data-utc]').forEach(function (i) { if (i.value) { fd.delete(i.name); fd.set(i.name, new Date(i.value).toISOString()); } });
+        form.querySelectorAll('input[data-utc]').forEach(function (i) { if (i.value) { fd.delete(i.name); fd.set(i.name, new Date(i.value + (i.value.length === 16 ? ':00' : '') + '+03:00').toISOString()); } });
         var label = btn ? btn.textContent : ''; form.querySelectorAll('button').forEach(function (b) { b.disabled = true; }); if (btn) btn.textContent = /\/Analyze\//.test(form.action) ? 'Analyzing the offers… about a minute' : 'Working…';
         var keep = openTitles();
         // Orange Motion: processing while the request runs, then the server's own feedback (Services/OrangeWorkflowFeedback.cs).

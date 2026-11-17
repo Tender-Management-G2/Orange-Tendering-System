@@ -136,7 +136,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         {
             var offers = await offerService.GetOffersAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var lines = offers.Select(o => $"Offer #{o.Id} | {o.TenderTitle} | Revision {o.Revision} | {o.Status} | {o.Total:0.00} {o.Terms.CurrencyCode}");
-            var summary = "My offer summary (UTC)\n" + string.Join("\n", lines);
+            var summary = "My offer summary (Jordan time)\n" + string.Join("\n", lines);
             return File(System.Text.Encoding.UTF8.GetBytes(summary), "text/plain; charset=utf-8", "my-offers-summary.txt");
         }
     }

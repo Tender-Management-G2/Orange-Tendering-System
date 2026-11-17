@@ -6,8 +6,8 @@
         <div><dt>Availability</dt><dd>@Model.Availability</dd></div>
         <div><dt>Your invitation</dt><dd>@Model.InvitationStatus</dd></div>
         <div><dt>Round</dt><dd>@Model.RoundNumber</dd></div>
-        <div><dt>Opens</dt><dd>@(Model.OpensAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
-        <div><dt>Submission deadline</dt><dd>@(Model.Deadline?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Opens</dt><dd>@(Model.OpensAt?.ToLocalTime().ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Submission deadline</dt><dd>@(Model.Deadline?.ToLocalTime().ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
     </dl>
 </section>
 <section class="ws-panel pg-panel">

@@ -76,7 +76,7 @@ public class ExternalInvitationDispatcher(ApplicationDbContext db, IExternalInvi
                 var register = new Uri(new Uri(options.Value.PublicBaseUrl!.TrimEnd('/') + "/"), invitation.SupplierId.HasValue ? $"Supplier/Workflow/Details/{tender.Id}" : "Identity/Account/Register");
                 await channel.Send(new ExternalInvitationMessage(invitation.Email, $"Invitation to tender: {tender.Title}",
                     $"Dear {invitation.CompanyName},\n\nOrange invites you to take part in the tender \"{tender.Title}\" (round {invitation.TenderRound.RoundNumber}).\n" +
-                    $"Offers close on {invitation.TenderRound.Deadline:yyyy-MM-dd HH:mm} UTC.\n\nOnly registered and approved suppliers can receive the tender documents and submit an offer. " +
+                    $"Offers close on {invitation.TenderRound.Deadline?.ToJordan("yyyy-MM-dd HH:mm")} (Jordan time).\n\nOnly registered and approved suppliers can receive the tender documents and submit an offer. " +
                     $"{(invitation.SupplierId.HasValue ? "Sign in and review your invitation" : "Register your company here")}: {register}\n\nThis message does not grant access to tender documents and is not a contract award."), ct);
                 invitation.Status = ExternalInvitationStatus.Sent; invitation.SentAt = now; invitation.LastError = null; sent++;
                 Audit(invitation, "ExternalInvitationSent", now);

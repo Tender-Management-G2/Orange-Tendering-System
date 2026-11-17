@@ -33,7 +33,7 @@
         </div>
         <div>
             <dt>Submitted</dt>
-            <dd>@(Model.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not submitted")</dd>
+            <dd>@(Model.SubmittedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "Not submitted")</dd>
         </div>
         <div>
             <dt>Recommended offer</dt>

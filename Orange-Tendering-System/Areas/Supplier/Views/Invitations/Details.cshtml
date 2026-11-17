@@ -22,8 +22,8 @@
         <div><dt>Tender</dt><dd>@Model.TenderTitle</dd></div>
         <div><dt>Description</dt><dd style="white-space: pre-wrap">@Model.Description</dd></div>
         <div><dt>Round</dt><dd>@Model.RoundNumber</dd></div>
-        <div><dt>Opens</dt><dd>@(Model.OpensAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
-        <div><dt>Deadline</dt><dd>@(Model.Deadline?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Opens</dt><dd>@(Model.OpensAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Deadline</dt><dd>@(Model.Deadline?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
         <div><dt>Invitation status</dt><dd>@Model.DisplayStatus</dd></div>
     </dl>
 </section>

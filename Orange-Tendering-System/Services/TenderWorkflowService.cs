@@ -330,15 +330,33 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var attachedDocuments = eligible.Sum(x => x.Documents.Count);
         var meeting = zoomMeetingId != null ? $"Zoom meeting {zoomMeetingId} was created for this session. Use Join meeting in this notification."
             : input.MeetingUrl!.Contains("meet.jit.si") ? "The system created the video meeting room for this session. Use Join meeting in this notification at the scheduled time." : "The Zoom link was supplied by the officer; open it from the tender page.";
-        await NotifyOfficerMeeting(id, $"Evaluation meeting scheduled for {session.StartsAt:u}. {meeting}");
-        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {session.StartsAt:u} and remains available after the meeting ends until you submit your final evaluation. {meeting} The reviewed AI analysis #{ai.Id} and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s) are attached on the tender page.");
+        await NotifyOfficerMeeting(id, $"Evaluation meeting scheduled for {JordanTime.Display(session.StartsAt)}. {meeting}");
+        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {JordanTime.Display(session.StartsAt)} and remains available after the meeting ends until you submit your final evaluation. {meeting} The reviewed AI analysis #{ai.Id} is attached to this meeting: download it (PDF) from the meeting card on the tender page, together with {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s).");
         Audit(a, id, "EvaluationScheduleEvidence", new { r.RoundNumber, session.StartsAt, session.EndsAt, ZoomMeetingId = zoomMeetingId, AiAnalysisId = ai.Id, EligibleBidIds = eligible.Select(x => x.Id), AttachedDocuments = attachedDocuments, InvitedMemberIds = members.Select(x => x.Id) });
+    });
+    // The Officer moves the meeting (and the scoring window) while nobody has submitted yet. Members and the Officer are notified.
+    public Task RescheduleEvaluation(int id, DateTimeOffset startsAt, DateTimeOffset endsAt, string reason, ClaimsPrincipal principal) => Change(id, principal, "EvaluationRescheduled", async (t, a) =>
+    {
+        await Officer(t, a); var s = await Session(id);
+        Require(t.Status == TenderStatus.Evaluation && s.ReportId == null && s.State is SessionState.Scheduled or SessionState.Incomplete, "Only a scheduled evaluation without a report can be moved.");
+        Require(s.Submissions.Count == 0, "A member has already submitted final scores; the meeting time can no longer change.");
+        Require(startsAt.UtcDateTime >= Now && endsAt > startsAt, "Start must be in the future and the end must be after the start.");
+        Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 500, "Give a short reason for the new time.");
+        var old = new { s.StartsAt, s.EndsAt };
+        s.StartsAt = startsAt.UtcDateTime; s.EndsAt = endsAt.UtcDateTime; s.OpenedAt = null;
+        if (s.State == SessionState.Incomplete) { s.State = SessionState.Scheduled; s.ClosedAt = null; s.ClosedByUserId = null; s.ClosureReason = null; }
+        db.Entry(s).Property(x => x.State).IsModified = true;
+        var zoom = s.ZoomMeetingId != null ? " Update the time of the Zoom meeting as well if it was created outside this system." : "";
+        foreach (var m in await Members(id, CommitteeType.Evaluation))
+            NotifyMeeting(m.UserId, id, "Evaluation meeting rescheduled", $"New time: {JordanTime.Display(s.StartsAt)} to {JordanTime.Display(s.EndsAt)}. Reason: {reason.Trim()}. The meeting link is unchanged.");
+        await NotifyOfficerMeeting(id, $"Evaluation meeting moved to {JordanTime.Display(s.StartsAt)} - {JordanTime.Display(s.EndsAt)}.{zoom}");
+        Audit(a, id, "EvaluationRescheduleEvidence", new { Old = old, New = new { s.StartsAt, s.EndsAt }, Reason = reason.Trim() });
     });
     public static bool EvaluationOpen(EvaluationSession session, DateTime now) =>
         session.ReportId == null && now >= session.StartsAt &&
         (session.State == SessionState.Scheduled || session.State == SessionState.Incomplete && session.ClosureReason == "Scheduled deadline reached");
 
-    public Task SubmitEvaluation(int id, List<ScoreInput> scores, ClaimsPrincipal principal)
+    public Task SubmitEvaluation(int id, List<ScoreInput> scores, ClaimsPrincipal principal, byte[]? signature = null)
     {
         return Change(id, principal, "EvaluationSubmitted", async (t, a) =>
         {
@@ -356,6 +374,12 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             var participation = s.Invitations.SingleOrDefault(x => x.CommitteeMemberId == member.Id);
             Require(participation != null, "A persisted evaluation invitation is required.");
             participation.SubmittedAt = Now;
+            if (signature != null)
+            {
+                // The member signs once, in the meeting, after scoring every supplier; the same signature is reused on the report.
+                participation.SignatureImage = signature; participation.SignedAt = Now;
+                Audit(a, id, "EvaluationSigned", new { MemberId = member.Id, Suppliers = scores.Count, SignatureSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(signature)) });
+            }
             if (s.State == SessionState.Incomplete)
             {
                 Audit(a, id, "EvaluationResumedAfterMeeting", new { s.ClosedAt, s.ClosureReason });
@@ -430,6 +454,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     public Task FinalizeReport(int id, string comment, ClaimsPrincipal principal, string? documentHash = null, bool confirmed = false, byte[]? signatureImage = null) => Change(id, principal, "ReportFinalizationVote", async (t, a) =>
     {
         var member = await Member(t, a, CommitteeType.Evaluation); var s = await Session(id);
+        signatureImage ??= s.Invitations.FirstOrDefault(x => x.CommitteeMemberId == member.Id)?.SignatureImage; // signature given in the meeting
         var signingRole = member.Responsibility == CommitteeResponsibility.SourcingManager && await Role(a, SystemRoles.SourcingManager) ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee;
         if (s.Report != null && await db.Set<ReportSignature>().AnyAsync(x => x.TenderReportId == s.ReportId && x.Stage == ReportSigningStage.Evaluation && x.UserId == a.Id))
         { await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Evaluation, signingRole, member.Responsibility.ToString()!, "Approve", documentHash, confirmed, Now, signatureImage); return; }

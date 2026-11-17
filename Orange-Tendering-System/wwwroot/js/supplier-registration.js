@@ -128,6 +128,7 @@
         if (!text) return requiredFields.has(name) ? label(input) + ' is required.' : '';
         if (name === 'Input.Email' || name === 'Input.CompanyEmail')
             return emailPattern.test(text) ? '' : 'Enter a valid email address, for example name@company.com.';
+        if (input.dataset.valRegex && input.validity.patternMismatch) return input.dataset.valRegex; // e.g. telephone: exactly 10 digits
         return input.checkValidity() ? '' : 'Check ' + label(input).toLowerCase() + '.';
     }
 
@@ -404,3 +405,11 @@
     // Values restored by the browser (back navigation, autofill) arrive after this script ran.
     window.addEventListener('pageshow', () => { updateRules(); updateFileStates(); publish(); });
 })();
+
+// Company telephone: digits only, at most 10 (the server requires exactly 10 digits).
+document.querySelectorAll('input[data-digits-only]').forEach(input => {
+    input.addEventListener('input', () => {
+        const digits = input.value.replace(/\D/g, '').slice(0, 10);
+        if (input.value !== digits) input.value = digits;
+    });
+});

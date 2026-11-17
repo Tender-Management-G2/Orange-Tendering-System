@@ -70,7 +70,7 @@
       histEmpty.hidden = items.length > 0;
       items.forEach(c => {
         const li = el('li'); const open = el('button', 'ai-hist-open'); open.type = 'button';
-        open.append(el('strong', null, c.title), el('small', null, new Date(c.UpdatedAt || c.updatedAt).toLocaleString()));
+        open.append(el('strong', null, c.title), el('small', null, new Date(c.UpdatedAt || c.updatedAt).toLocaleString('en-GB', { timeZone: 'Asia/Amman', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })));
         open.addEventListener('click', () => openConversation(c.id));
         const del = el('button', 'ai-hist-del', '×'); del.type = 'button'; del.setAttribute('aria-label', 'Delete conversation');
         del.addEventListener('click', async () => { try { await api(root.dataset.deleteUrl + '?id=' + c.id, {}); if (conversationId === c.id) reset(); li.remove(); } catch (e) { errorRow(e.message); } });

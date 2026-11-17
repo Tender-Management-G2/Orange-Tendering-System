@@ -376,7 +376,10 @@
                             <label>Why these scores?<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label></fieldset>
                         scoreIndex++;
                     }
-                    <button class="wp-primary">Submit my final evaluation</button><small>You submit once for all suppliers together.</small>
+                    @* After scoring every supplier the member signs here; the signature is saved with the scores and reused on the report. *@
+                    <h5 class="wp-sub">Your signature <small>required after scoring every supplier</small></h5>
+                    <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
+                    <button class="wp-primary">Sign and submit my final evaluation</button><small>You submit once for all suppliers together. Scores and signature cannot be changed afterwards.</small>
                 </form>
             </div>
         }
@@ -416,7 +419,7 @@
                     <div class="wp-sigtable">
                         <div class="wp-sigtable-head"><strong>Who signed</strong><span class="wp-sum">@signedNow.Count of 4 signed</span></div>
                         <div class="wp-table"><table><thead><tr><th>Member</th><th>Role</th><th>Status</th><th>When</th></tr></thead><tbody>
-                        @foreach (var m in evalMembers) { var sg = signedNow.FirstOrDefault(x => x.UserId == m.UserId); <tr class="@(sg != null ? "is-best" : null)"><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td><td><span class="wp-tag @(sg != null ? "wp-tag-good" : "")">@(sg != null ? "Signed" : "Waiting")</span></td><td>@(sg != null ? sg.SignedAt.ToString("d MMM HH:mm") : "—")</td></tr> }
+                        @foreach (var m in evalMembers) { var sg = signedNow.FirstOrDefault(x => x.UserId == m.UserId); <tr class="@(sg != null ? "is-best" : null)"><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td><td><span class="wp-tag @(sg != null ? "wp-tag-good" : "")">@(sg != null ? "Signed" : "Waiting")</span></td><td>@(sg != null ? sg.SignedAt.ToJordan("d MMM HH:mm") : "—")</td></tr> }
                         </tbody></table></div>
                     </div>
                 }
@@ -566,16 +569,35 @@
                             var doneCount = s.Invitations.Count(x => x.SubmittedAt != null);
                         <div class="wp-clock wp-clock-@roomState" data-countdown data-start="@startIso" data-end="@endIso" data-state="@roomState" data-final="@(s.State != SessionState.Scheduled && !TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? "1" : null)">
                             <div class="wp-clock-main"><small data-clock-label>@(roomState == "before" ? "Meeting and scoring start in" : roomState == "open" ? "Meeting ends in" : TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? "Meeting ended; evaluation remains open" : "Scoring is closed")</small><strong data-clock>--:--:--</strong></div>
-                            <div class="wp-clock-times"><span>Starts <time data-local="@startIso">@s.StartsAt.ToString("u")</time></span><span>Ends <time data-local="@endIso">@s.EndsAt.ToString("u")</time></span></div>
+                            <div class="wp-clock-times"><span>Starts <time data-local="@startIso">@s.StartsAt.ToJordan("yyyy-MM-dd HH:mm")</time></span><span>Ends <time data-local="@endIso">@s.EndsAt.ToJordan("yyyy-MM-dd HH:mm")</time></span></div>
                             @if (!string.IsNullOrWhiteSpace(s.MeetingUrl) && s.State == SessionState.Scheduled) { <a class="wp-primary wp-link wp-join@(roomState == "before" ? " is-locked" : null)" data-no-modal data-join="/Meetings/Join/@id" @(roomState == "before" ? Html.Raw("aria-disabled=\"true\" tabindex=\"-1\"") : Html.Raw("href=\"/Meetings/Join/" + id + "\""))><span data-join-label>@Html.Raw(roomState == "before" ? "&#128274; Opens when the meeting starts" : "&#127909; Join the meeting")</span></a> }
                         </div>
+                        @if (Model.IsOfficer && s.ReportId == null && (s.State == SessionState.Scheduled || s.State == SessionState.Incomplete) && doneCount == 0)
+                        {
+                            <details class="wp-opt"><summary>Change the meeting time</summary>
+                                <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RescheduleEvaluation" asp-route-id="@id" method="post" class="wp-form">
+                                    <div class="wp-cols"><label>New start<input name="startsAt" type="datetime-local" required data-utc /></label><label>New end<input name="endsAt" type="datetime-local" required data-utc /></label></div>
+                                    <label>Reason<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>A committee member is not available at the original time.</option><option>The meeting time passed before the committee could meet.</option></select><textarea name="reason" maxlength="500" required rows="2" data-fv-label="Reason" data-fv-label-ar="السبب"></textarea></label>
+                                    <button class="wp-primary">Save the new time and notify the committee</button><small>Times are in your local time (Jordan). Possible until the first member submits final scores; the meeting link stays the same.</small>
+                                </form>
+                            </details>
+                        }
+                        var meetingAi = Model.Analyses.FirstOrDefault(x => x.Id == s.AiAnalysisId);
+                        @if (meetingAi != null)
+                        {
+                            <div class="wp-aifile">
+                                <h5 class="wp-sub">AI analysis for this meeting <small>advisory only &middot; reviewed by the Sourcing Officer</small></h5>
+                                <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("AiAnalysisPdf", "Workflow", new { area, id })">&#11015; Download the AI analysis (PDF)</a></div>
+                                <details class="wp-opt"><summary>Read the analysis here</summary>@{ var mfr = FindingRows(meetingAi.Findings); }@if (mfr.Count > 0) { <dl class="wp-ai">@foreach (var row in mfr) { <div><dt>@row.Label</dt><dd>@row.Value</dd></div> }</dl> } else { <div class="wp-text">@meetingAi.Findings</div> }</details>
+                            </div>
+                        }
                         <h5 class="wp-sub">Committee <small>@doneCount of 4 submitted</small></h5>
                         <div class="wp-table"><table class="wp-sortable"><thead><tr><th>Member</th><th>Role</th><th>Status</th><th>Submitted</th></tr></thead><tbody>
                         @foreach (var m in evalMembers)
                         {
                             var part = s.Invitations.FirstOrDefault(x => x.CommitteeMemberId == m.Id);
                             var did = part?.SubmittedAt != null;
-                            <tr class="@(did ? "is-best" : null)"><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td><td><span class="wp-tag @(did ? "wp-tag-good" : "")">@(did ? "Submitted" : roomState == "open" ? "Scoring now" : roomState == "before" ? "Invited" : "No submission")</span></td><td>@(did ? part!.SubmittedAt!.Value.ToString("HH:mm") : "\u2014")</td></tr>
+                            <tr class="@(did ? "is-best" : null)"><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td><td><span class="wp-tag @(did ? "wp-tag-good" : "")">@(did ? (part!.SignatureImage != null ? "Submitted · signed" : "Submitted") : roomState == "open" ? "Scoring now" : roomState == "before" ? "Invited" : "No submission")</span></td><td>@(did ? part!.SubmittedAt!.Value.ToJordan("HH:mm") : "\u2014")</td></tr>
                         }
                         </tbody></table></div>
                         <h5 class="wp-sub">Offers to score <small>(compliant offers only)</small></h5>
@@ -645,7 +667,7 @@
             <article class="wp-ap wp-ap-@AS(0)"><span class="wp-dot">@(steps5[0] ? "\u2713" : "1")</span><div class="wp-ap-body">
                 <header><h4>Committee signatures</h4><span class="wp-sum">@evalSigned.Count of 4 signed</span></header>
                 <div class="wp-table"><table><thead><tr><th>Member</th><th>Role</th><th>Status</th><th>When</th></tr></thead><tbody>
-                @foreach (var m in evalMembers) { var sg = evalSigned.FirstOrDefault(x => x.UserId == m.UserId); <tr class="@(sg != null ? "is-best" : null)"><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td><td><span class="wp-tag @(sg != null ? "wp-tag-good" : "")">@(sg != null ? "Signed" : "Waiting")</span></td><td>@(sg != null ? sg.SignedAt.ToString("d MMM HH:mm") : "\u2014")</td></tr> }
+                @foreach (var m in evalMembers) { var sg = evalSigned.FirstOrDefault(x => x.UserId == m.UserId); <tr class="@(sg != null ? "is-best" : null)"><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td><td><span class="wp-tag @(sg != null ? "wp-tag-good" : "")">@(sg != null ? "Signed" : "Waiting")</span></td><td>@(sg != null ? sg.SignedAt.ToJordan("d MMM HH:mm") : "\u2014")</td></tr> }
                 </tbody></table></div>
             </div></article>
 
@@ -679,10 +701,10 @@
                 else
                 {
                     <div class="wp-table"><table><thead><tr><th>Member</th><th>Vote</th><th>When</th></tr></thead><tbody>
-                    @foreach (var tm in topMembers) { var v = topVotes.FirstOrDefault(x => x.CommitteeMemberId == tm.Id); <tr><td><strong>@Who(tm.UserId)</strong></td><td><span class="wp-tag @(v?.Decision == VoteDecision.Approve ? "wp-tag-good" : "")">@(v == null ? "Waiting" : Words(v.Decision.ToString()))</span></td><td>@(v != null ? v.VotedAt.ToString("d MMM HH:mm") : "\u2014")</td></tr> }
+                    @foreach (var tm in topMembers) { var v = topVotes.FirstOrDefault(x => x.CommitteeMemberId == tm.Id); <tr><td><strong>@Who(tm.UserId)</strong></td><td><span class="wp-tag @(v?.Decision == VoteDecision.Approve ? "wp-tag-good" : "")">@(v == null ? "Waiting" : Words(v.Decision.ToString()))</span></td><td>@(v != null ? v.VotedAt.ToJordan("d MMM HH:mm") : "\u2014")</td></tr> }
                     </tbody></table></div>
                     <p class="wp-formula">Approvals: <b>@topVotes.Count(x => x.Decision == VoteDecision.Approve)</b> of @topMembers.Count. Three approvals out of four complete the decision; a single Reject stops it.</p>
-                    @if (rejected) { <p class="wp-hint wp-warn">@(notice!.Outcome == FinalDecisionOutcome.Retender ? "Re-Tender requested" : "Rejected") by @Who(notice.RejectedByUserId ?? "") on @notice.RejectedAt?.ToString("d MMM HH:mm"): <b>@reasonText</b>. All earlier votes and signatures are kept.</p> }
+                    @if (rejected) { <p class="wp-hint wp-warn">@(notice!.Outcome == FinalDecisionOutcome.Retender ? "Re-Tender requested" : "Rejected") by @Who(notice.RejectedByUserId ?? "") on @notice.RejectedAt?.ToJordan("d MMM HH:mm"): <b>@reasonText</b>. All earlier votes and signatures are kept.</p> }
                 }
                 @if (topMembers.Count == 0 && s != null && s.State == SessionState.ManagerApproved) { <p class="wp-hint wp-warn">The Top Committee is seated automatically from four active Top Committee accounts. Ask an Admin to add them; the vote opens by itself.</p> }
             </div></article>
@@ -747,7 +769,7 @@
                 <div><dt>Estimated value</dt><dd>@Model.Tender.EstimatedValue.ToString("N0") @Model.Tender.Currency</dd></div>
                 <div><dt>Items</dt><dd>@Model.Tender.Items.Count</dd></div>
                 @if (round != null) { <div><dt>Round</dt><dd>@round.RoundNumber of @Model.MaxRounds</dd></div> }
-                @if (round?.Deadline != null) { <div><dt>Bidding deadline</dt><dd><time data-local="@DateTime.SpecifyKind(round.Deadline.Value, DateTimeKind.Utc).ToString("O")">@round.Deadline.Value.ToString("u")</time></dd></div> }
+                @if (round?.Deadline != null) { <div><dt>Bidding deadline</dt><dd><time data-local="@DateTime.SpecifyKind(round.Deadline.Value, DateTimeKind.Utc).ToString("O")">@round.Deadline.Value.ToJordan("yyyy-MM-dd HH:mm")</time></dd></div> }
                 <div><dt>Purchase request</dt><dd>#@Model.Tender.PurchaseRequestId</dd></div>
             </dl>
         </div>
@@ -775,6 +797,6 @@
     @if (!Model.IsSupplier && (Model.History.Count > 0))
     {
         <details class="wp-history"><summary>History (@Model.History.Count)</summary>
-            <ul>@foreach (var entry in Model.History) { <li><time>@entry.CreatedAt.ToString("d MMM yyyy HH:mm")</time><span>@Words(entry.Action)</span></li> }</ul></details>
+            <ul>@foreach (var entry in Model.History) { <li><time>@entry.CreatedAt.ToJordan("d MMM yyyy HH:mm")</time><span>@Words(entry.Action)</span></li> }</ul></details>
     }
 </div>

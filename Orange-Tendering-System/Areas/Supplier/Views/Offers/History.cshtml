@@ -1,6 +1,6 @@
 @model List<SupplierHistoryRow>
 @{ ViewData["Title"] = "Offer History"; ViewData["WorkspaceSection"] = "My Offers"; }
 <partial name="_PageHeader" />
-<section class="ws-panel pg-panel"><table class="pg-table"><thead><tr><th>Action</th><th>At (UTC)</th></tr></thead><tbody>
-@foreach (var row in Model) { <tr><td>@row.Action</td><td>@row.At.ToString("yyyy-MM-dd HH:mm")</td></tr> }
+<section class="ws-panel pg-panel"><table class="pg-table"><thead><tr><th>Action</th><th>At (Jordan time)</th></tr></thead><tbody>
+@foreach (var row in Model) { <tr><td>@row.Action</td><td>@row.At.ToJordan("yyyy-MM-dd HH:mm")</td></tr> }
 </tbody></table><a asp-action="Index">Back to my offers</a></section>
