@@ -37,20 +37,20 @@ public static class TeamAccountSeeder
         public string[] Roles => SystemRoles.AccountRoles(Role);
     }
 
-    /// <summary>The ten canonical accounts. The Sourcing Manager is the fourth Evaluation Committee member.</summary>
+    /// <summary>The eleven canonical accounts. The Sourcing Manager is the fourth Evaluation Committee member.</summary>
     public static readonly IReadOnlyList<TeamAccount> Accounts =
     [
-        new("admin@orange-demo.local", "Layla Mansour", SystemRoles.Admin, null, true, "Admin"),
-        new("department@orange-demo.local", "Omar Khalil", SystemRoles.RequestingDepartment, null, true, "Team Requesting Department"),
-        new("sourcing.officer@orange-demo.local", "Rana Haddad", SystemRoles.SourcingOfficer, null, false, "Team Sourcing Officer"),
-        new("sourcing.manager@orange-demo.local", "Samer Nasser", SystemRoles.SourcingManager, "evaluation-manager", false, "Team Sourcing Manager"),
-        new("evaluation.technical@orange-demo.local", "Khaled Abu Zaid", SystemRoles.Technical, "evaluation-technical-1", false),
-        new("evaluation.financial@orange-demo.local", "Dana Saleh", SystemRoles.Finance, "evaluation-financial", false),
-        new("evaluation.department@orange-demo.local", "Hiba Qasem", SystemRoles.DepartmentRepresentative, "evaluation-department", true),
-        new("top.ceo@orange-demo.local", "Dr. Faisal Al-Masri", SystemRoles.ChiefExecutiveOfficer, "top-ceo", false, "Team Top Committee CEO"),
-        new("top.cfo@orange-demo.local", "Nadia Darwish", SystemRoles.ChiefFinancialOfficer, "top-cfo", false, "Team Top Committee CFO"),
-        new("top.cto@orange-demo.local", "Yousef Haddadin", SystemRoles.ChiefTechnologyOfficer, "top-cto", false, "Team Top Committee CTO"),
-        new("top.coo@orange-demo.local", "Majd Shawabkeh", SystemRoles.ChiefOperationsOfficer, "top-coo", false, "Team Top Committee COO")
+        new("admin@orange-demo.local", "Orange Demo Administrator", SystemRoles.Admin, null, false, "Orange Demo Administrator"),
+        new("department@orange-demo.local", "Team Requesting Department", SystemRoles.RequestingDepartment, null, true, "Team Requesting Department"),
+        new("sourcing.officer@orange-demo.local", "Team Sourcing Officer", SystemRoles.SourcingOfficer, null, false, "Team Sourcing Officer"),
+        new("sourcing.manager@orange-demo.local", "Team Sourcing Manager", SystemRoles.SourcingManager, "evaluation-manager", false, "Team Sourcing Manager"),
+        new("evaluation.technical@orange-demo.local", "Team Technical Evaluator", SystemRoles.Technical, "evaluation-technical-1", false),
+        new("evaluation.financial@orange-demo.local", "Team Financial Evaluator", SystemRoles.Finance, "evaluation-financial", false),
+        new("evaluation.department@orange-demo.local", "Team Department Representative", SystemRoles.DepartmentRepresentative, "evaluation-department", true),
+        new("top.ceo@orange-demo.local", "Team Top Committee CEO", SystemRoles.ChiefExecutiveOfficer, "top-ceo", false, "Team Top Committee CEO"),
+        new("top.cfo@orange-demo.local", "Team Top Committee CFO", SystemRoles.ChiefFinancialOfficer, "top-cfo", false, "Team Top Committee CFO"),
+        new("top.cto@orange-demo.local", "Team Top Committee CTO", SystemRoles.ChiefTechnologyOfficer, "top-cto", false, "Team Top Committee CTO"),
+        new("top.coo@orange-demo.local", "Team Top Committee COO", SystemRoles.ChiefOperationsOfficer, "top-coo", false, "Team Top Committee COO")
     ];
 
     public static TeamAccount Find(string role) => Accounts.Single(a => a.Role == role);
