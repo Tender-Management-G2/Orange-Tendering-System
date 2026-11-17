@@ -1,0 +1,35 @@
+@*
+  Top Committee notification bell. Same markup and look as the Officer bell (_NotificationBell: ws-bell classes), but it keeps
+  the Top Committee's secure feed: GET TopCommittee/Notifications/Preview returns no raw links, and a notification is opened
+  only through POST TopCommittee/Notifications/Open, which re-checks that the member may still open the destination.
+  Script: wwwroot/js/top-committee-bell.js.
+*@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var arabic = UiLanguage.IsArabic(Context);
+    string L(string en, string ar) => arabic ? ar : en;
+}
+<div class="ws-bell tc-bell" data-tc-bell
+     data-preview-url="@Url.Action("Preview", "Notifications", new { area = "TopCommittee" })"
+     data-open-url="@Url.Action("Open", "Notifications", new { area = "TopCommittee" })"
+     data-csrf="@Antiforgery.GetAndStoreTokens(Context).RequestToken"
+     data-text-label="@L("Notifications", "الإشعارات")"
+     data-text-unread="@L("{0} unread", "{0} غير مقروءة")"
+     data-text-caught-up="@L("All caught up", "لا توجد إشعارات جديدة")"
+     data-text-read="@L("Read", "مقروء")"
+     data-text-new="@L("Unread", "غير مقروء")"
+     data-text-error="@L("Notifications could not be loaded. Try again.", "تعذّر تحميل الإشعارات. حاول مرة أخرى.")"
+     data-lang="@(arabic ? "ar" : "en")">
+    <button type="button" class="ws-icon-button ws-bell-button" aria-haspopup="dialog" aria-expanded="false" aria-controls="tc-bell-panel" aria-label="@L("Notifications", "الإشعارات")" title="@L("Notifications", "الإشعارات")">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg>
+        <span class="ws-bell-badge" hidden aria-live="polite">0</span>
+    </button>
+    <div class="ws-bell-panel" id="tc-bell-panel" role="dialog" aria-label="@L("Recent notifications", "أحدث الإشعارات")" hidden>
+        <header><strong>@L("Notifications", "الإشعارات")</strong><small class="tc-bell-count" data-tc-bell-count></small></header>
+        <p data-tc-bell-error role="status" hidden></p>
+        <ul class="ws-bell-list" aria-live="polite"></ul>
+        <p class="ws-bell-empty" hidden>@L("You are all caught up. No notifications yet.", "لا توجد إشعارات بعد.")</p>
+        <footer><a asp-area="" asp-controller="Notifications" asp-action="Index">@L("View all notifications", "عرض كل الإشعارات")</a></footer>
+    </div>
+</div>
+<partial name="_EventSpotlight" />

@@ -101,5 +101,5 @@ public static class RequestDisplay
         request.CreatedByUserId == userId && request.Tenders.Count == 0 &&
         request.Status is PurchaseRequestStatus.Draft or PurchaseRequestStatus.Returned;
 
-    public static string Date(DateTime? date) => date?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—";
+    public static string Date(DateTime? date) => date.HasValue ? JordanTime.Display(date.Value) : "—";
 }

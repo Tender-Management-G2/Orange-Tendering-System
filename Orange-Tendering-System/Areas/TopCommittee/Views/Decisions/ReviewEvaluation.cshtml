@@ -1,8 +1,8 @@
 @model RoundDetails
-@{ var request=Model.Tender.PurchaseRequest; ViewData["Title"]=$"T-{Model.Tender.Id} — Review Tender Evaluation"; ViewData["WorkspaceSection"]="Evaluation Summary"; ViewData["ExecutiveReview"]=true; }
+@{ var request=Model.Tender.PurchaseRequest; ViewData["Title"]=$"T-{Model.Tender.Id} — Review Tender Evaluation"; ViewData["WorkspaceSection"]="Evaluation Summary"; ViewData["HeroTitle"]="Review Tender Evaluation"; ViewData["Description"]=$"T-{Model.Tender.Id} · Top Committee review and decision on the tender evaluation for {Model.Tender.Title}."; ViewData["ExecutiveReview"]=true; }
 <div class="tc-review">
 <partial name="_Messages" />
-<header class="rv-page-head"><div><div class="rv-breadcrumb">Procurement <span>›</span> Top Committee <span>›</span> T-@Model.Tender.Id — Review Tender Evaluation</div><div class="rv-title-line"><partial name="_ReviewIcon" model='"report"' /><div><h1>T-@Model.Tender.Id — Review Tender Evaluation</h1><p>Top Committee review and decision on the tender evaluation for @Model.Tender.Title.</p></div></div></div></header>
+<partial name="_PageHeader" />
 <partial name="_ManagerSummary" model="Model" />
 <section class="rv-card rv-overview"><header class="rv-section-head"><partial name="_ReviewIcon" model='"laptop"' /><h2>Tender Overview</h2><p>Key information about this tender, its scope, requirements, and supplier participation.</p></header>
 <dl class="rv-overview-facts">

@@ -22,7 +22,7 @@
                 body.scrollTop = 0;
                 body.querySelectorAll('time[data-tender-local]').forEach(function (time) {
                     var date = new Date(time.dataset.tenderLocal);
-                    if (time.dataset.tenderLocal && !isNaN(date)) time.textContent = date.toLocaleString();
+                    if (time.dataset.tenderLocal && !isNaN(date)) time.textContent = date.toLocaleString('en-GB', { timeZone: 'Asia/Amman', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' (Jordan)';
                 });
             } catch (error) {
                 if (error.name !== 'AbortError') body.textContent = 'Tender details could not be loaded. Please close and try again.';

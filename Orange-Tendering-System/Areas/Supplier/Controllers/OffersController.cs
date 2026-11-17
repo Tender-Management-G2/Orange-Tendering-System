@@ -103,7 +103,14 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         public async Task<IActionResult> Details(int id)
         {
             var model = await offerService.GetOfferAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id);
-            return model == null ? NotFound() : View(model);
+            if (model == null) return NotFound();
+            // The My Offers page opens details in a popup; direct links (notifications, bookmarks) keep the full page.
+            if (string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                Response.Headers.CacheControl = "no-store";
+                return PartialView("_OfferDetailsPopup", model);
+            }
+            return View(model);
         }
 
         // Supplier Offer History — Owner: Saja · No Trello card
@@ -129,7 +136,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         {
             var offers = await offerService.GetOffersAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var lines = offers.Select(o => $"Offer #{o.Id} | {o.TenderTitle} | Revision {o.Revision} | {o.Status} | {o.Total:0.00} {o.Terms.CurrencyCode}");
-            var summary = "My offer summary (UTC)\n" + string.Join("\n", lines);
+            var summary = "My offer summary (Jordan time)\n" + string.Join("\n", lines);
             return File(System.Text.Encoding.UTF8.GetBytes(summary), "text/plain; charset=utf-8", "my-offers-summary.txt");
         }
     }

@@ -7,8 +7,8 @@
 <h2>@Model.TenderTitle — Offer #@Model.Id</h2>
 <dl class="pg-dl">
 <div><dt>Status / revision</dt><dd>@Model.Status / @Model.Revision</dd></div>
-<div><dt>Deadline (UTC)</dt><dd>@Model.Deadline?.ToString("yyyy-MM-dd HH:mm")</dd></div>
-<div><dt>Submitted (UTC)</dt><dd>@(Model.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not submitted")</dd></div>
+<div><dt>Deadline (Jordan time)</dt><dd>@Model.Deadline?.ToJordan("yyyy-MM-dd HH:mm")</dd></div>
+<div><dt>Submitted (Jordan time)</dt><dd>@(Model.SubmittedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "Not submitted")</dd></div>
 <div><dt>Delivery</dt><dd>@Model.Terms.DeliveryDays days</dd></div>
 <div><dt>Payment terms</dt><dd>@Model.Terms.PaymentTerms</dd></div>
 <div><dt>Technical proposal</dt><dd style="white-space:pre-wrap">@Model.Terms.TechnicalProposal</dd></div>
@@ -26,20 +26,30 @@
 <ul>@foreach (var doc in Model.Documents) { <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a></li> }</ul>
 @if (Model.Documents.Count == 0) { <p>No attachments uploaded.</p> }
 @if (Model.CanEdit) {
-<form asp-controller="Documents" asp-action="UploadOffer" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form">
-<label for="offer-file">Attach PDF, PNG or JPEG (maximum 10 MB)</label><input id="offer-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" required />
-<button class="pg-btn" type="submit">Upload attachment</button></form>
+@* The file uploads as soon as it is chosen (no separate button). At least one attachment is required before submission. *@
+<form asp-controller="Documents" asp-action="UploadOffer" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form" data-auto-upload>
+<label for="offer-file">Attach PDF, PNG or JPEG (maximum 10 MB)</label><input id="offer-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" @(Model.Documents.Count == 0 ? "required" : "") aria-describedby="offer-file-status" />
+<p class="pg-hint" id="offer-file-status" role="status" aria-live="polite">@(Model.Documents.Count == 0 ? "At least one attachment is required before you can submit the offer. Choosing a file uploads it immediately." : "Choosing another file uploads it immediately.")</p>
+</form>
 }
 </section>
 @if (Model.CanEdit) {
 <section class="ws-panel pg-panel"><h2>Submit offer</h2>
 <p>Check your prices, quantities, specifications and all tender requirements and attachments. After submission, editing is locked.</p>
 <a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn">Edit draft</a>
+@if (Model.Documents.Count == 0)
+{
+<p class="pg-note" role="alert">Add at least one attachment above before submitting the offer.</p>
+<button type="button" class="pg-btn pg-btn-primary" disabled aria-disabled="true">Submit final offer</button>
+}
+else
+{
 <form asp-action="Submit" asp-route-id="@Model.Id" method="post"><button type="submit" class="pg-btn pg-btn-primary">Submit final offer</button></form>
+}
 </section>
 }
 @if (Model.Outcome != null) {
-<section class="ws-panel pg-panel"><h2>Approved result: @Model.Outcome</h2><p style="white-space:pre-wrap">@Model.ResultMessage</p><p>Notified: @Model.NotifiedAt?.ToString("yyyy-MM-dd HH:mm") UTC</p></section>
+<section class="ws-panel pg-panel"><h2>Approved result: @Model.Outcome</h2><p style="white-space:pre-wrap">@Model.ResultMessage</p><p>Notified: @Model.NotifiedAt?.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</p></section>
 } else {
 <p class="pg-note">Awaiting the approved result notification from the Sourcing Officer.</p>
 }
@@ -48,3 +58,17 @@
 <a asp-controller="Clarifications" asp-action="Create" asp-route-bidId="@Model.Id">Contact Sourcing Officer</a><span> | </span>
 }
 <a asp-controller="Notifications" asp-action="Index">Notifications and results</a></nav>
+<script>
+// Upload the chosen attachment immediately; the server validates type and size and returns to this page.
+document.querySelectorAll('form[data-auto-upload]').forEach(function (form) {
+    var input = form.querySelector('input[type=file]'), status = form.querySelector('[role=status]');
+    input.addEventListener('change', function () {
+        var f = input.files && input.files[0]; if (!f) return;
+        var ok = /\.(pdf|png|jpe?g)$/i.test(f.name), small = f.size <= 10 * 1024 * 1024;
+        if (!ok || !small) { status.textContent = !ok ? 'Choose a PDF, PNG or JPEG file.' : 'The file is larger than 10 MB.'; status.classList.add('text-danger'); input.value = ''; return; }
+        status.classList.remove('text-danger'); status.textContent = 'Uploading ' + f.name + '…'; input.disabled = false;
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+        input.setAttribute('aria-busy', 'true');
+    });
+});
+</script>

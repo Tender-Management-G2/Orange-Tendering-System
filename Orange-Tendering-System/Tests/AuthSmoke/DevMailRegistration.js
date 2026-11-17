@@ -36,7 +36,7 @@ for (const [key, value] of Object.entries({
   'Input.Category': 'Other',
   'Input.RegistrationNumber': `DEV-${suffix}`,
   'Input.CompanyEmail': `company-${suffix}@example.test`,
-  'Input.CompanyPhone': '+962790000000',
+  'Input.CompanyPhone': '0790000000',
   'Input.CompanyAddress': 'Amman, Jordan',
   '__RequestVerificationToken': token
 })) form.append(key, value);

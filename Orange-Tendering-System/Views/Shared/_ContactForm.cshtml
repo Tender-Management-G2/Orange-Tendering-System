@@ -1,5 +1,5 @@
 @* OWNER: Tariq — Public Site (contact form; posts to ContactController, which honestly answers 501 Not Implemented) *@
-<form id="contact-form" asp-controller="Contact" asp-action="Submit" method="post">
+<form id="contact-form" asp-controller="Contact" asp-action="Submit" method="post" data-fv-skip>
   <div class="contact-field-row">
     <div><label for="contact-name">Full Name *</label><input id="contact-name" name="name" autocomplete="name" required maxlength="100" aria-describedby="name-error" /><span id="name-error" class="field-error"></span></div>
     <div><label for="contact-email">Email *</label><input id="contact-email" name="email" type="email" autocomplete="email" required maxlength="254" aria-describedby="email-error" /><span id="email-error" class="field-error"></span></div>

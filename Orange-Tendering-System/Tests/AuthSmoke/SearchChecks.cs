@@ -32,17 +32,20 @@ public static class SearchChecks
   var count=0;void Check(bool yes,string name){if(!yes)throw new Exception("FAIL "+name);count++;Console.WriteLine("PASS "+name);}
   var password="N!8a"+Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
   string[] areas=["Admin","Department","SourcingOfficer","Supplier","EvaluationCommittee","SourcingManager","TopCommittee"];
+  // The seven workspace roles, in the same order as areas. roles also lists job roles (CEO, Technical...) since the
+  // WorkV3 merge, so it can no longer be indexed together with areas.
+  string[] roles=[SystemRoles.Admin,SystemRoles.RequestingDepartment,SystemRoles.SourcingOfficer,SystemRoles.Supplier,SystemRoles.EvaluationCommittee,SystemRoles.SourcingManager,SystemRoles.TopCommittee];
   var usersByRole=new List<string>();var clients=new List<HttpClient>();var tokens=new List<string>();var hubUrls=new List<string>();
   using(var scope=app.Services.CreateScope()){
    var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();Check(!await db.Users.AnyAsync(),"isolated SQL Server database initially empty");
    var department=new Department{Name="Notification test department",IsActive=true};db.Add(department);await db.SaveChangesAsync();
    var users=scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-   for(int i=0;i<SystemRoles.All.Length;i++){
+   for(int i=0;i<roles.Length;i++){
     int? supplierId=null;
-    if(SystemRoles.All[i]==SystemRoles.Supplier){var s=new Supplier{CompanyName="Notification test company",Email="company@notification.invalid",RegistrationNumber=Guid.NewGuid().ToString(),Status=SupplierStatus.Approved};db.Add(s);await db.SaveChangesAsync();supplierId=s.Id;}
+    if(roles[i]==SystemRoles.Supplier){var s=new Supplier{CompanyName="Notification test company",Email="company@notification.invalid",RegistrationNumber=Guid.NewGuid().ToString(),Status=SupplierStatus.Approved};db.Add(s);await db.SaveChangesAsync();supplierId=s.Id;}
     var email="role"+i+"@notification.invalid";
-    var u=new ApplicationUser{Email=email,UserName=email,EmailConfirmed=true,IsActive=true,FullName="Notification test "+SystemRoles.All[i],SupplierId=supplierId,DepartmentId=i==1?department.Id:null};
-    if(!(await users.CreateAsync(u,password)).Succeeded||!(await users.AddToRoleAsync(u,SystemRoles.All[i])).Succeeded)throw new Exception("Identity setup failed");usersByRole.Add(u.Id);
+    var u=new ApplicationUser{Email=email,UserName=email,EmailConfirmed=true,IsActive=true,FullName="Notification test "+roles[i],SupplierId=supplierId,DepartmentId=i==1?department.Id:null};
+    if(!(await users.CreateAsync(u,password)).Succeeded||!(await users.AddToRoleAsync(u,roles[i])).Succeeded)throw new Exception("Identity setup failed");usersByRole.Add(u.Id);
    }
   }
   async Task<string> Token(HttpClient c,string url){var html=await(await c.GetAsync(url)).Content.ReadAsStringAsync();var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");if(!m.Success)throw new Exception("No CSRF token: "+url);return WebUtility.HtmlDecode(m.Groups[1].Value);}
@@ -60,16 +63,19 @@ public static class SearchChecks
   async Task<JsonElement> Query(int i,string q){var response=await clients[i].GetAsync("/Search/Query?q="+Uri.EscapeDataString(q));response.EnsureSuccessStatusCode();Check(response.Headers.CacheControl?.NoStore==true,"search response prevents private caching");using var json=JsonDocument.Parse(await response.Content.ReadAsStringAsync());return json.RootElement.GetProperty("items").Clone();}
   for(int i=0;i<7;i++){
    var c=app.CreateClient(new(){BaseAddress=new Uri("https://localhost"),AllowAutoRedirect=false});clients.Add(c);var token=await Token(c,"/Identity/Account/Login");
-   var login=await c.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","role"+i+"@notification.invalid"},{"Input.Password",password},{"__RequestVerificationToken",token}}));Check(login.StatusCode==HttpStatusCode.Redirect,SystemRoles.All[i]+": actual Identity login");
-   var page=await c.GetAsync("/"+areas[i]);var html=await page.Content.ReadAsStringAsync();Check(page.IsSuccessStatusCode&&html.Contains("global-search.js")&&html.Contains("data-voice-search")&&html.Contains("data-voice-language")&&html.Contains("ar-JO"),SystemRoles.All[i]+": search, microphone and language selector present");
+   var login=await c.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","role"+i+"@notification.invalid"},{"Input.Password",password},{"__RequestVerificationToken",token}}));Check(login.StatusCode==HttpStatusCode.Redirect,roles[i]+": actual Identity login");
+   var page=await c.GetAsync("/"+areas[i]);var html=await page.Content.ReadAsStringAsync();// Top Committee's top bar searches only its assigned committee rounds (data-tc-search, own microphone); every other role,
+   // Admin included, uses the shared global search. All roles have the shared language selector.
+   var searchControls=html.Contains("global-search.js")&&html.Contains("data-voice-search"); // Top Committee moved onto the shared search bar (b4a2ac1); results stay scoped server-side
+   Check(page.IsSuccessStatusCode&&searchControls&&html.Contains("data-voice-language")&&html.Contains("ar-JO"),roles[i]+": search, microphone and language selector present");
    var results=await Query(i,"Search");var titles=results.EnumerateArray().Select(x=>x.GetProperty("title").GetString()!).ToList();
    if(i==0)Check(!results.EnumerateArray().Any(x=>x.GetProperty("type").GetString()=="Tender"),"Admin does not receive inaccessible confidential tender links");
    else if(i==2)Check(titles.Contains("Search Alpha تجهيزات")&&titles.Contains("Search Secret"),"single Officer searches both tenders");
-   else Check(titles.Contains("Search Alpha تجهيزات")&&!titles.Contains("Search Secret"),SystemRoles.All[i]+": assignment/company/department search isolation");
+   else Check(titles.Contains("Search Alpha تجهيزات")&&!titles.Contains("Search Secret"),roles[i]+": assignment/company/department search isolation");
    if(i==1)Check(results.EnumerateArray().All(x=>x.GetProperty("url").GetString()!.StartsWith("/Department/PurchaseRequests/Details/")),"Department results open authorized request pages");
    foreach(var hit in results.EnumerateArray()){
     var url=hit.GetProperty("url").GetString()!;Check(url.StartsWith('/')&&!url.StartsWith("//"),"result URL is local");
-    for(int redirects=0;redirects<5;redirects++){var target=await c.GetAsync(url);if(target.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.MovedPermanently){url=target.Headers.Location!.ToString();continue;}Check(target.IsSuccessStatusCode,SystemRoles.All[i]+": search result opens permitted page");break;}
+    for(int redirects=0;redirects<5;redirects++){var target=await c.GetAsync(url);if(target.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.MovedPermanently){url=target.Headers.Location!.ToString();continue;}Check(target.IsSuccessStatusCode,roles[i]+": search result opens permitted page");break;}
    }
   }
   Check((await Query(5,"T-"+tenderId.ToString("D4"))).GetArrayLength()==1,"Manager finds padded tender identifier");

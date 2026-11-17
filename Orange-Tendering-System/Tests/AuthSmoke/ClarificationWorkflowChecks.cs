@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -52,6 +52,11 @@ public static class ClarificationWorkflowChecks
    var evaluator=new CommitteeMember{TenderId=t.Id,UserId=ids[SystemRoles.EvaluationCommittee],CommitteeType=CommitteeType.Evaluation,Responsibility=CommitteeResponsibility.TechnicalRepresentative};db.Add(evaluator);
    db.AddRange(new CommitteeMember{TenderId=t.Id,UserId=ids[SystemRoles.SourcingManager],CommitteeType=CommitteeType.Evaluation,Responsibility=CommitteeResponsibility.SourcingManager},new CommitteeMember{TenderId=t.Id,UserId=ids[SystemRoles.TopCommittee],CommitteeType=CommitteeType.Top});await db.SaveChangesAsync();evalSeat=evaluator.Id;
   });
+  var beforeBidOptions=await Service(sp=>sp.GetRequiredService<ClarificationService>().Options(Principal(SystemRoles.SourcingOfficer)));
+  var invitationOption=beforeBidOptions.Single(o=>o.RecipientId==ids[SystemRoles.Supplier]&&o.ContextType=="Tender"&&o.ContextId==tender);
+  Check(!beforeBidOptions.Any(o=>o.RecipientId==ids["SupplierTwo"]),"uninvited supplier is not offered as a contact");
+  var officerPrebid=await Service(sp=>sp.GetRequiredService<ClarificationService>().CreateAsync(Principal(SystemRoles.SourcingOfficer),invitationOption.RecipientId,invitationOption.ContextType,invitationOption.ContextId,"Officer invitation question","Please clarify before bidding"));
+  Check(await Service(sp=>sp.GetRequiredService<SupplierCommunicationService>().ReplyAsync(ids[SystemRoles.Supplier],officerPrebid,"Supplier pre-bid answer")),"Officer starts invitation-linked chat before bidding and Supplier replies");
   int prebid=(await Service(sp=>sp.GetRequiredService<SupplierCommunicationService>().CreateAsync(ids[SystemRoles.Supplier],new SupplierClarificationInputModel{InvitationId=invitation,Subject="Pre-bid question",Message="Please clarify the requirements"})))!.Value;
   Check(prebid>0,"supplier starts invitation-linked clarification before any bid exists");
   Check(await Service(sp=>sp.GetRequiredService<ClarificationService>().ReplyAsync(ids[SystemRoles.SourcingOfficer],prebid,"Officer pre-bid answer")),"Officer replies to pre-bid conversation");
@@ -84,7 +89,7 @@ public static class ClarificationWorkflowChecks
    var client=app.CreateClient(new(){BaseAddress=new Uri("https://localhost"),AllowAutoRedirect=false});clients[role]=client;var token=await Token(client,"/Identity/Account/Login");
    var i=Array.IndexOf(roles,role);if(i<0)i=7;
    var login=await client.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","u"+i+"@clarification.invalid"},{"Input.Password",pw},{"__RequestVerificationToken",token}}));
-   if(role is SystemRoles.Supplier or "SupplierTwo"){Check(login.StatusCode==HttpStatusCode.OK,role+": password accepted before identity step");var step=await client.PostAsync("/Identity/Account/Login?handler=PasswordOnly",new FormUrlEncodedContent(new Dictionary<string,string>{{"__RequestVerificationToken",token}}));Check(step.IsSuccessStatusCode && (await step.Content.ReadAsStringAsync()).Contains("signedIn"),role+": password-only identity step completed");}
+   if(role is SystemRoles.Supplier or "SupplierTwo"){Check(login.StatusCode==HttpStatusCode.Redirect&&login.Headers.Location?.ToString()=="/Supplier",role+": approved supplier signs in with Email & Password");}
    else Check(login.StatusCode==HttpStatusCode.Redirect,role+": actual Identity login");
    csrf[role]=await Token(client, role == SystemRoles.Supplier || role == "SupplierTwo" ? "/Supplier/Clarifications" : "/Clarifications");
   }
@@ -101,6 +106,57 @@ public static class ClarificationWorkflowChecks
   Check(!(await clients["SupplierTwo"].GetAsync("/Clarifications/Download/"+docId)).IsSuccessStatusCode,"other supplier cannot download clarification attachment");
   Check(!(await officer.PostAsync("/Clarifications/Reply",new FormUrlEncodedContent(new Dictionary<string,string>{{"id",prebid.ToString()},{"message","No CSRF"}}))).IsSuccessStatusCode,"reply requires antiforgery token");
   Check((await Post(SystemRoles.SourcingOfficer,"/SourcingOfficer/Clarifications/Reply",new(){{"id",prebid.ToString()},{"message","Legacy route response"}})).StatusCode==HttpStatusCode.Redirect,"legacy Officer reply uses shared authorized workflow");
+  // Sourcing Manager: the legacy area URLs now use the one shared, role-checked chat.
+  var manager=clients[SystemRoles.SourcingManager];
+  var managerOld=await manager.GetAsync("/SourcingManager/Clarifications");Check(managerOld.StatusCode==HttpStatusCode.Redirect&&managerOld.Headers.Location!.ToString().StartsWith("/Clarifications"),"legacy Manager inbox routes to shared role-based inbox");
+  // New clarification: a checklist of exactly the people SQL data allows; ticking several sends one message to each in its own thread.
+  var officerOptions=await Service(sp=>sp.GetRequiredService<ClarificationService>().Options(Principal(SystemRoles.SourcingOfficer)));
+  var oldNew=await officer.GetAsync("/Clarifications/New");Check(oldNew.StatusCode==HttpStatusCode.Redirect&&oldNew.Headers.Location!.ToString().Contains("compose=1"),"old New link opens the Create window on the list");
+  var officerNew=await officer.GetStringAsync("/Clarifications?compose=1");
+  var boxes=System.Text.RegularExpressions.Regex.Matches(officerNew,"name=\"options\"").Count;
+  Check(boxes==officerOptions.Count&&boxes>=2,"New clarification lists exactly the people allowed by SQL data ("+boxes+")");
+  var picked=officerOptions.Take(2).ToList();int before=0,after=0;
+  await Db(async db=>before=await db.Clarifications.CountAsync(c=>c.FromUserId==ids[SystemRoles.SourcingOfficer]));
+  var form=new List<KeyValuePair<string,string>>{new("__RequestVerificationToken",csrf[SystemRoles.SourcingOfficer]),new("message","Checklist message to several people\nSecond line")};
+  form.AddRange(picked.Select(o=>new KeyValuePair<string,string>("options",o.Value)));
+  var multi=await officer.PostAsync("/Clarifications/New",new FormUrlEncodedContent(form));
+  await Db(async db=>after=await db.Clarifications.CountAsync(c=>c.FromUserId==ids[SystemRoles.SourcingOfficer]&&c.Subject=="Checklist message to several people"));
+  Check(multi.StatusCode==HttpStatusCode.Redirect&&after==picked.Count,"ticking several people creates one conversation each with the message as subject");
+  var none=await Post(SystemRoles.SourcingOfficer,"/Clarifications/New",new(){{"message","Nobody chosen"}});
+  Check(none.StatusCode==HttpStatusCode.Redirect&&none.Headers.Location!.ToString().Contains("compose=1"),"Create without a ticked person is refused");
+  int threadsBefore=0,threadsAfter=0;await Db(async db=>threadsBefore=await db.Clarifications.CountAsync());
+  var onlyPending=await Post(SystemRoles.SourcingOfficer,"/Clarifications/New",new(){{"pending",ids[SystemRoles.SourcingManager]},{"message","Ticked without a shared record"}});
+  await Db(async db=>threadsAfter=await db.Clarifications.CountAsync());
+  Check(onlyPending.StatusCode==HttpStatusCode.Redirect&&onlyPending.Headers.Location!.ToString().Contains("compose=1")&&threadsAfter==threadsBefore,"ticked person without a shared record (or forged id) creates no conversation");
+  var mixedForm=new List<KeyValuePair<string,string>>{new("__RequestVerificationToken",csrf[SystemRoles.SourcingOfficer]),new("message","Mixed selection"),new("options",officerOptions[0].Value),new("pending",ids[SystemRoles.Admin])};
+  var mixed=await officer.PostAsync("/Clarifications/New",new FormUrlEncodedContent(mixedForm));
+  await Db(async db=>threadsAfter=await db.Clarifications.CountAsync(c=>c.Subject=="Mixed selection"));
+  Check(mixed.StatusCode==HttpStatusCode.Redirect&&threadsAfter==1,"mixed selection creates only the linked conversation");
+  foreach(var who in new[]{SystemRoles.RequestingDepartment,SystemRoles.SourcingOfficer,SystemRoles.EvaluationCommittee,SystemRoles.SourcingManager})
+  {
+   var svc=await Service(async sp=>{var s=sp.GetRequiredService<ClarificationService>();var o=await s.Options(Principal(who));return (o,await s.PendingContacts(Principal(who),o));});
+   Check(svc.Item2.All(p=>ClarificationPolicy.Partners(who).Contains(p.Role))&&!svc.Item2.Any(p=>svc.Item1.Any(o=>o.Recipient==p.Name)),who+": 'not available yet' lists only partner roles without a shared record");
+  }
+  var managerNew=await manager.GetStringAsync("/Clarifications?compose=1");Check(managerNew.Contains("Create clarification")&&managerNew.Contains("name=\"message\""),"Manager opens the Create window next to the table");
+  // Unread replies: the recipient sees an orange "new" badge and counter; opening the conversation marks it read.
+  var unreadThread=0;string? unreadUser=null;
+  await Db(async db=>{var n=await db.Notifications.Where(x=>!x.IsRead&&x.Link!=null&&x.Link.StartsWith("/Clarifications/Details/")&&x.UserId==ids[SystemRoles.SourcingOfficer]).OrderByDescending(x=>x.Id).FirstOrDefaultAsync();if(n!=null){unreadThread=int.Parse(n.Link!["/Clarifications/Details/".Length..]);unreadUser=n.UserId;}});
+  Check(unreadThread>0,"officer has an unread clarification notification to test with");
+  var inboxUnread=await officer.GetStringAsync("/Clarifications");Check(inboxUnread.Contains("cc-new-badge")&&inboxUnread.Contains("is-alert"),"unread replies show the orange card and a 'new' badge");
+  await officer.GetStringAsync("/Clarifications/Details/"+unreadThread);
+  var stillUnread=0;await Db(async db=>stillUnread=await db.Notifications.CountAsync(x=>x.UserId==unreadUser&&!x.IsRead&&x.Link=="/Clarifications/Details/"+unreadThread));
+  Check(stillUnread==0,"opening the conversation marks its notifications read");
+  var mainStart=managerNew.IndexOf("id=\"workspace-main\"");Check(mainStart>0&&managerNew.IndexOf("clarification-chat.css",mainStart)>mainStart,"chat styles load inside page content (pop-up safe)");
+  var managerThread=threads.TryGetValue((SystemRoles.SourcingManager,SystemRoles.EvaluationCommittee),out var mt)?mt:threads[(SystemRoles.EvaluationCommittee,SystemRoles.SourcingManager)];
+  var managerPage=await manager.GetStringAsync("/Clarifications/Details/"+managerThread);Check(managerPage.Contains("Clarification Chat")&&managerPage.Contains("Sourcing Manager")&&managerPage.Contains("Evaluation Committee"),"Manager sees the role-based chat thread");
+  var managerMayReply=await Service(async sp=>{var t=await sp.GetRequiredService<ApplicationDbContext>().Clarifications.SingleAsync(c=>c.Id==managerThread);return await sp.GetRequiredService<ClarificationService>().CanContinue(t);});
+  var managerReply=await Post(SystemRoles.SourcingManager,"/SourcingManager/Clarifications/Reply",new(){{"id",managerThread.ToString()},{"message","Manager legacy reply"}});
+  Check(managerMayReply?managerReply.StatusCode==HttpStatusCode.Redirect:!managerReply.IsSuccessStatusCode&&managerReply.StatusCode!=HttpStatusCode.Redirect,"legacy Manager reply follows the shared policy");
+  var foreignReply=await Post(SystemRoles.SourcingManager,"/SourcingManager/Clarifications/Reply",new(){{"id",prebid.ToString()},{"message","Not my conversation"}});
+  var foreignSaved=await Service(sp=>sp.GetRequiredService<ApplicationDbContext>().ClarificationMessages.AnyAsync(m=>m.ClarificationId==prebid&&m.Message=="Not my conversation"));
+  // A refused POST is re-executed by the status-code error page, so only "not a success/redirect, nothing saved" is asserted.
+  Check(!foreignReply.IsSuccessStatusCode&&foreignReply.StatusCode!=HttpStatusCode.Redirect&&!foreignSaved,"Manager cannot reply in an Officer-Supplier conversation");
+  Check((await Post(SystemRoles.SourcingManager,"/SourcingManager/Clarifications/Create",new(){{"tenderId",tender.ToString()},{"toUserId",ids[SystemRoles.Supplier]},{"subject","Forbidden"},{"message","Manager to supplier"}})).Headers.Location?.ToString().Contains("/Clarifications/New")==true,"legacy Manager create refuses an unauthorized role");
   Check((await Post(SystemRoles.Supplier,"/Supplier/Clarifications/Resolve",new(){{"id",prebid.ToString()}})).StatusCode==HttpStatusCode.Redirect,"supplier resolves own conversation through UI endpoint");
   Check(!await Service(sp=>sp.GetRequiredService<ClarificationService>().ReplyAsync(ids[SystemRoles.SourcingOfficer],prebid,"Closed reply")),"resolved thread blocks replies");
   Check(!await Service(sp=>sp.GetRequiredService<ClarificationService>().ResolveAsync(ids[SystemRoles.Supplier],prebid)),"duplicate resolution refused");

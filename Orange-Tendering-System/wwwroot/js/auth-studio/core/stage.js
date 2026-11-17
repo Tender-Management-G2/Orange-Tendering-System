@@ -121,6 +121,18 @@ export class Stage {
       if (this.running) this.invalidate();
     };
     document.addEventListener('visibilitychange', this._visibility);
+    const fillIntensity = this.fill.intensity, keyIntensity = this.key.intensity;
+    this._theme = () => {
+      const dark = document.documentElement.dataset.theme === 'dark';
+      const ground = dark ? '#1b2027' : COLOR.ground;
+      this.scene.background.set(ground);
+      this.groundMaterial.color.set(ground);
+      this.fill.intensity = fillIntensity * (dark ? 0.76 : 1);
+      this.key.intensity = keyIntensity * (dark ? 0.86 : 1);
+      this.invalidate();
+    };
+    window.addEventListener('orange:themechange', this._theme);
+    this._theme();
   }
 
   setLightTarget(x, y, z) {
@@ -181,6 +193,7 @@ export class Stage {
   dispose() {
     gsap.ticker.remove(this._tick);
     document.removeEventListener('visibilitychange', this._visibility);
+    window.removeEventListener('orange:themechange', this._theme);
     this._resize.disconnect();
     this.scene.traverse(o => {
       if (o.geometry) o.geometry.dispose();

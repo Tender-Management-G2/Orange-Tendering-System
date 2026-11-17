@@ -31,8 +31,8 @@
             <p class="as-lede">@(done
                 ? (Model.CompanyApproved
                     ? "Your identity has a place. Sign in with your email and password, then confirm with your face or passkey."
-                    : "Your identity has a place. " + (faceDone ? "Your face samples are linked to your account. " : "Your device passkey is linked to your account. ") + "Your company is still awaiting administrator review.")
-                : "Let's bring your identity to life. Choose one method: Face Recognition with your camera, or Fingerprint / Device Passkey with this device or your phone. One is enough.")</p>
+                    : "Your identity has a place. " + (faceDone ? "Your face samples are linked to your account. " : "Your phone is linked to your account. ") + "Your company is still awaiting administrator review.")
+                : "Let's bring your identity to life. Choose one method: Face Recognition with your camera, or Fingerprint / Phone with your smartphone. One is enough.")</p>
 
             <ol class="as-steps" aria-label="Registration progress">
                 <li class="is-done"><span class="as-n">1</span><span class="as-t">Application</span></li>
@@ -47,18 +47,35 @@
             }
             @if (passkeyDone)
             {
-                <p class="as-status is-success" role="status">Device passkey registered for this account (@Model.PasskeyCount passkey(s) registered.)</p>
+                <p class="as-status is-success" role="status">Fingerprint / phone sign-in registered for this account (@Model.PasskeyCount device(s) registered).</p>
             }
             <div id="bio-status" class="as-status bio-status" role="status" aria-live="polite"></div>
 
             <div class="as-field">
                 <label for="bioPassword">Current password</label>
                 <input id="bioPassword" type="password" autocomplete="current-password" />
-                <p class="as-fine">Your password is checked before the camera or the device prompt opens.</p>
+                <p class="as-fine">Your password is checked before the camera opens or a QR code is shown.</p>
             </div>
 
-            <div class="as-cards" role="group" aria-label="Identity methods">
-                <section class="as-card" aria-labelledby="faceCardTitle">
+            @* Choose a method; the other card stays hidden (wwwroot/js/phone-passkey.js). The method already enrolled
+               is preselected, otherwise Face Recognition. *@
+            <div class="as-methods" role="group" aria-label="Choose an identity method">
+                <button type="button" class="as-method" data-method-choice="faceCard" aria-pressed="@(passkeyDone && !faceDone ? "false" : "true")">
+                    <span class="as-method-icon" aria-hidden="true">
+                        <svg class="as-icon" viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" /><circle cx="24" cy="24" r="7.5" /><path d="M24 5 30.5 20.3M40.4 14.5 27.8 30.5M40.4 33.5 20.5 31M24 43 17.5 27.7M7.6 33.5 20.2 17.5M7.6 14.5 27.5 17" /></svg>
+                    </span>
+                    <span class="as-method-text"><strong>Face Recognition</strong><small>Use this device's camera</small></span>
+                </button>
+                <button type="button" class="as-method" data-method-choice="passkeyCard" aria-pressed="@(passkeyDone && !faceDone ? "true" : "false")">
+                    <span class="as-method-icon" aria-hidden="true">
+                        <svg class="as-icon" viewBox="0 0 48 48"><path d="M14 40c2.6-5 3.6-10.4 3.6-16a6.4 6.4 0 0 1 12.8 0c0 6.8-1.2 12.8-3.8 18M24 24c0 6.4-1.2 12-4 17M11 33c1.2-3 1.6-5.8 1.6-9a11.4 11.4 0 0 1 22.8 0c0 4.6-.5 8.8-1.6 12.8M9.5 19.5A15.5 15.5 0 0 1 24 8.5c4 0 7.7 1.5 10.5 4M38.5 18c.6 1.9 1 3.9 1 6" /></svg>
+                    </span>
+                    <span class="as-method-text"><strong>Fingerprint / Phone</strong><small>Your smartphone's fingerprint, face unlock or screen lock</small></span>
+                </button>
+            </div>
+
+            <div class="as-cards">
+                <section class="as-card" id="faceCard" aria-labelledby="faceCardTitle" hidden="@(passkeyDone && !faceDone)">
                     <h2 class="as-card-title" id="faceCardTitle">Face Recognition</h2>
                     <p class="as-fine">The Paper Iris opens on your live camera. Hold still for 7 seconds in good light.</p>
                     <div class="as-actions">
@@ -73,17 +90,10 @@
                     </div>
                     <p id="faceHint" class="as-hint" role="status" aria-live="polite">Use a well-lit place and keep only one person in view.</p>
                 </section>
-                <section class="as-card" aria-labelledby="passkeyCardTitle">
-                    <h2 class="as-card-title" id="passkeyCardTitle">Fingerprint / Device Passkey</h2>
-                    <p class="as-fine">Device passkey: your device asks for its fingerprint (or its face or PIN). To use your phone, choose "Use a phone or tablet" in the browser prompt and scan the QR code the browser shows. The application never receives your fingerprint and cannot see which method your device used.</p>
-                    <div class="as-field">
-                        <label for="passkeyLabel">Device name</label>
-                        <input id="passkeyLabel" type="text" maxlength="60" placeholder="My phone" />
-                    </div>
-                    <div class="as-actions">
-                        <button id="btnPasskeyRegister" type="button" class="@(done ? "as-secondary" : "as-primary")">@(passkeyDone ? "Add another device passkey" : "Register a device passkey")</button>
-                    </div>
-                    <p class="as-fine">@(passkeyDone ? Model.PasskeyCount + " passkey(s) registered." : "No device passkey registered.") This uses the password above.</p>
+                <section class="as-card" id="passkeyCard" aria-labelledby="passkeyCardTitle" hidden="@(!(passkeyDone && !faceDone))">
+                    <h2 class="as-card-title" id="passkeyCardTitle">Fingerprint / Phone</h2>
+                    <partial name="_PhonePasskeySetup" />
+                    <p class="as-fine">@(passkeyDone ? Model.PasskeyCount + " device(s) registered. You can add another phone." : "No phone registered yet.") Your fingerprint never leaves your phone: the phone may use its fingerprint, face unlock or screen lock, and this application cannot tell which.</p>
                 </section>
             </div>
 
@@ -99,8 +109,10 @@
 </section>
 @section Styles {
     <partial name="_AuthStudioHead" />
+    <link rel="stylesheet" href="~/css/phone-passkey.css" asp-append-version="true" />
 }
 @section Scripts {
     <script src="~/js/biometric.js" asp-append-version="true"></script>
+    <script src="~/js/phone-passkey.js" asp-append-version="true"></script>
     <script type="module" src="~/js/auth-studio/station-page.js" asp-append-version="true"></script>
 }

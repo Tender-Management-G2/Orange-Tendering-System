@@ -210,7 +210,9 @@ public static class UnifiedTenderChecks
         var bid = await db.Bids.SingleAsync(b => b.TenderInvitationId == invitation.Id);
         // A screening flag must not act as a predicted-outcome gate on a supplier's draft submission.
         bid.ComplianceStatus = ComplianceStatus.NonCompliant; await db.SaveChangesAsync();
-        Check(await offerService.SubmitAsync(supplierUser.Id, bid.Id) == null, "submission is not blocked by internal screening or predicted outcome");
+        Check(await offerService.SubmitAsync(supplierUser.Id, bid.Id) is string noFile && noFile.Contains("attachment"), "offer cannot be submitted without an attachment");
+        db.Add(new Document { FileName = "offer.pdf", StoragePath = "test/offer.pdf", ContentType = "application/pdf", SizeBytes = 10, UploadedByUserId = supplierUser.Id, UploadedAt = DateTime.UtcNow, BidId = bid.Id, DocumentType = "OfferAttachment" }); await db.SaveChangesAsync();
+        Check(await offerService.SubmitAsync(supplierUser.Id, bid.Id) == null, "submission is not blocked by internal screening or predicted outcome"); db.RemoveRange(db.Documents.Where(d => d.BidId == bid.Id && d.StoragePath == "test/offer.pdf")); await db.SaveChangesAsync(); // compliance later checks the real upload path
         var privateOffer = await offerService.GetOfferAsync(supplierUser.Id, bid.Id);
         Check(privateOffer!.ComplianceStatus == "" && privateOffer.Outcome == null, "internal screening and unannounced outcome not exposed");
         var waitingPopup = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
@@ -308,10 +310,34 @@ public static class UnifiedTenderChecks
         {
             var afterMeeting = await Ajax(lateClient, "/EvaluationCommittee/Workflow/Details/" + id);
             Check(afterMeeting.Contains("wp-scores") && afterMeeting.Contains("Financial (0"), "financial and technical score inputs remain visible after the meeting ends");
+            Check(afterMeeting.Contains("Sign and submit my final evaluation") && afterMeeting.Contains("data-pad"), "evaluation form asks for the member's signature after scoring every supplier");
+            Check(afterMeeting.Contains("Download the AI analysis (PDF)") && afterMeeting.Contains("AI analysis for this meeting"), "AI analysis travels with the meeting to the committee");
+            var aiPdf = await lateClient.GetAsync("/EvaluationCommittee/Workflow/AiAnalysisPdf/" + id);
+            var aiBytes = await aiPdf.Content.ReadAsByteArrayAsync();
+            Check(aiPdf.StatusCode == HttpStatusCode.OK && aiPdf.Content.Headers.ContentType?.MediaType == "application/pdf" && aiBytes.Length > 500 && aiBytes[0] == (byte)'%' && aiBytes[1] == (byte)'P', "committee member downloads the AI analysis as a PDF");
         }
+        var officerMeeting = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
+        Check(officerMeeting.Contains("Change the meeting time") && officerMeeting.Contains("RescheduleEvaluation"), "Officer popup offers to change the meeting time");
+        Check((await officerClient.GetAsync("/SourcingOfficer/Workflow/AiAnalysisPdf/" + id)).StatusCode == HttpStatusCode.OK, "Officer can download the meeting's AI analysis");
+        Check((await supplierClient.GetAsync("/Supplier/Workflow/AiAnalysisPdf/" + id)).StatusCode != HttpStatusCode.OK, "a supplier cannot download the AI analysis");
         var scores = new List<ScoreInput> { new() { BidId = bid.Id, Financial = 80, Technical = 80, Justification = "Test justification" } };
         var beforeStart = new EvaluationSession { StartsAt = DateTime.UtcNow.AddHours(1), State = SessionState.Scheduled };
         Check(!TenderWorkflowService.EvaluationOpen(beforeStart, DateTime.UtcNow), "evaluation stays closed before meeting start");
+        // Officer moves the meeting while nobody has submitted; only the Officer may; never into the past.
+        var originalStart = session.StartsAt; var originalEnd = session.EndsAt;
+        var pastRefused = false; try { await flow.RescheduleEvaluation(id, DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(1), "test", Principal(officer)); } catch (WorkflowException) { pastRefused = true; }
+        Check(pastRefused, "meeting cannot be moved into the past");
+        var memberRefused = false; try { await flow.RescheduleEvaluation(id, DateTimeOffset.UtcNow.AddHours(1), DateTimeOffset.UtcNow.AddHours(2), "test", Principal(manager)); } catch (WorkflowException) { memberRefused = true; }
+        Check(memberRefused, "only the Sourcing Officer can change the meeting time");
+        var newStart = DateTimeOffset.UtcNow.AddHours(3); var newEnd = newStart.AddHours(1);
+        await flow.RescheduleEvaluation(id, newStart, newEnd, "A member is not available at the original time.", Principal(officer));
+        await db.Entry(session).ReloadAsync();
+        Check(Math.Abs((session.StartsAt - newStart.UtcDateTime).TotalSeconds) < 1 && Math.Abs((session.EndsAt - newEnd.UtcDateTime).TotalSeconds) < 1 && session.OpenedAt == null, "Officer changes the meeting time before any submission");
+        Check(await db.Notifications.AnyAsync(n => n.UserId == technical.Id && n.Title == "Evaluation meeting rescheduled" && n.Message.Contains("Jordan time")), "committee is notified of the new time in Jordan time");
+        var earlyRefused = false; try { await flow.SubmitEvaluation(id, [new() { BidId = bid.Id, Financial = 80, Technical = 80, Justification = "early" }], Principal(technical)); } catch (WorkflowException) { earlyRefused = true; }
+        Check(earlyRefused, "scoring stays closed before the new start time");
+        session.StartsAt = originalStart; session.EndsAt = originalEnd; await db.SaveChangesAsync(); // test fixture: back to the elapsed window
+        var meetingPng = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=").Concat(new byte[250]).ToArray();
         foreach (var scorer in new[] { technical, financial, evaluator, manager })
         {
             if (scorer.Id == financial.Id)
@@ -320,8 +346,14 @@ public static class UnifiedTenderChecks
                 session.State = SessionState.Incomplete; session.ClosedAt = DateTime.UtcNow; session.ClosureReason = "Scheduled deadline reached";
                 await db.SaveChangesAsync();
             }
-            await flow.SubmitEvaluation(id, scores, Principal(scorer));
+            await flow.SubmitEvaluation(id, scores, Principal(scorer), meetingPng);
             Check(session.Invitations.Any(x => x.CommitteeMemberId == seats.Single(m => m.UserId == scorer.Id).Id && x.SubmittedAt != null), scorer.FullName + " submits after meeting end");
+            Check(session.Invitations.Any(x => x.CommitteeMemberId == seats.Single(m => m.UserId == scorer.Id).Id && x.SignatureImage != null && x.SignedAt != null), scorer.FullName + " signature saved with the scores");
+            if (scorer.Id == technical.Id)
+            {
+                var movedAfterSubmit = false; try { await flow.RescheduleEvaluation(id, DateTimeOffset.UtcNow.AddHours(1), DateTimeOffset.UtcNow.AddHours(2), "late", Principal(officer)); } catch (WorkflowException) { movedAfterSubmit = true; }
+                Check(movedAfterSubmit, "meeting time is locked after the first final submission");
+            }
             var scoreRepeatRejected = false;
             try { await flow.SubmitEvaluation(id, scores, Principal(scorer)); } catch (WorkflowException) { scoreRepeatRejected = true; }
             Check(scoreRepeatRejected, scorer.FullName + " cannot overwrite submitted scores");

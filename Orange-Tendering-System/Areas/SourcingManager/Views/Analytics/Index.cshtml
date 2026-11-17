@@ -141,9 +141,9 @@
                     <tr>
                         <td>@row.TenderTitle</td>
                         <td>v@(row.VersionNumber)</td>
-                        <td>@row.SubmittedBy<br /><span class="pg-muted">@row.SubmittedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
-                        <td>@row.Status<br /><span class="pg-muted">@row.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
-                        <td>@(row.TopCommitteeStatus?.ToString() ?? "Not forwarded")<br /><span class="pg-muted">@row.TopCommitteeDecidedAt?.ToString("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@row.SubmittedBy<br /><span class="pg-muted">@row.SubmittedAt?.ToJordan("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@row.Status<br /><span class="pg-muted">@row.ReviewedAt?.ToJordan("yyyy-MM-dd HH:mm")</span></td>
+                        <td>@(row.TopCommitteeStatus?.ToString() ?? "Not forwarded")<br /><span class="pg-muted">@row.TopCommitteeDecidedAt?.ToJordan("yyyy-MM-dd HH:mm")</span></td>
                         <td><a class="pg-btn" asp-area="SourcingManager" asp-controller="Reports" asp-action="Review" asp-route-id="@row.ReportId">Open report</a></td>
                     </tr>
                 }
@@ -171,5 +171,5 @@
     .sm-bar-track i.is-accepted { background: linear-gradient(180deg, #6da7dc, #3f79b7); }
     .sm-bar-track i.is-returned { background: linear-gradient(180deg, #a182c6, #70528e); }
     .sm-bar-track i.is-rejected { background: linear-gradient(180deg, #e0736d, #b53f3d); }
-    @@media (max-width: 620px) { .sm-bar-chart { gap: 8px; padding-inline: 8px; } .sm-bar-column { font-size: 10px; } .sm-chart-legend { margin-top: 6px; } }
+    @@media (max-width: 620px) { .sm-bar-chart { gap: 8px; padding-inline: 8px; } .sm-bar-column { font-size:var(--fs-micro,12px); } .sm-chart-legend { margin-top: 6px; } }
 </style>

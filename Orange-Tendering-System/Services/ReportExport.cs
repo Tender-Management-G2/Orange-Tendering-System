@@ -37,7 +37,7 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
         var summary = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><cols><col min=\"1\" max=\"1\" width=\"46\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"28\" customWidth=\"1\"/></cols><sheetData>");
         var r = 1;
         summary.Append($"<row r=\"{r}\">{Cell(r, 0, model.Title, true)}</row>"); r++;
-        summary.Append($"<row r=\"{r}\">{Cell(r, 0, "Generated (UTC)")}{Cell(r, 1, model.GeneratedAt.ToString("yyyy-MM-dd HH:mm"))}</row>"); r += 2;
+        summary.Append($"<row r=\"{r}\">{Cell(r, 0, "Generated (Jordan time)")}{Cell(r, 1, model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm"))}</row>"); r += 2;
         foreach (var k in model.Kpis) { summary.Append($"<row r=\"{r}\">{Cell(r, 0, k.Label)}{Cell(r, 1, k.Value)}</row>"); r++; }
         summary.Append("</sheetData></worksheet>");
         sheets.Add((SheetName("Summary", used), summary.ToString()));
@@ -77,7 +77,7 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
         section.PageSetup.LeftMargin = section.PageSetup.RightMargin = "1.4cm"; section.PageSetup.TopMargin = "1.4cm"; section.PageSetup.BottomMargin = "1.4cm";
         var orange = new Color(255, 121, 0);
         var title = section.AddParagraph(model.Title); title.Format.Font.Size = 20; title.Format.Font.Bold = true; title.Format.Font.Color = orange;
-        section.AddParagraph($"Sourcing & Tender Management System · generated {model.GeneratedAt:yyyy-MM-dd HH:mm} UTC from live system records").Format.Font.Color = Colors.Gray;
+        section.AddParagraph($"Sourcing & Tender Management System · generated {model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm")} (Jordan time) from live system records").Format.Font.Color = Colors.Gray;
         section.AddParagraph().Format.SpaceAfter = "4pt";
         if (model.Kpis.Count > 0)
         {

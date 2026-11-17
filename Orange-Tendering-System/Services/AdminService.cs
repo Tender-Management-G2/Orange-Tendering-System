@@ -47,6 +47,13 @@ namespace Orange_Tendering_System.Services
 
         // 1. ADMIN DASHBOARD
 
+        // Full name of the signed-in user for greetings; null when the account has none.
+        public async Task<string?> GetDisplayNameAsync(System.Security.Claims.ClaimsPrincipal principal)
+        {
+            var user = await _userManager.GetUserAsync(principal);
+            return string.IsNullOrWhiteSpace(user?.FullName) ? null : user.FullName;
+        }
+
         public async Task<WorkspaceDashboardViewModel> GetDashboardAsync()
         {
             var metrics = new Dictionary<string, int>
@@ -1140,7 +1147,9 @@ namespace Orange_Tendering_System.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
-            catch (Exception exception) when (exception is System.Net.Mail.SmtpException or InvalidOperationException)
+            // Any delivery or link failure (SMTP, address format, network) rolls the account back and shows a clear message
+            // instead of an error page; nothing is half-created.
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 await transaction.RollbackAsync();
                 return IdentityResult.Failed(new IdentityError

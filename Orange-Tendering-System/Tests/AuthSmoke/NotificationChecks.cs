@@ -32,17 +32,20 @@ public static class NotificationChecks
   var count=0;void Check(bool yes,string name){if(!yes)throw new Exception("FAIL "+name);count++;Console.WriteLine("PASS "+name);}
   var password="N!8a"+Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
   string[] areas=["Admin","Department","SourcingOfficer","Supplier","EvaluationCommittee","SourcingManager","TopCommittee"];
+  // The seven workspace roles, in the same order as areas. roles also lists job roles (CEO, Technical...) since the
+  // WorkV3 merge, so it can no longer be indexed together with areas.
+  string[] roles=[SystemRoles.Admin,SystemRoles.RequestingDepartment,SystemRoles.SourcingOfficer,SystemRoles.Supplier,SystemRoles.EvaluationCommittee,SystemRoles.SourcingManager,SystemRoles.TopCommittee];
   var usersByRole=new List<string>();var clients=new List<HttpClient>();var tokens=new List<string>();var hubUrls=new List<string>();
   using(var scope=app.Services.CreateScope()){
    var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();Check(!await db.Users.AnyAsync(),"isolated SQL Server database initially empty");
    var department=new Department{Name="Notification test department",IsActive=true};db.Add(department);await db.SaveChangesAsync();
    var users=scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-   for(int i=0;i<SystemRoles.All.Length;i++){
+   for(int i=0;i<roles.Length;i++){
     int? supplierId=null;
-    if(SystemRoles.All[i]==SystemRoles.Supplier){var s=new Supplier{CompanyName="Notification test company",Email="company@notification.invalid",RegistrationNumber=Guid.NewGuid().ToString(),Status=SupplierStatus.Approved};db.Add(s);await db.SaveChangesAsync();supplierId=s.Id;}
+    if(roles[i]==SystemRoles.Supplier){var s=new Supplier{CompanyName="Notification test company",Email="company@notification.invalid",RegistrationNumber=Guid.NewGuid().ToString(),Status=SupplierStatus.Approved};db.Add(s);await db.SaveChangesAsync();supplierId=s.Id;}
     var email="role"+i+"@notification.invalid";
-    var u=new ApplicationUser{Email=email,UserName=email,EmailConfirmed=true,IsActive=true,FullName="Notification test "+SystemRoles.All[i],SupplierId=supplierId,DepartmentId=i==1?department.Id:null};
-    if(!(await users.CreateAsync(u,password)).Succeeded||!(await users.AddToRoleAsync(u,SystemRoles.All[i])).Succeeded)throw new Exception("Identity setup failed");usersByRole.Add(u.Id);
+    var u=new ApplicationUser{Email=email,UserName=email,EmailConfirmed=true,IsActive=true,FullName="Notification test "+roles[i],SupplierId=supplierId,DepartmentId=i==1?department.Id:null};
+    if(!(await users.CreateAsync(u,password)).Succeeded||!(await users.AddToRoleAsync(u,roles[i])).Succeeded)throw new Exception("Identity setup failed");usersByRole.Add(u.Id);
    }
   }
   async Task<string> Token(HttpClient c,string url){var html=await(await c.GetAsync(url)).Content.ReadAsStringAsync();var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");if(!m.Success)throw new Exception("No CSRF token: "+url);return WebUtility.HtmlDecode(m.Groups[1].Value);}
@@ -50,19 +53,22 @@ public static class NotificationChecks
    Check(!(await anonymous.GetAsync("/Notifications/Feed")).IsSuccessStatusCode,"anonymous notification feed refused");
    Check(!(await anonymous.PostAsync("/hubs/notifications/negotiate?negotiateVersion=1",new StringContent(""))).IsSuccessStatusCode,"anonymous SignalR negotiation refused");
   }
-  for(int i=0;i<SystemRoles.All.Length;i++){
+  for(int i=0;i<roles.Length;i++){
    var c=app.CreateClient(new(){BaseAddress=new Uri("https://localhost"),AllowAutoRedirect=false});c.Timeout=TimeSpan.FromSeconds(25);clients.Add(c);
    var token=await Token(c,"/Identity/Account/Login");
    var response=await c.PostAsync("/Identity/Account/Login",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Email","role"+i+"@notification.invalid"},{"Input.Password",password},{"__RequestVerificationToken",token}}));
-   Check(response.StatusCode==HttpStatusCode.Redirect,SystemRoles.All[i]+": real Identity credential login");
+   Check(response.StatusCode==HttpStatusCode.Redirect,roles[i]+": real Identity credential login");
 
-   var page=await c.GetAsync("/"+areas[i]);var html=await page.Content.ReadAsStringAsync();Check(page.IsSuccessStatusCode&&html.Contains("data-notification-bell")&&html.Contains("notification-bell.js"),SystemRoles.All[i]+": dashboard bell and script rendered");
+   var page=await c.GetAsync("/"+areas[i]);var html=await page.Content.ReadAsStringAsync();// Top Committee keeps its own bell: it opens notifications only through TopCommittee/Notifications/Open, which checks the
+   // destination is a round assigned to the member (AuthorizedDestination). Every other role uses the shared live bell.
+   var bellRendered=roles[i]==SystemRoles.TopCommittee?html.Contains("data-tc-bell")&&html.Contains("data-preview-url")&&html.Contains("data-open-url"):html.Contains("data-notification-bell")&&html.Contains("notification-bell.js");
+   Check(page.IsSuccessStatusCode&&bellRendered,roles[i]+": dashboard bell and script rendered");
    tokens.Add(await Token(c,"/"+areas[i]));
    var negotiated=await c.PostAsync("/hubs/notifications/negotiate?negotiateVersion=1",new StringContent(""));negotiated.EnsureSuccessStatusCode();using var data=JsonDocument.Parse(await negotiated.Content.ReadAsStringAsync());
    var url="/hubs/notifications?id="+Uri.EscapeDataString(data.RootElement.GetProperty("connectionToken").GetString()!);hubUrls.Add(url);
    (await c.GetAsync(url)).EnsureSuccessStatusCode();
    (await c.PostAsync(url,new StringContent("{\"protocol\":\"json\",\"version\":1}\u001e",Encoding.UTF8,"application/octet-stream"))).EnsureSuccessStatusCode();
-   var handshake=await c.GetStringAsync(url);Check(handshake.Contains("{}"),SystemRoles.All[i]+": actual authenticated SignalR handshake");
+   var handshake=await c.GetStringAsync(url);Check(handshake.Contains("{}"),roles[i]+": actual authenticated SignalR handshake");
   }
   async Task<JsonElement> Next(HttpClient c,string url){for(int attempt=0;attempt<4;attempt++){var body=await c.GetStringAsync(url);foreach(var part in body.Split('\u001e',StringSplitOptions.RemoveEmptyEntries)){using var doc=JsonDocument.Parse(part);var r=doc.RootElement;if(r.TryGetProperty("target",out var target)&&target.GetString()=="notification")return r.GetProperty("arguments")[0].Clone();}}throw new Exception("Notification invocation not received");}
   var polls=clients.Select((c,i)=>Next(c,hubUrls[i])).ToArray();
@@ -72,9 +78,9 @@ public static class NotificationChecks
    await Task.Delay(150);Check(polls.All(p=>!p.IsCompleted),"no notification published before explicit SQL transaction commits");await tx.CommitAsync();
   }
   for(int i=0;i<7;i++){
-   var n=await polls[i];Check(n.GetProperty("title").GetString()=="Private role "+i,SystemRoles.All[i]+": committed SignalR push isolated to its owner");
+   var n=await polls[i];Check(n.GetProperty("title").GetString()=="Private role "+i,roles[i]+": committed SignalR push isolated to its owner");
    var feed=await clients[i].GetAsync("/Notifications/Feed");using var data=JsonDocument.Parse(await feed.Content.ReadAsStringAsync());var rows=data.RootElement.GetProperty("items");
-   Check(data.RootElement.GetProperty("unread").GetInt32()==1&&rows.GetArrayLength()==1&&rows[0].GetProperty("title").GetString()=="Private role "+i,SystemRoles.All[i]+": SQL feed contains only own notification");
+   Check(data.RootElement.GetProperty("unread").GetInt32()==1&&rows.GetArrayLength()==1&&rows[0].GetProperty("title").GetString()=="Private role "+i,roles[i]+": SQL feed contains only own notification");
    if(i==0)Check(rows[0].GetProperty("link").ValueKind==JsonValueKind.Null,"unsafe notification link removed from feed and hub payload");
   }
   int adminNotification,otherNotification;
@@ -83,7 +89,7 @@ public static class NotificationChecks
   Check(!(await Post(0,"/Notifications/Read?id="+otherNotification)).IsSuccessStatusCode,"cannot mark another account's notification read");
   Check(!(await clients[0].PostAsync("/Notifications/Read?id="+adminNotification,new StringContent(""))).IsSuccessStatusCode,"notification mutations require CSRF token");
   Check((await Post(0,"/Notifications/Read?id="+adminNotification)).IsSuccessStatusCode,"owner marks its notification read");
-  for(int i=1;i<7;i++)Check((await Post(i,"/Notifications/ReadAll")).IsSuccessStatusCode,SystemRoles.All[i]+": mark all read works");
+  for(int i=1;i<7;i++)Check((await Post(i,"/Notifications/ReadAll")).IsSuccessStatusCode,roles[i]+": mark all read works");
   var pending=Next(clients[6],hubUrls[6]);
   using(var scope=app.Services.CreateScope()){
    var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

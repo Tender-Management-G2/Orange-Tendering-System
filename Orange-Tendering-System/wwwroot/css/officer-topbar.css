@@ -1,0 +1,27 @@
+/* Sourcing Officer top bar controls on every officer page: language selector and light/dark switch (_SourcingOfficerLayout). */
+/* Language selector: globe + "English" + chevron; the native select stays the accessible control. */
+.ws-language { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; color: var(--ws-ink); cursor: pointer; }
+.ws-language-globe { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; flex: none; }
+.ws-language-chevron { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; flex: none; pointer-events: none; }
+.ws-shell .ws-language select.ws-voice-language { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; padding: 6px 2px; cursor: pointer; min-width: 0; max-width: none; min-height: 0; height: auto; box-shadow: none; }
+.ws-language select option { color: #15181c; background: #fff; }
+.ws-language:focus-within { outline: 2px solid var(--ws-orange); outline-offset: 3px; border-radius: 8px; }
+/* Light / dark switch (replaces the old help icon in the Sourcing Officer top bar). */
+.ws-theme-switch { display: inline-flex; align-items: stretch; width: 92px; height: 38px; padding: 0; border-radius: 19px; border: 2px solid #ff8a1f; background: #1f2226; overflow: hidden; cursor: pointer; flex: none; box-shadow: 0 3px 10px #ff790030; }
+.ws-theme-switch > span { flex: 1; display: grid; place-items: center; transition: background .2s ease, color .2s ease; }
+.ws-theme-switch svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; }
+.ws-theme-switch-sun { background: #fff6ec; color: #ff7900; border-radius: 17px 0 0 17px; }
+.ws-theme-switch-sun svg circle { fill: #ffa51f; }
+.ws-theme-switch-moon { background: #1f2226; color: #fff; }
+.ws-theme-switch-moon svg path { fill: #fff; stroke: none; }
+:root[data-theme="dark"] .ws-theme-switch-sun { background: #2a2d31; color: #9aa1aa; }
+:root[data-theme="dark"] .ws-theme-switch-sun svg circle { fill: none; }
+:root[data-theme="dark"] .ws-theme-switch-moon { background: linear-gradient(135deg, #ff9a2e, #ff7900); color: #fff; border-radius: 0 17px 17px 0; }
+.ws-theme-switch:focus-visible { outline: 2px solid var(--ws-orange); outline-offset: 3px; }
+.ws-theme-switch:hover { box-shadow: 0 4px 14px #ff790055; }
+[dir="rtl"] .ws-theme-switch { flex-direction: row-reverse; }
+.ws-shell svg.ws-language-globe { width: 28px; height: 28px; }
+.ws-shell svg.ws-language-chevron { width: 18px; height: 18px; }
+.ws-shell .ws-theme-switch svg { width: 24px; height: 24px; }
+
+@media (max-width: 767px) { .ws-theme-switch { width: 64px; height: 32px; } .ws-shell .ws-theme-switch svg { width: 20px; height: 20px; } }

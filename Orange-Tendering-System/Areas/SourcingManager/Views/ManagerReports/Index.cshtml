@@ -232,7 +232,7 @@
                                         ? "Further details requested"
                                         : "Under review")
                             </td>
-                            <td>@(response.DecidedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not available")</td>
+                            <td>@(response.DecidedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "Not available")</td>
                         </tr>
                     }
                 }

@@ -1,0 +1,18 @@
+@*
+  Global event spotlight (all signed-in workspaces; rendered next to the notification bell).
+  Data: GET /Spotlight/Pending (own, real, unacknowledged notifications only); dismissal is stored in SQL Server through
+  POST /Spotlight/Acknowledge/{id}. A verified tender win plays a one-time celebration; other events show calm cards.
+*@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery SpotlightAntiforgery
+@if (User.Identity?.IsAuthenticated == true)
+{
+    var arabic = Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
+    <div id="event-spotlight" hidden
+         data-pending-url="@Url.Action("Pending", "Spotlight", new { area = "" })"
+         data-ack-url="@Url.Content("~/Spotlight/Acknowledge/")"
+         data-history-url="@(User.IsInRole(SystemRoles.Supplier) ? Url.Action("Index", "Notifications", new { area = "Supplier" }) : Url.Action("Index", "Notifications", new { area = "" }))"
+         data-csrf="@SpotlightAntiforgery.GetAndStoreTokens(Context).RequestToken"
+         data-lang="@(arabic ? "ar" : "en")"></div>
+    <link rel="stylesheet" href="~/css/event-spotlight.css" asp-append-version="true" />
+    <script src="~/js/event-spotlight.js" asp-append-version="true" defer></script>
+}

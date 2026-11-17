@@ -1,0 +1,106 @@
+/* Orange form validation — styles for wwwroot/js/form-validation.js and the server's ModelState messages.
+   Loaded on every layout (via Views/Shared/_JQueryScripts.cshtml). Light and dark mode, LTR and RTL. */
+:root {
+  --fv-error: #c62828;
+  --fv-error-ring: rgba(198, 40, 40, .18);
+  --fv-error-bg: #fff5f5;
+}
+:root[data-theme="dark"] {
+  --fv-error: #ff8a80;
+  --fv-error-ring: rgba(255, 138, 128, .22);
+  --fv-error-bg: rgba(255, 138, 128, .07);
+}
+
+/* Mandatory indicator */
+.fv-req {
+  color: var(--fv-error);
+  font-weight: 700;
+  margin-inline-start: .2em;
+  text-decoration: none;
+}
+
+/* Invalid control: red border and focus ring, same shape as the control */
+.fv-form :is(input, select, textarea).fv-invalid,
+.fv-form :is(input, select, textarea).input-validation-error,
+form :is(input, select, textarea).input-validation-error {
+  border-color: var(--fv-error) !important;
+  background-color: var(--fv-error-bg);
+  box-shadow: 0 0 0 1px var(--fv-error);
+}
+.fv-form :is(input, select, textarea).fv-invalid:focus,
+.fv-form :is(input, select, textarea).fv-invalid:focus-visible,
+form :is(input, select, textarea).input-validation-error:focus {
+  outline: none;
+  border-color: var(--fv-error) !important;
+  box-shadow: 0 0 0 3px var(--fv-error-ring);
+}
+.fv-form input[type="checkbox"].fv-invalid,
+.fv-form input[type="radio"].fv-invalid {
+  outline: 2px solid var(--fv-error);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.fv-form input[type="file"].fv-invalid {
+  border: 1px dashed var(--fv-error) !important;
+  border-radius: 8px;
+  padding: 4px;
+}
+.fv-group-invalid {
+  outline: 1px solid var(--fv-error);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+/* Message directly under the field */
+.fv-msg,
+.fv-form .field-validation-error,
+form .field-validation-error {
+  display: block;
+  width: 100%;
+  flex-basis: 100%;
+  margin: .3rem 0 0;
+  color: var(--fv-error) !important;
+  font-size: .8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: start;
+  white-space: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.fv-msg[hidden],
+.fv-form .field-validation-valid:empty { display: none !important; }
+.fv-msg::before {
+  content: "!";
+  display: inline-grid;
+  place-items: center;
+  width: 1.05em;
+  height: 1.05em;
+  margin-inline-end: .35em;
+  border-radius: 50%;
+  background: var(--fv-error);
+  color: #fff;
+  font-size: .72em;
+  font-weight: 700;
+  vertical-align: .08em;
+}
+:root[data-theme="dark"] .fv-msg::before { color: #1b1b1b; }
+
+/* Labels that wrap their control keep the message on its own line */
+label > .fv-msg { margin-top: .25rem; }
+
+/* Server validation summaries share the same colour */
+form .validation-summary-errors,
+.fv-form [data-valmsg-summary="true"].validation-summary-errors {
+  color: var(--fv-error);
+}
+
+[dir="rtl"] .fv-msg, .fv-msg:dir(rtl) { text-align: right; }
+
+@media (max-width: 640px) {
+  .fv-msg, .fv-form .field-validation-error { font-size: .85rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fv-msg:not([hidden]) { animation: fv-in .16s ease-out; }
+  @keyframes fv-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+}

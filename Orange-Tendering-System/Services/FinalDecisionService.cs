@@ -15,6 +15,8 @@ public sealed class FinalDecisionService(TenderWorkflowService workflow, IEmailS
     }
 
     public Task RetryEmails(int tenderId, ClaimsPrincipal principal) => SendEmails(tenderId, principal, retryOnly: true);
+    // Used after the Executive Agent has separately confirmed and committed the existing SQL notification action.
+    public Task SendPendingEmails(int tenderId, ClaimsPrincipal principal) => SendEmails(tenderId, principal, retryOnly: false);
 
     private async Task SendEmails(int tenderId, ClaimsPrincipal principal, bool retryOnly)
     {
@@ -24,10 +26,14 @@ public sealed class FinalDecisionService(TenderWorkflowService workflow, IEmailS
             if (!configured) { await workflow.RecordEmailResult(delivery.Id, "NotConfigured", "SMTP is not configured; the in-app notification was delivered.", principal); continue; }
             try
             {
-                var body = delivery.Outcome == "Won"
-                    ? "<p>Congratulations: your company has been selected for a tender after all mandatory approvals.</p><p>Sign in to the Supplier Portal to see the details of your own offer.</p>"
-                    : "<p>A tender you participated in has been awarded. Your company was not selected. Thank you for participating.</p><p>Sign in to the Supplier Portal for details of your own offer.</p>";
-                await mail.SendEmailAsync(email, "Tender result", body);
+                var (subject, body) = delivery.Outcome switch
+                {
+                    "Won" => ("Tender result", "<p>Congratulations: your company has been selected for a tender after all mandatory approvals.</p><p>Sign in to the Supplier Portal to see the details of your own offer.</p>"),
+                    "Cancelled" => ("Tender cancelled", "<p>A tender you participated in has been cancelled because the company no longer needs it. No supplier was selected and no further offers are accepted. Thank you for participating.</p>"),
+                    "Reissued" => ("Tender reissued", "<p>A tender you participated in is being reissued as a new bidding round. Your earlier offer stays on record but will not be evaluated. You will receive a new invitation; please submit a new offer in the Supplier Portal.</p>"),
+                    _ => ("Tender result", "<p>A tender you participated in has been awarded. Your company was not selected. Thank you for participating.</p><p>Sign in to the Supplier Portal for details of your own offer.</p>")
+                };
+                await mail.SendEmailAsync(email, subject, body);
                 await workflow.RecordEmailResult(delivery.Id, "Sent", null, principal);
             }
             catch (Exception e)

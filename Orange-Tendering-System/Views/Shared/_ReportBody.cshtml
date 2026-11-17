@@ -1,7 +1,7 @@
 @model Orange_Tendering_System.Services.ReportModel
 @* Shared report renderer: the page, the Excel file and the PDF all use the same ReportModel computed from live SQL data. *@
 <section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">@Model.Description · generated @Model.GeneratedAt.ToString("yyyy-MM-dd HH:mm") UTC</span></div>
+    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">@Model.Description · generated @Model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</span></div>
         <div class="pg-actions"><a class="pg-btn pg-btn-primary" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "pdf" })">Download PDF</a>
             <a class="pg-btn" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "xlsx" })">Download Excel</a></div></div>
     <dl class="ui-facts">

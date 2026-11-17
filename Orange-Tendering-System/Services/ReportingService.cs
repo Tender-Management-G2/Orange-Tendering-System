@@ -140,7 +140,7 @@ public sealed class ReportingService(ApplicationDbContext db)
         m.Tables.Add(new("Top Committee voting records", ["Tender", "Approve", "Reject", "Last vote"], votes.GroupBy(v => v.Tender).Select(g => new[] { g.Key, g.Count(v => v.Decision == VoteDecision.Approve).ToString(), g.Count(v => v.Decision == VoteDecision.Reject).ToString(), D(g.Max(v => v.VotedAt)) }).ToList()));
         m.Tables.Add(new("Awarded contracts", ["Tender", "Supplier", "Estimated value", "Awarded"], awarded.Select(a => new[] { a.Title, a.Supplier, N(a.EstimatedValue), D(a.AwardedAt) }).ToList()));
         m.Tables.Add(new("Audit trail by action", ["Action", "Entries"], byAction.Select(a => new[] { Words(a.Key), a.Count.ToString() }).ToList()));
-        m.Tables.Add(new("Latest audit entries", ["Time (UTC)", "User", "Action", "Record"], audit.Select(a => new[] { a.CreatedAt.ToString("yyyy-MM-dd HH:mm"), a.User?.FullName ?? "system", Words(a.Action), $"{a.EntityName} {a.EntityId}" }).ToList()));
+        m.Tables.Add(new("Latest audit entries", ["Time (Jordan)", "User", "Action", "Record"], audit.Select(a => new[] { a.CreatedAt.ToJordan("yyyy-MM-dd HH:mm"), a.User?.FullName ?? "system", Words(a.Action), $"{a.EntityName} {a.EntityId}" }).ToList()));
         return m;
     }
 

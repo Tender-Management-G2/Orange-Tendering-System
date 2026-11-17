@@ -114,7 +114,7 @@ public static class SajaDemoFixture
         {
             var company = new Supplier { CompanyName = "SAJA DEMO - " + name, Category = category,
                 RegistrationNumber = "SAJA-DEMO-" + name, TaxNumber = "DEMO-TAX-" + name, Email = name + "@saja-demo.test",
-                Phone = "+962790000000", Address = "Amman - demonstration only", Status = status, CreatedAt = now.AddDays(-5),
+                Phone = "0790000000", Address = "Amman - demonstration only", Status = status, CreatedAt = now.AddDays(-5),
                 ReviewedByUserId = status == SupplierStatus.Pending ? null : admin.Id,
                 ReviewedAt = status == SupplierStatus.Pending ? null : now.AddDays(-4),
                 ReviewNotes = status == SupplierStatus.Pending ? null : "Seeded walkthrough state, not a real verification." };

@@ -4,20 +4,35 @@
     ViewData["Title"] = "Final decisions"; ViewData["WorkspaceSection"] = "Final Decisions";
     ViewData["Description"] = "Top Committee, then Sourcing Manager, then you. Only you can announce results to suppliers.";
     var suppliers = (Dictionary<int, string>)ViewBag.Suppliers; var emails = (Dictionary<string, string?>)ViewBag.Emails;
+    var rounds = (Dictionary<int, int>?)ViewBag.Rounds ?? new();
+    var maxRounds = Orange_Tendering_System.Services.TenderWorkflowService.MaxRounds;
 }
 <partial name="_PageHeader" />
 <partial name="_Flash" />
 @foreach (var n in Model)
 {
+    var rejected = n.Outcome != FinalDecisionOutcome.Award;
+    var currentRound = rounds.GetValueOrDefault(n.TenderId);
+    var blocked = n.Outcome == FinalDecisionOutcome.Retender && n.Status != FinalDecisionStatus.SuppliersNotified && currentRound >= maxRounds;
+    var reason = n.Outcome == FinalDecisionOutcome.Retender ? "Re-Tender requested: " + n.DecisionReason : "Company no longer needs this tender: " + n.DecisionReason;
     <section class="ws-panel pg-panel" aria-labelledby="fd-@n.Id">
         <div class="pg-panel-head"><h2 id="fd-@n.Id">@n.Tender.Title</h2>
             <span class="ui-pill ui-pill--@(n.Status == FinalDecisionStatus.SuppliersNotified ? "good" : n.Status == FinalDecisionStatus.ForwardedToOfficer ? "info" : "warn")">@(n.Status switch { FinalDecisionStatus.AwaitingManager => "Waiting for Manager", FinalDecisionStatus.ForwardedToOfficer => "Ready to notify suppliers", _ => "Suppliers notified" })</span></div>
         <ol class="ui-timeline">
-            <li><strong>Top Committee</strong><span>@(n.TopVotes == 0 ? "Not required: Manager approval is the final decision" : $"{n.TopApprovals} of {n.TopVotes} approved") · @n.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span></li>
-            <li><strong>Sourcing Manager</strong><span>@(n.ManagerAcknowledgedAt is { } t ? "Acknowledged and forwarded " + t.ToString("yyyy-MM-dd HH:mm") + (string.IsNullOrWhiteSpace(n.ManagerComment) ? "" : " · " + n.ManagerComment) : "Waiting for acknowledgement")</span></li>
-            <li><strong>Sourcing Officer</strong><span>@(n.SuppliersNotifiedAt is { } s ? "Suppliers notified " + s.ToString("yyyy-MM-dd HH:mm") : "Suppliers have not been notified")</span></li>
+            <li><strong>Top Committee</strong><span>@(rejected ? $"{reason} · approval stopped" : n.TopVotes == 0 ? "Not required: Manager approval is the final decision" : $"{n.TopApprovals} of {n.TopVotes} approved") · @n.CreatedAt.ToJordan("yyyy-MM-dd HH:mm")</span></li>
+            <li><strong>Sourcing Manager</strong><span>@(n.ManagerAcknowledgedAt is { } t ? "Acknowledged and forwarded " + t.ToJordan("yyyy-MM-dd HH:mm") + (string.IsNullOrWhiteSpace(n.ManagerComment) ? "" : " · " + n.ManagerComment) : "Waiting for acknowledgement")</span></li>
+            <li><strong>Sourcing Officer</strong><span>@(n.SuppliersNotifiedAt is { } s ? "Suppliers notified " + s.ToJordan("yyyy-MM-dd HH:mm") + (n.Outcome == FinalDecisionOutcome.Cancel ? " · tender cancelled" : n.Outcome == FinalDecisionOutcome.Retender ? $" · reissued as round {n.NewRoundNumber}" : "") : "Suppliers have not been notified")</span></li>
         </ol>
-        @if (n.Status == FinalDecisionStatus.ForwardedToOfficer)
+        @if (blocked) { <p class="pg-hint" role="alert">Re-tendering is blocked: round @currentRound is the last permitted round (@maxRounds). Round @(maxRounds + 1) can never be created.</p> }
+        else if (n.Outcome == FinalDecisionOutcome.Retender && n.Status == FinalDecisionStatus.ForwardedToOfficer)
+        {
+            <div class="pg-actions"><a class="pg-btn pg-btn-primary" asp-action="Retender" asp-route-id="@n.TenderId">Prepare round @(currentRound + 1): details, deadline &amp; invitations</a><span class="pg-hint">Publishing opens the round and notifies previous and newly invited suppliers.</span></div>
+        }
+        else if (rejected && n.Status == FinalDecisionStatus.ForwardedToOfficer)
+        {
+            <form method="post" asp-action="Notify" asp-route-id="@n.TenderId" class="pg-form"><div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary" data-confirm="@(n.Outcome == FinalDecisionOutcome.Cancel ? "Notify the suppliers and the requesting department, and cancel this tender permanently?" : "Notify the suppliers and reissue this tender as a new bidding round?")">@(n.Outcome == FinalDecisionOutcome.Cancel ? "Notify suppliers & cancel tender" : $"Notify suppliers & open round {currentRound + 1}")</button><span class="pg-hint">This can only be done once. Earlier votes, signatures and offers stay on record.</span></div></form>
+        }
+        else if (n.Status == FinalDecisionStatus.ForwardedToOfficer)
         {
             <form method="post" asp-action="Notify" asp-route-id="@n.TenderId" class="pg-form"><div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary" data-confirm="Announce the winning and unsuccessful results to suppliers now?">Notify Suppliers</button><span class="pg-hint">The tender must be awarded first. This can only be done once.</span></div></form>
         }

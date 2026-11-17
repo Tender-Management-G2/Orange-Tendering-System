@@ -12,10 +12,10 @@
 <p><a asp-controller="Reports" asp-action="Review" asp-route-id="@Model.ReportId">Review report #@Model.ReportId</a></p>
 <p role="status"><strong>@Model.Status</strong></p>
 @if (Model.FinalReason.HasValue) { <p>Final rejection reason: <strong>@Reason(Model.FinalReason)</strong></p> }
-<p>This page records the Top Committee decision only. It does not cancel a tender or create a bidding round. The existing vote thresholds and signed votes remain unchanged.</p>
+<p>The Top Committee has three decisions: Approve, Reject and Re-Tender. A single Reject or Re-Tender from any assigned member stops the Top approval at once, even after earlier approvals. It goes with its documented reason to the Sourcing Manager, then to the Sourcing Officer: Reject (the company no longer needs the tender) cancels it and notifies the suppliers and the requesting department; Re-Tender lets the Officer reissue the same tender as a new bidding round (maximum four rounds). Signed votes are never changed.</p>
 <table class="table"><thead><tr><th>Member</th><th>Signed vote</th><th>Original rejection reason</th><th>Justification</th></tr></thead><tbody>
 @foreach (var vote in Model.Votes) {
-    <tr><td>@vote.CommitteeMember.User.FullName</td><td>@vote.Decision</td><td>@(vote.Decision == VoteDecision.Reject ? Reason(vote.RejectionReason) : "—")</td><td>@vote.Comment</td></tr>
+    <tr><td>@vote.CommitteeMember.User.FullName</td><td>@vote.Decision</td><td>@(vote.Decision == VoteDecision.Reject ? Reason(vote.RejectionReason) : vote.Decision == VoteDecision.Retender ? "Re-Tender" : "—")</td><td>@vote.Comment</td></tr>
 }
 </tbody></table>
 @if (Model.CanAgree) {

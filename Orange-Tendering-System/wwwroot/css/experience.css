@@ -109,14 +109,14 @@ header nav {
 }
 .micro-label {
   display: block;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   letter-spacing: 1.5px;
   font-weight: 600;
   color: var(--subtle);
 }
 .quiet-tag {
   padding: 6px 9px;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   letter-spacing: 1px;
   color: var(--subtle);
   border: 1px solid var(--rule);
@@ -146,7 +146,7 @@ header nav {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 .explorer-toolbar svg {
@@ -174,7 +174,7 @@ header nav {
   border-radius: 9px;
   padding: 15px 12px;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--fs-micro);
   min-height: 52px;
 }
 .role-tabs button > svg {
@@ -184,13 +184,13 @@ header nav {
   stroke-width: 2;
 }
 .role-tabs button > span {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   color: inherit;
   line-height: 1.5;
 }
 .role-tabs button > b {
   margin-left: auto;
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   opacity: 0;
   font-weight: 400;
   color: var(--orange-ink);
@@ -255,7 +255,7 @@ header nav {
   margin-left: auto;
 }
 .role-panel > .role-summary {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--secondary);
   margin: 22px 0;
@@ -283,7 +283,7 @@ header nav {
   stroke-width: 2;
 }
 .responsibility-grid span {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.6;
   color: var(--ink);
 }
@@ -294,7 +294,7 @@ header nav {
   margin-top: 13px;
 }
 .role-capabilities > div > span {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   padding: 7px 9px;
   border: 1px solid var(--rule);
   border-radius: 6px;
@@ -338,7 +338,7 @@ header nav {
   stroke-width: 2;
 }
 .mini-workflow small {
-  font-size: 8px;
+  font-size: var(--fs-micro);
   line-height: 1.4;
   max-width: 80px;
 }
@@ -356,7 +356,7 @@ header nav {
   margin-top: 23px;
   display: flex;
   gap: 10px;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   line-height: 1.6;
   color: var(--secondary);
 }
@@ -384,16 +384,16 @@ header nav {
 }
 .access-notes strong {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 500;
   margin-bottom: 5px;
 }
 .access-notes small {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
 }
 .access-notes .integration-note {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   line-height: 1.7;
   color: var(--subtle);
   margin-left: auto;
@@ -413,12 +413,12 @@ header nav {
   margin-bottom: 18px;
 }
 .directory-heading h3 {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   margin: 0;
 }
 .directory-heading p {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   margin: 0;
 }
@@ -480,7 +480,7 @@ header nav {
 }
 .connection-icons b {
   font-weight: 400;
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   color: var(--subtle);
 }
 .connection-roles {
@@ -490,12 +490,12 @@ header nav {
   margin: 12px 0;
 }
 .connection-roles strong {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 500;
   line-height: 1.5;
 }
 .connection-roles > span {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: var(--orange-ink);
   line-height: 1;
 }
@@ -503,14 +503,14 @@ header nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   width: 100%;
   padding-top: 10px;
   border-top: 1px solid var(--rule);
 }
 .connection-stage b {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 400;
 }
 .relationship-list button:last-child .connection-stage {
@@ -521,7 +521,7 @@ header nav {
   margin: 0;
 }
 .directory-note {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   padding: 18px 0;
 }
@@ -538,7 +538,7 @@ header nav {
   align-items: center;
   gap: 10px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--fs-caption);
 }
 .clarification-console .console-bar svg {
   width: 19px;
@@ -569,7 +569,7 @@ header nav {
   border-bottom: 1px solid var(--rule);
 }
 .participants > span {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   padding: 6px 8px;
   border: 1px solid var(--rule);
   border-radius: 5px;
@@ -579,7 +579,7 @@ header nav {
 .participants > b {
   font-weight: 400;
   color: var(--orange-ink);
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
 }
 .thread-messages {
   min-height: 310px;
@@ -597,7 +597,7 @@ header nav {
   height: 30px;
 }
 .message-title {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--ink);
 }
 .message-title strong {
@@ -605,7 +605,7 @@ header nav {
 }
 .message-title small {
   color: var(--subtle);
-  font-size: 8px;
+  font-size: var(--fs-micro);
 }
 .message p {
   padding: 13px 15px;
@@ -614,7 +614,7 @@ header nav {
   border: 1px solid var(--rule);
   border-radius: 0 12px 12px 12px;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.7;
 }
 .message:nth-child(2) {
@@ -647,33 +647,33 @@ header nav {
   border: 1px solid var(--orange-rule);
   border-radius: 4px;
   background: var(--orange-wash);
-  font-size: 8px;
+  font-size: var(--fs-micro);
   color: var(--orange-ink);
   flex-shrink: 0;
 }
 .attachment strong {
   display: block;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   font-weight: 500;
   margin-bottom: 5px;
 }
 .attachment small {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
 }
 .attachment > b {
-  font-size: 16px;
+  font-size: var(--fs-body);
   color: var(--orange-ink);
   margin-left: auto;
   font-weight: 400;
 }
 .thread-awaiting {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   margin-top: 25px;
 }
 .thread-foot {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   border-color: var(--rule);
   margin-top: 18px;
   color: var(--subtle);
@@ -697,7 +697,7 @@ header nav {
   color: var(--subtle);
 }
 .status-switch button {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--secondary);
   border-color: var(--rule);
 }
@@ -745,19 +745,19 @@ header nav {
 }
 .dashboard-toolbar strong {
   display: block;
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   font-weight: 500;
   margin-bottom: 6px;
 }
 .dashboard-toolbar small {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
 }
 .connection-state {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   border: 1px solid var(--rule);
   padding: 8px 11px;
   border-radius: 20px;
@@ -796,12 +796,12 @@ header nav {
   stroke-width: 2;
 }
 .metric-state {
-  font-size: 7px;
+  font-size: var(--fs-micro);
   letter-spacing: 1px;
   color: var(--subtle);
 }
 .metric > span {
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: var(--ink);
   min-height: 16px;
 }
@@ -814,7 +814,7 @@ header nav {
 }
 .metric small {
   color: var(--subtle);
-  font-size: 10px;
+  font-size: var(--fs-micro);
 }
 .analytics-grid {
   grid-template-columns: 1fr 1fr;
@@ -829,7 +829,7 @@ header nav {
   min-height: 280px;
 }
 .panel-title h3 {
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 .distribution-empty {
   display: flex;
@@ -864,7 +864,7 @@ header nav {
 }
 .empty-donut small {
   display: block;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   margin-top: 3px;
 }
 .distribution-legend {
@@ -876,7 +876,7 @@ header nav {
   display: flex;
   gap: 9px;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: var(--secondary);
 }
 .distribution-legend i {
@@ -900,7 +900,7 @@ header nav {
   color: var(--subtle);
 }
 .chart-caption {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   line-height: 1.6;
   color: var(--subtle);
   border-top: 1px solid var(--rule);
@@ -943,12 +943,12 @@ header nav {
 }
 .activity-message strong {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   font-weight: 400;
   margin-bottom: 7px;
 }
 .activity-message > span {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
 }
 .dashboard-empty-note {
@@ -960,7 +960,7 @@ header nav {
   border-radius: 8px;
   margin-top: 18px;
   padding: 14px;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   line-height: 1.7;
   color: var(--subtle);
 }
@@ -1019,7 +1019,7 @@ header nav {
 }
 .benefit-card .micro-label {
   color: var(--orange-ink);
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 .benefit-card h3 {
   font-size: 24px;
@@ -1028,7 +1028,7 @@ header nav {
   margin: 14px 0;
 }
 .benefit-card p {
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: var(--secondary);
   line-height: 1.8;
   max-width: 270px;
@@ -1036,7 +1036,7 @@ header nav {
   margin-bottom: 28px;
 }
 .benefit-flow {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   letter-spacing: 0.3px;
   border-top: 1px solid var(--rule);
   padding-top: 19px;
@@ -1051,7 +1051,7 @@ header nav {
   line-height: 1.14;
 }
 .contact-intro > p {
-  font-size: 14px !important;
+  font-size: var(--fs-sm) !important;
   max-width: 390px !important;
   margin-top: 25px !important;
 }
@@ -1069,12 +1069,12 @@ header nav {
 }
 .contact-purpose strong {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   font-weight: 500;
   margin-bottom: 8px;
 }
 .contact-purpose span {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
 }
 .contact-brand {
@@ -1125,10 +1125,10 @@ header nav {
 }
 .contact-note strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--fs-micro);
 }
 .contact-note p {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   line-height: 1.8;
 }
@@ -1142,7 +1142,7 @@ header nav {
   margin: 12px 0;
 }
 .form-intro p {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   margin: 0;
 }
@@ -1151,7 +1151,7 @@ header nav {
   border-radius: 18px;
 }
 #contact-form label {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   color: var(--secondary);
   margin-bottom: 10px;
 }
@@ -1162,16 +1162,16 @@ header nav {
   color: var(--ink);
   border-color: var(--rule);
   padding: 14px;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   border-radius: 8px;
 }
 #contact-form .field-error {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   min-height: 28px;
   color: #d87742;
 }
 #contact-form .primary {
-  font-size: 13px;
+  font-size: var(--fs-caption);
   width: 100%;
   margin-top: 8px;
   min-height: 48px;
@@ -1182,7 +1182,7 @@ header nav {
   box-shadow: none;
 }
 .form-status {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   line-height: 1.7;
   margin-top: 15px;
@@ -1207,13 +1207,13 @@ header nav {
   margin: 24px 0;
 }
 .final-cta p {
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   color: #b0b0b5;
   line-height: 1.7;
 }
 .final-cta .eyebrow {
   color: #ff9b43;
-  font-size: 10px;
+  font-size: var(--fs-micro);
 }
 .final-actions {
   margin-top: 33px;
@@ -1221,7 +1221,7 @@ header nav {
 .final-actions button {
   min-width: 180px;
   height: 52px;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   border-radius: 12px;
   font-weight: 500;
 }
@@ -1242,7 +1242,7 @@ header nav {
 }
 .cta-note {
   color: #898991;
-  font-size: 10px;
+  font-size: var(--fs-micro);
 }
 .closing-waves {
   position: absolute;
@@ -1308,7 +1308,7 @@ header nav {
 .footer-identity > p {
   display: block;
   margin-top: 23px;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   color: var(--subtle);
   line-height: 1.8;
 }
@@ -1322,12 +1322,12 @@ header nav {
   position: static;
 }
 .footer-top nav .micro-label {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   margin-bottom: 6px;
 }
 .footer-top nav a {
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.5;
   padding: 0;
 }
@@ -1338,14 +1338,14 @@ header nav {
   border-color: var(--rule);
   align-items: center;
   color: var(--subtle);
-  font-size: 10px;
+  font-size: var(--fs-micro);
   line-height: 1.8;
 }
 .footer-bottom small {
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 .footer-bottom .attribution {
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 .footer-bottom a {
   color: var(--secondary);
@@ -1591,7 +1591,7 @@ header nav {
     min-height: 165px;
   }
   .connection-roles strong {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .directory-heading {
     align-items: start;
@@ -1611,7 +1611,7 @@ header nav {
     padding: 20px;
   }
   .metric > span {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .contact-section {
     gap: 55px;
@@ -1654,7 +1654,7 @@ header nav {
     margin: 0;
   }
   .role-tabs button > span {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .role-tabs button > b {
     display: none;
@@ -1721,7 +1721,7 @@ header nav {
     border-width: 12px;
   }
   .distribution-legend > span {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .benefit-grid {
     gap: 13px;
@@ -1733,11 +1733,11 @@ header nav {
     font-size: 21px;
   }
   .benefit-card p {
-    font-size: 12px;
+    font-size: var(--fs-micro);
     min-height: 100px;
   }
   .benefit-flow {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .contact-section {
     grid-template-columns: 1fr 1fr;
@@ -1747,13 +1747,13 @@ header nav {
     font-size: 36px;
   }
   .contact-intro > p {
-    font-size: 13px !important;
+    font-size: var(--fs-caption) !important;
   }
   .contact-brand {
     margin: 30px 0;
   }
   .contact-purpose span {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   #contact-form {
     padding: 26px;
@@ -1767,13 +1767,13 @@ header nav {
     gap: 30px;
   }
   .enterprise-footer .brand-title {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .footer-identity > p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .footer-top nav a {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .footer-top nav {
     flex-shrink: 0;
@@ -1807,10 +1807,10 @@ header nav {
     padding: 18px;
   }
   .explorer-toolbar > span:first-child {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .explorer-toolbar .quiet-tag {
-    font-size: 7px;
+    font-size: var(--fs-micro);
   }
   .role-selector {
     padding: 15px;
@@ -1829,7 +1829,7 @@ header nav {
     height: 19px;
   }
   .role-tabs button > span {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .role-panel {
     padding: 24px 18px;
@@ -1851,10 +1851,10 @@ header nav {
     line-height: 1.2;
   }
   .role-detail-header .micro-label {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .role-panel > .role-summary {
-    font-size: 12px;
+    font-size: var(--fs-micro);
     line-height: 1.8;
     margin: 20px 0;
   }
@@ -1877,15 +1877,15 @@ header nav {
     height: 19px;
   }
   .responsibility-grid span {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .role-capabilities .micro-label,
   .role-position .micro-label {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     letter-spacing: 1.1px;
   }
   .role-capabilities > div > span {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .mini-workflow {
     grid-template-columns: repeat(3, 1fr);
@@ -1895,14 +1895,14 @@ header nav {
     display: none;
   }
   .mini-workflow small {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .mini-workflow svg {
     width: 34px;
     height: 34px;
   }
   .authority-note {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .access-notes {
     gap: 18px;
@@ -1911,16 +1911,16 @@ header nav {
     width: 100%;
   }
   .access-notes .integration-note {
-    font-size: 9px;
+    font-size: var(--fs-micro);
     padding: 12px;
     border: 1px solid var(--rule);
     border-radius: 8px;
   }
   .directory-heading h3 {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .directory-heading p {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .relationship-list {
     grid-template-columns: 1fr 1fr;
@@ -1956,13 +1956,13 @@ header nav {
     height: 20px;
   }
   .connection-roles strong {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .connection-stage {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .directory-note {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .clarification-console .console-bar {
     flex-direction: row;
@@ -1970,27 +1970,27 @@ header nav {
     padding: 18px;
   }
   .clarification-console .console-bar > span:first-child {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .clarification-console .demo-badge {
-    font-size: 7px;
+    font-size: var(--fs-micro);
     padding: 5px;
   }
   .thread-panel {
     padding: 18px 15px;
   }
   .thread-heading h3 {
-    font-size: 16px;
+    font-size: var(--fs-body);
   }
   .thread-heading .small-label {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .status-badge {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     padding: 5px;
   }
   .participants > span {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     padding: 5px 7px;
   }
   .participants {
@@ -2004,7 +2004,7 @@ header nav {
     margin-left: 10px;
   }
   .message-title {
-    font-size: 9px;
+    font-size: var(--fs-micro);
     gap: 8px;
   }
   .message-title small {
@@ -2012,35 +2012,35 @@ header nav {
   }
   .message p {
     padding: 11px;
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .avatar {
     width: 25px;
     height: 25px;
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .attachment {
     padding: 9px;
     gap: 8px;
   }
   .attachment strong {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .attachment small {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .thread-messages {
     min-height: 300px;
   }
   .status-switch > span {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .status-switch button {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     padding: 7px;
   }
   .thread-foot {
-    font-size: 7px;
+    font-size: var(--fs-micro);
   }
   .dashboard-toolbar {
     padding: 20px;
@@ -2049,13 +2049,13 @@ header nav {
     gap: 17px;
   }
   .dashboard-toolbar strong {
-    font-size: 14px;
+    font-size: var(--fs-sm);
   }
   .dashboard-toolbar small {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .connection-state {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .dashboard-body {
     padding: 13px;
@@ -2079,7 +2079,7 @@ header nav {
     height: 22px;
   }
   .metric > span {
-    font-size: 13px;
+    font-size: var(--fs-caption);
     margin: 0;
   }
   .metric strong {
@@ -2090,7 +2090,7 @@ header nav {
   }
   .metric small {
     grid-column: 1;
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .analytics-grid {
     grid-template-columns: 1fr;
@@ -2102,10 +2102,10 @@ header nav {
     min-height: 0;
   }
   .panel-title h3 {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .panel-title .quiet-tag {
-    font-size: 7px;
+    font-size: var(--fs-micro);
   }
   .distribution-empty {
     padding: 26px 3px 16px;
@@ -2119,10 +2119,10 @@ header nav {
     gap: 13px;
   }
   .distribution-legend > span {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .chart-caption {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .activity-empty {
     height: 165px;
@@ -2131,14 +2131,14 @@ header nav {
     padding: 15px;
   }
   .activity-message strong {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .activity-message > span {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .dashboard-empty-note {
     align-items: start;
-    font-size: 9px;
+    font-size: var(--fs-micro);
     padding: 12px;
   }
   .dashboard-empty-note strong {
@@ -2154,7 +2154,7 @@ header nav {
   }
   .benefit-card p {
     min-height: 0;
-    font-size: 13px;
+    font-size: var(--fs-caption);
     max-width: 280px;
     margin-bottom: 24px;
   }
@@ -2165,7 +2165,7 @@ header nav {
     font-size: 26px;
   }
   .benefit-flow {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .contact-section {
     grid-template-columns: 1fr;
@@ -2184,13 +2184,13 @@ header nav {
     font-size: 21px;
   }
   .contact-purpose span {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .contact-note {
     max-width: none;
   }
   .contact-note p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   #contact-form {
     padding: 25px 20px;
@@ -2198,11 +2198,11 @@ header nav {
   #contact-form input,
   #contact-form select,
   #contact-form textarea {
-    font-size: 16px;
+    font-size: var(--fs-body);
     padding: 13px;
   }
   #contact-form label {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .form-intro h3 {
     font-size: 24px;
@@ -2215,11 +2215,11 @@ header nav {
     letter-spacing: -1.4px;
   }
   .final-cta .eyebrow {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     letter-spacing: 1.3px;
   }
   .final-cta p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .final-actions {
     flex-direction: column;
@@ -2230,11 +2230,11 @@ header nav {
   .final-actions button {
     width: 100%;
     max-width: 295px;
-    font-size: 13px;
+    font-size: var(--fs-caption);
     min-height: 50px;
   }
   .cta-note {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .enterprise-footer {
     padding: 40px 23px 28px;
@@ -2247,34 +2247,34 @@ header nav {
     width: 100%;
   }
   .footer-identity > p {
-    font-size: 12px;
+    font-size: var(--fs-micro);
     margin-top: 20px;
   }
   .enterprise-footer .brand-title {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .enterprise-footer .footer-top nav {
     width: calc(50% - 13px);
     gap: 12px;
   }
   .footer-top nav a {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .footer-top nav .micro-label {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .footer-bottom {
     display: flex;
     flex-direction: column;
     align-items: start;
     gap: 17px;
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .footer-bottom .attribution {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .footer-bottom a {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2305,7 +2305,7 @@ header nav {
   color: var(--subtle);
 }
 .mini-workflow small {
-  font-size: 10px;
+  font-size: var(--fs-micro);
 }
 .mini-workflow > span:not(.in-scope) > svg {
   opacity: 0.6;
@@ -2339,7 +2339,7 @@ header nav {
 }
 @media (max-width: 600px) {
   .mini-workflow small {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2367,10 +2367,10 @@ header nav {
     min-height: 44px;
     width: 44px;
     height: 44px;
-    font-size: 15px;
+    font-size: var(--fs-body-sm);
   }
   header .brand-title {
-    font-size: 10.5px;
+    font-size: var(--fs-micro);
     padding-left: 9px;
   }
   header .theme-toggle {
@@ -2379,7 +2379,7 @@ header nav {
   }
   header .menu {
     padding: 5px 8px;
-    font-size: 14px;
+    font-size: var(--fs-sm);
   }
 }
 .theme-ready .glass.reveal {
@@ -2433,7 +2433,7 @@ header nav {
     font-size: 21px;
   }
   .connection-roles strong {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
 }
 .dialog-content {

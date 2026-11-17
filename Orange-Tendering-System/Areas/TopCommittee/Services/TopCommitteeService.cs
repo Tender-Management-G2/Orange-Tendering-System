@@ -158,7 +158,7 @@ public sealed class TopCommitteeService(ApplicationDbContext db, UserManager<App
     public async Task Vote(string userId, VoteInput input, string? signatureHash = null, string? signatureSvg = null,
         Func<RoundDetails, CancellationToken, Task<byte[]>>? finalPdfFactory = null, string? reportStorageRoot = null)
     {
-        if (input.Decision is null || !Enum.IsDefined(input.Decision.Value) ||
+        if (input.Decision is null || !Enum.IsDefined(input.Decision.Value) || input.Decision == VoteDecision.Retender ||
             (input.Decision == VoteDecision.Reject && string.IsNullOrWhiteSpace(input.Comment)) || input.Comment?.Length > 2000)
             throw new InvalidOperationException("Select a valid decision and give a reason when rejecting.");
         if (input.Decision == VoteDecision.Approve && (string.IsNullOrWhiteSpace(signatureHash) || signatureHash.Length != 64 ||

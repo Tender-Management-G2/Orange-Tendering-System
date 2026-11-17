@@ -36,7 +36,10 @@ wwwroot/js/biometric.js, BiometricsController.
     ViewData["WorkspaceSection"] = "My Workspace";
     ViewData["Description"] = "Register a fingerprint-capable authenticator for this account.";
 }
-@section Styles { <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" /> }
+@section Styles {
+    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/phone-passkey.css" asp-append-version="true" />
+}
 <partial name="_PageHeader" />
 
 <div id="bio-root" data-return-url="">
@@ -67,18 +70,17 @@ wwwroot/js/biometric.js, BiometricsController.
     </section>
 
     <section class="ws-panel pg-panel">
-        <h2>Register fingerprint</h2>
+        <h2>Add a phone</h2>
         <div class="pg-form">
             <div class="pg-form-grid">
-                <div class="pg-field"><label for="passkeyLabel">Authenticator name</label><input id="passkeyLabel" type="text" maxlength="150" placeholder="e.g. Office laptop" /></div>
-                <div class="pg-field"><label for="bioPassword">Current password</label><input id="bioPassword" type="password" autocomplete="current-password" /><small class="pg-hint">Re-checked before a new authenticator is added.</small></div>
+                <div class="pg-field"><label for="bioPassword">Current password</label><input id="bioPassword" type="password" autocomplete="current-password" /><small class="pg-hint">Re-checked before a new device is added.</small></div>
             </div>
-            <div class="pg-actions">
-                <button id="btnPasskeyRegister" type="button" class="pg-btn pg-btn-primary">Register Fingerprint / Passkey</button>
-                <span class="pg-hint">If this computer has no fingerprint reader or Windows Hello, choose "Use a phone or tablet" in the browser window and scan the QR code with your phone.</span>
-            </div>
+            <partial name="_PhonePasskeySetup" />
         </div>
     </section>
 </div>
 
-@section Scripts { <script src="~/js/biometric.js" asp-append-version="true"></script> }
+@section Scripts {
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
+    <script src="~/js/phone-passkey.js" asp-append-version="true"></script>
+}

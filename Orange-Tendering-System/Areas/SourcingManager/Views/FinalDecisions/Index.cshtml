@@ -11,10 +11,10 @@
             <tbody>
             @foreach (var n in Model)
             {
-                <tr><td><strong>@n.Tender.Title</strong></td><td>@(n.TopVotes == 0 ? "Manager decision" : $"{n.TopApprovals} of {n.TopVotes} approved")</td>
-                    <td>@(n.Status switch { FinalDecisionStatus.AwaitingManager => "Awaiting your acknowledgement", FinalDecisionStatus.ForwardedToOfficer => "Forwarded to Officer", _ => "Suppliers notified" })</td>
-                    <td>@n.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
-                    <td>@if (n.Status == FinalDecisionStatus.AwaitingManager) { <a class="pg-btn pg-btn-primary" asp-action="Acknowledge" asp-route-id="@n.TenderId">Acknowledge &amp; forward</a> }</td></tr>
+                <tr><td><strong>@n.Tender.Title</strong></td><td>@(n.Outcome == FinalDecisionOutcome.Cancel ? $"Rejected (cancel): {n.DecisionReason}" : n.Outcome == FinalDecisionOutcome.Retender ? $"Re-Tender: {n.DecisionReason}" : n.TopVotes == 0 ? "Manager decision" : $"{n.TopApprovals} of {n.TopVotes} approved")</td>
+                    <td>@(n.Status switch { FinalDecisionStatus.AwaitingManager => "Awaiting your acknowledgement", FinalDecisionStatus.ForwardedToOfficer => "Forwarded to Officer", _ => n.Outcome == FinalDecisionOutcome.Cancel ? "Suppliers notified · tender cancelled" : n.Outcome == FinalDecisionOutcome.Retender ? $"Suppliers notified · round {n.NewRoundNumber} opened" : "Suppliers notified" })</td>
+                    <td>@n.CreatedAt.ToJordan("yyyy-MM-dd HH:mm")</td>
+                    <td>@if (n.Status == FinalDecisionStatus.AwaitingManager) { <a class="pg-btn pg-btn-primary" asp-action="Acknowledge" asp-route-id="@n.TenderId">@(n.Outcome == FinalDecisionOutcome.Award ? "Acknowledge & forward" : n.Outcome == FinalDecisionOutcome.Retender ? "Review & forward Re-Tender" : "Forward rejection")</a> }</td></tr>
             }
             @if (Model.Count == 0) { <tr><td colspan="5"><partial name="_EmptyState" model='"No final decisions are waiting for you."' /></td></tr> }
             </tbody>

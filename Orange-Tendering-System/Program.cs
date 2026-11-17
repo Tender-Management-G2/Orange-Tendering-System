@@ -8,7 +8,13 @@ using Orange_Tendering_System.Services.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
 // Development launch profiles select the isolated team database (Services/TeamDevDatabase.cs).
-TeamDevDatabase.Apply(builder);
+// The "https (hosted shared database)" profile switches to the team's hosted SQL Server instead (Services/HostedDatabase.cs).
+var hostedDatabase = HostedDatabase.Apply(builder);
+if (!hostedDatabase) TeamDevDatabase.Apply(builder);
+// One development browser origin for every role, Identity and Executive Agent.
+// Keep the historical HTTP listener only to redirect old links to HTTPS.
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddHttpsRedirection(options => options.HttpsPort = 7182);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("Default Connection") ?? throw new InvalidOperationException("Connection string 'Default Connection' not found.");
@@ -52,9 +58,16 @@ builder.Services.AddSingleton<AccountLinkGenerator>();
 
 builder.Services.AddControllersWithViews(options => options.Filters.Add<OrangeMotionResultFilter>());
 builder.Services.AddBiometrics(builder.Configuration);
+// A tunnel such as ngrok ends HTTPS and forwards plain HTTP to Kestrel on this machine. Its X-Forwarded-For /
+// X-Forwarded-Proto are trusted only from the loopback proxy (the framework's default known proxies), so passkeys
+// see the real https:// origin and throttling sees the real client address. Host names: AllowedHosts.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+        Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto);
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierProfileService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierInvitationService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierOfferService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.EventSpotlightService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierCommunicationService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDocumentService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.SupplierDashboardService>();
@@ -67,6 +80,12 @@ builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<InternalDashboardService>();
 builder.Services.AddScoped<FinalDecisionService>();
 builder.Services.AddScoped<AiChatService>();
+builder.Services.Configure<ExecutiveAgentOptions>(builder.Configuration.GetSection("ExecutiveAgent"));
+builder.Services.AddHttpClient<ExecutiveAgentClient>();
+builder.Services.AddScoped<ExecutiveAgentService>();
+builder.Services.AddScoped<ExecutiveNavigationService>();
+builder.Services.Configure<ExecutiveSpeechOptions>(builder.Configuration.GetSection("ExecutiveSpeech"));
+builder.Services.AddScoped<ExecutiveSpeechService>();
 builder.Services.AddScoped<ClarificationService>();
 builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<ReportExport>();
@@ -96,6 +115,7 @@ builder.Services.AddHostedService<EvaluationDeadlineWorker>();
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -148,7 +168,17 @@ if (app.Environment.IsDevelopment())
 {
     using var migrationScope = app.Services.CreateScope();
     var db = migrationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await db.Database.MigrateAsync();
+    // The hosted database is shared by the team: never migrate it implicitly (HostedDatabase:AutoMigrate to opt in).
+    if (!hostedDatabase || app.Configuration.GetValue<bool>("HostedDatabase:AutoMigrate"))
+        await db.Database.MigrateAsync();
+    else
+    {
+        var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+        var hostedLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("HostedDatabase");
+        if (pending.Count == 0) hostedLog.LogInformation("Hosted database {Database} is up to date.", TeamDevDatabase.Describe(db.Database.GetConnectionString()));
+        else hostedLog.LogWarning("Hosted database {Database} is missing {Count} migration(s): {Migrations}. They were NOT applied automatically.",
+            TeamDevDatabase.Describe(db.Database.GetConnectionString()), pending.Count, string.Join(", ", pending));
+    }
 }
 
 await IdentityBootstrap.SeedAsync(app.Services, app.Configuration);

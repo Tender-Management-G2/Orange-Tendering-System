@@ -79,6 +79,7 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
     [HttpPost] public Task<IActionResult> Compliance(int id, int bidId, ComplianceStatus status, string notes, string missing = "") => Execute(id, () => Workflow.Compliance(id, bidId, status, notes, missing, User));
     [HttpPost] public Task<IActionResult> Setup(int id, SessionInput input, CancellationToken ct) => Execute(id, () => scheduling.Schedule(id, input, User, ct));
     [HttpPost] public Task<IActionResult> EndEvaluation(int id, bool confirmed, string reason) => Execute(id, () => Workflow.EndEvaluation(id, confirmed, reason, User));
+    [HttpPost] public Task<IActionResult> RescheduleEvaluation(int id, DateTimeOffset startsAt, DateTimeOffset endsAt, string reason) => Execute(id, () => Workflow.RescheduleEvaluation(id, startsAt, endsAt, reason, User));
     // The analysis keeps running even if the browser tab is closed or navigated away (the service has its own timeout), so a click is never lost.
     [HttpPost] public Task<IActionResult> Analyze(int id) => Execute(id, async () => { await AutoCheckOffers(id); await ai.Analyze(id, User, CancellationToken.None); });
     [HttpPost] public Task<IActionResult> ReviewAi(int id, int analysisId) => Execute(id, () => Workflow.ReviewAi(id, analysisId, User));

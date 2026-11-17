@@ -20,6 +20,11 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 public sealed class DecisionsController(ApplicationDbContext db, UserManager<ApplicationUser> users,
     IWebHostEnvironment environment, ILogger<DecisionsController> logger, IRazorViewEngine views) : TopCommitteeControllerBase(db, users)
 {
+    // Read-only counts for the summary cards on Voting, Evaluation Summary and Decision History.
+    private async Task<Dictionary<CommitteeRoundStatus, int>> RoundStatusCounts(string userId) =>
+        await Committee.RoundList(userId).AsNoTracking().GroupBy(r => r.Status)
+            .Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count);
+
     [HttpGet]
     public async Task<IActionResult> Search(string? q)
     {
@@ -32,7 +37,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             .OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).Take(8)
             .Select(r => new { r.Id, r.TenderRound.TenderId, r.TenderRound.Tender.Title }).ToListAsync();
         return Json(new { items = rounds.Select(r => new {
-            title = r.Title, subtitle = $"T-{r.TenderId:0000}",
+            type = Orange_Tendering_System.ViewModels.UiText.T(HttpContext, "Committee rounds"), title = r.Title, subtitle = $"T-{r.TenderId:0000}",
             url = Url.Action(nameof(Decision), "Decisions", new { area = "TopCommittee", id = r.Id })
         }) });
     }
@@ -43,8 +48,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         if (user is null) return Forbid();
         if (!id.HasValue) return await SelectRound(user.Id, nameof(ReviewEvaluation), search, status, page);
         var details = await Committee.Load(user.Id, id.Value);
-        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation } report)
-            return RedirectToAction("Review", "SignedReports", new { area = "TopCommittee", id = report.Id });
+        // Signed tender reports are reviewed and voted on inside the tender's workflow popup.
+        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation })
+            return RedirectToAction("Index", "Workflow", new { area = "TopCommittee", open = details.Round.TenderRound.TenderId });
         return details is null ? NotFound() : View(details);
     }
     public async Task<IActionResult> Decision(int? id, string? search = null, CommitteeRoundStatus? status = null, int page = 1)
@@ -63,8 +69,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             }
             catch (InvalidOperationException exception) { TempData["TopError"] = exception.Message; }
         }
-        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation } report)
-            return RedirectToAction("Review", "SignedReports", new { area = "TopCommittee", id = report.Id });
+        // Signed tender reports are reviewed and voted on inside the tender's workflow popup.
+        if (details?.Round.TenderReport is { ReportType: ReportType.FullEvaluation })
+            return RedirectToAction("Index", "Workflow", new { area = "TopCommittee", open = details.Round.TenderRound.TenderId });
         return details is null ? NotFound() : View(details);
     }
 
@@ -86,7 +93,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
                     .Skip((page - 1) * 20).Take(20).AsSplitQuery().ToListAsync()
             }
         };
-        return Request.Headers["X-TopCommittee-Live"] == "1" ? PartialView("_RoundResults", model) : View("SelectRound", model);
+        if (Request.Headers["X-TopCommittee-Live"] == "1") return PartialView("_RoundResults", model);
+        model.Listing.StatusCounts = await RoundStatusCounts(userId);
+        return View("SelectRound", model);
     }
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Vote(VoteInput input)
@@ -430,7 +439,9 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
             Rounds = await query.OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id)
                 .Skip((page - 1) * 20).Take(20).AsSplitQuery().ToListAsync()
         };
-        return Request.Headers["X-TopCommittee-Live"] == "1" ? PartialView("_HistoryResults", model) : View(model);
+        if (Request.Headers["X-TopCommittee-Live"] == "1") return PartialView("_HistoryResults", model);
+        model.StatusCounts = await RoundStatusCounts(user.Id);
+        return View(model);
     }
     [HttpGet]
     public async Task<IActionResult> Download(int id, int roundId)

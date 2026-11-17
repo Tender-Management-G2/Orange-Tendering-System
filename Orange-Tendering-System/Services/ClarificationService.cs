@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
@@ -25,6 +25,9 @@ public static class ClarificationPolicy
     private static readonly string[] Order = [SystemRoles.RequestingDepartment, SystemRoles.SourcingOfficer, SystemRoles.EvaluationCommittee, SystemRoles.SourcingManager, SystemRoles.TopCommittee, SystemRoles.Supplier];
 
     public static bool Allowed(string? a, string? b) => a != null && b != null && Pairs.Any(p => p.A == a && p.B == b || p.A == b && p.B == a);
+    // The roles a chat role may talk to (for display; Allowed/CanContinue remain the enforcement).
+    public static IReadOnlyList<string> Partners(string? role) => role == null ? [] : Pairs.Where(p => p.A == role || p.B == role).Select(p => p.A == role ? p.B : p.A).ToList();
+    public static IReadOnlyList<(string A, string B)> AllPairs => Pairs;
     public static string? ChatRole(IEnumerable<string> roles) => Order.FirstOrDefault(roles.Contains);
     public static string Label(ClarificationStatus s) => s switch { ClarificationStatus.Open => "Pending", ClarificationStatus.Answered => "Answered", _ => "Resolved" };
 }
@@ -45,7 +48,7 @@ public sealed class ClarificationService(ApplicationDbContext db, UserManager<Ap
         return (user, role);
     }
 
-    private async Task<List<ApplicationUser>> ActiveInRole(string role) => (await users.GetUsersInRoleAsync(role)).Where(u => u.IsActive).ToList();
+    private async Task<List<ApplicationUser>> ActiveInRole(string role) => (await users.GetUsersInRoleAsync(role)).Where(u => u.IsActive && u.EmailConfirmed).ToList();
     private static string Name(ApplicationUser u) => string.IsNullOrWhiteSpace(u.FullName) ? u.Email ?? u.UserName ?? u.Id : u.FullName;
 
     // Everyone the caller may start a conversation with, together with the record that conversation would be about.
@@ -53,14 +56,14 @@ public sealed class ClarificationService(ApplicationDbContext db, UserManager<Ap
     {
         var (me, role) = await Actor(principal);
         var result = new List<ClarificationOption>();
-        void Add(ApplicationUser u, string r, string type, int id, string label) { if (u.Id != me.Id && u.IsActive) result.Add(new(u.Id, Name(u), r, type, id, label)); }
+        void Add(ApplicationUser u, string r, string type, int id, string label) { if (u.Id != me.Id && u.IsActive && u.EmailConfirmed) result.Add(new(u.Id, Name(u), r, type, id, label)); }
         async Task<List<(ApplicationUser User, int TenderId)>> Seats(CommitteeType type, string requiredRole, IEnumerable<int> tenderIds, CommitteeResponsibility? responsibility = null)
         {
             var ids = tenderIds.ToList();
             var rows = await db.CommitteeMembers.AsNoTracking().Include(m => m.User)
                 .Where(m => ids.Contains(m.TenderId) && m.CommitteeType == type && (responsibility == null ? m.Responsibility != CommitteeResponsibility.SourcingManager : m.Responsibility == responsibility)).ToListAsync();
             var list = new List<(ApplicationUser, int)>();
-            foreach (var m in rows) if (m.User.IsActive && await users.IsInRoleAsync(m.User, requiredRole)) list.Add((m.User, m.TenderId));
+            foreach (var m in rows) if (m.User.IsActive && m.User.EmailConfirmed && await users.IsInRoleAsync(m.User, requiredRole)) list.Add((m.User, m.TenderId));
             return list;
         }
         async Task<Dictionary<int, string>> Titles(IEnumerable<int> ids) { var l = ids.Distinct().ToList(); return await db.Tenders.AsNoTracking().Where(t => l.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Title); }
@@ -77,8 +80,18 @@ public sealed class ClarificationService(ApplicationDbContext db, UserManager<Ap
             {
                 foreach (var p in await db.PurchaseRequests.AsNoTracking().Include(p => p.CreatedByUser).Where(p => p.Status != PurchaseRequestStatus.Draft).ToListAsync())
                     if (p.CreatedByUser.IsActive && await users.IsInRoleAsync(p.CreatedByUser, SystemRoles.RequestingDepartment)) Add(p.CreatedByUser, "Requesting Department", "PurchaseRequest", p.Id, "Request: " + p.Title);
-                foreach (var b in await db.Bids.AsNoTracking().Where(b => b.Status == BidStatus.Submitted).Select(b => new { b.Id, b.TenderInvitation.SupplierId, Title = b.TenderInvitation.TenderRound.Tender.Title }).ToListAsync())
-                    foreach (var s in await db.Users.Where(u => u.SupplierId == b.SupplierId && u.IsActive).ToListAsync()) Add(s, "Supplier", "Bid", b.Id, "Offer on: " + b.Title);
+                // An invitation is already a shared record: the Officer may ask a supplier
+                // for clarification before a bid is submitted, without inventing a bid context.
+                var supplierUsers = (await ActiveInRole(SystemRoles.Supplier));
+                var approvedSuppliers = await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Approved).Select(s => s.Id).ToListAsync();
+                foreach (var i in await db.TenderInvitations.AsNoTracking()
+                    .Where(i => i.InvitedByUserId == me.Id && approvedSuppliers.Contains(i.SupplierId))
+                    .Select(i => new { i.SupplierId, i.TenderRound.TenderId, Title = i.TenderRound.Tender.Title }).Distinct().ToListAsync())
+                    foreach (var s in supplierUsers.Where(s => s.SupplierId == i.SupplierId))
+                        Add(s, "Supplier", "Tender", i.TenderId, "Invited to: " + i.Title);
+                foreach (var b in await db.Bids.AsNoTracking().Where(b => b.Status == BidStatus.Submitted && b.TenderInvitation.InvitedByUserId == me.Id && approvedSuppliers.Contains(b.TenderInvitation.SupplierId))
+                    .Select(b => new { b.Id, b.TenderInvitation.SupplierId, Title = b.TenderInvitation.TenderRound.Tender.Title }).ToListAsync())
+                    foreach (var s in supplierUsers.Where(s => s.SupplierId == b.SupplierId)) Add(s, "Supplier", "Bid", b.Id, "Offer on: " + b.Title);
                 var tenderIds = await db.Tenders.AsNoTracking().Select(t => t.Id).ToListAsync(); var titles = await Titles(tenderIds);
                 foreach (var (u, t) in await Seats(CommitteeType.Evaluation, SystemRoles.EvaluationCommittee, tenderIds)) Add(u, "Evaluation Committee", "Tender", t, "Tender: " + titles[t]);
                 break;
@@ -108,6 +121,36 @@ public sealed class ClarificationService(ApplicationDbContext db, UserManager<Ap
             }
             // Suppliers start their conversations from their own portal pages (Supplier area), always with the Officer.
         }
+        return result;
+    }
+
+    public sealed record PendingContact(string Id, string Name, string Role, string Reason);
+
+    // Read-only, for display: people in the caller's approved partner roles who have no shared record with the caller yet,
+    // with what is still missing. They cannot be messaged (Options/CreateAsync remain the only way to start a conversation).
+    public async Task<List<PendingContact>> PendingContacts(ClaimsPrincipal principal, IEnumerable<ClarificationOption> available)
+    {
+        var (me, role) = await Actor(principal);
+        var reachable = available.Select(o => o.RecipientId).ToHashSet();
+        var approvedSuppliers = await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Approved).Select(s => s.Id).ToListAsync();
+        string Reason(string partner) => (role, partner) switch
+        {
+            (SystemRoles.RequestingDepartment, _) => "Available once your department submits a purchase request.",
+            (SystemRoles.SourcingOfficer, SystemRoles.RequestingDepartment) => "Available once this department submits a purchase request.",
+            (SystemRoles.SourcingOfficer, SystemRoles.Supplier) => "Available once you invite this supplier to a tender.",
+            (SystemRoles.SourcingOfficer, SystemRoles.EvaluationCommittee) => "Available once this member is assigned to a tender's Evaluation Committee.",
+            (SystemRoles.EvaluationCommittee, SystemRoles.SourcingOfficer) => "Available once you are assigned to a tender's Evaluation Committee.",
+            _ => "Available once you are both assigned to the same tender."
+        };
+        var result = new List<PendingContact>();
+        foreach (var partner in ClarificationPolicy.Partners(role))
+            foreach (var u in (await ActiveInRole(partner)).Where(u => u.Id != me.Id && !reachable.Contains(u.Id)).OrderBy(Name))
+            {
+                if (partner == SystemRoles.Supplier && (u.SupplierId == null || !approvedSuppliers.Contains(u.SupplierId.Value))) continue;
+                if (ClarificationPolicy.ChatRole(await users.GetRolesAsync(u)) != partner) continue;
+                result.Add(new(u.Id, Name(u), partner, Reason(partner)));
+                if (result.Count >= 60) return result;
+            }
         return result;
     }
 
@@ -178,7 +221,8 @@ public sealed class ClarificationService(ApplicationDbContext db, UserManager<Ap
         db.ClarificationMessages.Add(new ClarificationMessage { ClarificationId = id, SenderUserId = userId, Message = message, SentAt = now });
         thread.Status = ClarificationStatus.Answered;
         db.Notifications.Add(new Notification { UserId = thread.FromUserId == userId ? thread.ToUserId : thread.FromUserId,
-            Title = "Clarification reply", Message = $"A reply was sent in: {thread.Subject}", Link = $"/Clarifications/Details/{id}", CreatedAt = now });
+            Title = "Clarification reply", Message = $"{(await users.FindByIdAsync(userId) is { } sender ? Name(sender) : "The other participant")} replied: {thread.Subject}",
+            Link = $"/Clarifications/Details/{id}", CreatedAt = now });
         db.AuditLogs.Add(new AuditLog { UserId = userId, EntityName = "Clarification", EntityId = id.ToString(), Action = "ClarificationReplied", CreatedAt = now });
         await db.SaveChangesAsync();
         await transaction.CommitAsync();

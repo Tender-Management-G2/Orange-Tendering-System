@@ -6,7 +6,7 @@ using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Services;
 
-// Top decision records only. No tender, session, bidding, award or notification state is changed here.
+// Top decision records. A single Reject stops the approval (see TenderWorkflowService.TopRejection.cs); this file only reads and records reasons.
 public partial class TenderWorkflowService
 {
     private async Task<TopRejectionReview> TopReasonState(Tender tender, EvaluationSession session, CommitteeRound round)
@@ -29,6 +29,16 @@ public partial class TenderWorkflowService
         }
         var result = new TopRejectionReview { ReportId = session.ReportId!.Value, TenderId = tender.Id,
             DocumentHash = session.Report!.PdfSha256 ?? "", Votes = votes, Agreements = agreements.Values.ToList() };
+        // New rule: the first authorized Reject stops the Top approval; its reason is the final reason.
+        var firstReject = votes.FirstOrDefault(x => x.Decision != VoteDecision.Approve);
+        if (firstReject != null)
+        {
+            result.FinalReason = firstReject.RejectionReason;
+            result.Status = firstReject.Decision == VoteDecision.Retender
+                ? "Re-Tender requested — approval stopped and forwarded to the Sourcing Manager"
+                : "Top rejection finalized — approval stopped and forwarded to the Sourcing Manager";
+            return result;
+        }
         var policy = FinalPolicy(session);
         var approves = votes.Count(x => x.Decision == VoteDecision.Approve);
         var rejects = votes.Count(x => x.Decision == VoteDecision.Reject);

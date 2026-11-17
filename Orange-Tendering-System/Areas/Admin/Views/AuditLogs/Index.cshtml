@@ -53,7 +53,7 @@ tokens or biometric data.
 
             <thead>
                 <tr>
-                    <th>Date &amp; Time (UTC)</th>
+                    <th>Date &amp; Time (Jordan time)</th>
                     <th>User</th>
                     <th>Action</th>
                     <th>Entity</th>
@@ -80,7 +80,7 @@ tokens or biometric data.
 
                             <!-- Date -->
                             <td>
-                                @log.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                @log.CreatedAt.ToJordan("yyyy-MM-dd HH:mm")
                             </td>
 
                             <!-- User -->

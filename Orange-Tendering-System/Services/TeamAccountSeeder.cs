@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,7 @@ namespace Orange_Tendering_System.Services;
 public static class TeamAccountSeeder
 {
     public const string Password = "OrangeDemo2026!";
-    public const string DepartmentName = "Team Demo Department";
+    public const string DepartmentName = "Information Technology";
     public const string MarkerClaimType = "orange:team-account";
     public const string MarkerValue = "managed";
 
@@ -96,6 +97,25 @@ public static class TeamAccountSeeder
             results.Add($"{other.Email}: synthetic Sourcing Officer deactivated (only one may be active)");
         }
 
+        // Team database only: when the Admin has never saved a Top Committee, save the four seeded Chiefs as the standing
+        // Top Committee so a Manager approval can seat it. An existing roster (the Admin's choice) is never changed.
+        var topRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == SystemRoles.TopCommittee);
+        if (topRole != null && !await db.RoleClaims.AnyAsync(c => c.RoleId == topRole.Id && c.ClaimType == TenderWorkflowService.StandingClaim))
+        {
+            var chiefs = new Dictionary<string, string>();
+            foreach (var seat in CommitteeAccountSeats.All.Where(x => x.Committee == "Top"))
+            {
+                var chief = await users.FindByEmailAsync(Accounts.Single(a => a.Seat == seat.Key).Email);
+                if (chief is { IsActive: true }) chiefs[seat.Key] = chief.Id;
+            }
+            if (chiefs.Count == 4)
+            {
+                db.RoleClaims.Add(new IdentityRoleClaim<string> { RoleId = topRole.Id, ClaimType = TenderWorkflowService.StandingClaim, ClaimValue = JsonSerializer.Serialize(chiefs) });
+                await db.SaveChangesAsync();
+                results.Add("standing Top Committee saved with the four team Chiefs (it was empty)");
+            }
+        }
+
         await transaction.CommitAsync();
         foreach (var line in results) logger.LogInformation("Team account {Result}", line);
     }
@@ -110,8 +130,13 @@ public static class TeamAccountSeeder
                 throw new TeamAccountException($"The reserved team user name {account.Email} belongs to another account. Rename it in Admin > Users, then restart.");
             user = new ApplicationUser
             {
-                UserName = account.Email, Email = account.Email, EmailConfirmed = true, FullName = account.Name,
-                DepartmentId = account.InDepartment ? departmentId : null, IsActive = true, MustChangePassword = false
+                UserName = account.Email,
+                Email = account.Email,
+                EmailConfirmed = true,
+                FullName = account.Name,
+                DepartmentId = account.InDepartment ? departmentId : null,
+                IsActive = true,
+                MustChangePassword = false
             };
             Check(await users.CreateAsync(user, Password), $"create {account.Email}");
             Check(await users.AddClaimAsync(user, new Claim(MarkerClaimType, MarkerValue)), $"mark {account.Email}");

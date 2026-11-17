@@ -1,6 +1,6 @@
 @model PrivateConversation
-@{ ViewData["Title"]=Model.Thread.Subject; }
-<div class="tc-review"><header class="rv-page-head"><div><div class="rv-breadcrumb">Private conversation · T-@Model.Details.Tender.Id · Committee round @Model.Details.Round.RoundNumber</div><h1>@Model.Thread.Subject</h1><p>@Model.Details.Tender.Title</p></div><a class="rv-secondary" asp-action="Index">← Private inbox</a></header><partial name="_Messages" />
+@{ ViewData["Title"]=Model.Thread.Subject; ViewData["HeroTitle"]="Private Conversation"; ViewData["Description"]=$"{Model.Thread.Subject} · T-{Model.Details.Tender.Id} · {Model.Details.Tender.Title} · committee round {Model.Details.Round.RoundNumber}"; }
+<div class="tc-review"><partial name="_PageHeader" /><div class="rv-page-links"><a class="rv-secondary" asp-action="Index">← Private inbox</a></div><partial name="_Messages" />
 <section class="rv-card rv-clarifications"><h2>Private conversation</h2><p class="rv-muted">Status: @CommitteeDisplay.Clarification(Model.Thread.Status)</p><p class="rv-private-note">Only the sending Top Committee member and the responsible Sourcing Manager can read this thread and its attachments.</p>
 @if(ViewData["ClarificationError"] is string error){<p class="rv-error" role="alert">@error</p>}
 @foreach(var message in Model.Thread.Messages.OrderBy(m=>m.SentAt).ThenBy(m=>m.Id))

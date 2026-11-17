@@ -15,10 +15,11 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
 /// <summary>
-/// One sign-in page for every account. Everybody starts with email and password. Employees, and suppliers
-/// who are still setting up, are signed in by the password. An approved supplier with biometrics enrolled
-/// is not: the correct password only opens a short pre-auth transaction (SupplierPreAuth) and the page moves
-/// to the biometric step; the session is issued by /Biometrics/FaceLogin (or by a passkey) afterwards.
+/// One sign-in page for every account (owner decision 2026-11-16). A supplier first chooses one method:
+/// Email &amp; Password, Face ID or Fingerprint. Other users sign in with email and password.
+///   - Email &amp; Password: checked here and signed in directly (an approved supplier gets the password-step session).
+///   - Face ID / Fingerprint: the email opens a short identity step (SupplierPreAuth, handler IdentityStart); the
+///     session is issued afterwards by /Biometrics/FaceLogin or /Biometrics/PasskeyLogin, for that account only.
 /// </summary>
 public class LoginModel(
     UserManager<ApplicationUser> users,
@@ -26,18 +27,28 @@ public class LoginModel(
     ApplicationDbContext db,
     SupplierPreAuth preAuth,
     BiometricSignInService biometric,
+    BiometricThrottle throttle,
     IOptions<BiometricOptions> biometricOptions,
     ILogger<LoginModel> logger) : PageModel
 {
-    // One message for an unknown email, a wrong password, a locked account and an account that may not sign in.
+    // One message for an unknown email, a wrong password and an account that may not sign in.
     private const string Rejected = "Invalid email or password. Please try again.";
+
+    // A locked account is told so (as the default Identity UI does with its Lockout page). With the generic message
+    // a person kept typing the right password during the 15 minutes and concluded the account was broken.
+    private static string LockedOut(DateTimeOffset? until)
+    {
+        var minutes = until is { } end ? Math.Max(1, (int)Math.Ceiling((end - DateTimeOffset.UtcNow).TotalMinutes)) : 15;
+        return $"This account is temporarily locked after too many unsuccessful sign-in attempts. Try again in {minutes} minute{(minutes == 1 ? "" : "s")}.";
+    }
+
+    // The same answer whatever is wrong with the email (unknown, not a supplier, not approved, nothing set up).
+    private const string FaceUnavailable = "Face ID is not available for this email. Check the email, or sign in with Email & Password and set up Face ID from your account menu.";
+    private const string FingerprintUnavailable = "Fingerprint is not available for this email. Check the email, or sign in with Email & Password and set up Fingerprint from your account menu.";
 
     [BindProperty] public InputModel Input { get; set; } = new();
     public string? ReturnUrl { get; private set; }
     public int BiometricStepSeconds => biometricOptions.Value.PreAuthSeconds;
-
-    /// <summary>Set when the password was accepted and the supplier's biometric step comes next.</summary>
-    public BiometricStep? Biometric { get; private set; }
 
     public class InputModel
     {
@@ -50,11 +61,9 @@ public class LoginModel(
         public string? AccountType { get; set; }
     }
 
-    /// <summary>Which methods the account can use next. Told to the browser only after a correct password.</summary>
-    public sealed record BiometricStep(bool Face, bool Passkey, bool PasswordOnly);
-
-    /// <summary>Mismatch: the password was right but the chosen account type was not; nothing is signed in.</summary>
-    private sealed record Accepted(string? Redirect, BiometricStep? Biometric, string? Mismatch = null);
+    /// <summary>Mismatch: the password was right but the chosen account type was not; nothing is signed in.
+    /// Locked: the account is locked out; nothing is signed in.</summary>
+    private sealed record Accepted(string? Redirect, string? Mismatch = null, string? Locked = null);
 
     public async Task OnGetAsync(string? returnUrl = null)
     {
@@ -75,14 +84,12 @@ public class LoginModel(
             return Page();
         }
 
-        if (accepted.Mismatch is not null)
+        if ((accepted.Locked ?? accepted.Mismatch) is { } refused)
         {
-            ModelState.AddModelError(string.Empty, accepted.Mismatch);
+            ModelState.AddModelError(string.Empty, refused);
             return Page();
         }
-        if (accepted.Redirect is not null) return LocalRedirect(accepted.Redirect);
-        Biometric = accepted.Biometric;
-        return Page();
+        return LocalRedirect(accepted.Redirect!);
     }
 
     /// <summary>The same check for the page script (wwwroot/js/supplier-login.js), answered as JSON so the page can stay in place.</summary>
@@ -93,34 +100,54 @@ public class LoginModel(
         if (accepted is null)
             return new JsonResult(new { outcome = "rejected", error = Rejected }) { StatusCode = StatusCodes.Status401Unauthorized };
 
+        if (accepted.Locked is not null)
+            return new JsonResult(new { outcome = "locked", error = accepted.Locked }) { StatusCode = StatusCodes.Status423Locked };
         if (accepted.Mismatch is not null)
             return new JsonResult(new { outcome = "mismatch", error = accepted.Mismatch }) { StatusCode = StatusCodes.Status409Conflict };
-        return accepted.Redirect is not null
-            ? new JsonResult(new { outcome = "signedIn", redirect = accepted.Redirect })
-            : new JsonResult(new { outcome = "biometric", face = accepted.Biometric!.Face, passkey = accepted.Biometric.Passkey, passwordOnly = accepted.Biometric.PasswordOnly });
+        return new JsonResult(new { outcome = "signedIn", redirect = accepted.Redirect });
     }
 
     /// <summary>
-    /// "Continue with Email &amp; Password" on the supplier's identity step (owner decision 2026-11-15, switch
-    /// Biometric:SupplierPasswordOnly). Accepted only inside the live pre-auth transaction that the correct password
-    /// opened in this browser, for that account; the password is not sent again.
+    /// The supplier chose Face ID or Fingerprint and typed an email (no password). For an approved, active supplier
+    /// with that method set up, this opens the short identity step for that account; /Biometrics/FaceChallenge +
+    /// FaceLogin, or PasskeyLoginOptions + PasskeyLogin (and the phone QR code) then work only for it. Nothing is
+    /// signed in here. Any other email gets the same "not available" answer and no usable step.
     /// </summary>
-    public async Task<IActionResult> OnPostPasswordOnlyAsync(string? returnUrl = null)
+    public async Task<IActionResult> OnPostIdentityStartAsync(string? method)
     {
-        ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
-        var user = biometricOptions.Value.SupplierPasswordOnly ? await preAuth.UserAsync(HttpContext, users) : null;
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        if (user is null || !await biometric.SignInAsync(user, BiometricSignInService.PasswordStepMethod, ip))
-        {
-            preAuth.End(HttpContext);
-            return new JsonResult(new { outcome = "rejected", restart = true, error = "Enter your email and password again to continue." })
-                { StatusCode = StatusCodes.Status401Unauthorized };
-        }
         preAuth.End(HttpContext);
-        return new JsonResult(new { outcome = "signedIn", redirect = await biometric.DestinationAsync(user, ReturnUrl, Url.IsLocalUrl) });
+        var face = method == "face";
+        if (!face && method != "fingerprint") return BadRequest(new { error = "Choose Face ID or Fingerprint." });
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var ipKey = BiometricThrottle.IpKey(ip);
+        if (throttle.IsBlocked(ipKey) || !throttle.TryUse("identity-start:" + ipKey, 30))
+            return new JsonResult(new { error = "Too many attempts. Wait a few minutes, then try again." }) { StatusCode = StatusCodes.Status429TooManyRequests };
+
+        var email = Input.Email?.Trim() ?? string.Empty;
+        if (!new EmailAddressAttribute().IsValid(email) || email.Length == 0)
+            return BadRequest(new { error = "Enter a valid email address, for example name@company.com." });
+
+        var user = await users.FindByEmailAsync(email);
+        var ready = user is not null && user.EmailConfirmed &&
+            await users.IsInRoleAsync(user, SystemRoles.Supplier) &&
+            await biometric.AccountAllowedAsync(user) &&
+            (face
+                ? await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id)
+                : (await users.GetPasskeysAsync(user)).Count > 0);
+        if (!ready)
+        {
+            logger.LogInformation("Identity step refused for a {Method} sign-in.", method);
+            return new JsonResult(new { outcome = "unavailable", error = face ? FaceUnavailable : FingerprintUnavailable })
+                { StatusCode = StatusCodes.Status409Conflict };
+        }
+
+        preAuth.Begin(HttpContext, user!);
+        await biometric.AuditAsync(user!.Id, "BiometricStepStarted", face ? "face" : "fingerprint", ip, "email");
+        return new JsonResult(new { outcome = "ready", method });
     }
 
-    /// <summary>The supplier left the biometric step ("Use a different account").</summary>
+    /// <summary>The supplier left the Face ID / Fingerprint step.</summary>
     public IActionResult OnPostCancel()
     {
         preAuth.End(HttpContext);
@@ -141,9 +168,14 @@ public class LoginModel(
         }
 
         var result = await signIn.CheckPasswordSignInAsync(user, Input.Password, lockoutOnFailure: true);
+        if (result.IsLockedOut)
+        {
+            logger.LogWarning("Identity sign-in refused: account {UserId} is locked out.", user.Id);
+            return new Accepted(null, Locked: LockedOut(await users.GetLockoutEndDateAsync(user)));
+        }
         if (!result.Succeeded)
         {
-            logger.LogWarning(result.IsLockedOut ? "Identity account locked out." : "Identity sign-in failed.");
+            logger.LogWarning("Identity sign-in failed.");
             return null;
         }
 
@@ -165,34 +197,19 @@ public class LoginModel(
         if (chosen is "supplier" or "other" && (chosen == "supplier") != isSupplier)
         {
             logger.LogInformation("Account type choice did not match the account for user {UserId}.", user.Id);
-            return new Accepted(null, null, isSupplier
+            return new Accepted(null, isSupplier
                 ? "This is a supplier account. Choose Supplier above, then sign in again."
                 : "This account is not a supplier account. Choose Other User above, then sign in again.");
         }
 
-        // An approved supplier with biometrics enrolled is not signed in by the password. It opens the
-        // pre-auth transaction; the supplier workspace needs the face (or passkey) session that follows.
-        if (isSupplier && supplierStatus == SupplierStatus.Approved)
-        {
-            var face = await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id);
-            var passkey = (await users.GetPasskeysAsync(user)).Count > 0;
-            if (face || passkey)
-            {
-                // The identity step (face, passkey or, where allowed, password only) happens inside this transaction.
-                preAuth.Begin(HttpContext, user);
-                await biometric.AuditAsync(user.Id, "BiometricStepStarted", "password",
-                    HttpContext.Connection.RemoteIpAddress?.ToString(), null);
-                return new Accepted(null, new BiometricStep(face, passkey, biometricOptions.Value.SupplierPasswordOnly));
-            }
-        }
-
-        // An approved supplier without enrolled biometrics still needs the same signed
-        // method claim as the configured password-only continuation. The password was
-        // verified above; never relax the supplier workspace gate or approval checks.
+        // "Email & Password" is one of the supplier's three methods: an approved supplier gets the signed
+        // password-step session that SupplierApprovalGate accepts while Biometric:SupplierPasswordOnly is on.
+        // With the switch off, the password only opens supplier setup (Pending Approval) below.
         if (isSupplier && supplierStatus == SupplierStatus.Approved && biometricOptions.Value.SupplierPasswordOnly)
         {
-            if (!await biometric.SignInAsync(user, BiometricSignInService.PasswordStepMethod, HttpContext.Connection.RemoteIpAddress?.ToString())) return null;
-            return new Accepted(await DestinationAsync(user, isSupplier), null);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            if (!await biometric.SignInAsync(user, BiometricSignInService.PasswordStepMethod, ip)) return null;
+            return new Accepted(await biometric.DestinationAsync(user, ReturnUrl, Url.IsLocalUrl));
         }
 
         await signIn.SignInAsync(user, Input.RememberMe);
@@ -203,7 +220,7 @@ public class LoginModel(
             CreatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
-        return new Accepted(await DestinationAsync(user, isSupplier), null);
+        return new Accepted(await DestinationAsync(user, isSupplier));
     }
 
     private async Task<string> DestinationAsync(ApplicationUser user, bool isSupplier)

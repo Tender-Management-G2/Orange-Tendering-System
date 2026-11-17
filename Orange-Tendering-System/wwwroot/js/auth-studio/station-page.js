@@ -376,7 +376,7 @@ function boot() {
           to({ glow: 1, pulse: 1, pulseT: 0 }, { duration: 0.4, delay: 0.9, onComplete: () => {
             if (!reduced && !waitLoop) waitLoop = gsap.fromTo(rig, { wait: 0 }, { wait: 1, duration: 1.5, ease: 'power1.out', repeat: -1, repeatDelay: 0.25, onUpdate: invalidate });
           } });
-          say('The mobile module is waiting for your device: confirm with its fingerprint, face or PIN, or choose a phone and scan the browser\'s QR code.');
+          say('The mobile module is waiting for your phone: confirm with its fingerprint, face unlock or screen lock.');
           break;
         case 'confirmed':
           // Only after the server verified the registration: the pulse runs into the package, the lid closes.

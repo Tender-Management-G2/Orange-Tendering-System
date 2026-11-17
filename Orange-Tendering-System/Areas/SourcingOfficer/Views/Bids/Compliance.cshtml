@@ -23,7 +23,7 @@
             <div asp-validation-summary="ModelOnly" class="pg-validation" role="alert"></div>
             <div class="pg-field pg-field-wide">
                 <label for="status">Does this offer meet the requirements?</label>
-                <select id="status" name="status" aria-controls="noncompliant-box clarification-box">
+                <select id="status" name="status" required data-fv-label="Compliance result" data-fv-label-ar="نتيجة الامتثال" aria-controls="noncompliant-box clarification-box">
                     <option value="Compliant" selected="@(Model.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant)">Compliant — meets requirements</option>
                     <option value="NonCompliant" selected="@(Model.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.NonCompliant)">Non-compliant — a requirement is missing</option>
                     <option value="PendingClarification" selected="@(Model.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.PendingClarification)">Needs clarification — waiting for supplier</option>
@@ -32,13 +32,13 @@
             <p class="pg-hint" data-compliance-confirmation hidden>Choosing Compliant confirms that you reviewed the attached documents and resolved the previous missing requirements.</p>
             <div class="pg-field so-conditional-box" id="noncompliant-box" hidden>
                 <label for="notes">Why does this offer not meet the requirements?</label>
-                <textarea name="notes" id="notes" rows="3" maxlength="2000" placeholder="Explain the unmet requirement or failed check">@Model.ComplianceNotes</textarea>
+                <textarea name="notes" id="notes" rows="3" maxlength="2000" data-fv-label="Non-compliance reason" data-fv-label-ar="سبب عدم الامتثال" placeholder="Explain the unmet requirement or failed check">@Model.ComplianceNotes</textarea>
                 <small class="pg-hint">A reason is required so the decision is clear.</small>
                 <span class="pg-validation" data-error-for="notes">@Html.ValidationMessage("notes")</span>
             </div>
             <div class="pg-field so-conditional-box" id="clarification-box" hidden>
                 <label for="missingRequirements">What information or documents are needed from the supplier?</label>
-                <textarea name="missingRequirements" id="missingRequirements" rows="3" maxlength="2000" placeholder="List each missing document or detail">@Model.MissingRequirements</textarea>
+                <textarea name="missingRequirements" id="missingRequirements" rows="3" maxlength="2000" data-fv-label="Missing information" data-fv-label-ar="المعلومات الناقصة" placeholder="List each missing document or detail">@Model.MissingRequirements</textarea>
                 <small class="pg-hint">List what the supplier needs to provide before you can complete the check.</small>
                 <span class="pg-validation" data-error-for="missingRequirements">@Html.ValidationMessage("missingRequirements")</span>
             </div>

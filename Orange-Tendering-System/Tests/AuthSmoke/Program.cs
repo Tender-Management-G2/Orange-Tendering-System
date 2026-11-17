@@ -22,6 +22,14 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 using System.Security.Claims;
 
+if (args.Contains("--executive-agent-checks")) { await ExecutiveAgentChecks.Run(); return; }
+if (args.Contains("--executive-navigation-checks")) { ExecutiveNavigationChecks.Run(); return; }
+if (args.Contains("--executive-knowledge-checks")) { await ExecutiveKnowledgeChecks.Run(args.Contains("--live-model")); return; }
+if (args.Contains("--executive-model-diagnose")) { await ExecutiveModelDiagnosis.Run(); return; }
+if (args.Contains("--executive-model-failure-checks")) { await ExecutiveModelFailureChecks.Run(); return; }
+if (args.Contains("--executive-agent-csrf-probe")) { await ExecutiveAgentCsrfChecks.Run(args.Contains("--expect-fixed")); return; }
+if (args.Contains("--executive-agent-browser-host")) { await ExecutiveAgentBrowserHost.Run(); return; }
+if (args.Contains("--theme-browser-host")) { await ThemeBrowserHost.Run(); return; }
 if (args.Contains("--seed-saja-demo")) { await SajaDemoFixture.Run(); return; }
 if (args.Contains("--unified-tender-checks")) { await UnifiedTenderChecks.Run(); return; }
 if (args.Contains("--verify-saja-demo")) { await SajaDemoFixture.Run(verifyExisting: true); return; }
@@ -30,6 +38,8 @@ if (args.Contains("--clarification-workflow-checks")) { await ClarificationWorkf
 if (args.Contains("--top-decision-checks")) { await TopDecisionChecks.Run(); return; }
 if (args.Contains("--search-checks")) { await SearchChecks.Run(); return; }
 if (args.Contains("--notification-checks")) { await NotificationChecks.Run(); return; }
+if (args.Contains("--spotlight-checks")) { await SpotlightChecks.Run(); return; }
+if (args.Contains("--admin-account-checks")) { await AdminAccountChecks.Run(); return; }
 if (args.Contains("--retender-checks")) { await RetenderChecks.Run(); return; }
 if (args.Contains("--provision-browser")) { await BrowserProvisioning.Run(); return; }
 if (args.Contains("--seed-ui-fixture")) { await UiFixture.Run(); return; }
@@ -70,6 +80,22 @@ Environment.SetEnvironmentVariable("Smtp__From", "sender@example.test");
 Environment.SetEnvironmentVariable("Logging__LogLevel__Microsoft.EntityFrameworkCore", "Warning");
 
 using var factory = CreateFactory();
+HttpClient ClientAt(string baseUrl) => factory.CreateClient(new() { BaseAddress = new Uri(baseUrl), AllowAutoRedirect = false, HandleCookies = true });
+// "Use my phone" (QR code / email link) only, for a quick run; the full run includes it after the biometric checks.
+if (args.Contains("--phone-checks"))
+{
+    await PhonePasskeyChecks.Run(ClientAt, Check, factory.Services, suffix, mail);
+    Console.WriteLine("Phone passkey checks passed.");
+    return;
+}
+// Face recognition, device passkeys and the phone flows only (fixtures of their own; no other part of the run needed).
+if (args.Contains("--biometric-checks"))
+{
+    await BiometricChecks.Run(() => Client(factory), Token, Check, factory.Services, suffix);
+    await PhonePasskeyChecks.Run(ClientAt, Check, factory.Services, suffix, mail);
+    Console.WriteLine("Biometric checks passed.");
+    return;
+}
 using var admin = Client(factory);
 using var supplier = Client(factory);
 
@@ -132,7 +158,7 @@ foreach (var field in new Dictionary<string, string>
     ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
     ["Input.RegistrationNumber"] = "CR-" + suffix,
     ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
-    ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
+    ["Input.CompanyPhone"] = "0790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
     ["__RequestVerificationToken"] = registerToken
 }) registration.Add(new StringContent(field.Value), field.Key);
 var pdf = Encoding.ASCII.GetBytes("%PDF-1.7\nTest legal document\n%%EOF");
@@ -447,7 +473,9 @@ var decision = await admin.PostAsync("/Admin/Suppliers/SubmitReview", Form(new()
 }));
 Check(decision.StatusCode == HttpStatusCode.Redirect, "Approve form submits and redirects");
 var reviewResult = await admin.GetAsync(reviewPath);
-Check((await reviewResult.Content.ReadAsStringAsync()).Contains("Supplier review completed successfully"),
+var reviewHtml = await reviewResult.Content.ReadAsStringAsync();
+// Since 791d6a1 (Orange Motion) a successful review shows the "Supplier approved!" popup instead of the text banner.
+Check(reviewHtml.Contains("Supplier review completed successfully") || reviewHtml.Contains("Supplier approved!"),
     "Admin sees supplier approval confirmation");
 using (var scope = factory.Services.CreateScope())
 {
@@ -526,10 +554,19 @@ var approvedLogin = await supplier.PostAsync("/Identity/Account/Login", Form(new
     ["Input.Email"] = supplierEmail, ["Input.Password"] = supplierPassword,
     ["__RequestVerificationToken"] = approvedLoginToken
 }));
-Check(approvedLogin.StatusCode == HttpStatusCode.Redirect && approvedLogin.Headers.Location?.ToString().Contains("PendingApproval") == true,
-    "approved supplier without biometrics reaches setup");
-Check((await supplier.GetAsync("/Supplier")).Headers.Location?.ToString().Contains("PendingApproval") == true,
-    "approved supplier password session cannot open workspace");
+Check(approvedLogin.StatusCode == HttpStatusCode.Redirect && approvedLogin.Headers.Location?.ToString() == "/Supplier" &&
+      (await supplier.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
+    "approved supplier signs in with Email & Password and opens the Supplier workspace");
+var loginPage = await (await supplier.GetAsync("/Identity/Account/Login")).Content.ReadAsStringAsync();
+Check(loginPage.Contains("name=\"method\" value=\"password\"") && loginPage.Contains("name=\"method\" value=\"face\"") &&
+      loginPage.Contains("name=\"method\" value=\"fingerprint\""),
+    "the sign-in page offers the three supplier methods (Email & Password, Face ID, Fingerprint) first");
+var noFaceStart = await supplier.PostAsync("/Identity/Account/Login?handler=IdentityStart", Form(new()
+{
+    ["Input.Email"] = supplierEmail, ["method"] = "face", ["__RequestVerificationToken"] = await Token(supplier, "/Identity/Account/Login")
+}));
+Check(noFaceStart.StatusCode == HttpStatusCode.Conflict && (await noFaceStart.Content.ReadAsStringAsync()).Contains("Face ID is not available"),
+    "Face ID without a face set up explains how to set it up and opens nothing");
 Check((await supplier.GetAsync("/Admin")).StatusCode != HttpStatusCode.OK, "supplier cannot enter Admin area");
 using (var scope = factory.Services.CreateScope())
 {
@@ -761,6 +798,22 @@ using (var lockedClient = Client(factory))
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var locked = await db.Users.SingleAsync(u => u.Email == adminEmail);
     Check(locked.LockoutEnd > DateTimeOffset.UtcNow, "five wrong passwords lock the account");
+
+    // The right password during the lockout is refused with a lockout message, not "Invalid email or password".
+    var lockedPage = await lockedClient.PostAsync("/Identity/Account/Login", Form(new()
+    {
+        ["Input.Email"] = adminEmail, ["Input.Password"] = resetPassword, ["__RequestVerificationToken"] = wrongToken
+    }));
+    var lockedHtml = await lockedPage.Content.ReadAsStringAsync();
+    Check(lockedPage.StatusCode == HttpStatusCode.OK && lockedHtml.Contains("temporarily locked") && !lockedHtml.Contains("Invalid email or password"),
+        "a locked account with the right password is told it is locked");
+    var lockedJson = await lockedClient.PostAsync("/Identity/Account/Login?handler=Credentials", Form(new()
+    {
+        ["Input.Email"] = adminEmail, ["Input.Password"] = resetPassword, ["__RequestVerificationToken"] = wrongToken
+    }));
+    Check(lockedJson.StatusCode == (HttpStatusCode)423 && (await lockedJson.Content.ReadAsStringAsync()).Contains("\"locked\""),
+        "the sign-in script gets the locked outcome (423) and no session");
+    Check((await lockedClient.GetAsync("/Admin")).StatusCode != HttpStatusCode.OK, "a locked account gets no workspace access");
 }
 
 using var secondFactory = CreateFactory();
@@ -804,10 +857,9 @@ foreach (var workspace in Orange_Tendering_System.ViewModels.WorkspaceNavigation
     }));
     if (workspace.Role == SystemRoles.Supplier)
     {
-        Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString().Contains("PendingApproval") == true,
-            "supplier password login routes to biometric setup");
-        Check((await roleClient.GetAsync("/" + workspace.Area)).Headers.Location?.ToString().Contains("PendingApproval") == true,
-            "supplier password cookie cannot open its dashboard");
+        Check(roleLogin.StatusCode == HttpStatusCode.Redirect && roleLogin.Headers.Location?.ToString() == "/" + workspace.Area &&
+              (await roleClient.GetAsync("/" + workspace.Area)).StatusCode == HttpStatusCode.OK,
+            "supplier Email & Password login opens its dashboard");
     }
     else
     {
@@ -847,6 +899,7 @@ using (var scope = factory.Services.CreateScope())
 }
 
 await BiometricChecks.Run(() => Client(factory), Token, Check, factory.Services, suffix);
+await PhonePasskeyChecks.Run(ClientAt, Check, factory.Services, suffix, mail);
 
 using (var productionFactory = CreateFactory().WithWebHostBuilder(builder => builder.UseEnvironment("Production")))
 using (var production = Client(productionFactory))
@@ -877,7 +930,9 @@ WebApplicationFactory<Orange_Tendering_System.WebAppMarker> CreateFactory() => n
         ["Smtp:Mode"] = "Smtp", ["Smtp:Host"] = "test.local", ["Smtp:Port"] = "587", ["Smtp:From"] = "sender@example.test",
         ["Smtp:Username"] = "unused", ["Smtp:Password"] = "unused",
         ["AccountLinks:PublicBaseUrl"] = "https://tendering.example.test",
-        ["Biometric:MaxFailuresPerWindow"] = "100"
+        ["Biometric:MaxFailuresPerWindow"] = "100",
+        // A developer's own public address (User Secrets) must not leak into the checks; PhonePasskeyChecks sets it itself.
+        ["Biometric:PublicOrigin"] = ""
     }));
     builder.ConfigureTestServices(services =>
     {
@@ -919,7 +974,7 @@ static MultipartFormDataContent RegistrationContent(string email, string passwor
         ["Input.CompanyName"] = "Test Supplier " + suffix, ["Input.Category"] = "IT & Electronics",
         ["Input.RegistrationNumber"] = "CR-" + suffix,
         ["Input.CompanyEmail"] = "company-" + suffix + "@example.test",
-        ["Input.CompanyPhone"] = "+962790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
+        ["Input.CompanyPhone"] = "0790000000", ["Input.CompanyAddress"] = "Amman, Jordan",
         ["__RequestVerificationToken"] = token
     }) content.Add(new StringContent(field.Value), field.Key);
     var pdf = Encoding.ASCII.GetBytes("%PDF-1.7\nTest legal document\n%%EOF");

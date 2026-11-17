@@ -19,7 +19,7 @@
 .ws-shell[data-workspace-role="Sourcing Officer"] .pg-page { max-width: 1440px; gap: 20px; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .pg-header { padding-top: 18px; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .pg-title { font-size: clamp(28px, 3vw, 38px); font-weight: 750; }
-.ws-shell[data-workspace-role="Sourcing Officer"] .pg-description { max-width: 900px; font-size: 14px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .pg-description { max-width: 900px; font-size: var(--fs-sm); }
 .ws-shell[data-workspace-role="Sourcing Officer"] .ws-panel,
 .ws-shell[data-workspace-role="Sourcing Officer"] .pg-card {
     border-color: var(--ws-rule);
@@ -74,7 +74,7 @@
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-welcome h2 { font-size: 25px; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-metrics .pg-card { min-height: 142px; padding: 20px; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-steps > li { padding-block: 21px; }
-.ws-shell[data-workspace-role="Sourcing Officer"] .so-step-number { width: 34px; height: 34px; font-size: 14px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .so-step-number { width: 34px; height: 34px; font-size: var(--fs-sm); }
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-forward-panel { border-color: var(--officer-border); border-radius: 17px; }
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-forward-shortcut {
     display: flex;
@@ -87,7 +87,7 @@
     background: linear-gradient(110deg, var(--officer-glow), var(--ws-surface) 65%);
 }
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-forward-shortcut > div { display: flex; flex-direction: column; gap: 4px; }
-.ws-shell[data-workspace-role="Sourcing Officer"] .so-forward-shortcut > div > strong { font-size: 15px; }
+.ws-shell[data-workspace-role="Sourcing Officer"] .so-forward-shortcut > div > strong { font-size: var(--fs-body-sm); }
 .ws-shell[data-workspace-role="Sourcing Officer"] .so-round-forward { padding-block: 18px; }
 :root[data-theme="light"] .ws-shell[data-workspace-role="Sourcing Officer"] .ws-topbar {
     background: color-mix(in srgb, white 92%, transparent);

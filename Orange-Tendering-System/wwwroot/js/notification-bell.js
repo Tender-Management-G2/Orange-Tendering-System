@@ -19,7 +19,7 @@
     if (s < 60) return 'just now';
     if (s < 3600) return Math.floor(s / 60) + ' min ago';
     if (s < 86400) return Math.floor(s / 3600) + ' h ago';
-    return new Date(iso).toLocaleDateString();
+    return new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Asia/Amman' });
   };
   const setUnread = n => {
     unread = Math.max(0, n);
@@ -101,7 +101,7 @@
   if (window.signalR) {
     const conn = new signalR.HubConnectionBuilder().withUrl(root.dataset.hubUrl).withAutomaticReconnect().build();
     conn.on('notification', n => {
-      if (!seen.has(n.id)) { seen.add(n.id); toast(n); }
+      if (!seen.has(n.id)) { seen.add(n.id); toast(n); window.dispatchEvent(new CustomEvent('orange:notification', { detail: n })); }
       load(); // SQL Server is authoritative; never increment for a duplicate or replayed message.
     });
     conn.onreconnecting(() => { root.dataset.hub = 'reconnecting'; });

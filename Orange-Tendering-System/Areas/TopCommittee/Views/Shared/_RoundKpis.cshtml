@@ -1,0 +1,26 @@
+@model DecisionHistory
+@*
+  Summary cards for Voting, Evaluation Summary and Decision History: the same pg-cards as the Officer and Clarifications
+  pages (officer-theme.css colours each card and draws its icon from data-icon). Each card filters the list by status.
+*@
+@{
+    var action = ViewData["KpiAction"]?.ToString() ?? "History";
+    var counts = Model.StatusCounts;
+    int Count(CommitteeRoundStatus s) => counts.TryGetValue(s, out var n) ? n : 0;
+    var arabic = UiLanguage.IsArabic(Context);
+    string L(string en, string ar) => arabic ? ar : en;
+    var cards = new (string Label, int Value, CommitteeRoundStatus? Status, string Icon)[]
+    {
+        (L("All committee rounds", "كل جولات اللجنة"), counts.Values.Sum(), null, "layers"),
+        (L("In progress", "قيد التنفيذ"), Count(CommitteeRoundStatus.InProgress), CommitteeRoundStatus.InProgress, "clipboard"),
+        (L("Rejected", "مرفوضة"), Count(CommitteeRoundStatus.Rejected), CommitteeRoundStatus.Rejected, "return"),
+        (L("Approved", "معتمدة"), Count(CommitteeRoundStatus.Approved), CommitteeRoundStatus.Approved, "check")
+    };
+}
+<section class="pg-cards tc-round-kpis" aria-label="@L("Committee rounds summary", "ملخص جولات اللجنة")">
+    @foreach (var card in cards)
+    {
+        <a class="pg-card @(Model.Status == card.Status ? "is-current" : null)" data-icon="@card.Icon" asp-action="@action" asp-route-id="" asp-route-status="@card.Status"
+           aria-current="@(Model.Status == card.Status ? "true" : null)"><strong>@card.Value</strong><span>@card.Label</span></a>
+    }
+</section>

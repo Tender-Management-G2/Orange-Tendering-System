@@ -50,10 +50,13 @@ INTEGRATED. No business logic.
         <link rel="stylesheet" href="~/css/identity.css" asp-append-version="true" />
     }
     @await RenderSectionAsync("Styles", required: false)
+    <link rel="stylesheet" href="~/css/theme-surfaces.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/typography.css" asp-append-version="true" />
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
     <partial name="_Icons" />
+    <div class="overlay"></div>
     <partial name="_SiteNav" />
     <div id="main-content" class="@(isIdentityPage ? "identity-page" : null)">
         @RenderBody()

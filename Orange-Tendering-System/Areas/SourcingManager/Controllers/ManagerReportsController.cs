@@ -140,8 +140,9 @@ namespace Orange_Tendering_System.Areas.SourcingManager.Controllers
                 return NotFound();
             }
 
+            // Signed reports are reviewed and decided inside the tender's workflow popup.
             if (!string.IsNullOrWhiteSpace(report.PdfSha256))
-                return RedirectToAction("Review", "Reports", new { id });
+                return RedirectToAction("Index", "Workflow", new { open = report.TenderRound.TenderId });
 
             ViewBag.IsWithTopCommittee = await _context.CommitteeRounds
                 .AnyAsync(round =>

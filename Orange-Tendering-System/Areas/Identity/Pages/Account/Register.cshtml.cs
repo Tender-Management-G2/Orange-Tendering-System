@@ -36,7 +36,8 @@ public class RegisterModel(
         [Required, StringLength(80)] public string RegistrationNumber { get; set; } = string.Empty;
         [StringLength(80)] public string? TaxNumber { get; set; }
         [Required, EmailAddress, StringLength(256)] public string CompanyEmail { get; set; } = string.Empty;
-        [Required, Phone, StringLength(40)] public string CompanyPhone { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Company telephone is required."), RegularExpression(@"^[0-9]{10}$", ErrorMessage = "Telephone must be exactly 10 digits, for example 0791234567.")]
+        public string CompanyPhone { get; set; } = string.Empty;
         [Required, StringLength(500)] public string CompanyAddress { get; set; } = string.Empty;
     }
 
