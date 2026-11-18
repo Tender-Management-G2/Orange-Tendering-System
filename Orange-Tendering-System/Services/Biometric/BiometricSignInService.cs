@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
@@ -21,17 +22,23 @@ public class BiometricSignInService(
 {
     public const string FaceMethod = "biometric-face";
     public const string PasskeyMethod = "biometric-passkey";
+    /// <summary>Supplier chose "Continue with Email &amp; Password" inside the pre-auth transaction (Biometric:SupplierPasswordOnly).</summary>
+    public const string PasswordStepMethod = "supplier-password-step";
+    public const string AuthenticationMethodClaim = "orange:biometric-auth-method";
 
     public async Task<bool> SignInAsync(ApplicationUser user, string method, string? ipAddress)
     {
-        if (method is not (PasskeyMethod or FaceMethod) || !await AccountAllowedAsync(user))
+        if (method is not (PasskeyMethod or FaceMethod or PasswordStepMethod) || !await AccountAllowedAsync(user))
         {
             await AuditAsync(user.Id, "BiometricSignInDenied", method, ipAddress, "account not allowed to sign in");
             return false;
         }
 
         await users.ResetAccessFailedCountAsync(user);
-        await signInManager.SignInAsync(user, isPersistent: false, authenticationMethod: method);
+        // Keep the method in the signed Identity principal so the supplier
+        // workspace gate can distinguish it from a password-only setup cookie.
+        await signInManager.SignInWithClaimsAsync(user, isPersistent: false,
+            [new Claim(AuthenticationMethodClaim, method)]);
         await AuditAsync(user.Id, "BiometricSignIn", method, ipAddress, null);
         return true;
     }

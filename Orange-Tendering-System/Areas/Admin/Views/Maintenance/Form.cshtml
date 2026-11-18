@@ -1,0 +1,25 @@
+@using Orange_Tendering_System.Models.Entities
+@model AdminMaintenanceForm
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Schedule Maintenance" : "Edit Maintenance";
+    ViewData["Description"] = "Record the agreed maintenance date, responsible team and progress.";
+}
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel">
+    <form asp-area="Admin" asp-controller="Maintenance" asp-action="@(Model.Id == 0 ? "Create" : "Edit")" asp-route-id="@(Model.Id == 0 ? (int?)null : Model.Id)" method="post" class="pg-form">
+        <input type="hidden" asp-for="Id" /><input type="hidden" asp-for="Version" />
+        <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+        <div class="pg-form-grid">
+            <div class="pg-field pg-field-wide"><label asp-for="Title">Maintenance title</label><input asp-for="Title" maxlength="120" placeholder="e.g. Annual platform review" /></div>
+            <div class="pg-field"><label asp-for="Category">Type</label><select asp-for="Category"><option value="AnnualReview">Annual review</option><option value="SecurityUpdate">Security update</option><option value="BackupRecovery">Backup &amp; recovery</option><option value="PlatformCare">Platform care</option></select></div>
+            <div class="pg-field"><label asp-for="ScheduledDate">Scheduled date</label><input asp-for="ScheduledDate" type="date" /></div>
+            <div class="pg-field"><label asp-for="ResponsibleTeam">Responsible team</label><input asp-for="ResponsibleTeam" maxlength="100" /></div>
+            <div class="pg-field"><label asp-for="DurationMinutes">Estimated minutes</label><input asp-for="DurationMinutes" type="number" min="15" max="1440" /></div>
+            <div class="pg-field"><label asp-for="Status">Status</label><select asp-for="Status"><option value="Scheduled">Scheduled</option><option value="InProgress">In progress</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select></div>
+            <div class="pg-field"><label asp-for="CompletedDate">Completion date</label><input asp-for="CompletedDate" type="date" /><small class="pg-hint">Fill only when the work is completed.</small></div>
+            <div class="pg-field pg-field-wide"><label asp-for="Notes">Notes / outcome</label><textarea asp-for="Notes" rows="3" maxlength="1000"></textarea></div>
+        </div>
+        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save Maintenance</button><a class="pg-btn" asp-area="" asp-controller="Analytics" asp-action="Index">Cancel</a></div>
+    </form>
+</section>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

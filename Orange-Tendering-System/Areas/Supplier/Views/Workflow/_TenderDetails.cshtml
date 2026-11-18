@@ -1,0 +1,9 @@
+@model SupplierTenderPortalViewModel
+<article class="supplier-tender-summary">
+    <header><span class="pg-hint">T-@Model.TenderId.ToString("0000") · Tender details</span><h2 id="supplier-tender-title">@Model.Title</h2><p>@Model.Description</p></header>
+    <partial name="_SupplierTenderContent" model="Model" />
+    <footer class="pg-actions">
+        <button type="button" class="pg-btn" data-tender-close>Close</button>
+        <button type="button" class="pg-btn pg-btn-primary" data-tender-workflow data-id="@Model.TenderId">Open workflow &rarr;</button>
+    </footer>
+</article>

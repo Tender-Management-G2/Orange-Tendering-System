@@ -1,8 +1,54 @@
-@* Role dashboard: all six internal roles share Views/Shared/_InternalDashboard.cshtml; the numbers come from InternalDashboardService. *@
-@model WorkspaceDashboardViewModel
+@model CommitteeDashboard
 @{
     ViewData["Title"] = "Top Committee Dashboard";
     ViewData["WorkspaceSection"] = "Dashboard";
-    ViewData["DashboardRole"] = "TopCommittee";
+    var total = Model.Active + Model.Approved + Model.Rejected;
+    var segments = new List<string>();
+    decimal angle = 0;
+    foreach (var part in new[] { (Model.Active, "#098fff"), (Model.Approved, "#00bf81"), (Model.Rejected, "#e5604f") })
+    {
+        if (total == 0) break;
+        var end = angle + part.Item1 * 360m / total;
+        segments.Add($"{part.Item2} {angle.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg {end.ToString(System.Globalization.CultureInfo.InvariantCulture)}deg");
+        angle = end;
+    }
+    var distribution = total == 0 ? "conic-gradient(var(--dash-empty-ring) 0deg 360deg)" : $"conic-gradient({string.Join(",", segments)})";
 }
-<partial name="_InternalDashboard" model="Model" />
+<div class="dash-board dash-internal" data-dashboard-role="Top Committee">
+<section class="dash-welcome"><div class="dash-welcome-photo" aria-hidden="true"></div><div class="dash-welcome-waves" aria-hidden="true"></div><div class="dash-welcome-copy"><h1>Welcome back,<strong>@Model.DisplayName</strong></h1><p>Review tenders, track committee votes, and manage final procurement decisions.</p></div></section>
+<section class="dash-metrics" aria-label="Committee at a Glance">
+@foreach (var metric in new[] { ("Awaiting My Vote", Model.AwaitingVote, "dash-orange"), ("Active Committee Rounds", Model.Active, "dash-blue"), ("Approved Committee Rounds", Model.Approved, "dash-green"), ("Rejected Committee Rounds", Model.Rejected, "dash-purple") })
+{
+    <article class="dash-metric @metric.Item3"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="17" rx="2"/><path d="M9 3h6v5H9zM8 14l3 3 5-6"/></svg></div><div class="dash-metric-copy"><strong>@metric.Item2</strong><span>@metric.Item1</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Assigned committee rounds</span></article>
+}
+</section>
+<section class="dash-middle-row">
+    <article class="dash-panel dash-workflow"><div class="dash-panel-heading"><h2>Committee Workflow</h2></div><ol class="dash-workflow-stages">
+    @foreach (var step in new[] { "Review Evaluation", "Review Recommendation", "Committee Voting", "Final Decision" })
+    { <li><span class="dash-workflow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v17H5zM8 10h8M8 15h8"/></svg></span><span>@step</span></li> }
+    </ol><span class="dash-data-caption">All four members vote before a final result is recorded.</span></article>
+    <article class="dash-panel dash-distribution"><div class="dash-panel-heading"><h2>Committee Outcomes</h2></div><div class="dash-distribution-body"><div class="dash-donut" style="--dash-distribution:@distribution"><span><strong>@total</strong><small>Rounds</small></span></div><div class="dash-legend"><div><span>Active</span><b>@Model.Active</b></div><div><span>Approved</span><b>@Model.Approved</b></div><div><span>Rejected</span><b>@Model.Rejected</b></div></div></div></article>
+</section>
+<section class="dash-panel"><div class="dash-panel-heading"><h2>Tenders Awaiting Committee Action</h2><a class="dash-text-action" asp-controller="Decisions" asp-action="History">All rounds →</a></div>
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Tender</th><th>Round</th><th>Recommended Supplier</th><th>Approvals</th><th>Voting Progress</th><th>My Vote</th><th>Actions</th></tr></thead><tbody>
+@foreach (var item in Model.Pending)
+{
+    var voteClass = item.MyVote?.Decision switch { VoteDecision.Approve => "is-ok", VoteDecision.Reject => "is-bad", _ => "is-warn" };
+    var progressClass = item.ValidVotes.Count >= 4 ? "is-ok" : "is-warn";
+    <tr><td>T-@item.Tender.Id<br />@item.Tender.Title</td><td>@item.Round.RoundNumber</td><td>@item.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName</td><td>@item.ValidVotes.Count(v => v.Decision == VoteDecision.Approve) / 4</td><td><span class="pg-badge @progressClass">@item.ValidVotes.Count / 4 Voted</span></td><td><span class="pg-badge @voteClass">@(item.MyVote?.Decision.ToString() ?? "Pending")</span></td><td><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@item.Round.Id">Review</a>
+    @if (item.CanVote || (ViewData["SignedReportRounds"] as HashSet<int>)?.Contains(item.Round.Id) == true) { <a class="pg-btn pg-btn-primary" asp-controller="Decisions" asp-action="Decision" asp-route-id="@item.Round.Id">Vote</a> }
+    else { <span class="pg-hint">@(item.MyVote is not null ? "Vote recorded" : "Review eligibility notes")</span> }</td></tr>
+}
+@if (Model.Pending.Count == 0) { <tr><td colspan="7">No tenders awaiting committee action.</td></tr> }
+</tbody></table></div><p class="pg-hint">Showing up to 20 active assigned rounds. Counts include all your assigned rounds.</p></section>
+<section class="dash-panel dash-activity"><div class="dash-panel-heading"><h2>Recent Decisions</h2></div><div class="dash-activity-list">
+@foreach (var item in Model.Recent) { <div class="dash-activity-item"><i aria-hidden="true"></i><div><strong>@item.TenderRound.Tender.Title · @CommitteeDisplay.Status(item.Status)</strong><a asp-controller="Decisions" asp-action="History" asp-route-id="@item.Id">Decision details</a></div><time>@CommitteeDisplay.Date(item.CompletedAt)</time></div> }
+@if (Model.Recent.Count == 0) { <div class="dash-empty-state">No completed decisions available.</div> }
+</div></section>
+<section class="dash-panel"><div class="dash-panel-heading"><h2>AI Report Analysis</h2></div>
+@if (Model.Pending.FirstOrDefault(item => item.AiAnalysis is not null) is { } analyzed)
+{ <p>Analysis available for T-@analyzed.Tender.Id — @analyzed.Tender.Title.</p><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@analyzed.Round.Id" asp-fragment="report-ai">View report analysis</a> }
+else { <p>No current report analysis is available.</p><a class="pg-btn" asp-controller="Decisions" asp-action="ReviewEvaluation">Select a Manager report to analyze</a> }
+<p class="pg-hint">Ollama analysis is advisory and does not change votes or awards.</p></section>
+</div>
+@section Styles { <partial name="_TopStyles" /> }

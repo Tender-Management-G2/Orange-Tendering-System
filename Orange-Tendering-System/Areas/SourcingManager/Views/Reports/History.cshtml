@@ -1,20 +1,77 @@
-@model List<Orange_Tendering_System.ViewModels.WorkflowListRow>
+@model List<Orange_Tendering_System.Models.Entities.TenderReport>
+
 @{
-    ViewData["Title"] = "Decision History"; ViewData["WorkspaceSection"] = "Decision History";
-    ViewData["Description"] = "Tenders whose report has already been decided.";
+    ViewData["Title"] = "Sourcing Manager Decision History";
+    ViewData["WorkspaceSection"] = "Decision History";
+    ViewData["Description"] = "Every decision you made on report versions.";
 }
+
 <partial name="_PageHeader" />
-<section class="ws-panel pg-panel" aria-labelledby="mr-title">
-    <div class="pg-panel-head"><h2 id="mr-title">Decision History</h2></div>
+
+<section class="ws-panel pg-panel" aria-labelledby="tbl-decisions">
+    <div class="pg-panel-head">
+        <h2 id="tbl-decisions">Decisions</h2>
+    </div>
+
     <div class="pg-table-wrap">
         <table class="pg-table">
-            <thead><tr><th scope="col">Tender</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col" data-nosort>Actions</th></tr></thead>
+            <thead>
+                <tr>
+                    <th scope="col">Tender</th>
+                    <th scope="col">Report version</th>
+                    <th scope="col">Decision</th>
+                    <th scope="col">Comment</th>
+                    <th scope="col">Decided at</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+
             <tbody>
-            @foreach (var row in Model)
-            {
-                <tr><td>T-@row.TenderId.ToString("0000")</td><td><strong>@row.Title</strong></td><td>@row.Status</td><td><a class="pg-btn" data-no-modal asp-area="SourcingManager" asp-controller="Workflow" asp-action="Details" asp-route-id="@row.TenderId">Open</a></td></tr>
-            }
-            @if (Model.Count == 0) { <tr><td colspan="4"><partial name="_EmptyState" model='"No decided reports yet."' /></td></tr> }
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            <partial name="_EmptyState"
+                                     model='"No decisions recorded yet."' />
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var report in Model)
+                    {
+                        var statusClass = report.Status switch
+                        {
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Accepted => "is-accepted",
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Returned => "is-returned",
+                            Orange_Tendering_System.Models.Entities.ReportStatus.Rejected => "is-rejected",
+                            _ => "is-submitted"
+                        };
+                        <tr>
+                            <td>@report.TenderRound?.Tender?.Title</td>
+
+                            <td>Version @report.VersionNumber</td>
+
+                            <td><span class="sm-status @statusClass">@report.Status</span></td>
+
+                            <td>@(report.ReviewComment ?? "-")</td>
+
+                            <td>
+                                @report.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")
+                            </td>
+
+                            <td>
+                                <a asp-area="SourcingManager"
+                                   asp-controller="Reports"
+                                   asp-action="Review"
+                                   asp-route-id="@report.Id"
+                                   class="pg-btn">
+                                    View Report
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
             </tbody>
         </table>
     </div>

@@ -1,0 +1,42 @@
+@model Orange_Tendering_System.ViewModels.TopRejectionReview
+@using Orange_Tendering_System.Models.Entities
+@{
+    ViewData["Title"] = "Top Committee decision";
+    string Reason(TopRejectionReason? reason) => reason switch {
+        TopRejectionReason.NotNeeded => "Company No Longer Needs This Tender",
+        TopRejectionReason.UnacceptableOffers => "No Supplier Offers Are Acceptable",
+        _ => "Not recorded"
+    };
+}
+<h1>Top Committee decision</h1>
+<p><a asp-controller="Reports" asp-action="Review" asp-route-id="@Model.ReportId">Review report #@Model.ReportId</a></p>
+<p role="status"><strong>@Model.Status</strong></p>
+@if (Model.FinalReason.HasValue) { <p>Final rejection reason: <strong>@Reason(Model.FinalReason)</strong></p> }
+<p>This page records the Top Committee decision only. It does not cancel a tender or create a bidding round. The existing vote thresholds and signed votes remain unchanged.</p>
+<table class="table"><thead><tr><th>Member</th><th>Signed vote</th><th>Original rejection reason</th><th>Justification</th></tr></thead><tbody>
+@foreach (var vote in Model.Votes) {
+    <tr><td>@vote.CommitteeMember.User.FullName</td><td>@vote.Decision</td><td>@(vote.Decision == VoteDecision.Reject ? Reason(vote.RejectionReason) : "—")</td><td>@vote.Comment</td></tr>
+}
+</tbody></table>
+@if (Model.CanAgree) {
+    <h2>Resolve conflicting reasons</h2>
+    <p>The rejection remains pending until all four assigned Top Committee members confirm the same reason. Confirmations are separate electronic acknowledgments; they do not replace signed votes or their original reasons.</p>
+    <form asp-action="Agree" method="post">
+        <input type="hidden" name="id" value="@Model.ReportId" />
+        <input type="hidden" name="documentHash" value="@Model.DocumentHash" />
+        <label>Agreed rejection reason<select name="reason" required>
+            <option value="NotNeeded">Company No Longer Needs This Tender</option>
+            <option value="UnacceptableOffers">No Supplier Offers Are Acceptable</option>
+        </select></label>
+        <label>Justification<textarea name="comment" maxlength="2000" required></textarea></label>
+        <label><input type="checkbox" name="confirmed" value="true" required /> I reviewed this report and explicitly agree to this rejection reason.</label>
+        <button type="submit">Record reason agreement</button>
+    </form>
+}
+@if (Model.Agreements.Count > 0) {
+    <h2>Current reason agreements</h2>
+    <ul>@foreach (var agreement in Model.Agreements) {
+        var name = Model.Votes.FirstOrDefault(x => x.CommitteeMemberId == agreement.CommitteeMemberId)?.CommitteeMember.User.FullName;
+        <li>@name — @Reason(agreement.Reason): @agreement.Comment</li>
+    }</ul>
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "a-card-normal",
+    "duration": 7.68,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "a-card-slow",
+    "duration": 16.4,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "b-building-normal",
+    "duration": 8.24,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "b-building-slow",
+    "duration": 17.84,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "c-iris-normal",
+    "duration": 4.04,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "c-iris-slow",
+    "duration": 8.6,
+    "width": 1440,
+    "height": 900
+  }
+]

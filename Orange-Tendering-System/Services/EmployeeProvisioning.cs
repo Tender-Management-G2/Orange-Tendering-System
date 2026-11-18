@@ -15,7 +15,7 @@ public sealed class EmployeeProvisioning(
     ApplicationDbContext db,
     UserManager<ApplicationUser> users,
     IEmailSender emailSender,
-    LinkGenerator links)
+    AccountLinkGenerator links)
 {
     public async Task<IdentityResult> CreateAsync(HttpContext context, string fullName, string email,
         int departmentId, IReadOnlyCollection<string> roles)
@@ -35,7 +35,7 @@ public sealed class EmployeeProvisioning(
         };
         var created = await users.CreateAsync(user);
         if (!created.Succeeded) return created;
-        var assigned = await users.AddToRolesAsync(user, roles);
+        var assigned = await users.AddToRolesAsync(user, roles.SelectMany(SystemRoles.AccountRoles).Distinct());
         if (!assigned.Succeeded) return assigned;
 
         var token = await users.GeneratePasswordResetTokenAsync(user);

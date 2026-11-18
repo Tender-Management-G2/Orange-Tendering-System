@@ -1,0 +1,60 @@
+@model SourcingManagerClarificationDetailsViewModel
+
+@{
+    ViewData["Title"] = "Clarification thread";
+    ViewData["WorkspaceSection"] = "Clarifications";
+    ViewData["Description"] = "Tender: " + Model.TenderTitle;
+}
+
+<partial name="_PageHeader" />
+
+@if (TempData["Error"] is string error)
+{
+    <p class="pg-notice pg-notice-error">@error</p>
+}
+@if (TempData["Success"] is string success)
+{
+    <p class="pg-notice pg-notice-success">@success</p>
+}
+
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head">
+        <div><h2>@Model.Subject</h2><p>With @Model.OtherParticipant · Status: <strong>@Model.Status</strong></p></div>
+        @if (Model.CanClose)
+        {
+            <form asp-action="Close" asp-route-id="@Model.Id" method="post"><button class="pg-btn pg-btn-secondary" type="submit">Close clarification</button></form>
+        }
+    </div>
+    <div class="sm-thread">
+        @foreach (var message in Model.Messages)
+        {
+            <article class="sm-message">
+                <header><strong>@message.Sender</strong><time>@message.SentAt.ToString("yyyy-MM-dd HH:mm")</time></header>
+                <p>@message.Message</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.CanReply)
+{
+    <section class="ws-panel pg-panel">
+        <h2>Reply</h2>
+        <form asp-action="Reply" asp-route-id="@Model.Id" method="post" class="pg-form">
+            <div class="pg-field"><label for="message">Message</label><textarea id="message" name="message" maxlength="2000" required></textarea></div>
+            <div class="pg-actions"><button class="pg-btn pg-btn-primary" type="submit">Send reply</button><a class="pg-btn pg-btn-secondary" asp-action="Index">Back to clarifications</a></div>
+        </form>
+    </section>
+}
+else
+{
+    <p><a class="pg-btn pg-btn-secondary" asp-action="Index">Back to clarifications</a></p>
+}
+
+<style>
+    .sm-thread { display: grid; gap: 12px; }
+    .sm-message { border: 1px solid var(--ws-soft-rule); border-radius: 12px; padding: 14px 16px; background: var(--ws-raised); }
+    .sm-message header { display: flex; justify-content: space-between; gap: 12px; color: var(--ws-muted); font-size: 12px; }
+    .sm-message header strong { color: var(--ws-ink); }
+    .sm-message p { margin: 10px 0 0; white-space: pre-wrap; line-height: 1.65; }
+</style>

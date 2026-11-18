@@ -1,0 +1,17 @@
+@model ReportChart
+@{
+    var total = Model.Points.Sum(p => p.Count);
+    decimal angle = 0;
+    var slices = new List<string>();
+    foreach (var point in Model.Points)
+    {
+        if (total == 0) break;
+        var next = angle + point.Count * 360m / total;
+        slices.Add($"{point.Color} {ReportFormat.Number((double)angle)}deg {ReportFormat.Number((double)next)}deg"); angle = next;
+    }
+    var gradient = total > 0 ? $"conic-gradient({string.Join(",", slices)})" : "conic-gradient(#e5e8ee 0deg 360deg)";
+}
+<section class="tc-panel"><h2>@Model.Title</h2><div class="tc-donut-body">
+<div class="tc-donut" style="--tc-gradient:@gradient" role="img" aria-label="@Model.Title: @string.Join(", ", Model.Points.Select(p => p.Label + ": " + p.Count))"><div><strong>@total.ToString("N0")</strong><span>@Model.CenterLabel</span></div></div>
+<div class="tc-legend">@foreach (var point in Model.Points) { <div><i style="background:@point.Color" aria-hidden="true"></i><span>@point.Label</span><b>@point.Count (@ReportFormat.Percent(ReportFormat.Ratio(point.Count, total)))</b></div> }</div>
+</div>@if (total == 0) { <p class="tc-notes">No records available yet.</p> }</section>

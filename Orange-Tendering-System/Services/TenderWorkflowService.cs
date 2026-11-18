@@ -104,15 +104,19 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var actor = await Actor(principal);
         Require(await IsOfficer(actor), "Exactly one active Sourcing Officer must be configured.");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var pr = await db.PurchaseRequests.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == input.PurchaseRequestId);
+        var pr = await db.PurchaseRequests.FromSqlInterpolated($"SELECT * FROM PurchaseRequests WITH (UPDLOCK,HOLDLOCK) WHERE Id={input.PurchaseRequestId}").Include(x => x.Items).SingleOrDefaultAsync();
         Require(pr?.Status == PurchaseRequestStatus.Accepted && pr.Items.Count > 0, "An accepted Purchase Request with line items is required.");
+        Require(!await db.Tenders.AnyAsync(t => t.PurchaseRequestId == input.PurchaseRequestId), "This request already has a tender. Continue that tender or create a new round instead.");
         var ids = new[] { input.SourcingManagerId, input.DepartmentRepresentativeId, input.FinancialRepresentativeId, input.TechnicalRepresentativeId };
         Require(ids.Distinct().Count() == 4 && !ids.Contains(actor.Id), "Assign four distinct committee members, separate from the officer.");
+        var seatRoles = new[] { SystemRoles.SourcingManager, SystemRoles.DepartmentRepresentative, SystemRoles.Finance, SystemRoles.Technical };
         for (var i = 0; i < ids.Length; i++)
         {
+            await ValidateStandingPerson(ids[i], seatRoles[i]);
             var person = await users.FindByIdAsync(ids[i]);
             Require(person is { IsActive: true }, "Committee account missing or inactive.");
             Require(await Role(person!, i == 0 ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee), "Each member must have the appropriate Identity role.");
+            Require(!await Role(person!, i == 0 ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager), i == 0 ? "The Sourcing Manager seat is only for a dedicated Sourcing Manager, not an Evaluation Committee member." : "A Sourcing Manager cannot take a committee member seat.");
             if (i == 1) Require(person!.DepartmentId == pr!.DepartmentId, "Department representative must belong to the requesting department.");
         }
         var requirements = JsonSerializer.Serialize(new { input.TechnicalRequirements, input.CommercialConditions, input.DeliveryExpectations, input.MandatoryCompliance });
@@ -123,6 +127,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         await db.SaveChangesAsync();
         db.TenderRounds.Add(new TenderRound { TenderId = tender.Id, RoundNumber = 1, CreatedByUserId = actor.Id, CreatedAt = Now });
         for (var i = 0; i < ids.Length; i++) db.CommitteeMembers.Add(new CommitteeMember { TenderId = tender.Id, UserId = ids[i], CommitteeType = CommitteeType.Evaluation, Responsibility = (CommitteeResponsibility)i, AssignedAt = Now });
+        Audit(actor, tender.Id, "EvaluationCommitteeAssigned", new { Members = ids });
         Audit(actor, tender.Id, "RequirementsCreated", input);
         await db.SaveChangesAsync(); await tx.CommitAsync(); return tender.Id;
     }
@@ -148,14 +153,14 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         {
             var avg = WeightedCalculation.Average(weights.Proposals.Select(x => (x.Financial, x.Technical)));
             weights.FinancialAverage = avg.Financial; weights.TechnicalAverage = avg.Technical; weights.State = WeightState.AwaitingApproval;
-            await NotifyOfficer(id, "Weight proposals complete", Policy.WeightConfigured ? "Awaiting formal weight approval." : "Awaiting Approval Policy: bidding remains blocked.");
+            await NotifyOfficer(id, "Weight proposals complete", "All four proposals are in. Review the average and approve it to lock the official weights.");
         }
         Audit(a, id, "ProposalEvidence", new { weights.Version, member.Id, financial, technical });
     });
     public Task ApproveWeights(int id, ClaimsPrincipal principal) => Change(id, principal, "WeightsApproved", async (t, a) =>
     {
-        Require(await WeightApprover(a), "Awaiting Approval Policy, or you are not an authorized weight approver.");
-        Require(await Role(a, SystemRoles.SourcingManager) && (await ManagerSeat(id))?.UserId == a.Id, "Only the Sourcing Manager assigned to this tender may approve its calculated weights.");
+        // The Sourcing Officer who defined the tender approves the committee average, which then becomes the official weighting.
+        await Officer(t, a);
         var w = await Weights(id);
         Require(t.Status == TenderStatus.Draft && w.State == WeightState.AwaitingApproval && w.Proposals.Count == 4, "Weights are not awaiting approval.");
         var avg = WeightedCalculation.Average(w.Proposals.Select(x => (x.Financial, x.Technical)));
@@ -172,15 +177,30 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         round.OpensAt = Now; round.Deadline = deadline.UtcDateTime; round.Status = TenderRoundStatus.Open; t.Status = TenderStatus.Bidding;
         if (round.RoundNumber > 1) await CarryForwardSuppliers(t, a, round);
     });
+    // Repair a legacy open round with no deadline only through an explicit Officer action.
+    public Task SetMissingBiddingDeadline(int id, DateTimeOffset deadline, ClaimsPrincipal principal) => Change(id, principal, "MissingBiddingDeadlineSet", async (t, a) =>
+    {
+        await Officer(t, a); var round = await Round(id); var weights = await Weights(id);
+        Require(t.Status == TenderStatus.Bidding && round.Status == TenderRoundStatus.Open && round.Deadline == null,
+            "Only an open legacy round with a missing deadline can be repaired here.");
+        Require(weights.State == WeightState.Approved, "The assigned Sourcing Officer must approve and lock all four weight proposals before a bidding deadline can be set.");
+        Require(deadline != default && deadline.UtcDateTime > Now, "Choose a bidding closing date and time in the future.");
+        Require(!await db.Set<EvaluationSession>().AnyAsync(x => x.TenderRoundId == round.Id), "Evaluation has already started; the deadline cannot change.");
+        round.Deadline = deadline.UtcDateTime; round.OpensAt ??= Now;
+        Audit(a, id, "BiddingDeadlineRepairEvidence", new { round.Id, Deadline = round.Deadline });
+    });
     public Task Invite(int id, int supplierId, ClaimsPrincipal principal) => Change(id, principal, "SupplierInvited", async (t, a) =>
     {
         await Officer(t, a); var r = await Round(id);
-        Require(r.Status == TenderRoundStatus.Open && r.Deadline > Now, "Bidding is not open.");
-        Require(await db.Suppliers.AnyAsync(x => x.Id == supplierId && x.Status == SupplierStatus.Approved), "Only approved suppliers can be invited.");
+        Require(r.Deadline.HasValue, "This bidding round has no closing deadline. Set the missing deadline before inviting suppliers.");
+        Require(t.Status == TenderStatus.Bidding && r.Status == TenderRoundStatus.Open && r.Deadline > Now
+            && await db.Set<WeightRound>().AnyAsync(w => w.TenderId == id && w.State == WeightState.Approved), "Complete tender setup and approved weights before inviting suppliers.");
+        Require(await db.Suppliers.AnyAsync(x => x.Id == supplierId && x.Status == SupplierStatus.Approved
+            && db.Users.Any(u => u.SupplierId == x.Id && u.IsActive && u.EmailConfirmed)), "Only approved suppliers with an active verified account can be invited.");
         Require(!await db.TenderInvitations.AnyAsync(x => x.TenderRoundId == r.Id && x.SupplierId == supplierId), "Supplier already invited.");
         db.TenderInvitations.Add(new TenderInvitation { TenderRoundId = r.Id, SupplierId = supplierId, InvitedAt = Now, InvitedByUserId = a.Id });
         await QueueSupplierEmail(r, await db.Suppliers.SingleAsync(x => x.Id == supplierId), a);
-        foreach (var u in await db.Users.Where(x => x.SupplierId == supplierId && x.IsActive).ToListAsync()) Notify(u.Id, id, "Tender invitation", "Review the published requirements and approved weights, then accept or decline.");
+        foreach (var u in await db.Users.Where(x => x.SupplierId == supplierId && x.IsActive).ToListAsync()) Notify(u.Id, id, "Tender invitation", "Review the tender requirements and submission dates, then accept or decline.");
     });
     public Task Respond(int id, int invitationId, bool accept, ClaimsPrincipal principal) => Change(id, principal, "InvitationResponded", async (t, a) =>
     {
@@ -239,11 +259,15 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     public Task CloseBidding(int id, ClaimsPrincipal principal) => Change(id, principal, "BiddingClosed", async (t, a) =>
     {
         await Officer(t, a); var r = await Round(id);
-        // Bidding closes after its deadline, or earlier once every invited supplier has either declined or submitted its offer (nothing is left to wait for).
+        // The Officer may close early after three distinct suppliers submit, without waiting for other invitations.
+        // Deadline and all-answered closure remain available for low-response / re-tendering rounds.
         var invitations = await db.TenderInvitations.Where(i => i.TenderRoundId == r.Id).Select(i => new { i.Id, i.Status }).ToListAsync();
         var submitted = (await db.Bids.Where(b => b.Status == BidStatus.Submitted && b.TenderInvitation.TenderRoundId == r.Id).Select(b => b.TenderInvitationId).ToListAsync()).ToHashSet();
         var everyoneAnswered = invitations.Count > 0 && invitations.All(i => i.Status == InvitationStatus.Declined || submitted.Contains(i.Id));
-        Require(r.Status == TenderRoundStatus.Open && (r.Deadline <= Now || everyoneAnswered), "Bidding can close only after its deadline, or once every invited supplier has submitted an offer or declined.");
+        var submittedSuppliers = await db.Bids.Where(b => b.Status == BidStatus.Submitted && b.TenderInvitation.TenderRoundId == r.Id)
+            .Select(b => b.TenderInvitation.SupplierId).Distinct().CountAsync();
+        Require(r.Status == TenderRoundStatus.Open && (submittedSuppliers >= 3 || r.Deadline <= Now || everyoneAnswered),
+            "Bidding can close after three distinct suppliers submit offers, after the deadline, or once every invited supplier submits or declines.");
         r.Status = TenderRoundStatus.Closed; r.ClosedAt = Now;
     });
     public Task Compliance(int id, int bidId, ComplianceStatus status, string notes, string missing, ClaimsPrincipal principal) => Change(id, principal, "ComplianceRecorded", async (t, a) =>
@@ -301,16 +325,19 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var meeting = zoomMeetingId != null ? $"Zoom meeting {zoomMeetingId} was created for this session. Use Join meeting in this notification."
             : input.MeetingUrl!.Contains("meet.jit.si") ? "The system created the video meeting room for this session. Use Join meeting in this notification at the scheduled time." : "The Zoom link was supplied by the officer; open it from the tender page.";
         await NotifyOfficerMeeting(id, $"Evaluation meeting scheduled for {session.StartsAt:u}. {meeting}");
-        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {session.StartsAt:u} and closes automatically at {session.EndsAt:u}. {meeting} The reviewed AI analysis #{ai.Id} and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s) are attached on the tender page.");
+        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {session.StartsAt:u} and remains available after the meeting ends until you submit your final evaluation. {meeting} The reviewed AI analysis #{ai.Id} and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s) are attached on the tender page.");
         Audit(a, id, "EvaluationScheduleEvidence", new { r.RoundNumber, session.StartsAt, session.EndsAt, ZoomMeetingId = zoomMeetingId, AiAnalysisId = ai.Id, EligibleBidIds = eligible.Select(x => x.Id), AttachedDocuments = attachedDocuments, InvitedMemberIds = members.Select(x => x.Id) });
     });
+    public static bool EvaluationOpen(EvaluationSession session, DateTime now) =>
+        session.ReportId == null && now >= session.StartsAt &&
+        (session.State == SessionState.Scheduled || session.State == SessionState.Incomplete && session.ClosureReason == "Scheduled deadline reached");
+
     public Task SubmitEvaluation(int id, List<ScoreInput> scores, ClaimsPrincipal principal)
     {
-        DateTime? limit = null;
         return Change(id, principal, "EvaluationSubmitted", async (t, a) =>
         {
-            var member = await Member(t, a, CommitteeType.Evaluation); var s = await Session(id); limit = s.EndsAt;
-            Require(s.State == SessionState.Scheduled && Now >= s.StartsAt && Now < s.EndsAt, "Evaluation is not open. Check the scheduled opening and closing times.");
+            var member = await Member(t, a, CommitteeType.Evaluation); var s = await Session(id);
+            Require(t.Status == TenderStatus.Evaluation && EvaluationOpen(s, Now), "Evaluation is not open yet or has already been finalized.");
             Require(s.Submissions.All(x => x.CommitteeMemberId != member.Id), "Your final evaluation was already submitted and is immutable.");
             Require(scores.Count == s.EligibleBids.Count && scores.Select(x => x.BidId).Distinct().Count() == scores.Count && scores.All(x => s.EligibleBids.Any(y => y.BidId == x.BidId)), "Score every eligible supplier exactly once.");
             foreach (var score in scores)
@@ -323,9 +350,14 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             var participation = s.Invitations.SingleOrDefault(x => x.CommitteeMemberId == member.Id);
             Require(participation != null, "A persisted evaluation invitation is required.");
             participation.SubmittedAt = Now;
+            if (s.State == SessionState.Incomplete)
+            {
+                Audit(a, id, "EvaluationResumedAfterMeeting", new { s.ClosedAt, s.ClosureReason });
+                s.State = SessionState.Scheduled; s.ClosedAt = null; s.ClosedByUserId = null; s.ClosureReason = null;
+            }
             // Touch rowversion so closure and final submission share the same concurrency boundary.
             db.Entry(s).Property(x => x.State).IsModified = true;
-        }, () => limit);
+        });
     }
     public Task EndEvaluation(int id, bool confirmed, string reason, ClaimsPrincipal principal) => Change(id, principal, "EvaluationClosed", async (t, a) =>
     {
@@ -358,7 +390,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     public Task GenerateReport(int id, string justification, ClaimsPrincipal principal) => Change(id, principal, "UnifiedReportGenerated", async (t, a) =>
     {
         await Member(t, a, CommitteeType.Evaluation); var s = await Session(id);
-        if (s.State == SessionState.Scheduled && Now >= s.EndsAt) Closed(s);
+        if (s.State == SessionState.Scheduled && Now >= s.EndsAt && s.Submissions.Count == 4) Closed(s);
         Require(s.State == SessionState.Closed && s.ReportId == null && !string.IsNullOrWhiteSpace(justification), "Close a complete evaluation first and provide the recommendation justification.");
         await GenerateReportCore(t, a, s, justification);
     });
@@ -396,6 +428,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         if (s.Report != null && await db.Set<ReportSignature>().AnyAsync(x => x.TenderReportId == s.ReportId && x.Stage == ReportSigningStage.Evaluation && x.UserId == a.Id))
         { await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Evaluation, signingRole, member.Responsibility.ToString()!, "Approve", documentHash, confirmed, Now, signatureImage); return; }
         Require(s.State == SessionState.ReportDraft && s.Report != null, "A complete unified report must be available for review.");
+        Require(s.ReportSentAt != null, "The Sourcing Officer has not sent the report for signing yet.");
         await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Evaluation, signingRole, member.Responsibility.ToString()!, "Approve", documentHash, confirmed, Now, signatureImage);
         var reviewRoundId = s.ReportReviewRoundId ?? s.CommitteeRoundId;
         var votes = await db.CommitteeVotes.Where(x => x.CommitteeRoundId == reviewRoundId).ToListAsync();
@@ -461,16 +494,8 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                 var assignedTop = await Members(id, CommitteeType.Top);
                 if (assignedTop.Count == 0)
                 {
-                    // The Top Committee is a standing body: when the Manager approves, the first four eligible active members are seated automatically (no officer step).
-                    var evaluators = await db.CommitteeMembers.Where(x => x.TenderId == id).Select(x => x.UserId).ToListAsync();
-                    var pool = new List<ApplicationUser>();
-                    foreach (var person in (await users.GetUsersInRoleAsync(SystemRoles.TopCommittee)).Where(x => x.IsActive && !evaluators.Contains(x.Id)).OrderBy(x => x.FullName))
-                        if (!await Role(person, SystemRoles.SourcingOfficer) && !await Role(person, SystemRoles.SourcingManager)) pool.Add(person);
-                    if (pool.Count >= 4)
-                    {
-                        foreach (var person in pool.Take(4)) db.CommitteeMembers.Add(new CommitteeMember { TenderId = id, UserId = person.Id, CommitteeType = CommitteeType.Top, AssignedAt = Now });
-                        await db.SaveChangesAsync(); assignedTop = await Members(id, CommitteeType.Top);
-                    }
+                    await CaptureStandingTop(t, a);
+                    await db.SaveChangesAsync(); assignedTop = await Members(id, CommitteeType.Top);
                 }
                 if (assignedTop.Count == 4 && !await db.CommitteeRounds.AnyAsync(x => x.TenderRoundId == s.TenderRoundId && x.CommitteeType == CommitteeType.Top && x.TenderReportId == s.ReportId))
                 {
@@ -484,28 +509,32 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         Audit(a, id, "ManagerDecisionEvidence", new { decision, comment, s.ReportId });
         await NotifyOfficer(id, "Manager decision", $"{decision}: {comment}");
     });
-    public Task AssignTop(int id, string[] memberIds, ClaimsPrincipal principal) => Change(id, principal, "TopCommitteeAssigned", async (t, a) =>
+    public Task AssignTop(int id, Dictionary<TopExecutivePosition, string> executives, ClaimsPrincipal principal) => Change(id, principal, "TopCommitteeAssigned", async (t, a) =>
     {
         await Officer(t, a); var s = await Session(id);
         Require(s.State == SessionState.ManagerApproved && RequiresTop(t, s), "Manager approval and a configured policy requiring Top Committee are required.");
+        Require(executives.Count == 4 && Enum.GetValues<TopExecutivePosition>().All(executives.ContainsKey), "Assign CEO, CFO, CTO and COO explicitly.");
+        var memberIds = executives.Values.ToArray();
         Require(memberIds.Length == 4 && memberIds.Distinct().Count() == 4 && !await db.CommitteeMembers.AnyAsync(x => x.TenderId == id && x.CommitteeType == CommitteeType.Top), "Assign four distinct Top Committee members once.");
-        foreach (var userId in memberIds)
+        foreach (var (position, userId) in executives)
         {
             var person = await users.FindByIdAsync(userId);
             Require(person is { IsActive: true } && await Role(person, SystemRoles.TopCommittee) && !await Role(person, SystemRoles.SourcingOfficer) && !await Role(person, SystemRoles.SourcingManager) && !await db.CommitteeMembers.AnyAsync(x => x.TenderId == id && x.UserId == userId), "Top members must be active, appropriately authorized, and separate from the Evaluation Committee, officer, and manager.");
-            db.CommitteeMembers.Add(new CommitteeMember { TenderId = id, UserId = userId, CommitteeType = CommitteeType.Top, AssignedAt = Now });
+            db.CommitteeMembers.Add(new CommitteeMember { TenderId = id, UserId = userId, CommitteeType = CommitteeType.Top, ExecutivePosition = position, AssignedAt = Now });
             Notify(userId, id, "Final decision requested", "Review the finalized report, recommendation, evidence and manager decision. Do not re-enter evaluation scores.");
         }
         db.CommitteeRounds.Add(new CommitteeRound { TenderRoundId = s.TenderRoundId, CommitteeType = CommitteeType.Top, RoundNumber = 1, TenderReportId = s.ReportId, StartedAt = Now });
         t.Status = TenderStatus.TopCommitteeReview;
     });
-    public Task TopVote(int id, VoteDecision decision, string comment, ClaimsPrincipal principal, string? documentHash = null, bool confirmed = false, byte[]? signatureImage = null) => Change(id, principal, "TopCommitteeDecision", async (t, a) =>
+    public Task TopVote(int id, VoteDecision decision, string comment, ClaimsPrincipal principal, string? documentHash = null, bool confirmed = false, byte[]? signatureImage = null, TopRejectionReason? rejectionReason = null) => Change(id, principal, "TopCommitteeDecision", async (t, a) =>
     {
+        Require(decision != VoteDecision.Reject || rejectionReason.HasValue && Enum.IsDefined(rejectionReason.Value), "Select one of the two valid rejection reasons.");
+        if (decision != VoteDecision.Reject) rejectionReason = null;
         var member = await Member(t, a, CommitteeType.Top); var s = await Session(id);
         var topSeats = await db.CommitteeMembers.Where(x => x.TenderId == id && x.CommitteeType == CommitteeType.Top).OrderBy(x => x.Id).Select(x => x.Id).ToListAsync();
         var slot = (topSeats.IndexOf(member.Id) + 1).ToString();
         if (s.Report != null && await db.Set<ReportSignature>().AnyAsync(x => x.TenderReportId == s.ReportId && x.Stage == ReportSigningStage.Top && x.UserId == a.Id))
-        { await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Top, SystemRoles.TopCommittee, slot, decision.ToString(), documentHash, confirmed, Now, signatureImage); return; }
+        { Require(await db.CommitteeVotes.AnyAsync(v => v.CommitteeRound.TenderReportId == s.ReportId && v.CommitteeMemberId == member.Id && v.Decision == decision && v.RejectionReason == rejectionReason), "Your signed vote and rejection reason cannot be changed. Use the separate reason agreement to resolve a conflict."); await reportDocuments.Sign(s.Report, s, a, ReportSigningStage.Top, SystemRoles.TopCommittee, slot, decision.ToString(), documentHash, confirmed, Now, signatureImage); return; }
         Require(s.State == SessionState.ManagerApproved && t.Status == TenderStatus.TopCommitteeReview && RequiresTop(t, s), "This recommendation is not awaiting Top Committee decisions.");
         Require(Enum.IsDefined(decision) && !string.IsNullOrWhiteSpace(comment), "An official decision and justification are required.");
         await reportDocuments.RequireCommitteeSignatures(s.Report!, s);
@@ -513,11 +542,13 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         await reportDocuments.Sign(s.Report!, s, a, ReportSigningStage.Top, SystemRoles.TopCommittee, slot, decision.ToString(), documentHash, confirmed, Now, signatureImage);
         var cr = await db.CommitteeRounds.SingleAsync(x => x.TenderRoundId == s.TenderRoundId && x.CommitteeType == CommitteeType.Top && x.TenderReportId == s.ReportId);
         Require(!await db.CommitteeVotes.AnyAsync(x => x.CommitteeRoundId == cr.Id && x.CommitteeMemberId == member.Id), "Your final decision is already recorded.");
-        db.CommitteeVotes.Add(new CommitteeVote { CommitteeRoundId = cr.Id, CommitteeMemberId = member.Id, Decision = decision, Comment = comment, VotedAt = Now });
+        db.CommitteeVotes.Add(new CommitteeVote { CommitteeRoundId = cr.Id, CommitteeMemberId = member.Id, Decision = decision, RejectionReason = rejectionReason, Comment = comment, VotedAt = Now });
         var priorVotes = await db.CommitteeVotes.Where(x => x.CommitteeRoundId == cr.Id).Select(x => x.Decision).ToListAsync();
         var approvesNow = priorVotes.Count(d => d == VoteDecision.Approve) + (decision == VoteDecision.Approve ? 1 : 0);
         if (approvesNow >= FinalPolicy(s).TopApprovalsRequired) await RecordFinalDecision(t, s, approvesNow, priorVotes.Count + 1, false);
-        Audit(a, id, "TopDecisionEvidence", new { decision, comment, s.ReportId, PolicyVersion = FinalPolicy(s).Version });
+        await db.SaveChangesAsync();
+        await FinalizeTopRejectionReason(t, s, cr, a);
+        Audit(a, id, "TopDecisionEvidence", new { decision, rejectionReason, comment, s.ReportId, PolicyVersion = FinalPolicy(s).Version });
     });
     public Task Award(int id, ClaimsPrincipal principal) => Change(id, principal, "TenderAwardedAndClosed", async (t, a) =>
     {
@@ -567,7 +598,19 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var a = await Actor(principal);
         var supplier = await Role(a, SystemRoles.Supplier);
         var query = db.Tenders.AsNoTracking();
-        if (supplier) query = query.Where(x => db.TenderInvitations.Any(i => i.TenderRound.TenderId == x.Id && i.SupplierId == a.SupplierId));
+        if (supplier)
+        {
+            query = query.Where(x => db.TenderInvitations.Any(i => i.TenderRound.TenderId == x.Id && i.SupplierId == a.SupplierId));
+            var now = Now;
+            var rows = await query.OrderByDescending(t => t.Id).Select(t => new
+            {
+                t.Id, t.Title,
+                Open = t.Status == TenderStatus.Bidding && t.Rounds.Any(r => r.RoundNumber == t.Rounds.Max(x => x.RoundNumber)
+                    && r.Status == TenderRoundStatus.Open && r.Deadline > now && (!r.OpensAt.HasValue || r.OpensAt <= now)),
+                Upcoming = t.Rounds.Any(r => r.RoundNumber == t.Rounds.Max(x => x.RoundNumber) && r.Status == TenderRoundStatus.Open && r.OpensAt > now)
+            }).ToListAsync();
+            return rows.Select(t => new WorkflowListRow(t.Id, t.Title, t.Open ? "Open" : t.Upcoming ? "Upcoming" : "Closed")).ToList();
+        }
         else if (!await IsOfficer(a)) query = query.Where(x => x.CommitteeMembers.Any(m => m.UserId == a.Id));
         return await query.OrderByDescending(x => x.Id).Select(x => new WorkflowListRow(x.Id, x.Title, x.Status.ToString())).ToListAsync();
     }
@@ -579,12 +622,12 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         if (supplier) { foreach (var r in t!.Rounds) r.Invitations = r.Invitations.Where(x => x.SupplierId == a.SupplierId).ToList(); t.CommitteeMembers = []; }
         var w = await db.Set<WeightRound>().Include(x => x.Proposals).OrderByDescending(x => x.Version).FirstOrDefaultAsync(x => x.TenderId == id);
         var s = supplier ? null : await db.Set<EvaluationSession>().Include(x => x.WeightRound).Include(x => x.CommitteeRound).ThenInclude(x => x.Criteria).Include(x => x.EligibleBids).Include(x => x.Report).Include(x => x.Invitations).Include(x => x.TenderRound).SingleOrDefaultAsync(x => x.TenderRound.TenderId == id && x.TenderRound.RoundNumber == db.TenderRounds.Where(r => r.TenderId == id).Max(r => r.RoundNumber));
-        // Deadline is authoritative even without background processing. Persist the automatic closure under the same lock.
-        if (s?.State == SessionState.Scheduled && Now >= s.EndsAt)
+        // The meeting end does not discard missing evaluations. Finalize only after all four submit.
+        if (s?.State == SessionState.Scheduled && Now >= s.EndsAt && s.Submissions.Count == 4)
             await Change(id, principal, "EvaluationAutoClosed", async (tender, _) =>
             {
                 var current = await Session(id);
-                if (current.State == SessionState.Scheduled && Now >= current.EndsAt)
+                if (current.State == SessionState.Scheduled && Now >= current.EndsAt && current.Submissions.Count == 4)
                 {
                     Closed(current);
                     if (current.State == SessionState.Closed) await GenerateReportCore(tender, await GlobalOfficer(), current, "Automatically calculated at the scheduled deadline from all four independent evaluations and approved weights.");
@@ -599,7 +642,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var bids = await db.Bids.Include(x => x.Items).Include(x => x.TenderInvitation).ThenInclude(x => x.Supplier).Where(x => x.TenderInvitation.TenderRoundId == roundId && (supplier ? x.TenderInvitation.SupplierId == a.SupplierId : canReadBids)).ToListAsync();
         var result = new WorkflowDetails { Tender = t, Weights = w, Session = s, Bids = bids, UserId = a.Id, IsOfficer = officer, IsEvaluator = evaluator, IsTop = top, IsSupplier = supplier,
             IsManager = evaluator && await Role(a, SystemRoles.SourcingManager) && t.CommitteeMembers.Any(x => x.UserId == a.Id && x.Responsibility == CommitteeResponsibility.SourcingManager),
-            CanApproveWeights = !supplier && await WeightApprover(a) && (await ManagerSeat(id))?.UserId == a.Id && await Role(a, SystemRoles.SourcingManager), WeightPolicyConfigured = Policy.WeightConfigured, FinalPolicyConfigured = s?.FinalApprovalPolicyJson != null || Policy.FinalConfigured, UtcNow = Now };
+            CanApproveWeights = !supplier && officer, WeightPolicyConfigured = Policy.WeightConfigured, FinalPolicyConfigured = s?.FinalApprovalPolicyJson != null || Policy.FinalConfigured, UtcNow = Now };
         if (supplier && w != null) w.Proposals = []; // Supplier sees approved published criteria, never proposals/audit.
         await LoadRoundControl(result, t, a, officer, supplier);
         result.Documents = await db.Documents.Where(x => x.TenderId == id || x.BidId != null && bids.Select(b => b.Id).Contains(x.BidId.Value)).AsNoTracking().ToListAsync();
@@ -646,18 +689,18 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     });
     public async Task CloseDueSessions(CancellationToken ct)
     {
-        var ids = await db.Set<EvaluationSession>().Where(x => x.State == SessionState.Scheduled && x.EndsAt <= Now).Select(x => x.TenderRound.TenderId).ToListAsync(ct);
+        var ids = await db.Set<EvaluationSession>().Where(x => x.State == SessionState.Scheduled && x.EndsAt <= Now && x.Invitations.Count(i => i.SubmittedAt != null) == 4).Select(x => x.TenderRound.TenderId).ToListAsync(ct);
         foreach (var id in ids)
         {
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             var tender = await db.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={id}").SingleAsync(ct);
             var s = await Session(id);
-            if (s.State == SessionState.Scheduled && Now >= s.EndsAt)
+            if (s.State == SessionState.Scheduled && Now >= s.EndsAt && s.Submissions.Count == 4)
             {
                 Closed(s);
                 if (s.State == SessionState.Closed)
                     await GenerateReportCore(tender, await GlobalOfficer(), s, "Automatically calculated from all four independent final evaluations at the scheduled deadline, using approved locked weights.");
-                await NotifyOfficer(id, "Evaluation closed at the deadline", $"Scoring closed automatically with {s.Submissions.Count} of 4 final submissions.");
+                await NotifyOfficer(id, "Evaluation completed", "All four final evaluations were submitted. The report is ready for signing.");
                 db.AuditLogs.Add(new AuditLog { EntityName = "Tender", EntityId = id.ToString(), Action = "EvaluationAutoClosed", CreatedAt = Now });
                 await db.SaveChangesAsync(ct);
             }

@@ -153,7 +153,15 @@ offers.
                     @foreach (var document in Model.Documents)
                     {
                         <tr>
-                            <td>@document.FileName</td>
+                            <td>
+                                <a asp-area="Admin"
+                                   asp-controller="Suppliers"
+                                   asp-action="Document"
+                                   asp-route-id="@document.Id"
+                                   data-no-modal
+                                   target="_blank"
+                                   rel="noopener noreferrer">@document.FileName</a>
+                            </td>
 
                             <td>@(document.DocumentType ?? "—")</td>
 
@@ -195,13 +203,13 @@ offers.
                                             <select name="Status"
                                                     class="form-control"
                                                     required>
-                                                <option value="Pending">
+                                                <option value="Pending" selected="@(document.VerificationStatus == "Pending")">
                                                     Pending
                                                 </option>
-                                                <option value="Verified">
+                                                <option value="Verified" selected="@(document.VerificationStatus == "Verified")">
                                                     Verified
                                                 </option>
-                                                <option value="Rejected">
+                                                <option value="Rejected" selected="@(document.VerificationStatus == "Rejected")">
                                                     Rejected
                                                 </option>
                                             </select>
@@ -243,8 +251,8 @@ offers.
     <div class="pg-panel-head">
         <h2>Supplier Decision</h2>
         <p>
-            Approval and rejection decisions are recorded
-            in the audit history.
+            Open the documents before making a decision. Approving also verifies
+            pending, unexpired documents and records the decision in the audit history.
         </p>
     </div>
 
@@ -285,6 +293,10 @@ offers.
                             Restore Approval
                         </option>
                     }
+                    else if (Model.Status == "Rejected")
+                    {
+                        <option value="Approved">Approve</option>
+                    }
                     else
                     {
                         <option value="">
@@ -315,7 +327,8 @@ offers.
 
         @if (Model.Status == "Pending" ||
              Model.Status == "Approved" ||
-             Model.Status == "Suspended")
+             Model.Status == "Suspended" ||
+             Model.Status == "Rejected")
         {
             <div class="pg-actions">
                 <button type="submit"
@@ -323,13 +336,6 @@ offers.
                     Submit Decision
                 </button>
             </div>
-        }
-        else
-        {
-            <p>
-                This registration was rejected.
-                A new review requires a resubmission workflow.
-            </p>
         }
     </form>
 </section>

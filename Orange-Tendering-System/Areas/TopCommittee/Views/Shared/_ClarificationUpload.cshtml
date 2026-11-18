@@ -1,0 +1,6 @@
+@model string
+<div class="rv-upload" data-upload-area>
+<label class="rv-drop" for="@Model"><span class="rv-attachment-icon" aria-hidden="true">↥</span><strong>Drag &amp; drop a file here or <span>browse files</span></strong><small>PDF, DOCX, JPG, PNG · Maximum 10 MB</small><input type="file" id="@Model" name="Attachment" accept=".pdf,.docx,.jpg,.jpeg,.png" data-file-input /></label>
+<div class="rv-selected" hidden><span aria-hidden="true">▤</span><span data-file-name></span><button type="button" data-remove-file>Remove attachment</button></div>
+<p class="rv-upload-error" data-file-error role="alert" hidden></p>
+</div>

@@ -10,7 +10,8 @@ using Orange_Tendering_System.Services;
 namespace Orange_Tendering_System.Controllers;
 
 [Authorize]
-public class ClarificationsController(ApplicationDbContext db, ClarificationService clarifications) : Controller
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+public class ClarificationsController(ApplicationDbContext db, ClarificationService clarifications, IWebHostEnvironment environment) : Controller
 {
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -18,6 +19,7 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
     {
         var userId = CurrentUserId;
         if (string.IsNullOrEmpty(userId)) return Challenge();
+        if (User.IsInRole(SystemRoles.Supplier)) return RedirectToAction(nameof(Index), "Clarifications", new { area = "Supplier" });
 
         IQueryable<Clarification> query = db.Clarifications.AsNoTracking()
             .Where(c => c.FromUserId == userId || c.ToUserId == userId)
@@ -49,6 +51,7 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
         var userId = CurrentUserId;
         if (string.IsNullOrEmpty(userId)) return Challenge();
         if (id is null or <= 0) return NotFound();
+        if (User.IsInRole(SystemRoles.Supplier)) return RedirectToAction(nameof(Details), "Clarifications", new { area = "Supplier", id });
 
         var thread = await db.Clarifications.AsNoTracking()
             .Where(c => c.Id == id && (c.FromUserId == userId || c.ToUserId == userId))
@@ -62,6 +65,22 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
         return thread == null ? NotFound() : View(thread);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> Download(int id)
+    {
+        var document = await db.Documents.AsNoTracking().Include(d => d.ClarificationMessage).ThenInclude(m => m!.Clarification)
+            .SingleOrDefaultAsync(d => d.Id == id && d.ClarificationMessageId != null);
+        var thread = document?.ClarificationMessage?.Clarification;
+        if (thread == null || (thread.FromUserId != CurrentUserId && thread.ToUserId != CurrentUserId) || !await clarifications.CanContinue(thread)) return NotFound();
+        string path;
+        try { path = PrivateDocumentPaths.Resolve(environment.ContentRootPath, document!.StoragePath); }
+        catch (WorkflowException) { return NotFound(); }
+        if (!System.IO.File.Exists(path)) return NotFound();
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return PhysicalFile(path, "application/octet-stream", Path.GetFileName(document!.FileName));
+    }
+
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Reply(int id, string message)
     {
@@ -73,30 +92,8 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        var thread = await db.Clarifications.SingleOrDefaultAsync(c => c.Id == id
-            && (c.FromUserId == userId || c.ToUserId == userId)
-            && c.Status != ClarificationStatus.Closed);
-        if (thread == null) return NotFound();
-        if (!await clarifications.CanContinue(thread))
-        {
-            TempData["ClarificationError"] = "This conversation can no longer continue: the two people are no longer an allowed role pair.";
-            return RedirectToAction(nameof(Details), new { id });
-        }
-
-        var now = DateTime.UtcNow;
-        db.ClarificationMessages.Add(new ClarificationMessage
-        {
-            ClarificationId = id, SenderUserId = userId, Message = message.Trim(), SentAt = now
-        });
-        thread.Status = ClarificationStatus.Answered;
-        db.Notifications.Add(new Notification
-        {
-            UserId = thread.FromUserId == userId ? thread.ToUserId : thread.FromUserId,
-            Title = "Clarification reply", Message = $"A reply was sent in: {thread.Subject}",
-            Link = $"/Clarifications/Details/{id}", CreatedAt = now
-        });
-        await db.SaveChangesAsync();
-        TempData["ClarificationMessage"] = "Reply sent.";
+        if (!await clarifications.ReplyAsync(userId, id, message)) return NotFound();
+        TempData.Orange(OrangeFeedback.Toast("Reply sent", "The other participant was notified.", OrangeVariant.Send));
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -117,7 +114,7 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
         {
             if (parts.Length != 3 || !int.TryParse(parts[2], out var contextId)) throw new WorkflowException("Choose who to ask.");
             var id = await clarifications.CreateAsync(User, parts[0], parts[1], contextId, subject, message);
-            TempData["ClarificationMessage"] = "Clarification sent.";
+            TempData.Orange(OrangeFeedback.Toast("Clarification sent!", "The recipient was notified.", OrangeVariant.Send));
             return RedirectToAction(nameof(Details), new { id });
         }
         catch (WorkflowException e) { TempData["ClarificationError"] = e.Message; return RedirectToAction(nameof(Index)); }
@@ -127,7 +124,7 @@ public class ClarificationsController(ApplicationDbContext db, ClarificationServ
     public async Task<IActionResult> Resolve(int id)
     {
         if (!await clarifications.ResolveAsync(CurrentUserId!, id)) return NotFound();
-        TempData["ClarificationMessage"] = "Marked as resolved.";
+        TempData.Orange(OrangeFeedback.Toast("Clarification resolved", "The conversation is marked as resolved.", OrangeVariant.Approve));
         return RedirectToAction(nameof(Details), new { id });
     }
 }

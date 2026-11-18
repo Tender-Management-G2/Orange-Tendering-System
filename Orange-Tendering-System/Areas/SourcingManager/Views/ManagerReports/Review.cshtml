@@ -1,0 +1,230 @@
+@model Orange_Tendering_System.Models.Entities.TenderReport
+@using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.ViewModels
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = "Review Unified Evaluation Report";
+    ViewData["WorkspaceSection"] = "Report Review";
+    ViewData["Description"] = "Read the submitted report, committee scores and recommendation.";
+
+    var ranking = string.IsNullOrWhiteSpace(Model.RankingSnapshotJson)
+        ? []
+        : JsonSerializer.Deserialize<List<RankingSnapshotRow>>(
+            Model.RankingSnapshotJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+    var statusClass = Model.Status switch
+    {
+        ReportStatus.Submitted => "is-submitted",
+        ReportStatus.Accepted => "is-accepted",
+        ReportStatus.Returned => "is-returned",
+        ReportStatus.Rejected => "is-rejected",
+        _ => ""
+    };
+    var isWithTopCommittee = ViewBag.IsWithTopCommittee == true;
+}
+
+<partial name="_PageHeader" />
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
+
+<section class="ws-panel pg-panel">
+    <h2>Report</h2>
+
+    <dl class="pg-dl">
+        <div>
+            <dt>Tender</dt>
+            <dd>@Model.TenderRound.Tender.Title</dd>
+        </div>
+
+        <div>
+            <dt>Version</dt>
+            <dd>v@Model.VersionNumber</dd>
+        </div>
+
+        <div>
+            <dt>Submitted by</dt>
+            <dd>
+                @(Model.CreatedByUser?.UserName
+                    ?? Model.CreatedByUserId)
+            </dd>
+        </div>
+
+        <div>
+            <dt>Submitted</dt>
+            <dd>
+                @(Model.SubmittedAt?.ToString("yyyy-MM-dd HH:mm")
+                    ?? "Not submitted")
+            </dd>
+        </div>
+
+        <div>
+            <dt>Recommended supplier</dt>
+            <dd>
+                @(Model.RecommendedBid?.TenderInvitation?.Supplier?.CompanyName
+                    ?? "No recommendation")
+            </dd>
+        </div>
+
+        <div>
+            <dt>Evaluation round</dt>
+            <dd>@Model.TenderRound.RoundNumber</dd>
+        </div>
+
+        <div>
+            <dt>Status</dt>
+            <dd><span class="sm-status @statusClass">@Model.Status</span></dd>
+        </div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel">
+    <h2>Report content</h2>
+
+    @if (string.IsNullOrWhiteSpace(Model.Content))
+    {
+        <partial name="_EmptyState"
+                 model='"No report content available."' />
+    }
+    else
+    {
+        <div class="sm-report-content">@Model.Content</div>
+    }
+</section>
+
+<section class="ws-panel pg-panel"
+         aria-labelledby="tbl-committee-result-frozen">
+
+    <div class="pg-panel-head">
+        <h2 id="tbl-committee-result-frozen">
+            Submitted evaluation results
+        </h2>
+    </div>
+
+    <div class="pg-table-wrap">
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th scope="col">Rank</th>
+                    <th scope="col">Supplier</th>
+                    <th scope="col">Final score</th>
+                    <th scope="col">Eligible</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (!ranking.Any())
+                {
+                    <tr>
+                        <td colspan="4">
+                            <partial name="_EmptyState"
+                                     model='"Committee result not loaded."' />
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var row in ranking)
+                    {
+                        <tr>
+                            <td>@row.Rank</td>
+                            <td>@row.Supplier</td>
+                            <td>@row.FinalScore.ToString("N2")</td>
+                            <td>@(row.Eligible ? "Yes" : "No")</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<aside class="pg-note">
+    <strong>Submitted reports are immutable</strong>
+    <p>
+        The Manager does not edit the Officer's submitted report.
+        To correct it, return it with a comment;
+        the Officer submits a new version.
+    </p>
+</aside>
+
+@if (Model.Status == ReportStatus.Submitted)
+{
+    <nav class="pg-links" aria-label="Manager decisions">
+        <ul>
+            <li>
+                <a asp-area="SourcingManager"
+                   asp-controller="ManagerReports"
+                   asp-action="Approve"
+                   asp-route-id="@Model.Id">
+                    Approve
+                </a>
+            </li>
+
+            <li>
+                <a asp-area="SourcingManager"
+                   asp-controller="ManagerReports"
+                   asp-action="Return"
+                   asp-route-id="@Model.Id">
+                    Return for review
+                </a>
+            </li>
+
+            <li>
+                <a asp-area="SourcingManager"
+                   asp-controller="ManagerReports"
+                   asp-action="Reject"
+                   asp-route-id="@Model.Id">
+                    Reject
+                </a>
+            </li>
+        </ul>
+    </nav>
+}
+else
+{
+    <section class="ws-panel pg-panel">
+        <h2>Manager Decision</h2>
+
+        <div class="sm-decision-card">
+            <div><span>Status</span><strong class="sm-status @statusClass">@Model.Status</strong></div>
+            <div><span>Comment</span><strong>@(Model.ReviewComment ?? "No comment")</strong></div>
+            <div><span>Reviewed</span><strong>@(Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not reviewed")</strong></div>
+        </div>
+    </section>
+}
+
+@if (Model.Status == ReportStatus.Accepted && !isWithTopCommittee)
+{
+    <nav class="pg-links" aria-label="Next steps">
+        <ul>
+            <li>
+                <a asp-area="SourcingManager"
+                   asp-controller="ManagerReports"
+                   asp-action="Forward"
+                   asp-route-id="@Model.Id">
+                    Forward to Top Committee
+                </a>
+            </li>
+        </ul>
+    </nav>
+}
+else if (Model.Status == ReportStatus.Accepted && isWithTopCommittee)
+{
+    <aside class="pg-note">
+        <strong>With Top Committee</strong>
+        <p>This evaluation has already been forwarded and is awaiting the committee response.</p>
+    </aside>
+}
+
+<a asp-area="SourcingManager"
+   asp-controller="ManagerReports"
+   asp-action="Index"
+   class="btn btn-secondary">
+    Back to Reports
+</a>

@@ -17,6 +17,9 @@ namespace Orange_Tendering_System.Models.Entities
         [Required, MaxLength(120)]
         public string ContentType { get; set; } = string.Empty;
 
+        [MaxLength(64)]
+        public string? ContentHash { get; set; }
+
         public long SizeBytes { get; set; }
 
         // e.g. "CommercialRegistration", "TaxCertificate", "TechnicalProposal".

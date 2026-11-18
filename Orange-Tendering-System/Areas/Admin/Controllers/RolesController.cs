@@ -74,6 +74,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             TempData[result == "Success"
                 ? "SuccessMessage"
                 : "ErrorMessage"] = GetResultMessage(result);
+            if (result == "Success") { TempData.Remove("SuccessMessage"); TempData.Orange(OrangeFeedback.Toast("Role assigned", $"The {model.RoleName} role was assigned.", OrangeVariant.Approve)); }
 
             return RedirectToAction(nameof(Index));
         }
@@ -104,6 +105,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             TempData[result == "Success"
                 ? "SuccessMessage"
                 : "ErrorMessage"] = GetResultMessage(result);
+            if (result == "Success") { TempData.Remove("SuccessMessage"); TempData.Orange(OrangeFeedback.Toast("Role removed", $"The {model.RoleName} role was removed.", OrangeVariant.Return)); }
 
             return RedirectToAction(nameof(Index));
         }

@@ -10,7 +10,7 @@ using Orange_Tendering_System.Models;
 namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers
 {
     [Area("SourcingOfficer")]
-    //[Authorize(Roles = SystemRoles.SourcingOfficer)]
+    [Authorize(Roles = SystemRoles.SourcingOfficer)]
     public class InvitationsController : Controller
     {
         // Supplier Invitations — Owner: Amal · Trello: Supplier Invitations (https://trello.com/c/Qh7GKR8x)

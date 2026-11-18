@@ -11,7 +11,8 @@
   const empty = root.querySelector('.ws-bell-empty');
   const toasts = root.querySelector('.ws-toast-region');
   const csrf = root.dataset.csrf;
-  let unread = 0, connected = false;
+  let unread = 0, loading = false;
+  const seen = new Set();
 
   const ago = iso => {
     const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -26,7 +27,7 @@
     badge.hidden = unread === 0;
     button.setAttribute('aria-label', unread ? `Notifications, ${unread} unread` : 'Notifications');
   };
-  const post = url => fetch(url, { method: 'POST', credentials: 'same-origin', headers: { RequestVerificationToken: csrf } });
+  const post = url => fetch(url, { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { RequestVerificationToken: csrf } });
 
   function row(n) {
     const li = document.createElement('li');
@@ -41,11 +42,16 @@
     const m = document.createElement('small'); m.textContent = n.message;
     const a = document.createElement('time'); a.dateTime = n.createdAt; a.textContent = ago(n.createdAt);
     text.append(t, m, a); open.append(dot, text); li.append(open);
-    open.addEventListener('click', async () => {
+    open.addEventListener('click', async ev => {
+      if (n.link && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && ev.button === 0) ev.preventDefault();
+      const navigate = n.link && ev.defaultPrevented;
       if (!n.isRead) {
-        n.isRead = true; li.classList.remove('is-unread');
-        try { const r = await post('/Notifications/Read?id=' + n.id); if (r.ok) setUnread((await r.json()).unread); } catch { /* the link still opens */ }
+        try {
+          const r = await post(root.dataset.readUrl + '?id=' + n.id);
+          if (r.ok) { n.isRead = true; li.classList.remove('is-unread'); setUnread((await r.json()).unread); }
+        } catch { /* The related page remains accessible; polling reconciles the unread state. */ }
       }
+      if (navigate) window.location.assign(n.link);
     });
     return li;
   }
@@ -54,12 +60,18 @@
     empty.hidden = items.length > 0;
   }
   async function load() {
+    if (loading) return;
+    loading = true;
     try {
-      const r = await fetch('/Notifications/Feed?take=12', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-      if (!r.ok) return;
+      const r = await fetch(root.dataset.feedUrl + '?take=12', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      if (!r.ok || !r.headers.get('content-type')?.includes('application/json')) throw new Error('Notification feed unavailable');
       const data = await r.json();
       setUnread(data.unread); render(data.items);
-    } catch { /* offline: keep the previous state */ }
+      data.items.forEach(n => seen.add(n.id));
+      root.dataset.state = 'ready';
+      root.querySelector('[data-bell-error]').hidden = true;
+    } catch { root.dataset.state = 'offline'; root.querySelector('[data-bell-error]').hidden = false; }
+    finally { loading = false; }
   }
   function toast(n) {
     const el = document.createElement(n.link ? 'a' : 'div');
@@ -79,21 +91,27 @@
   document.addEventListener('click', ev => { if (!panel.hidden && !root.contains(ev.target)) setOpen(false); });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !panel.hidden) { setOpen(false); button.focus(); } });
   root.querySelector('[data-bell-readall]').addEventListener('click', async () => {
-    const r = await post('/Notifications/ReadAll');
-    if (r.ok) { setUnread(0); list.querySelectorAll('.is-unread').forEach(x => x.classList.remove('is-unread')); }
+    try {
+      const r = await post(root.dataset.readAllUrl);
+      if (r.ok) await load();
+    } catch { root.dataset.state = 'offline'; }
   });
 
   load();
   if (window.signalR) {
-    const conn = new signalR.HubConnectionBuilder().withUrl('/hubs/notifications').withAutomaticReconnect().build();
+    const conn = new signalR.HubConnectionBuilder().withUrl(root.dataset.hubUrl).withAutomaticReconnect().build();
     conn.on('notification', n => {
-      setUnread(unread + 1);
-      if (!panel.hidden) { list.prepend(row(n)); empty.hidden = true; }
-      toast(n);
+      if (!seen.has(n.id)) { seen.add(n.id); toast(n); }
+      load(); // SQL Server is authoritative; never increment for a duplicate or replayed message.
     });
-    conn.onreconnected(load);
-    conn.onclose(() => { connected = false; });
-    conn.start().then(() => { connected = true; root.dataset.hub = 'connected'; }).catch(() => { connected = false; });
+    conn.onreconnecting(() => { root.dataset.hub = 'reconnecting'; });
+    conn.onreconnected(() => { root.dataset.hub = 'connected'; load(); });
+    conn.onclose(() => { root.dataset.hub = 'offline'; });
+    const start = () => conn.start().then(() => { root.dataset.hub = 'connected'; load(); }).catch(() => { root.dataset.hub = 'offline'; });
+    start();
+    setInterval(() => { if (!document.hidden && conn.state === signalR.HubConnectionState.Disconnected) start(); }, 30000);
   }
-  setInterval(() => { if (!connected && !document.hidden) load(); }, 45000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+  window.addEventListener('online', load);
+  setInterval(() => { if (!document.hidden) load(); }, 15000);
 })();

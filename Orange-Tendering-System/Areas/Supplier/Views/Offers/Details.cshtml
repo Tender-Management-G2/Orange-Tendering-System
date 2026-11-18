@@ -13,7 +13,7 @@
 <div><dt>Payment terms</dt><dd>@Model.Terms.PaymentTerms</dd></div>
 <div><dt>Technical proposal</dt><dd style="white-space:pre-wrap">@Model.Terms.TechnicalProposal</dd></div>
 <div><dt>Valid until</dt><dd>@Model.Terms.ValidUntil?.ToString("yyyy-MM-dd")</dd></div>
-<div><dt>Compliance</dt><dd>@Model.ComplianceStatus</dd></div>
+
 <div><dt>Missing requirements</dt><dd>@(Model.MissingRequirements ?? "None recorded")</dd></div>
 </dl>
 <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th>Specifications</th><th>Line total</th></tr></thead><tbody>

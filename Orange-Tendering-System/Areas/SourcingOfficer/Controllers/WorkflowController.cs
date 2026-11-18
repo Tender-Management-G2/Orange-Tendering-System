@@ -27,13 +27,18 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         try
         {
             var id = await Workflow.Create(input, User);
-            if (ajax) return Json(new { ok = true, id });
+            var created = OrangeFeedback.Popup("Tender created!", $"T-{id:0000} is ready. Open it to request the committee weights.", OrangeVariant.Save);
+            if (ajax) return Json(new { ok = true, id, feedback = created.ToJsonElement() });
+            TempData.Orange(created);
             return RedirectToAction(nameof(Index), new { created = id });
         }
         catch (WorkflowException e) when (ajax) { return BadRequest(new { errors = new[] { e.Message } }); }
     }
     [HttpPost] public Task<IActionResult> RequestWeights(int id) => Execute(id, () => Workflow.RequestWeights(id, User));
+    [HttpPost] public Task<IActionResult> SendReport(int id) => Execute(id, () => Workflow.SendReportToCommittee(id, User));
+    [HttpPost] public Task<IActionResult> ApproveWeights(int id) => Execute(id, () => Workflow.ApproveWeights(id, User));
     [HttpPost] public Task<IActionResult> OpenBidding(int id, DateTimeOffset deadline) => Execute(id, () => Workflow.OpenBidding(id, deadline, User));
+    [HttpPost] public Task<IActionResult> SetMissingDeadline(int id, DateTimeOffset deadline) => Execute(id, () => Workflow.SetMissingBiddingDeadline(id, deadline, User));
     // One click: invite every approved supplier that is not yet invited in the current round (each invitation follows the normal rules and is audited).
     [HttpPost] public Task<IActionResult> InviteAll(int id, int[]? supplierIds) => Execute(id, async () =>
     {
@@ -41,9 +46,12 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         TenderWorkflowService.Require(round != null, "Tender round not found.");
         var already = await db.TenderInvitations.AsNoTracking().Where(i => i.TenderRoundId == round!.Id).Select(i => i.SupplierId).ToListAsync();
         var wanted = supplierIds is { Length: > 0 } ? supplierIds.ToHashSet() : null;
-        var ids = await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Approved && !already.Contains(s.Id) && (wanted == null || wanted.Contains(s.Id))).OrderBy(s => s.CompanyName).Select(s => s.Id).ToListAsync();
+        var ids = await db.Suppliers.AsNoTracking().Where(s => s.Status == SupplierStatus.Approved
+            && db.Users.Any(u => u.SupplierId == s.Id && u.IsActive && u.EmailConfirmed)
+            && !already.Contains(s.Id) && (wanted == null || wanted.Contains(s.Id))).OrderBy(s => s.CompanyName).Select(s => s.Id).ToListAsync();
         TenderWorkflowService.Require(ids.Count > 0, wanted == null ? "Every approved supplier has already been invited." : "Choose at least one supplier that is not invited yet.");
         foreach (var supplierId in ids) await Workflow.Invite(id, supplierId, User);
+        ActionFeedback = OrangeFeedback.Popup("Invitations sent!", $"{ids.Count} supplier{(ids.Count == 1 ? " was" : "s were")} invited to this round.", OrangeVariant.Send);
     });
     [HttpPost] public Task<IActionResult> Invite(int id, int supplierId) => Execute(id, () => Workflow.Invite(id, supplierId, User));
     // The compliance check is automatic: an offer with at least one attached document is compliant; an offer without any document cannot be
@@ -71,11 +79,12 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
     [HttpPost] public Task<IActionResult> Compliance(int id, int bidId, ComplianceStatus status, string notes, string missing = "") => Execute(id, () => Workflow.Compliance(id, bidId, status, notes, missing, User));
     [HttpPost] public Task<IActionResult> Setup(int id, SessionInput input, CancellationToken ct) => Execute(id, () => scheduling.Schedule(id, input, User, ct));
     [HttpPost] public Task<IActionResult> EndEvaluation(int id, bool confirmed, string reason) => Execute(id, () => Workflow.EndEvaluation(id, confirmed, reason, User));
-    [HttpPost] public Task<IActionResult> Analyze(int id, CancellationToken ct) => Execute(id, async () => { await AutoCheckOffers(id); await ai.Analyze(id, User, ct); });
+    // The analysis keeps running even if the browser tab is closed or navigated away (the service has its own timeout), so a click is never lost.
+    [HttpPost] public Task<IActionResult> Analyze(int id) => Execute(id, async () => { await AutoCheckOffers(id); await ai.Analyze(id, User, CancellationToken.None); });
     [HttpPost] public Task<IActionResult> ReviewAi(int id, int analysisId) => Execute(id, () => Workflow.ReviewAi(id, analysisId, User));
     [HttpPost] public Task<IActionResult> RegenerateReport(int id) => Execute(id, () => Workflow.RegenerateReport(id, User));
     [HttpPost] public Task<IActionResult> Forward(int id) => Execute(id, () => Workflow.Forward(id, User));
-    [HttpPost] public Task<IActionResult> AssignTop(int id, string[] memberIds) => Execute(id, () => Workflow.AssignTop(id, memberIds, User));
+    [HttpPost] public Task<IActionResult> AssignTop(int id, Dictionary<TopExecutivePosition, string> executives) => Execute(id, () => Workflow.AssignTop(id, executives, User));
     [HttpPost] public Task<IActionResult> Award(int id) => Execute(id, () => Workflow.Award(id, User));
     [HttpPost, RequestSizeLimit(21 * 1024 * 1024)] public Task<IActionResult> Upload(int id, IFormFile file, CancellationToken ct) => Execute(id, () => Documents.Upload(id, null, file, User, ct));
 }

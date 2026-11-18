@@ -26,6 +26,9 @@ INTEGRATED. No business logic.
 *@
 @{
     var isIdentityPage = ViewData["IdentityPage"] is true;
+    var accountPath = Context.Request.Path.Value?.TrimEnd('/');
+    var hideFooter = string.Equals(accountPath, "/Identity/Account/Login", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(accountPath, "/Identity/Account/Register", StringComparison.OrdinalIgnoreCase);
 }
 <!doctype html>
 <html lang="en">
@@ -41,6 +44,7 @@ INTEGRATED. No business logic.
     <link rel="stylesheet" href="~/css/experience.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/mvc.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/public-pages.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site-nav.css" asp-append-version="true" />
     @if (isIdentityPage)
     {
         <link rel="stylesheet" href="~/css/identity.css" asp-append-version="true" />
@@ -50,19 +54,24 @@ INTEGRATED. No business logic.
 <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
     <partial name="_Icons" />
-    <partial name="_Header" />
+    <partial name="_SiteNav" />
     <div id="main-content" class="@(isIdentityPage ? "identity-page" : null)">
         @RenderBody()
     </div>
-    <partial name="_Footer" />
+    @if (!hideFooter && ViewData["HideFooter"] is not true)
+    {
+        <partial name="_Footer" />
+    }
     <dialog aria-labelledby="dialog-title"><button class="close" aria-label="Close dialog">×</button><div class="dialog-content"></div></dialog>
     <partial name="_JQueryScripts" />
+    <partial name="_OrangeMotion" />
     @await RenderSectionAsync("Scripts", required: false)
     @if (isIdentityPage)
     {
         <script src="~/js/auth-forms.js" asp-append-version="true"></script>
     }
     <script src="~/js/experience.js" asp-append-version="true"></script>
+    <script src="~/js/site-nav.js" asp-append-version="true"></script>
     <script src="~/js/public-pages.js" asp-append-version="true"></script>
 </body>
 </html>

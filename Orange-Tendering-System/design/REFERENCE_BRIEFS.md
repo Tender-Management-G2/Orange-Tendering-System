@@ -1,0 +1,12 @@
+# Reference boards / image generation briefs
+
+The attached previous face enrollment PNG is a visual concept, not a runtime asset. The two technical SVG storyboards communicate geometry and motion beats, not final material quality. Generate/review new art references separately using the following briefs before modeling. No real names, emails, portraits or secrets. Do not use image generation output as an entire webpage backdrop.
+
+## Board A: Paper Genesis
+Six consecutive landscape frames of the SAME isolated paper object on an ivory studio canvas. Modern editorial vector line drawing, disciplined 2px dark ink, Orange #FF7900 geometric registration square. Frame 1 single planar line-drawn sheet with crease lines; frame 2 contact card emerges from an attached paper flap; frame 3 card slides into folded sleeve; frame 4 same sheet tilts into three-quarter view and gets real thickness; frame 5 connected hinged paper walls and roof rise into small contemporary office building; frame 6 same base transforms into a telecom tower and IT equipment. Clean paper-engineering aesthetics, no desk, no background photographs, no floating unrelated shapes, consistent camera and base across 3D frames. Provide isolated hero render and intermediate folds. No UI labels except tiny frame numbers.
+
+## Board B: Orange Signal
+Six consecutive frames of the SAME compact telecom hardware assembly, graphite studio canvas: 2D schematic outline with orange trace; SIM contact plate and elegantly curved single fiber cable gain depth; precision contact pads slide into square core; hardware opens into mechanical six/eight blade aperture; aperture reveals an abstract placeholder portrait / real camera geometry concept; assembled core releases one warm orange pulse along the fiber cable. Minimal refined product design, satin graphite, ivory internal components, polished copper contact pads, no generic neon network, no locks, no cyberpunk, no wire spaghetti, no other unrelated objects. Provide front/three-quarter views and exploded detail.
+
+## Board C: Face Enrollment
+Rework existing face concept to same new ivory canvas; frame 1 empty portrait flap connected to root; frame 2 half-folded face mesh; frame 3 complete faceted paper face; frame 4 petals hinge outward to physically reveal abstract camera preview; frame 5 portrait card forms from same outline and slides into pocket. Consistent geometry throughout. Real camera replaces abstract portrait only at runtime.

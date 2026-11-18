@@ -1,0 +1,6 @@
+---
+name: orange-motion-qa
+description: Enforce visual acceptance and security regression gates for Orange registration and login motion; require browser screenshots, intermediate frames, real geometry proof, recordings and explicit user approval.
+---
+# QA workflow
+Read `design/QA_GATES.md` and `design/MOTION_SPEC.md` at repository root. Maintain G0–G4 evidence. Inspect actual browser at desktop and phone sizes. Record 0/25/50/75/100 percent frames, orbit/wireframe, playback and reverse/category switching; check real timings, reduced motion and failure states. Prefer Playwright screenshots/video with synthetic test inputs; do not capture real biometrics, credentials or OTP in traces or recordings. Do not claim an unrun test was successful. If browser tools are unavailable, label visual verification blocked and do not proceed to production. Do not declare success just from build or generated screenshots; human art approval is required. After approved integration verify server-authoritative auth, supplier status, existing form validation/document/OTP behavior, no bypass and camera cleanup. Explicitly distinguish visual-only, tested, untested and blocked. Reject static photo plus disconnected overlays, abrupt scene swaps and fake 3D.

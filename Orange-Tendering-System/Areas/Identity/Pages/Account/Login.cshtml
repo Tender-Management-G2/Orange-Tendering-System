@@ -1,107 +1,133 @@
 @page
 @model LoginModel
-@*
-===========================================================
-ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Sign In (ASP.NET Core Identity login)
-
-DEVELOPER OWNER: Ahmad
-MODULE: Authentication & Biometrics
-TRELLO TASK: User Login & Role Redirect
-  (also hosts the entry points for "Fingerprint Registration &
-  Login" and "Face Registration & Recognition Login")
-TRELLO URL: https://trello.com/c/WoTewqHd
-
-PURPOSE:
-The ONE sign-in page of the system: employees, pending suppliers and approved suppliers all start here with their email.
-
-BUSINESS ACCESS:
-Anonymous visitors.
-
-BIOMETRIC SIGN-IN:
-- Face recognition (email + live camera challenge) and fingerprint
-  (WebAuthn passkey, demo) are wired to BiometricsController and
-  wwwroot/js/biometric.js. They issue the same Identity cookie.
-- An Approved supplier who has enrolled face/passkey cannot use the
-  password form (Login.cshtml.cs); pending suppliers can, to reach
-  Pending Approval and finish face setup.
-
-DEPENDENCIES:
-AspNetUsers, ApplicationUser, Supplier, SignInManager,
-Biometrics pages, AuditLogs.
-
-STATUS:
-Identity sign-in, role redirect, account-state checks, and lockout are implemented.
-Biometric sign-in is implemented (see Controllers/BiometricsController.cs).
-
-IMPORTANT:
-Do not add a second authentication system next to Identity.
-===========================================================
-*@
 @{
-    ViewData["Title"] = "Sign In";
+    ViewData["Title"] = "Sign in";
+    // After a plain form post the server may render the page already on the biometric step.
+    var step = Model.Biometric;
 }
-<section class="section auth-section">
-    <div class="glass login-shell">
-        <aside class="login-brand" aria-hidden="true">
-            <span class="logo">orange<span>&reg;</span></span>
-            <h2>Sourcing &amp; Tender Management</h2>
-            <p>One workspace from purchase request to award.</p>
-            <ul>
-                <li>Every role signs in here</li>
-                <li>Suppliers can use face recognition or a fingerprint / passkey</li>
-                <li>Your actions are recorded in the audit trail</li>
-            </ul>
-        </aside>
+<section class="as-shell" id="authStudio" data-chapter="login" data-step="@(step is null ? "credentials" : "biometric")">
+    @* LEFT: the animated world. Decorative: every real status is repeated as text in the form. *@
+    <div class="as-stage" id="asStage" data-shot="wide" data-caption="1">
+        <div class="as-stage-ui" aria-hidden="true">
+            <p class="as-chapter"><span class="as-sq"></span>Orange Signal</p>
+            <p class="as-tagline">Every connection begins with a signal.</p>
+        </div>
+        <div class="as-stage-fallback" data-stage-fallback hidden></div>
+        @* The live camera of the face step. It opens only after the supplier chooses Face Recognition. *@
+        <div class="as-camera bio-hidden" id="facePanel">
+            <video id="faceVideo" playsinline muted autoplay aria-label="Live camera preview"></video>
+        </div>
+        <p class="sr-only" data-scene-status></p>
+    </div>
 
-        <div class="login-main auth-card">
-            <span class="eyebrow">YOUR PROCUREMENT WORKSPACE</span>
-            <h1>Sign in</h1>
-            <p class="login-lead">Enter your account email. Employees sign in with a password; approved suppliers can also use face recognition or a fingerprint / passkey.</p>
+    @* RIGHT: a normal form. It never waits for the illustration. *@
+    <div class="as-panel">
+        <div class="as-panel-inner" id="bio-root" data-return-url="@Model.ReturnUrl"
+             data-face="@(step?.Face == true ? "true" : "false")" data-passkey="@(step?.Passkey == true ? "true" : "false")" data-password-only="@(step?.PasswordOnly == true ? "true" : "false")"
+             data-expires-in="@Model.BiometricStepSeconds">
+            <p class="as-brand"><span class="as-brand-mark" aria-hidden="true"></span><span class="as-brand-name">Sourcing &amp; Tender Management</span></p>
 
-            <form id="account" method="post" novalidate>
-                <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
-                <label asp-for="Input.Email">Email</label>
-                <input asp-for="Input.Email" type="email" autocomplete="username" autofocus aria-required="true" placeholder="name@company.com" />
-                <span asp-validation-for="Input.Email" class="field-error"></span>
-                <label asp-for="Input.Password">Password</label>
-                <input asp-for="Input.Password" autocomplete="current-password" aria-required="true" />
-                <span asp-validation-for="Input.Password" class="field-error"></span>
-                <div class="login-row">
-                    <label class="auth-check"><input asp-for="Input.RememberMe" /> @Html.DisplayNameFor(m => m.Input.RememberMe)</label>
-                    <a class="auth-link" id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
-                </div>
-                <button id="login-submit" type="submit" class="primary">Sign in</button>
-            </form>
+            @* ---------- Step 1: email and password, for every account ---------- *@
+            <div id="signInCredentials" hidden="@(step is not null)">
+                <p class="as-kicker">Welcome back</p>
+                <h1 class="as-title">Sign in to your workspace</h1>
+                <p class="as-lede"><span class="as-lede-tagline">Every connection begins with a signal. </span>Use the email and password for your account.</p>
 
-            @* Biometric sign-in for supplier companies (Ahmad): same email box as above; BiometricsController verifies the live face
-               (or the WebAuthn passkey) and issues the same Identity cookie. *@
-            <div class="login-or"><span>or sign in as a supplier with</span></div>
-            <div class="login-bio" id="bio-root" data-return-url="@Model.ReturnUrl">
-                <div id="bio-status" class="bio-status" role="status" aria-live="polite"></div>
-                <div class="login-bio-buttons">
-                    <button type="button" id="btnFaceLogin">Login with Face Recognition</button>
-                    <button type="button" id="btnPasskeyLogin">Login with Fingerprint / Passkey</button>
-                </div>
-                <div id="facePanel" class="bio-face-panel bio-hidden">
-                    <video id="faceVideo" playsinline muted autoplay></video>
-                    <div id="faceHint" class="bio-face-hint"></div>
-                </div>
-                <small>Face recognition uses the email typed above. The camera picture stays on this device; only face measurements are checked. A passkey uses your device's own fingerprint, face unlock or PIN.</small>
+                <form id="account" method="post" novalidate>
+                    <div id="signInMessage" class="as-summary" role="alert"></div>
+                    <div asp-validation-summary="ModelOnly" class="as-summary" role="alert"></div>
+                    @* A preference only: the server checks it against the account's real role after the password. *@
+                    <fieldset class="as-account" id="accountType">
+                        <legend class="as-account-legend">I am signing in as</legend>
+                        <label class="as-seg"><input type="radio" name="Input.AccountType" value="supplier" checked="@(Model.Input.AccountType != "other")" /><span>Supplier</span></label>
+                        <label class="as-seg"><input type="radio" name="Input.AccountType" value="other" checked="@(Model.Input.AccountType == "other")" /><span>Other User</span></label>
+                    </fieldset>
+                    <div class="as-field">
+                        <label asp-for="Input.Email">Email address</label>
+                        <input asp-for="Input.Email" autocomplete="username" inputmode="email" aria-required="true" />
+                        <span asp-validation-for="Input.Email" class="as-field-error"></span>
+                    </div>
+                    <div class="as-field">
+                        <label asp-for="Input.Password">Password</label>
+                        <div class="as-with-toggle">
+                            <input asp-for="Input.Password" autocomplete="current-password" aria-required="true" />
+                            <button type="button" class="as-reveal" data-reveal="Input_Password" aria-pressed="false" data-bio-keep>Show</button>
+                        </div>
+                        <span asp-validation-for="Input.Password" class="as-field-error"></span>
+                    </div>
+                    <label class="as-check"><input asp-for="Input.RememberMe" /> <span>Remember me on this device</span></label>
+                    <div class="as-actions">
+                        <button id="login-submit" type="submit" class="as-primary">Continue <span aria-hidden="true">→</span></button>
+                    </div>
+                </form>
+
+                <p class="as-or"><span>or</span></p>
+                <button type="button" id="btnPasskeyLogin" class="as-secondary as-block">Sign in with a device passkey</button>
+                <p class="as-fine">A passkey uses the screen lock of your phone or computer, so it needs no password.</p>
+
+                <p class="as-links">
+                    <a id="forgot-password" asp-page="./ForgotPassword">Forgot your password?</a>
+                    <a asp-page="./Register">Register as a supplier</a>
+                    <a id="resend-confirmation" asp-page="./VerifyEmail">Verify supplier email</a>
+                </p>
             </div>
 
-            <p class="login-foot">
-                New supplier? <a class="auth-link" asp-page="./Register">Register your company</a>
-                &middot; <a class="auth-link" id="resend-confirmation" asp-page="./VerifyEmail">Verify your email</a>
-            </p>
+            @* ---------- Step 2: approved suppliers confirm their identity ---------- *@
+            <div id="signInBiometric" hidden="@(step is null)">
+                <p class="as-kicker">Step 2 of 2 · Supplier identity</p>
+                <h1 class="as-title" id="biometricTitle" tabindex="-1">Choose your identity</h1>
+                <p class="as-lede">Your password is correct. Confirm it is you to open your supplier workspace: choose one method.</p>
+
+                <div class="as-methods as-methods--three" role="group" aria-labelledby="biometricTitle">
+                    <button type="button" id="btnPasswordOnly" class="as-method" aria-describedby="passwordMethodNote" hidden="@(step?.PasswordOnly != true)">
+                        <span class="as-method-icon" aria-hidden="true">
+                            <svg class="as-icon" viewBox="0 0 48 48"><rect x="9" y="21" width="30" height="20" rx="4" /><path d="M16 21v-6a8 8 0 0 1 16 0v6M24 29v5" /></svg>
+                        </span>
+                        <span class="as-method-text">
+                            <strong>Email &amp; Password</strong>
+                            <small id="passwordMethodNote">Continue with the password you just entered</small>
+                        </span>
+                    </button>
+                    <button type="button" id="btnFaceLogin" class="as-method" aria-describedby="faceMethodNote">
+                        <span class="as-method-icon" aria-hidden="true">
+                            <svg class="as-icon" viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" /><circle cx="24" cy="24" r="7.5" /><path d="M24 5 30.5 20.3M40.4 14.5 27.8 30.5M40.4 33.5 20.5 31M24 43 17.5 27.7M7.6 33.5 20.2 17.5M7.6 14.5 27.5 17" /></svg>
+                        </span>
+                        <span class="as-method-text">
+                            <strong>Face Recognition</strong>
+                            <small id="faceMethodNote">Verify with this device's camera</small>
+                        </span>
+                    </button>
+                    @* A WebAuthn passkey: the device decides how it unlocks it (fingerprint, Windows Hello face or PIN), and a
+                       phone passkey is reached through the QR code the browser shows. The server cannot tell which. *@
+                    <button type="button" id="btnPasskeyStep" class="as-method" aria-describedby="fingerprintMethodNote" disabled="@(step?.Passkey != true)">
+                        <span class="as-method-icon" aria-hidden="true">
+                            <svg class="as-icon" viewBox="0 0 48 48"><path d="M14 40c2.6-5 3.6-10.400 3.600-16a6.400 6.400 0 0 1 12.800 0c0 6.800-1.200 12.800-3.800 18M24 24c0 6.400-1.200 12-4 17M11 33c1.200-3 1.600-5.800 1.600-9a11.400 11.400 0 0 1 22.800 0c0 4.600-.5 8.800-1.600 12.800M9.500 19.500A15.500 15.500 0 0 1 24 8.500c4 0 7.700 1.500 10.500 4M38.500 18c.6 1.900 1 3.900 1 6" /></svg>
+                        </span>
+                        <span class="as-method-text">
+                            <strong>Fingerprint / Passkey</strong>
+                            <small id="fingerprintMethodNote">@(step?.Passkey == false ? "No passkey is set up for this account yet." : "This device's fingerprint, or your phone via QR code")</small>
+                        </span>
+                    </button>
+                </div>
+
+                <div id="bio-status" class="as-status bio-status" role="status" aria-live="polite"></div>
+                <p id="faceHint" class="as-hint" role="status" aria-live="polite">Your camera opens only after you choose Face Recognition.</p>
+                <div class="as-actions" id="faceActions" hidden>
+                    <button type="button" id="btnFaceCancel" class="as-secondary" data-bio-keep>Cancel and close the camera</button>
+                </div>
+
+                <p class="as-fine">Your camera image stays on this device; only face measurements are sent to this application. This academic face check has no liveness or spoof protection, so it is not production-grade biometric proof. A passkey is set up once (Pending Approval, or Face &amp; passkey settings after signing in); your device then asks for its fingerprint, face or PIN.</p>
+                <p class="as-links"><button type="button" id="btnBiometricBack" class="as-quiet" data-bio-keep>Use a different account</button></p>
+                <noscript><p class="as-note">Face recognition and passkeys need JavaScript. Enable it, then sign in again.</p></noscript>
+            </div>
         </div>
     </div>
 </section>
-
 @section Styles {
-    <link rel="stylesheet" href="~/css/biometric.css" asp-append-version="true" />
+    <partial name="_AuthStudioHead" />
 }
 @section Scripts {
-    <partial name="_ValidationScriptsPartial" />
     <script src="~/js/biometric.js" asp-append-version="true"></script>
+    <script src="~/js/supplier-login.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/auth-studio/login-page.js" asp-append-version="true"></script>
 }

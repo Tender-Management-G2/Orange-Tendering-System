@@ -1,54 +1,18 @@
-@model Orange_Tendering_System.Areas.TopCommittee.Services.TopCaseDetails
-@{
-    ViewData["Title"] = Model.Case.Title; ViewData["WorkspaceSection"] = "Evaluation Summary";
-    ViewData["Description"] = "Request, offers, unified report, Sourcing Manager recommendation and AI analysis for the final decision.";
-}
-<partial name="_PageHeader" />
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>@Model.Case.Title</h2>
-        @if (Model.Case.AwaitingMyVote) { <a class="pg-btn pg-btn-primary" data-no-modal asp-action="Decision" asp-route-id="@Model.Case.TenderId">Go to voting</a> }</div>
-    <dl class="ui-facts">
-        <div><dt>Department</dt><dd>@Model.Case.Department</dd></div>
-        <div><dt>Tender status</dt><dd>@Model.Case.Status</dd></div>
-        <div><dt>Recommended supplier</dt><dd>@(Model.Case.Winner ?? "—")</dd></div>
-        <div><dt>Unified report</dt><dd>v@(Model.ReportVersion) · @Model.ReportStatus</dd></div>
-        <div><dt>Sourcing Manager</dt><dd>@(Model.ManagerName ?? "—")@(Model.ManagerReviewedAt is { } d ? " · " + d.ToString("yyyy-MM-dd") : "")</dd></div>
-    </dl>
-    @if (!string.IsNullOrWhiteSpace(Model.ManagerComment)) { <p><strong>Manager recommendation:</strong> @Model.ManagerComment</p> }
-</section>
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>Purchase request: @Model.RequestTitle</h2></div>
-    <p>@Model.Justification</p>
-    <div class="pg-table-wrap"><table class="pg-table" data-no-enhance><thead><tr><th scope="col">Item</th><th scope="col">Quantity</th><th scope="col">Specifications</th></tr></thead>
-        <tbody>@foreach (var i in Model.Items) { <tr><td>@i.Name</td><td>@i.Quantity @i.Unit</td><td>@i.Specifications</td></tr> }</tbody></table></div>
-</section>
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>Submitted offers (ranked by committee score)</h2></div>
-    <div class="pg-table-wrap"><table class="pg-table">
-        <thead><tr><th scope="col">Rank</th><th scope="col">Supplier</th><th scope="col">Total price</th><th scope="col">Delivery (days)</th><th scope="col">Compliance</th><th scope="col">Average score</th><th scope="col">Result</th></tr></thead>
-        <tbody>
-        @foreach (var o in Model.Offers)
-        {
-            <tr><td>@o.Rank</td><td><strong>@o.Supplier</strong></td><td>@o.Total.ToString("N2")</td><td>@(o.DeliveryDays?.ToString() ?? "—")</td><td>@o.Compliance</td><td>@(o.AverageScore?.ToString("0.##") ?? "—")</td><td>@(o.Awarded ? "Awarded" : o.Recommended ? "Recommended" : "")</td></tr>
-        }
-        @if (Model.Offers.Count == 0) { <tr><td colspan="7"><partial name="_EmptyState" model='"No submitted offers."' /></td></tr> }
-        </tbody>
-    </table></div>
-</section>
-@if (Model.AiStatus != null)
-{
-    <section class="ws-panel pg-panel">
-        <div class="pg-panel-head"><h2>AI-assisted analysis <span class="ui-pill ui-pill--@(Model.AiStatus == "Completed" ? "good" : "warn")">@Model.AiStatus</span></h2></div>
-        <p class="pg-hint">Unverified assistance reviewed by the Officer. It cannot approve or award anything.</p>
-        @if (!string.IsNullOrWhiteSpace(Model.AiFindings)) { <details><summary>Show the analysis</summary><pre style="white-space:pre-wrap">@Model.AiFindings</pre></details> }
-    </section>
-}
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>Votes</h2></div>
-    @if (Model.CanSeeCounts) { <p>@Model.Case.Approvals of @Model.Case.Votes recorded decisions approve the recommendation@(Model.Case.MyVote != null ? ". Your decision: " + Model.Case.MyVote + "." : ".")</p> }
-    else { <p class="pg-hint">Vote counts are shown after you have cast your own decision, so every member decides independently.</p> }
-    <div class="pg-actions">
-        @if (Model.Case.ReportId != 0) { <a class="pg-btn" data-no-modal asp-area="TopCommittee" asp-controller="Reports" asp-action="Review" asp-route-id="@Model.Case.ReportId">Open the signed report</a> }
-        <a class="pg-btn" asp-action="ReviewEvaluation" asp-route-id="">All tenders</a>
-    </div>
-</section>
+@model RoundDetails
+@{ var request=Model.Tender.PurchaseRequest; ViewData["Title"]=$"T-{Model.Tender.Id} — Review Tender Evaluation"; ViewData["WorkspaceSection"]="Evaluation Summary"; ViewData["ExecutiveReview"]=true; }
+<div class="tc-review">
+<partial name="_Messages" />
+<header class="rv-page-head"><div><div class="rv-breadcrumb">Procurement <span>›</span> Top Committee <span>›</span> T-@Model.Tender.Id — Review Tender Evaluation</div><div class="rv-title-line"><partial name="_ReviewIcon" model='"report"' /><div><h1>T-@Model.Tender.Id — Review Tender Evaluation</h1><p>Top Committee review and decision on the tender evaluation for @Model.Tender.Title.</p></div></div></div></header>
+<partial name="_ManagerSummary" model="Model" />
+<section class="rv-card rv-overview"><header class="rv-section-head"><partial name="_ReviewIcon" model='"laptop"' /><h2>Tender Overview</h2><p>Key information about this tender, its scope, requirements, and supplier participation.</p></header>
+<dl class="rv-overview-facts">
+@foreach(var fact in new[]{("Tender Reference","T-"+Model.Tender.Id,"hash"),("Tender Title",Model.Tender.Title,"laptop"),("Department",request.Department.Name,"layers"),("Priority",request.Priority.ToString(),"flag")})
+{ <div><partial name="_ReviewIcon" model="fact.Item3" /><div><dt>@fact.Item1</dt><dd>@fact.Item2</dd></div></div> }
+</dl><dl class="rv-dates">
+@foreach(var fact in new[]{("Created Date",(DateTime?)Model.Tender.CreatedAt),("Open Date",Model.Round.TenderRound.OpensAt),("Deadline Date",Model.Round.TenderRound.Deadline)})
+{ <div><partial name="_ReviewIcon" model='"calendar"' /><div><dt>@fact.Item1</dt><dd>@(fact.Item2?.ToString("dd MMM yyyy")??"—")</dd></div></div> }
+</dl></section>
+<partial name="_Clarifications" model="Model" />
+</div>
+@section Styles { <partial name="_ReviewStyles" /> }
+@section Scripts { <partial name="_ClarificationScripts" /> }

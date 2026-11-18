@@ -6,6 +6,8 @@ namespace Orange_Tendering_System.Data
 {
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
+        public DbSet<AdminMaintenancePlan> AdminMaintenancePlans => Set<AdminMaintenancePlan>();
+
         // Organization
         public DbSet<Department> Departments => Set<Department>();
         public DbSet<Supplier> Suppliers => Set<Supplier>();
@@ -120,6 +122,12 @@ namespace Orange_Tendering_System.Data
                 .HasIndex(m => new { m.TenderId, m.CommitteeType, m.Responsibility })
                 .IsUnique()
                 .HasFilter("[Responsibility] IS NOT NULL");
+
+            builder.Entity<CommitteeMember>()
+                .HasIndex(m => new { m.TenderId, m.ExecutivePosition }).IsUnique()
+                .HasFilter("[ExecutivePosition] IS NOT NULL");
+            builder.Entity<CommitteeMember>().ToTable(t => t.HasCheckConstraint("CK_CommitteeMember_ExecutivePosition",
+                "[ExecutivePosition] IS NULL OR ([CommitteeType] = 'Top' AND [ExecutivePosition] IN ('CEO','CFO','CTO','COO'))"));
 
             // A document belongs to exactly one owner: supplier, purchase request, tender, bid,
             // clarification message or report.

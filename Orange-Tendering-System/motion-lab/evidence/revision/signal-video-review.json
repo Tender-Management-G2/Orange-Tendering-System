@@ -1,0 +1,14 @@
+[
+  {
+    "name": "signal-normal",
+    "duration": 8.56,
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "name": "signal-slow",
+    "duration": 20.16,
+    "width": 1440,
+    "height": 900
+  }
+]

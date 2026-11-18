@@ -1,0 +1,1249 @@
+{
+  "capturedAt": "2026-11-14T15:13:53.052Z",
+  "browser": "157.0.4341.60",
+  "errors": [],
+  "checks": {
+    "Card rises from planar crease": true,
+    "Sleeve folds on named hinges": true,
+    "Walls and roof pass through intermediate angles": true,
+    "Iris leaf and blade rotate continuously": true,
+    "reverseProgress": 0.7787187499999993,
+    "Reverse playback moves backward": true,
+    "Supplier category changes": true,
+    "Wireframe toggle works": true,
+    "Orbit inspection works": true,
+    "Raking light control works": true,
+    "Neutral clay material view works": true,
+    "Shadow control works": true,
+    "Fingerprint is disabled": true,
+    "Reduced motion starts enabled": true,
+    "Reduced motion jumps to shot endpoint": true,
+    "WebGL fallback is visible": true,
+    "No browser page errors": true
+  },
+  "poses": {
+    "flat": {
+      "cardHinge": {
+        "position": [
+          -1.82,
+          1.18,
+          0.045
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.left": {
+        "position": [
+          -2.55,
+          1.18,
+          0.07
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.right": {
+        "position": [
+          -1.08,
+          1.18,
+          0.076
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.bottom": {
+        "position": [
+          -1.82,
+          1.18,
+          0.105
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.top": {
+        "position": [
+          -1.82,
+          2.21,
+          0.112
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallFrontHinge": {
+        "position": [
+          0.53,
+          -0.8,
+          0.025
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallBackHinge": {
+        "position": [
+          0.53,
+          0.8,
+          0.025
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallLeftHinge": {
+        "position": [
+          -0.68,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallRightHinge": {
+        "position": [
+          1.74,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "roofHinge": {
+        "position": [
+          0,
+          1.25,
+          0.017
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.attachedLeafHinge": {
+        "position": [
+          2.54,
+          -0.64,
+          0.063
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.bladePivot.0": {
+        "position": [
+          0.505,
+          -0.77,
+          -0.033
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      }
+    },
+    "cardLift": {
+      "cardHinge": {
+        "position": [
+          -1.82,
+          1.18,
+          0.045
+        ],
+        "rotation": [
+          0.61,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.left": {
+        "position": [
+          -2.55,
+          1.18,
+          0.07
+        ],
+        "rotation": [
+          0,
+          0.13,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.right": {
+        "position": [
+          -1.08,
+          1.18,
+          0.076
+        ],
+        "rotation": [
+          0,
+          -0.13,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.bottom": {
+        "position": [
+          -1.82,
+          1.18,
+          0.105
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.top": {
+        "position": [
+          -1.82,
+          2.21,
+          0.112
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallFrontHinge": {
+        "position": [
+          0.53,
+          -0.8,
+          0.025
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallBackHinge": {
+        "position": [
+          0.53,
+          0.8,
+          0.025
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallLeftHinge": {
+        "position": [
+          -0.68,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallRightHinge": {
+        "position": [
+          1.74,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "roofHinge": {
+        "position": [
+          0,
+          1.25,
+          0.017
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.attachedLeafHinge": {
+        "position": [
+          2.54,
+          -0.64,
+          0.063
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.bladePivot.0": {
+        "position": [
+          0.505,
+          -0.77,
+          -0.033
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      }
+    },
+    "cardClosed": {
+      "cardHinge": {
+        "position": [
+          -1.82,
+          1.18,
+          0.045
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.left": {
+        "position": [
+          -2.55,
+          1.18,
+          0.07
+        ],
+        "rotation": [
+          0,
+          -3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.right": {
+        "position": [
+          -1.08,
+          1.18,
+          0.076
+        ],
+        "rotation": [
+          0,
+          3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.bottom": {
+        "position": [
+          -1.82,
+          1.18,
+          0.105
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.top": {
+        "position": [
+          -1.82,
+          2.21,
+          0.112
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallFrontHinge": {
+        "position": [
+          0.53,
+          -0.8,
+          0.025
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallBackHinge": {
+        "position": [
+          0.53,
+          0.8,
+          0.025
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallLeftHinge": {
+        "position": [
+          -0.68,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallRightHinge": {
+        "position": [
+          1.74,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "roofHinge": {
+        "position": [
+          0,
+          1.25,
+          0.017
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.attachedLeafHinge": {
+        "position": [
+          2.54,
+          -0.64,
+          0.063
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.bladePivot.0": {
+        "position": [
+          0.505,
+          -0.77,
+          -0.033
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      }
+    },
+    "buildingMid": {
+      "cardHinge": {
+        "position": [
+          -1.82,
+          1.18,
+          0.045
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.left": {
+        "position": [
+          -2.55,
+          1.18,
+          0.07
+        ],
+        "rotation": [
+          0,
+          -3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.right": {
+        "position": [
+          -1.08,
+          1.18,
+          0.076
+        ],
+        "rotation": [
+          0,
+          3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.bottom": {
+        "position": [
+          -1.82,
+          1.18,
+          0.105
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.top": {
+        "position": [
+          -1.82,
+          2.21,
+          0.112
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallFrontHinge": {
+        "position": [
+          0.53,
+          -0.8,
+          0.025
+        ],
+        "rotation": [
+          -0.9415469538092069,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallBackHinge": {
+        "position": [
+          0.53,
+          0.8,
+          0.025
+        ],
+        "rotation": [
+          1.0642436550887227,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallLeftHinge": {
+        "position": [
+          -0.68,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          0.6292493729856887,
+          0
+        ],
+        "visible": true
+      },
+      "wallRightHinge": {
+        "position": [
+          1.74,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          -0.478685636180312,
+          0
+        ],
+        "visible": true
+      },
+      "roofHinge": {
+        "position": [
+          0,
+          1.25,
+          0.017
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.attachedLeafHinge": {
+        "position": [
+          2.54,
+          -0.64,
+          0.063
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.bladePivot.0": {
+        "position": [
+          0.505,
+          -0.77,
+          -0.033
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      }
+    },
+    "buildingRest": {
+      "cardHinge": {
+        "position": [
+          -1.82,
+          1.18,
+          0.045
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.left": {
+        "position": [
+          -2.55,
+          1.18,
+          0.07
+        ],
+        "rotation": [
+          0,
+          -3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.right": {
+        "position": [
+          -1.08,
+          1.18,
+          0.076
+        ],
+        "rotation": [
+          0,
+          3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.bottom": {
+        "position": [
+          -1.82,
+          1.18,
+          0.105
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.top": {
+        "position": [
+          -1.82,
+          2.21,
+          0.112
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallFrontHinge": {
+        "position": [
+          0.53,
+          -0.8,
+          0.025
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallBackHinge": {
+        "position": [
+          0.53,
+          0.8,
+          0.025
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallLeftHinge": {
+        "position": [
+          -0.68,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          1.5707963267948966,
+          0
+        ],
+        "visible": true
+      },
+      "wallRightHinge": {
+        "position": [
+          1.74,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          -1.5707963267948966,
+          0
+        ],
+        "visible": true
+      },
+      "roofHinge": {
+        "position": [
+          0,
+          1.25,
+          0.017
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.attachedLeafHinge": {
+        "position": [
+          2.54,
+          -0.64,
+          0.063
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.bladePivot.0": {
+        "position": [
+          0.505,
+          -0.77,
+          -0.033
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      }
+    },
+    "irisMid": {
+      "cardHinge": {
+        "position": [
+          -1.82,
+          1.18,
+          0.045
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.left": {
+        "position": [
+          -2.55,
+          1.18,
+          0.07
+        ],
+        "rotation": [
+          0,
+          -3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.right": {
+        "position": [
+          -1.08,
+          1.18,
+          0.076
+        ],
+        "rotation": [
+          0,
+          3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.bottom": {
+        "position": [
+          -1.82,
+          1.18,
+          0.105
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.top": {
+        "position": [
+          -1.82,
+          2.21,
+          0.112
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallFrontHinge": {
+        "position": [
+          0.53,
+          -0.8,
+          0.025
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallBackHinge": {
+        "position": [
+          0.53,
+          0.8,
+          0.025
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallLeftHinge": {
+        "position": [
+          -0.68,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          1.5707963267948966,
+          0
+        ],
+        "visible": true
+      },
+      "wallRightHinge": {
+        "position": [
+          1.74,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          -1.5707963267948966,
+          0
+        ],
+        "visible": true
+      },
+      "roofHinge": {
+        "position": [
+          0,
+          1.25,
+          0.017
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.attachedLeafHinge": {
+        "position": [
+          2.54,
+          -0.64,
+          0.063
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.bladePivot.0": {
+        "position": [
+          0.505,
+          -0.77,
+          -0.033
+        ],
+        "rotation": [
+          0,
+          0,
+          -0.26356793993293554
+        ],
+        "visible": true
+      }
+    },
+    "irisOpen": {
+      "cardHinge": {
+        "position": [
+          -1.82,
+          1.18,
+          0.045
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.left": {
+        "position": [
+          -2.55,
+          1.18,
+          0.07
+        ],
+        "rotation": [
+          0,
+          -3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.right": {
+        "position": [
+          -1.08,
+          1.18,
+          0.076
+        ],
+        "rotation": [
+          0,
+          3.141592653589793,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.bottom": {
+        "position": [
+          -1.82,
+          1.18,
+          0.105
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "sleeveHinge.top": {
+        "position": [
+          -1.82,
+          2.21,
+          0.112
+        ],
+        "rotation": [
+          3.141592653589793,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallFrontHinge": {
+        "position": [
+          0.53,
+          -0.8,
+          0.025
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallBackHinge": {
+        "position": [
+          0.53,
+          0.8,
+          0.025
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "wallLeftHinge": {
+        "position": [
+          -0.68,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          1.5707963267948966,
+          0
+        ],
+        "visible": true
+      },
+      "wallRightHinge": {
+        "position": [
+          1.74,
+          0,
+          0.026
+        ],
+        "rotation": [
+          0,
+          -1.5707963267948966,
+          0
+        ],
+        "visible": true
+      },
+      "roofHinge": {
+        "position": [
+          0,
+          1.25,
+          0.017
+        ],
+        "rotation": [
+          1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.attachedLeafHinge": {
+        "position": [
+          2.54,
+          -0.64,
+          0.063
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "visible": true
+      },
+      "paperIris.bladePivot.0": {
+        "position": [
+          0.505,
+          -0.77,
+          -0.033
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.04
+        ],
+        "visible": true
+      }
+    }
+  },
+  "camera": {
+    "flat": {
+      "position": [
+        0,
+        0,
+        11
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "zoom": 1
+    },
+    "cardLift": {
+      "position": [
+        -1.9444027047332835,
+        -1.475619834710745,
+        5.608790383170548
+      ],
+      "up": [
+        0,
+        0.9650173634597157,
+        0.26218598021492096
+      ],
+      "zoom": 2.1459203606311044
+    },
+    "cardClosed": {
+      "position": [
+        -1.9757999999999996,
+        -3.0448,
+        5.256
+      ],
+      "up": [
+        0,
+        0.8382677655597285,
+        0.5452587947236617
+      ],
+      "zoom": 2.05116
+    },
+    "buildingMid": {
+      "position": [
+        2.770162962962963,
+        -5.842133333333333,
+        5.428118518518518
+      ],
+      "up": [
+        0,
+        0.33022236411641026,
+        0.9439031678288664
+      ],
+      "zoom": 1.0412296296296295
+    },
+    "buildingRest": {
+      "position": [
+        1.95,
+        -5.3,
+        4.05
+      ],
+      "up": [
+        0,
+        0.14002100472618156,
+        0.9901485334208553
+      ],
+      "zoom": 1.08
+    },
+    "irisMid": {
+      "position": [
+        4.141426611796983,
+        -4.682853223593964,
+        1.4515363511659807
+      ],
+      "up": [
+        0,
+        0.03378043541232837,
+        0.9994292782300075
+      ],
+      "zoom": 1.7102880658436215
+    },
+    "irisOpen": {
+      "position": [
+        3.9,
+        -4.2,
+        0.65
+      ],
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "zoom": 2
+    }
+  },
+  "render": {
+    "desktop": {
+      "pixelRatio": 1,
+      "calls": 239,
+      "triangles": 13803,
+      "points": 0,
+      "lines": 34,
+      "viewport": [
+        953,
+        650
+      ]
+    },
+    "mobile": {
+      "pixelRatio": 1,
+      "calls": 239,
+      "triangles": 13803,
+      "points": 0,
+      "lines": 34,
+      "viewport": [
+        364,
+        385
+      ]
+    }
+  }
+}

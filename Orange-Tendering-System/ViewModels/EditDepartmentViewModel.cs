@@ -1,6 +1,6 @@
-﻿// sara rjoub 
-
+﻿
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace Orange_Tendering_System.ViewModels
 {
@@ -13,11 +13,15 @@ namespace Orange_Tendering_System.ViewModels
         [Display(Name = "Department Name")]
         public string Name { get; set; } = "";
 
-        [StringLength(500)]
+        [StringLength(160, ErrorMessage = "Use a short description of up to 160 characters.")]
         public string? Description { get; set; }
 
         public bool IsActive { get; set; }
+
+        // Current and newly selected employees
+        public List<string> SelectedEmployeeIds { get; set; } = new();
+
+        // Employees available for the department
+        public List<SelectListItem> AvailableEmployees { get; set; } = new();
     }
 }
-
-// الفرق بين هذا والـCreate ViewModel هو وجود Id، لأننا هون بدنا نحدد أي Department رح نعدل.

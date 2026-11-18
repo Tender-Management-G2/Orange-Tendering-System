@@ -1,0 +1,85 @@
+@model Orange_Tendering_System.Models.Entities.TenderReport
+
+@{
+    ViewData["Title"] = "Approve Evaluation Report";
+    ViewData["WorkspaceSection"] = "Report Review";
+    ViewData["Description"] = "Approve the evaluation report. Earlier versions stay in history.";
+}
+
+<partial name="_PageHeader" />
+
+<section class="ws-panel pg-panel">
+    <h2>Report</h2>
+
+    <dl class="pg-dl">
+        <div>
+            <dt>Tender</dt>
+            <dd>@Model.TenderRound.Tender.Title</dd>
+        </div>
+        <div>
+            <dt>Version</dt>
+            <dd>v@Model.VersionNumber</dd>
+        </div>
+        <div>
+            <dt>Submitted by</dt>
+            <dd>@(Model.CreatedByUser?.UserName ?? Model.CreatedByUserId)</dd>
+        </div>
+        <div>
+            <dt>Submitted</dt>
+            <dd>@(Model.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not submitted")</dd>
+        </div>
+        <div>
+            <dt>Recommended offer</dt>
+            <dd>@(Model.RecommendedBidId?.ToString() ?? "No recommendation")</dd>
+        </div>
+        <div>
+            <dt>Status</dt>
+            <dd>@Model.Status</dd>
+        </div>
+    </dl>
+</section>
+
+<section class="ws-panel pg-panel pg-confirm"
+         aria-labelledby="confirm-title">
+
+    <h2 id="confirm-title">Approve Evaluation Report</h2>
+
+    <p>Approve the evaluation committee's recommendation.</p>
+
+    <p class="pg-consequence">
+        <strong>What this will do:</strong>
+        Sets this report version to Accepted.
+        This does not award the tender.
+    </p>
+
+    <form asp-area="SourcingManager"
+          asp-controller="ManagerReports"
+          asp-action="Approve"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" name="id" value="@Model.Id" />
+
+        <div class="pg-field">
+            <label for="comment">Manager comment (optional)</label>
+            <textarea id="comment"
+                      name="comment"
+                      rows="4"
+                      maxlength="2000"
+                      placeholder="Write your comment..."></textarea>
+        </div>
+
+        <div class="pg-actions">
+            <button type="submit" class="pg-btn pg-btn-primary">
+                Confirm Approval
+            </button>
+
+            <a asp-action="Review"
+               asp-route-id="@Model.Id">
+                Cancel
+            </a>
+        </div>
+    </form>
+</section>

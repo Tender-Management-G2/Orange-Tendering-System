@@ -2,6 +2,7 @@ namespace Orange_Tendering_System.ViewModels;
 
 public sealed class SupplierProfileViewModel
 {
+    public List<SupplierDocumentViewModel> Documents { get; set; } = [];
     public SupplierContactInputModel Contact { get; init; } = new();
     public string? AccessMessage { get; init; }
     public string CompanyName { get; init; } = string.Empty;
