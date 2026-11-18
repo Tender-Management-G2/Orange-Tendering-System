@@ -99,6 +99,10 @@ builder.Services.AddSingleton<OrangeReportRenderer>();
 builder.Services.AddScoped<IReportCertificateProvider, StoreReportCertificateProvider>();
 builder.Services.AddScoped<ReportCryptography>();
 builder.Services.AddScoped<ReportDocumentService>();
+// Tender Passport (audit-trail package) and personalized PDF watermarks; both reuse the existing AuditLogs table.
+builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<TenderPassportService>();
+builder.Services.AddScoped<DocumentWatermarkService>();
 builder.Services.Configure<OllamaSettings>(builder.Configuration.GetSection("Ollama"));
 builder.Services.AddHttpClient<OllamaChatClient>();
 builder.Services.AddScoped<OllamaBidAnalysisService>();

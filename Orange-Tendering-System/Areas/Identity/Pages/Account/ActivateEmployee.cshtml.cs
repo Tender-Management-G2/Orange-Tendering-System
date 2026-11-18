@@ -10,7 +10,10 @@ using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
-public class ActivateEmployeeModel(UserManager<ApplicationUser> users, ApplicationDbContext db) : PageModel
+public class ActivateEmployeeModel(
+    UserManager<ApplicationUser> users,
+    SignInManager<ApplicationUser> signIn,
+    ApplicationDbContext db) : PageModel
 {
     [BindProperty] public InputModel Input { get; set; } = new();
     public bool Activated { get; private set; }
@@ -68,6 +71,14 @@ public class ActivateEmployeeModel(UserManager<ApplicationUser> users, Applicati
         });
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        // The emailed link and the new password prove the account: sign in and offer the optional Face ID /
+        // Fingerprint setup (EmployeeIdentity). Enrolling there re-checks the password, as everywhere else.
+        if (user.IsActive && await signIn.CanSignInAsync(user))
+        {
+            await signIn.SignInAsync(user, isPersistent: false);
+            return RedirectToPage("./EmployeeIdentity", new { activated = true });
+        }
         Activated = true;
         return Page();
     }

@@ -189,6 +189,23 @@ static class BiometricChecks
                   (await faceAnonymous.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.Redirect,
                 "the enrolled face alone (email + face, no password) never signs in");
         }
+        // Employees (Other User) choose Face ID on the Login page too (owner decision 2026-11-17).
+        using (var employeeFace = newClient())
+        {
+            var startCsrf = await token(employeeFace, "/Identity/Account/Login");
+            var start = await employeeFace.PostAsync("/Identity/Account/Login?handler=IdentityStart", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Input.Email"] = email, ["Input.AccountType"] = "other", ["method"] = "face", ["__RequestVerificationToken"] = startCsrf
+            }));
+            check(start.StatusCode == HttpStatusCode.OK && (await start.Content.ReadAsStringAsync()).Contains("\"ready\""),
+                "an employee with Face ID set up opens the Face ID step from the Login page");
+            var employeeSignIn = await Post(employeeFace, startCsrf, "/Biometrics/FaceLogin",
+                FaceBody(await FaceChallenge(employeeFace, startCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+            var employeeBody = employeeSignIn.StatusCode == HttpStatusCode.OK ? await employeeSignIn.Content.ReadFromJsonAsync<JsonElement>() : default;
+            check(employeeSignIn.StatusCode == HttpStatusCode.OK && employeeBody.GetProperty("redirect").GetString() == "/EvaluationCommittee" &&
+                  (await employeeFace.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.OK,
+                "Face ID signs the employee into the assigned workspace");
+        }
         await SupplierFaceChecks(newClient, token, check, services, suffix);
         await FaceDemoChecks(newClient, token, check, services);
         await FingerprintDemoChecks(newClient, token, check, services);

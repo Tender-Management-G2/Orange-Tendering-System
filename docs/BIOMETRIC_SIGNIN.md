@@ -35,6 +35,14 @@ authentication system: ASP.NET Core Identity and its cookie. Biometric methods a
   bypass. The separate "Sign in with a device passkey" button and the "passkey" wording were removed from the page.
   **Risk the owner accepted:** Face ID no longer has a password in front of it and there is still no liveness check, so a good
   photo of an enrolled supplier plus their email can pass it. Covered by `BiometricChecks.cs` and `PhonePasskeyChecks.cs`.
+- **Employees too** (owner decision 2026-11-17). When an admin-created employee sets the password from the emailed link
+  (`ActivateEmployee`), they are signed in and taken to `Areas/Identity/Pages/Account/EmployeeIdentity` to optionally set
+  up **Face ID** or **Fingerprint** (the same enrollment endpoints and `_PhonePasskeySetup` as suppliers, password
+  re-checked), or **Skip for now** to their workspace. They can return there or use the account menu later. On the Login
+  page, **Other User** now also offers Email & Password / Face ID / Fingerprint: `handler=IdentityStart` opens the step for
+  any active account with that method set up (`AccountAllowedAsync` still requires an Approved supplier company). The
+  Supplier / Other User choice stays a preference; the real role picks the workspace. Covered by `Tests/AuthSmoke/Program.cs`
+  (activation) and `BiometricChecks.cs` (employee Face ID sign-in).
 - *(Superseded 2026-11-16)* **Supplier face sign-in is password first** (owner decision 2026-11-15). The Login page checks email + password
   (`Login?handler=Credentials`); for an approved supplier with a face enrolled it does not sign in but opens a short pre-auth
   transaction (`Services/Biometric/SupplierPreAuth.cs`: a random HttpOnly cookie pointing at a server-side record,

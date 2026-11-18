@@ -22,7 +22,7 @@ public abstract class ReportControllerBase(TenderWorkflowService workflow) : Con
     }
     public async Task<IActionResult> Pdf(int id, bool download = false)
     {
-        var copy = await workflow.ReportPdf(id, User); PrivateResponse();
+        var copy = await workflow.ReportPdf(id, User, download); PrivateResponse();
         Response.Headers["X-Canonical-SHA256"] = copy.CanonicalHash;
         Response.Headers["X-Access-Copy-SHA256"] = copy.CopyHash;
         return download ? File(copy.Bytes, "application/pdf", copy.Name) : File(copy.Bytes, "application/pdf");

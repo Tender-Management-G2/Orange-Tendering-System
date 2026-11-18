@@ -645,7 +645,12 @@ using (var employee = Client(factory))
         ["Input.Password"] = employeePassword, ["Input.ConfirmPassword"] = employeePassword,
         ["__RequestVerificationToken"] = activationToken
     }));
-    Check((await activated.Content.ReadAsStringAsync()).Contains("Your password is set"), "employee activation confirms account");
+    Check(activated.Headers.Location?.ToString().StartsWith("/Identity/Account/EmployeeIdentity?activated=", StringComparison.Ordinal) == true,
+        "employee activation signs in and opens the optional Face ID / Fingerprint step");
+    var identityPage = await (await employee.GetAsync(activated.Headers.Location)).Content.ReadAsStringAsync();
+    Check(identityPage.Contains("Your password is set") && identityPage.Contains("id=\"btnFaceEnroll\"") &&
+          identityPage.Contains("id=\"phoneSetup\"") && identityPage.Contains("Skip for now") && identityPage.Contains("href=\"/Department\""),
+        "employee identity step offers Face ID, Fingerprint and Skip for now to the assigned workspace");
     var employeeLoginToken = await Token(employee, "/Identity/Account/Login");
     var employeeLogin = await employee.PostAsync("/Identity/Account/Login", Form(new()
     {
@@ -718,7 +723,7 @@ using (var adminCreated = Client(factory))
         ["Input.Password"] = welcomePassword, ["Input.ConfirmPassword"] = welcomePassword,
         ["__RequestVerificationToken"] = activationToken
     }));
-    Check((await activated.Content.ReadAsStringAsync()).Contains("Your password is set"),
+    Check(activated.Headers.Location?.ToString().StartsWith("/Identity/Account/EmployeeIdentity?activated=", StringComparison.Ordinal) == true,
         "welcome link sets the password and confirms the account");
     using (var scope = factory.Services.CreateScope())
     {

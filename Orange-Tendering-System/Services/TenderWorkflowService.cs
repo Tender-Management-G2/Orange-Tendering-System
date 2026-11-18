@@ -76,8 +76,11 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable) : null;
         var tender = await db.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={tenderId}").SingleOrDefaultAsync();
         Require(tender != null, "Tender not found.");
+        var before = tender!.Status;
         await operation(tender!, actor);
-        Audit(actor, tenderId, action);
+        // The status before and after the action feeds the Tender Passport ("previous / new status").
+        db.AuditLogs.Add(new AuditLog { UserId = actor.Id, EntityName = "Tender", EntityId = tenderId.ToString(), Action = action, CreatedAt = Now,
+            OldValues = JsonSerializer.Serialize(new { Status = before.ToString() }), NewValues = JsonSerializer.Serialize(new { Status = tender.Status.ToString() }) });
         await db.SaveChangesAsync();
         if (deadline != null) Require(deadline() is { } end && Now < end, "The submission deadline has passed. Nothing was submitted.");
         if (tx != null) await tx.CommitAsync();

@@ -196,6 +196,28 @@ public static class UnifiedTenderChecks
         var officerPopup = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
         Check(officerPopup.Contains("data-supplier-search") && officerPopup.Contains("select data-supplier-category")
             && !officerPopup.Contains("INACTIVE_SUPPLIER"), "canonical supplier picker preserves search, categories and eligibility");
+        // Tender Passport: stickers come only from recorded events, suppliers never see it, a visit is recorded once per window.
+        Check(officerPopup.Contains("data-tp ") && officerPopup.Contains("Tender Passport") && officerPopup.Contains("tp-k-approved") && officerPopup.Contains("Weights approved")
+            && !officerPopup.Contains("tp-k-awarded") && !officerPopup.Contains("tp-k-rejected"), "officer popup shows the Tender Passport with only recorded stickers");
+        Check(!popup.Contains("data-tp") && !popup.Contains("Tender Passport"), "suppliers never receive the Tender Passport");
+        await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
+        Check(await db.AuditLogs.CountAsync(a => a.EntityName == "Tender" && a.EntityId == id.ToString() && a.Action == AuditLogService.TenderViewed && a.UserId == officer.Id) == 1,
+            "repeated popup refreshes record a single tender view");
+        var opened = await db.AuditLogs.AsNoTracking().SingleAsync(a => a.EntityName == "Tender" && a.EntityId == id.ToString() && a.Action == "BiddingOpened");
+        Check(opened.OldValues!.Contains("Draft") && opened.NewValues!.Contains("Bidding"), "workflow audit keeps the previous and new tender status");
+        var trail = await Ajax(officerClient, "/SourcingOfficer/Workflow/Passport/" + id);
+        Check(trail.Contains("tp-journey") && trail.Contains("Bidding opened") && trail.Contains("Weight proposal submitted") && trail.Contains("Draft"), "officer opens the full activity trail");
+        using (var evaluatorClient = await Login(evaluator))
+        {
+            var memberTrail = await Ajax(evaluatorClient, "/EvaluationCommittee/Workflow/Passport/" + id);
+            Check(memberTrail.Contains("Weights approved") && !memberTrail.Contains("Supplier invited") && !memberTrail.Contains("Invitation answered"),
+                "before evaluation access a committee member's trail shows setup events only");
+        }
+        using (var supplierTrail = new HttpRequestMessage(HttpMethod.Get, "/Supplier/Workflow/Passport/" + id))
+        {
+            supplierTrail.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            Check((await supplierClient.SendAsync(supplierTrail)).StatusCode != HttpStatusCode.OK, "a supplier cannot open the activity trail");
+        }
         var summary = await Ajax(supplierClient, "/Supplier/Workflow/TenderDetails/" + id);
         Check(!summary.Contains("Weights") && !summary.Contains("COMPETITOR_SECRET_NAME"), "supplier tender details are sanitized");
         var supplierRows = await flow.List(Principal(supplierUser));
@@ -315,6 +337,8 @@ public static class UnifiedTenderChecks
             var aiPdf = await lateClient.GetAsync("/EvaluationCommittee/Workflow/AiAnalysisPdf/" + id);
             var aiBytes = await aiPdf.Content.ReadAsByteArrayAsync();
             Check(aiPdf.StatusCode == HttpStatusCode.OK && aiPdf.Content.Headers.ContentType?.MediaType == "application/pdf" && aiBytes.Length > 500 && aiBytes[0] == (byte)'%' && aiBytes[1] == (byte)'P', "committee member downloads the AI analysis as a PDF");
+            Check(await db.AuditLogs.AnyAsync(a => a.Action == AuditLogService.AiAnalysisPdfDownloaded && a.UserId == financial.Id && a.NewValues!.Contains("\"Watermarked\":true")),
+                "the AI analysis PDF is a personalized watermarked copy and the download is audited");
         }
         var officerMeeting = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
         Check(officerMeeting.Contains("Change the meeting time") && officerMeeting.Contains("RescheduleEvaluation"), "Officer popup offers to change the meeting time");

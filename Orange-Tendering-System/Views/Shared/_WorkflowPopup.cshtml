@@ -200,9 +200,11 @@
     var stepIndex = status switch { TenderStatus.Draft or TenderStatus.Bidding => 1, TenderStatus.Evaluation => s?.State == SessionState.ReportDraft ? 3 : 2, TenderStatus.OfficerReview => 3, _ => 4 };
 }
 <div class="wf wf-pop" data-tender="@id">
-    <header class="wf-pop-head">
+    <header class="wf-pop-head@(Model.IsSupplier ? "" : " has-passport")">
         <div class="wf-pop-title"><span class="wf-eyebrow">T-@id.ToString("0000")</span><h2 id="wf-dialog-title">@Model.Tender.Title</h2>
             <div class="wf-chips"><span class="wf-chip wf-chip-status">@Words(status.ToString())</span>@if (w?.State == WeightState.Approved) { <span class="wf-chip wf-chip-good">Weights @w.ApprovedFinancial!.Value.ToString("0.##")% financial / @w.ApprovedTechnical!.Value.ToString("0.##")% technical</span> }</div></div>
+        @* Tender Passport: the audit trail as a tracked package (internal users only; Views/Shared/Components/TenderPassport). *@
+        @if (!Model.IsSupplier) { @await Component.InvokeAsync("TenderPassport", new { details = Model, trailUrl = Url.Action("Passport", ViewContext.RouteData.Values["controller"]?.ToString(), new { area, id }) }) }
         <partial name="_WorkflowStepper" model="Model" />
     </header>
     @if (TempData["WorkflowMessage"] is string message) { <div class="wf-flash" role="status"><b aria-hidden="true">&#10003;</b>@message</div> }

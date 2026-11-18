@@ -64,11 +64,11 @@ public partial class TenderWorkflowService
             .OrderByDescending(x => x.VersionNumber).Select(x => new TenderReport { Id = x.Id, VersionNumber = x.VersionNumber, Status = x.Status, CreatedAt = x.CreatedAt, SupersededAt = x.SupersededAt }).ToListAsync();
         return result;
     }
-    public async Task<ProtectedReportCopy> ReportPdf(int reportId, ClaimsPrincipal principal)
+    public async Task<ProtectedReportCopy> ReportPdf(int reportId, ClaimsPrincipal principal, bool download = false)
     {
         var tenderId = await db.TenderReports.Where(x => x.Id == reportId).Select(x => x.TenderRound.TenderId).SingleOrDefaultAsync();
         ProtectedReportCopy? copy = null;
-        await Change(tenderId, principal, "ReportPdfAccessed", async (tender, actor) =>
+        await Change(tenderId, principal, download ? "ReportPdfDownloaded" : "ReportPdfAccessed", async (tender, actor) =>
         {
             await ReportReader(tender, actor); var (report, session) = await ReportContext(reportId);
             var bytes = await reportDocuments.AccessCopy(report, session, actor, Now);

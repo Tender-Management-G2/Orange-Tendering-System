@@ -1,7 +1,7 @@
 // OWNER: Ahmad — Authentication.
 // Sign-in form of Areas/Identity/Pages/Account/Login.cshtml.
 //
-// A supplier first chooses one method (owner decision 2026-11-16); other users always use the password.
+// Every account first chooses one method (owner decision 2026-11-16; other users too since 2026-11-17).
 //   Email & Password → Login?handler=Credentials. The server answers signedIn (go to its redirect),
 //                      mismatch (wrong account type, nobody signed in) or rejected (one generic message).
 //   Face ID          → Login?handler=IdentityStart (email only) opens the identity step for that account,
@@ -26,7 +26,6 @@
     const submit = document.getElementById('login-submit');
     const message = document.getElementById('signInMessage');
     const ledeText = document.getElementById('signInLedeText');
-    const methods = document.getElementById('signInMethods');
     const methodInputs = Array.from(form.querySelectorAll('input[name="method"]'));
     const faceButton = document.getElementById('btnFaceLogin');
     const fingerprintButton = document.getElementById('btnPasskeyStep');
@@ -115,9 +114,8 @@
         return checked ? checked.value : null;
     }
 
-    // Other users always sign in with the password; a supplier uses the method chosen above.
+    // Suppliers and other users both use the method chosen above.
     function method() {
-        if (accountType() === 'other') return 'password';
         const checked = methodInputs.find(input => input.checked);
         return checked ? checked.value : 'password';
     }
@@ -141,7 +139,6 @@
     function render() {
         const current = method();
         const text = TEXT[current];
-        if (methods) methods.hidden = accountType() === 'other';
         passwordFields.hidden = current !== 'password';
         password.disabled = current !== 'password';
         if (ledeText) ledeText.textContent = text.lede;

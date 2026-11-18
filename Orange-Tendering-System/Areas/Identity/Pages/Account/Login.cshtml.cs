@@ -15,8 +15,8 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
 /// <summary>
-/// One sign-in page for every account (owner decision 2026-11-16). A supplier first chooses one method:
-/// Email &amp; Password, Face ID or Fingerprint. Other users sign in with email and password.
+/// One sign-in page for every account (owner decision 2026-11-16). Every account first chooses one method:
+/// Email &amp; Password, Face ID or Fingerprint (Other User too since 2026-11-17, set up in EmployeeIdentity).
 ///   - Email &amp; Password: checked here and signed in directly (an approved supplier gets the password-step session).
 ///   - Face ID / Fingerprint: the email opens a short identity step (SupplierPreAuth, handler IdentityStart); the
 ///     session is issued afterwards by /Biometrics/FaceLogin or /Biometrics/PasskeyLogin, for that account only.
@@ -108,8 +108,8 @@ public class LoginModel(
     }
 
     /// <summary>
-    /// The supplier chose Face ID or Fingerprint and typed an email (no password). For an approved, active supplier
-    /// with that method set up, this opens the short identity step for that account; /Biometrics/FaceChallenge +
+    /// The person chose Face ID or Fingerprint and typed an email (no password). For an active internal user or an
+    /// approved supplier with that method set up, this opens the short identity step for that account; /Biometrics/FaceChallenge +
     /// FaceLogin, or PasskeyLoginOptions + PasskeyLogin (and the phone QR code) then work only for it. Nothing is
     /// signed in here. Any other email gets the same "not available" answer and no usable step.
     /// </summary>
@@ -128,9 +128,10 @@ public class LoginModel(
         if (!new EmailAddressAttribute().IsValid(email) || email.Length == 0)
             return BadRequest(new { error = "Enter a valid email address, for example name@company.com." });
 
+        // Suppliers and internal users alike (employees since 2026-11-17); AccountAllowedAsync applies the supplier
+        // approval rule. The Supplier / Other User choice stays a preference: the real role picks the workspace.
         var user = await users.FindByEmailAsync(email);
         var ready = user is not null && user.EmailConfirmed &&
-            await users.IsInRoleAsync(user, SystemRoles.Supplier) &&
             await biometric.AccountAllowedAsync(user) &&
             (face
                 ? await db.FaceTemplates.AnyAsync(t => t.UserId == user.Id)

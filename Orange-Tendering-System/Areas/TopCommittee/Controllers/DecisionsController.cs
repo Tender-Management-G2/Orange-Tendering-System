@@ -215,7 +215,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         if (details?.Round.TenderReport is not { ReportType: ReportType.ExecutiveSummary, SubmittedAt: not null, Status: not ReportStatus.Draft }) return NotFound();
         try
         {
-            var bytes = await GetOrCreateOriginalPdf(details, user.Id, cancellationToken);
+            var bytes = await RestrictedCopy(await GetOrCreateOriginalPdf(details, user.Id, cancellationToken), user, details.Tender.Id, details.Round.TenderReport!.VersionNumber, false);
             Response.Headers.CacheControl = "no-store";
             Response.Headers["X-Content-Type-Options"] = "nosniff";
             return File(bytes, "application/pdf");
@@ -234,7 +234,7 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         if (details?.Round.TenderReport is not { ReportType: ReportType.ExecutiveSummary, SubmittedAt: not null, Status: not ReportStatus.Draft } report) return NotFound();
         try
         {
-            var bytes = await GetOrCreateOriginalPdf(details, user.Id, cancellationToken);
+            var bytes = await RestrictedCopy(await GetOrCreateOriginalPdf(details, user.Id, cancellationToken), user, details.Tender.Id, report.VersionNumber, true);
             Response.Headers.CacheControl = "no-store";
             Response.Headers["X-Content-Type-Options"] = "nosniff";
             return File(bytes, "application/pdf", $"Manager-Summary-T{details.Tender.Id}-R{report.Id}-V{report.VersionNumber}.pdf");
@@ -279,9 +279,24 @@ public sealed class DecisionsController(ApplicationDbContext db, UserManager<App
         else return Forbid();
         var bytes = await ReadStoredPdf(document, cancellationToken);
         if (bytes is null || document.ContentHash != Convert.ToHexString(SHA256.HashData(bytes))) return NotFound();
+        // The stored, hash-verified final PDF stays unchanged; the response is a personalized restricted copy.
+        var source = await Db.TenderReports.AsNoTracking().Where(r => r.Id == document.TenderReportId).Select(r => new { r.TenderRound.TenderId, r.VersionNumber }).SingleOrDefaultAsync(cancellationToken);
+        if (source != null) bytes = await RestrictedCopy(bytes, user, source.TenderId, source.VersionNumber, download, "Final signed summary");
         Response.Headers.CacheControl = "no-store";
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return download ? File(bytes, "application/pdf", document.FileName) : File(bytes, "application/pdf");
+    }
+
+    // Personalized "Orange Restricted" copy of a stored committee PDF, audited for the Tender Passport. The stored original
+    // (whose SHA-256 the executives sign) is never modified; only the bytes sent to this user carry the watermark.
+    private async Task<byte[]> RestrictedCopy(byte[] pdf, ApplicationUser user, int tenderId, int version, bool download, string what = "Executive summary")
+    {
+        var marks = HttpContext.RequestServices.GetRequiredService<DocumentWatermarkService>();
+        var audit = HttpContext.RequestServices.GetRequiredService<AuditLogService>();
+        var copy = marks.Apply(pdf, new WatermarkStamp(await marks.IdentityAsync(user.Id), audit.UtcNow, TenderPassportService.Reference(tenderId), $"{what} v{version:00}", download ? "Downloaded" : "Viewed"));
+        await audit.RecordAsync(user.Id, download ? AuditLogService.DocumentDownloaded : AuditLogService.DocumentViewed, "Tender", tenderId.ToString(),
+            new { FileName = $"{what} v{version:00}", VersionNumber = version, Scope = "Report", Watermarked = copy.Applied }, oncePerWindow: !download);
+        return copy.Bytes;
     }
 
     [HttpGet]

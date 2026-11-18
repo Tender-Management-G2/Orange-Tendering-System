@@ -357,7 +357,7 @@ function boot() {
       rig.lid = 1;
       to({ ring: 1 }, { duration: 0.9, delay: 0.6 });
       to({ pending: 1 }, { duration: 1.4, delay: 1.0, ease: 'power1.inOut' });
-      say(shell.dataset.approved === 'true' ? 'Identity enrolled and company approved.' : 'Identity enrolled. The application waits on its platform for administrator approval.');
+      say(shell.dataset.doneSay || (shell.dataset.approved === 'true' ? 'Identity enrolled and company approved.' : 'Identity enrolled. The application waits on its platform for administrator approval.'));
     } else {
       rig.lid = 0;
       say('The Identity Station is ready. The camera opens only after you start face enrollment.');
