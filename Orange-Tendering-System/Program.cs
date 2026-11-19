@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
+using Orange_Tendering_System.Areas.TopCommittee.Services;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services;
@@ -87,7 +88,11 @@ builder.Services.AddScoped<ExecutiveNavigationService>();
 builder.Services.Configure<ExecutiveSpeechOptions>(builder.Configuration.GetSection("ExecutiveSpeech"));
 builder.Services.AddScoped<ExecutiveSpeechService>();
 builder.Services.AddScoped<ClarificationService>();
-builder.Services.AddScoped<ReportingService>();
+builder.Services.AddScoped(services => new ReportingService(
+    new ApplicationDbContext(TopCommitteeCompatibility.Options(services.GetRequiredService<DbContextOptions<ApplicationDbContext>>())),
+    services.GetRequiredService<TimeProvider>(), ownsContext: true));
+builder.Services.AddScoped<ReportAccessService>();
+builder.Services.AddScoped<FinalTenderContractService>();
 builder.Services.AddScoped<ReportExport>();
 builder.Services.AddScoped<Orange_Tendering_System.Areas.TopCommittee.Services.TopCommitteeService>();
 builder.Services.AddScoped<AdminService>();

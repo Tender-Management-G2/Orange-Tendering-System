@@ -1,0 +1,85 @@
+@using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.Services
+@model AnalyticsFilterForm
+<section class="ws-panel pg-panel analytics-filter-panel" id="analytics-filters">
+    <form method="get" asp-controller="Analytics" asp-action="@Model.Action" class="analytics-filters" data-analytics-filters
+          data-updating="@UiText.T(Context, "Updating results…")"
+          data-invalid-range="@UiText.T(Context, "The start date must be on or before the end date.")"
+          data-update-error="@UiText.T(Context, "Could not update results. Try again.")">
+        @if (Model.Section != null)
+        {
+            <input type="hidden" name="section" value="@Model.Section" />
+        }
+        <label class="analytics-search">@UiText.T(Context, "Search") <input type="search" name="search" value="@Model.Filter.Search" maxlength="100" placeholder="@UiText.T(Context, "Search names or reference numbers")" /></label>
+        <label>@UiText.T(Context, "From") <input type="date" name="from" value="@Model.Filter.From?.ToString("yyyy-MM-dd")" min="0001-01-02" max="9999-12-30" /></label>
+        <label>@UiText.T(Context, "To") <input type="date" name="to" value="@Model.Filter.To?.ToString("yyyy-MM-dd")" min="0001-01-02" max="9999-12-30" /></label>
+        <label>@UiText.T(Context, "Department")
+            <select name="departmentId">
+                <option value="">@UiText.T(Context, "All departments")</option>
+                @foreach (var option in Model.Departments)
+                {
+                    <option value="@option.Id" selected="@(option.Id == Model.Filter.DepartmentId)">@option.Name</option>
+                }
+            </select>
+        </label>
+        <label>@UiText.T(Context, "Supplier")
+            <select name="supplierId">
+                <option value="">@UiText.T(Context, "All suppliers")</option>
+                @foreach (var option in Model.Suppliers)
+                {
+                    <option value="@option.Id" selected="@(option.Id == Model.Filter.SupplierId)">@option.Name</option>
+                }
+            </select>
+        </label>
+        <label>@UiText.T(Context, "Tender status")
+            <select name="tenderStatus">
+                <option value="">@UiText.T(Context, "All tender statuses")</option>
+                @foreach (var status in Enum.GetValues<TenderStatus>())
+                {
+                    <option value="@status" selected="@(status == Model.Filter.TenderStatus)">@UiText.T(Context, ReportingService.Words(status.ToString()))</option>
+                }
+            </select>
+        </label>
+        @if (Model.Action == "PurchaseRequests" || Model.Filter.RequestStatus.HasValue)
+        {
+            <label>@UiText.T(Context, "Request status")
+                <select name="requestStatus">
+                    <option value="">@UiText.T(Context, "All request statuses")</option>
+                    @foreach (var status in Enum.GetValues<PurchaseRequestStatus>().Where(s => s is not (PurchaseRequestStatus.Accepted or PurchaseRequestStatus.ConvertedToTender)))
+                    {
+                        <option value="@status" selected="@(status == Model.Filter.RequestStatus)">@UiText.T(Context, ReportingService.Words(status.ToString()))</option>
+                    }
+                </select>
+            </label>
+        }
+        @if (Model.Action == "Suppliers" || Model.Filter.SupplierStatus.HasValue)
+        {
+            <label>@UiText.T(Context, "Supplier status")
+                <select name="supplierStatus">
+                    <option value="">@UiText.T(Context, "All supplier statuses")</option>
+                    @foreach (var status in Enum.GetValues<SupplierStatus>())
+                    {
+                        <option value="@status" selected="@(status == Model.Filter.SupplierStatus)">@UiText.T(Context, status.ToString())</option>
+                    }
+                </select>
+            </label>
+        }
+        @if (Model.Action == "Tenders" || Model.Filter.TenderScope != null)
+        {
+            <label>@UiText.T(Context, "Tender grouping")
+                <select name="tenderScope">
+                    <option value="">@UiText.T(Context, "All tenders")</option>
+                    <option value="closed" selected="@(Model.Filter.TenderScope == "closed")">@UiText.T(Context, "Closed to bidding")</option>
+                    <option value="closed-unawarded" selected="@(Model.Filter.TenderScope == "closed-unawarded")">@UiText.T(Context, "Closed without an award")</option>
+                    <option value="no-offers" selected="@(Model.Filter.TenderScope == "no-offers")">@UiText.T(Context, "No offers")</option>
+                    <option value="evaluation-delays" selected="@(Model.Filter.TenderScope == "evaluation-delays")">@UiText.T(Context, "Overdue evaluations")</option>
+                </select>
+            </label>
+        }
+        <div class="pg-actions analytics-filter-actions">
+            <button type="submit" class="pg-btn pg-btn-primary" data-analytics-apply>@UiText.T(Context, "Apply filters")</button>
+            <a asp-action="@Model.Action" asp-route-section="@Model.Section" class="pg-btn" data-analytics-clear>@UiText.T(Context, "Clear")</a>
+        </div>
+        <p class="analytics-filter-status" role="status" aria-atomic="true" data-analytics-status></p>
+    </form>
+</section>

@@ -5,17 +5,19 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Areas.SourcingManager.Controllers;
 
 [Area("SourcingManager")]
 [Authorize(Roles = SystemRoles.SourcingManager)]
-public sealed class AnalyticsController(ApplicationDbContext context) : Controller
+public sealed class AnalyticsController(ApplicationDbContext context, ReportAccessService reportAccess) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(string? search, string? status)
     {
+        if (!await reportAccess.CanReadAsync("governance", User, HttpContext.RequestAborted)) return Forbid();
         var model = await BuildModel(search, status);
         return View(model);
     }
@@ -23,6 +25,7 @@ public sealed class AnalyticsController(ApplicationDbContext context) : Controll
     [HttpGet]
     public async Task<IActionResult> Export(string? search, string? status)
     {
+        if (!await reportAccess.CanReadAsync("governance", User, HttpContext.RequestAborted)) return Forbid();
         var model = await BuildModel(search, status);
         var csv = new StringBuilder();
         csv.AppendLine("Tender,Report Version,Submitted By,Submitted At,Manager Decision,Reviewed At,Top Committee Status,Top Committee Decided At");

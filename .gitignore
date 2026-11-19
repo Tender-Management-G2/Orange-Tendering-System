@@ -494,6 +494,7 @@ Orange-Tendering-System/App_Data/SupplierUploads/
 
 # Protected tender uploads are operational data, never source assets.
 /Orange-Tendering-System/App_Data/TenderDocuments/
+/Orange-Tendering-System/App_Data/FinalContracts/
 # Generated PDF layout artifacts are reproducible, not production business records.
 /tmp/pdfs/
 /output/pdf/

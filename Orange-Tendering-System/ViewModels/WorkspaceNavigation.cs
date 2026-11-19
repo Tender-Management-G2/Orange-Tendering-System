@@ -138,7 +138,18 @@ namespace Orange_Tendering_System.ViewModels
             ["folder"] = "<path d=\"M3 6h7l2 3h9v11H3z\"/>",
             ["compare"] = "<path d=\"M8 3v18M16 3v18M3 8h5M16 16h5\"/>",
             ["report"] = "<path d=\"M12 3v9h9\"/><path d=\"M8 4a9 9 0 1 0 12 12\"/>",
-            ["radar"] = "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 12 19 5\"/><circle cx=\"16\" cy=\"9\" r=\"1\"/>"
+            ["radar"] = "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 12 19 5\"/><circle cx=\"16\" cy=\"9\" r=\"1\"/>",
+            ["unlock"] = "<rect x=\"5\" y=\"10\" width=\"14\" height=\"11\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8-1m-4 8v3\"/>",
+            ["lock"] = "<rect x=\"5\" y=\"10\" width=\"14\" height=\"11\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8 0v3m-4 4v3\"/>",
+            ["trend"] = "<path d=\"M3 19h18M5 15l5-5 4 3 6-7m-5 0h5v5\"/>",
+            ["dismiss"] = "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"m9 9 6 6m0-6-6 6\"/>",
+            ["award"] = "<circle cx=\"12\" cy=\"9\" r=\"6\"/><path d=\"m8 14-2 7 6-3 6 3-2-7m-6-5 1 1 3-3\"/>",
+            ["inbox"] = "<path d=\"M3 13 6 5h12l3 8v6H3zm0 0h5l2 3h4l2-3h5\"/>",
+            ["alert"] = "<path d=\"M12 3 2 20h20zm0 6v4m0 3v.1\"/>",
+            ["pause"] = "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M10 8v8m4-8v8\"/>",
+            ["search"] = "<circle cx=\"10\" cy=\"10\" r=\"5\"/><path d=\"m14 14 5 5\"/>",
+            ["calendar"] = "<rect x=\"4\" y=\"5\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M8 3v4m8-4v4M4 10h16m-8 3v3m0 2v.1\"/>",
+            ["return"] = "<path d=\"m9 5-5 5 5 5m-5-5h10a5 5 0 0 1 0 10h-2\"/>"
         };
 
         public static string Icon(string name) => Icons.TryGetValue(name, out var svg) ? svg : Icons["request"];

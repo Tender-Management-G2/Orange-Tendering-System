@@ -19,8 +19,8 @@ def sql(q):
 
 
 AUD = {"purchase-requests": ["Admin", "SourcingOfficer", "SourcingManager", "TopCommittee"], "tenders": ["Admin", "SourcingOfficer", "SourcingManager", "TopCommittee"],
-       "suppliers": ["Admin", "SourcingOfficer", "SourcingManager", "TopCommittee"], "evaluations": ["SourcingOfficer", "SourcingManager", "TopCommittee"],
-       "governance": ["Admin", "SourcingManager", "TopCommittee"], "management": ["TopCommittee"]}
+       "suppliers": ["Admin", "SourcingOfficer", "SourcingManager", "TopCommittee"], "evaluations": ["Admin", "SourcingOfficer", "SourcingManager", "TopCommittee"],
+       "governance": ["Admin", "SourcingManager", "TopCommittee"], "management": ["Admin", "TopCommittee"]}
 PATH = {"purchase-requests": "PurchaseRequests", "tenders": "Tenders", "suppliers": "Suppliers", "evaluations": "Evaluations", "governance": "Governance", "management": "Management"}
 
 proc = start_server()
@@ -48,14 +48,17 @@ try:
         for area in ("Admin", "SourcingOfficer", "SourcingManager", "TopCommittee"):
             c = ctx(); pg = c.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
             login(pg, area)
-            pg.goto(BASE + "/Analytics"); pg.wait_for_timeout(400)
-            listed = pg.locator(".pg-card span").all_inner_texts()
+            pg.goto(BASE + ("/Analytics" if area == "Admin" else "/Analytics/Catalog")); pg.wait_for_timeout(400)
+            listed = pg.locator(".analytics-report-grid .analytics-report-card strong").all_inner_texts()
             expected = [k for k, roles in AUD.items() if area in roles]
             check(len(listed) == len(expected), f"{area}: report index lists exactly the {len(expected)} reports of its role", str(listed))
             for key, roles in AUD.items():
                 r = pg.goto(BASE + "/Analytics/" + PATH[key]); pg.wait_for_timeout(250)
                 if area in roles:
-                    ok = r.status == 200 and "Download PDF" in pg.inner_text("main") and pg.locator("dl.ui-facts dd").count() >= 5
+                    header = pg.locator(".analytics-letterhead")
+                    ok = (r.status == 200 and "Download PDF" in pg.inner_text("main") and pg.locator(".analytics-summary-metrics dd").count() >= 3
+                          and header.count() == 1 and "Orange Jordan" in header.inner_text() and "Prepared by" in header.inner_text()
+                          and bool(header.locator("bdi").inner_text().strip()))
                     check(ok, f"{area}: {key} report opens with live KPIs and export buttons")
                 else:
                     check("AccessDenied" in pg.url or r.status == 403, f"{area}: {key} report is refused", pg.url.replace(BASE, ""))
@@ -65,16 +68,16 @@ try:
         # ---- numbers match SQL; exports are valid files ----
         c = ctx(); pg = c.new_page(); login(pg, "TopCommittee")
         pg.goto(BASE + "/Analytics/PurchaseRequests"); pg.wait_for_timeout(400)
-        facts = dict(zip(pg.locator("dl.ui-facts dt").all_text_contents(), pg.locator("dl.ui-facts dd").all_text_contents()))
+        facts = dict(zip(pg.locator(".analytics-summary-metrics dt").all_text_contents(), pg.locator(".analytics-summary-metrics dd").all_text_contents()))
         check(facts["Total requests"] == sql("SELECT COUNT(*) FROM PurchaseRequests"), "Purchase-request total equals SQL", str(facts))
         pg.screenshot(path=os.path.join(OUT, "Report-purchase-requests-dark.png"))
         pg.goto(BASE + "/Analytics/Tenders"); pg.wait_for_timeout(300)
-        facts = dict(zip(pg.locator("dl.ui-facts dt").all_text_contents(), pg.locator("dl.ui-facts dd").all_text_contents()))
+        facts = dict(zip(pg.locator(".analytics-summary-metrics dt").all_text_contents(), pg.locator(".analytics-summary-metrics dd").all_text_contents()))
         check(facts["Total tenders"] == sql("SELECT COUNT(*) FROM Tenders") and facts["Awarded"] == sql("SELECT COUNT(*) FROM Tenders WHERE Status='Awarded'"), "Tender totals and awarded count equal SQL")
         pg.screenshot(path=os.path.join(OUT, "Report-tenders-dark.png"))
-        pg.goto(BASE + "/TopCommittee/Statistics"); pg.wait_for_timeout(400)
-        facts = dict(zip(pg.locator("dl.ui-facts dt").all_text_contents(), pg.locator("dl.ui-facts dd").all_text_contents()))
-        check(facts["Registered suppliers"] == sql("SELECT COUNT(*) FROM Suppliers") and "Transactions with each supplier" in pg.inner_text("main"), "Top Committee statistics page: supplier counts and per-supplier transactions")
+        pg.goto(BASE + "/Analytics/Management"); pg.wait_for_timeout(400)
+        facts = dict(zip(pg.locator(".analytics-summary-metrics dt").all_text_contents(), pg.locator(".analytics-summary-metrics dd").all_text_contents()))
+        check(facts["Registered suppliers"] == sql("SELECT COUNT(*) FROM Suppliers") and "Awarded transactions by supplier" in pg.inner_text("main"), "Top Committee statistics page: supplier counts and per-supplier transactions")
         pg.screenshot(path=os.path.join(OUT, "TopCommittee-statistics-dark.png"))
         for key in AUD:
             if "TopCommittee" not in AUD[key]: continue
@@ -94,10 +97,11 @@ try:
         check(f">{sql('SELECT COUNT(*) FROM PurchaseRequests')}<" in s1 or f"<v>{sql('SELECT COUNT(*) FROM PurchaseRequests')}</v>" in s1, "Excel summary sheet contains the live request count")
         check(pg.request.get(BASE + "/Analytics/Export?key=purchase-requests&format=csv").status == 400, "Unknown export format refused")
         c.close()
-        # Admin cannot export evaluations / management via direct URL
+        # Admin can access and export every report category.
         c = ctx(); pa = c.new_page(); login(pa, "Admin")
         r1 = pa.request.get(BASE + "/Analytics/Export?key=evaluations&format=pdf", max_redirects=0); r2 = pa.request.get(BASE + "/Analytics/Export?key=management&format=xlsx", max_redirects=0)
-        check(r1.status in (302, 403) and r2.status in (302, 403), "Admin cannot export evaluation or management reports by URL", f"{r1.status}/{r2.status}")
+        check(r1.status == 200 and r1.body().startswith(b"%PDF") and r2.status == 200 and r2.body().startswith(b"PK"),
+              "Admin can export evaluation and management reports", f"{r1.status}/{r2.status}")
         pa.goto(BASE + "/Analytics"); pa.screenshot(path=os.path.join(OUT, "Reports-index-admin-dark.png")); c.close()
         # Supplier / Department have no access
         for area in ("Supplier", "Department"):

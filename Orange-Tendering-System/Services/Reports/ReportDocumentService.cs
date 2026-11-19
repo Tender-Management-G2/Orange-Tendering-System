@@ -60,6 +60,7 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
         try
         {
             using var json = JsonDocument.Parse(content);
+            if (json.RootElement.ValueKind != JsonValueKind.Object) return "Review the recommendation, source observations and audit record.";
             if (json.RootElement.TryGetProperty("TextualCorrection", out var correction))
             {
                 var original = json.RootElement.TryGetProperty("Justification", out var basis) ? basis.GetString() ?? "" :

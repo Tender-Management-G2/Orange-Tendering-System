@@ -1,0 +1,36 @@
+@model IReadOnlyList<AnalyticsOption>
+@{
+    Layout = "/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = "Add final contract";
+    ViewData["WorkspaceSection"] = "Reports & Analytics";
+}
+<partial name="_PageHeader" />
+<p><a class="pg-btn" asp-action="Governance">Approvals &amp; Decisions</a></p>
+@if (TempData["AnalyticsError"] is string error)
+{
+    <p class="pg-note" role="alert">@error</p>
+}
+<section class="ws-panel pg-panel">
+    @if (Model.Count == 0)
+    {
+        <p class="pg-hint">No awarded tenders are available.</p>
+    }
+    else
+    {
+        <form asp-action="AddContract" method="post" enctype="multipart/form-data" class="pg-form">
+            <div class="pg-form-grid">
+                <label>Awarded tender
+                    <select name="tenderId" required>
+                        <option value="">Select a tender</option>
+                        @foreach (var tender in Model)
+                        {
+                            <option value="@tender.Id">T-@tender.Id.ToString("0000") · @tender.Name</option>
+                        }
+                    </select>
+                </label>
+                <label>Signed contract PDF (up to 10 MB) <input type="file" name="pdf" accept=".pdf,application/pdf" required /></label>
+            </div>
+            <button type="submit" class="pg-btn pg-btn-primary">Save contract</button>
+        </form>
+    }
+</section>

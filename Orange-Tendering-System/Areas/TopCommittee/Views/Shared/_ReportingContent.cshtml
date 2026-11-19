@@ -16,6 +16,7 @@
 <div class="tc-reports">
 <header class="tc-report-head"><div class="tc-title-group"><div class="tc-title-icon" aria-hidden="true"><svg viewBox="0 0 42 42"><rect x="2" y="28" width="7" height="12"/><rect x="12" y="20" width="7" height="20"/><rect x="22" y="10" width="7" height="30"/><rect x="32" y="2" width="7" height="38"/></svg></div><div><h1>Full System Statistics</h1><p>Comprehensive reports and analytics for purchase requests, tenders, suppliers, bids, evaluations, and committee decisions.</p></div></div>
 <div class="tc-export">
+<a asp-area="" asp-controller="Analytics" asp-action="Management">Supplier award history</a>
 <a asp-controller="Statistics" asp-action="ExportPdf"><span style="color:#f43b3b"><partial name="_ReportIcon" model='"tenders"' /></span>Export PDF</a>
 <a asp-controller="Statistics" asp-action="ExportExcel"><span style="color:#168139"><partial name="_ReportIcon" model='"tenders"' /></span>Export Excel</a>
 </div></header>

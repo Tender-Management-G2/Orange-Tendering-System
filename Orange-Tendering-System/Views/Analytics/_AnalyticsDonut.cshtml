@@ -1,0 +1,61 @@
+@using System.Globalization
+@model (string Title, string Icon, string Action, AnalyticsFilter Filter, IReadOnlyList<AnalyticsBar> Points)
+@{
+    var total = Model.Points.Sum(point => point.Count);
+    var stops = new List<string>();
+    var start = 0m;
+    for (var index = 0; index < Model.Points.Count; index++)
+    {
+        if (Model.Points[index].Count == 0) continue;
+        var end = start + Model.Points[index].Count * 100m / total;
+        stops.Add($"var(--chart-color-{index % 6 + 1}) {start.ToString("0.###", CultureInfo.InvariantCulture)}% {end.ToString("0.###", CultureInfo.InvariantCulture)}%");
+        start = end;
+    }
+    var ringStyle = stops.Count == 0 ? "" : $"--analytics-ring:conic-gradient({string.Join(",", stops)})";
+}
+<section class="analytics-insight">
+    <header class="analytics-insight-head">
+        <h2><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon(Model.Icon))</svg>@UiText.T(Context, Model.Title)</h2>
+        @if (!string.IsNullOrEmpty(Model.Action))
+        {
+            <a asp-action="@Model.Action" asp-route-section="status" asp-all-route-data="Model.Filter.RouteValues()">@UiText.T(Context, "View details") <span class="analytics-link-arrow" aria-hidden="true">→</span></a>
+        }
+    </header>
+    @if (Model.Points.Count == 0)
+    {
+        <p class="analytics-insight-empty">@UiText.T(Context, "No matching records.")</p>
+    }
+    else
+    {
+    <div class="analytics-donut-layout">
+        <div class="analytics-donut" style="@ringStyle" aria-hidden="true">
+            <div><strong>@total</strong><span>@UiText.T(Context, "Total")</span></div>
+        </div>
+        <ul class="analytics-chart-legend">
+            @for (var index = 0; index < Model.Points.Count; index++)
+            {
+                var point = Model.Points[index];
+                var share = total == 0 ? "0%" : (point.Count * 100.0 / total).ToString("0.#", CultureInfo.InvariantCulture) + "%";
+                var color = $"--legend-color:var(--chart-color-{index % 6 + 1})";
+                Func<object?, Microsoft.AspNetCore.Html.IHtmlContent> content = @<text>
+                        <span class="analytics-legend-dot" aria-hidden="true"></span>
+                        <span>@UiText.T(Context, point.Label)</span>
+                        <bdi>@point.Count <small>(@share)</small></bdi>
+                    </text>;
+                <li style="@color">
+                    @if (string.IsNullOrEmpty(point.Action))
+                    {
+                        <div class="analytics-legend-item">@content(null)</div>
+                    }
+                    else
+                    {
+                        var route = Model.Filter.RouteValues();
+                        route[point.Parameter] = point.Selection;
+                        <a asp-action="@point.Action" asp-all-route-data="route">@content(null)</a>
+                    }
+                </li>
+            }
+        </ul>
+    </div>
+    }
+</section>

@@ -19,7 +19,7 @@
             <div class="pg-field"><label asp-for="CompletedDate">Completion date</label><input asp-for="CompletedDate" type="date" /><small class="pg-hint">Fill only when the work is completed.</small></div>
             <div class="pg-field pg-field-wide"><label asp-for="Notes">Notes / outcome</label><textarea asp-for="Notes" rows="3" maxlength="1000"></textarea></div>
         </div>
-        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save Maintenance</button><a class="pg-btn" asp-area="" asp-controller="Analytics" asp-action="Index">Cancel</a></div>
+        <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save Maintenance</button><a class="pg-btn" asp-area="" asp-controller="Analytics" asp-action="Maintenance">Cancel</a></div>
     </form>
 </section>
 @section Scripts { <partial name="_ValidationScriptsPartial" /> }

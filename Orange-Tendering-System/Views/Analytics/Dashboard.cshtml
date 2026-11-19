@@ -1,0 +1,21 @@
+@using Orange_Tendering_System.Services
+@model AnalyticsDashboardPage
+@{
+    Layout = "/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = UiText.T(Context, "Reports & Analytics");
+    ViewData["WorkspaceSection"] = "Reports & Analytics";
+    ViewData["Description"] = UiText.T(Context, "Track purchasing, tenders, and supplier performance.");
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/analytics.css" asp-append-version="true" />
+}
+@section Scripts {
+    <script src="~/js/admin-analytics.js" asp-append-version="true" defer></script>
+}
+<partial name="_PageHeader" />
+<div class="analytics-dashboard" data-analytics-page>
+    <div data-analytics-region="overview" data-analytics-live data-source="@Url.Action("DashboardData", "Analytics", new Microsoft.AspNetCore.Routing.RouteValueDictionary(Model.Filters.Filter.RouteValues().ToDictionary(pair => pair.Key, pair => (object?)pair.Value)))">
+        <partial name="_DashboardData" model="Model.Dashboard" />
+    </div>
+    <partial name="_ReportCatalog" model="((IReadOnlyList<ReportDefinition>)ReportingService.Catalog, Model.Filters.Filter, (AnalyticsFilterForm?)Model.Filters)" />
+</div>

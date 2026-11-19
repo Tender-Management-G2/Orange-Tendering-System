@@ -1,0 +1,32 @@
+@model IReadOnlyList<AnalyticsAccessRow>
+@{
+    Layout = "/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = "Report access";
+    ViewData["WorkspaceSection"] = "Reports & Analytics";
+    ViewData["Description"] = "Set which eligible roles may open or export each report in this workspace.";
+}
+<partial name="_PageHeader" />
+<p><a class="pg-btn" asp-action="Index">All reports</a></p>
+@if (TempData["AnalyticsMessage"] is string message)
+{
+    <p class="pg-note" role="status">@message</p>
+}
+<section class="ws-panel pg-panel">
+    <p class="pg-hint">Admin access is always enabled. A user with several eligible roles can open a report when any of their roles has access.</p>
+    <div class="pg-table-wrap"><table class="pg-table" data-no-enhance>
+        <thead><tr><th scope="col">Report</th><th scope="col">Role</th><th scope="col">Permission</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+        @foreach (var row in Model)
+        {
+            <tr>
+                <th scope="row">@row.Title</th><td>@row.Role</td><td>@(row.Allowed ? "Allowed" : "Blocked")</td>
+                <td><form asp-action="SetAccess" method="post">
+                    <input type="hidden" name="key" value="@row.Key" /><input type="hidden" name="role" value="@row.Role" />
+                    <input type="hidden" name="allowed" value="@(!row.Allowed ? "true" : "false")" />
+                    <button class="pg-btn" type="submit" aria-label="@(row.Allowed ? "Block" : "Allow") @row.Role for @row.Title">@(row.Allowed ? "Block" : "Allow")</button>
+                </form></td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</section>

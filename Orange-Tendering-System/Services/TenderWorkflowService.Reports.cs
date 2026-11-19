@@ -64,13 +64,25 @@ public partial class TenderWorkflowService
             .OrderByDescending(x => x.VersionNumber).Select(x => new TenderReport { Id = x.Id, VersionNumber = x.VersionNumber, Status = x.Status, CreatedAt = x.CreatedAt, SupersededAt = x.SupersededAt }).ToListAsync();
         return result;
     }
-    public async Task<ProtectedReportCopy> ReportPdf(int reportId, ClaimsPrincipal principal, bool download = false)
+    public Task<ProtectedReportCopy> ReportPdf(int reportId, ClaimsPrincipal principal, bool download = false) =>
+        CreateReportAccessCopy(reportId, principal, download, adminAnalytics: false);
+
+    public Task<ProtectedReportCopy> AdminEvaluationPdf(int reportId, ClaimsPrincipal principal) =>
+        CreateReportAccessCopy(reportId, principal, download: true, adminAnalytics: true);
+
+    private async Task<ProtectedReportCopy> CreateReportAccessCopy(int reportId, ClaimsPrincipal principal, bool download, bool adminAnalytics)
     {
         var tenderId = await db.TenderReports.Where(x => x.Id == reportId).Select(x => x.TenderRound.TenderId).SingleOrDefaultAsync();
         ProtectedReportCopy? copy = null;
         await Change(tenderId, principal, download ? "ReportPdfDownloaded" : "ReportPdfAccessed", async (tender, actor) =>
         {
-            await ReportReader(tender, actor); var (report, session) = await ReportContext(reportId);
+            if (adminAnalytics)
+                Require(await Role(actor, SystemRoles.Admin) && !await Role(actor, SystemRoles.Supplier), "Only an administrator can download this analytics document.");
+            else
+                await ReportReader(tender, actor);
+            var (report, session) = await ReportContext(reportId);
+            if (adminAnalytics)
+                Require(report.ReportType == ReportType.FullEvaluation && report.SubmittedAt != null, "Only a submitted unified evaluation report can be downloaded here.");
             var bytes = await reportDocuments.AccessCopy(report, session, actor, Now);
             copy = new(bytes, $"Orange-Tender-{tender.Id}-Report-v{report.VersionNumber}.pdf", report.PdfSha256!, ReportCryptography.Hash(bytes));
             db.AuditLogs.Add(new AuditLog { UserId = actor.Id, EntityName = "TenderReport", EntityId = reportId.ToString(), Action = "ProtectedReportViewed", CreatedAt = Now,

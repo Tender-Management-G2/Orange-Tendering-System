@@ -1,0 +1,29 @@
+@model (IReadOnlyList<Orange_Tendering_System.Services.ReportDefinition> Reports, AnalyticsFilter Filter, AnalyticsFilterForm? FilterForm)
+<section class="ws-panel pg-panel analytics-catalog" id="analytics-reports" aria-labelledby="analytics-reports-title">
+    <div class="analytics-insight-head analytics-catalog-title">
+        <h2 id="analytics-reports-title"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("request"))</svg>@UiText.T(Context, "All reports")</h2>
+    </div>
+    @if (Model.FilterForm != null)
+    {
+        <partial name="_AnalyticsFilters" model="Model.FilterForm" />
+    }
+    @if (Model.Reports.Count == 0)
+    {
+        <p class="pg-hint">@UiText.T(Context, "There are no reports available for your roles.")</p>
+    }
+    <div class="analytics-report-grid" data-analytics-region="catalog">
+        @foreach (var report in Model.Reports)
+        {
+            <a class="analytics-report-card" data-report="@report.Key" asp-controller="Analytics" asp-action="@report.Action" asp-all-route-data="Model.Filter.RouteValues()">
+                <span class="analytics-report-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon(report.Icon))</svg>
+                </span>
+                <strong>@UiText.T(Context, report.Title)</strong>
+                <span class="analytics-report-summary">@UiText.T(Context, report.Summary)</span>
+                <span class="analytics-report-arrow" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>
+                </span>
+            </a>
+        }
+    </div>
+</section>
