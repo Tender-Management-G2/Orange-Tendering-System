@@ -1,0 +1,189 @@
+@using System.Globalization
+@model AnalyticsDashboard
+@{
+    Func<(AnalyticsMetric Metric, string Icon), Microsoft.AspNetCore.Html.IHtmlContent> metricContent = @<text>
+        <span class="analytics-metric-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon(item.Icon))</svg>
+        </span>
+        <span class="analytics-metric-copy">
+            <strong><bdi>@item.Metric.Value</bdi></strong>
+            <span>@UiText.T(Context, item.Metric.Label)</span>
+        </span>
+    </text>;
+    var filterRoute = Model.Filter.RouteValues();
+    var summaryExport = new Dictionary<string, string>(filterRoute) { ["key"] = "dashboard", ["format"] = "pdf" };
+    var spreadsheetExport = new Dictionary<string, string>(summaryExport) { ["format"] = "xlsx" };
+    var monthCulture = UiText.IsArabic(Context) ? CultureInfo.GetCultureInfo("ar-JO") : CultureInfo.InvariantCulture;
+    var peak = Math.Max(.01, Model.ApprovalMonths.Select(month => month.AverageDays ?? 0).DefaultIfEmpty().Max());
+    var dots = Model.ApprovalMonths.Select((month, index) => new
+    {
+        X = 12d + 276d * index / Math.Max(1, Model.ApprovalMonths.Count - 1),
+        Y = 102d - 82d * (month.AverageDays ?? 0) / peak,
+        Period = month.Month.ToString("MMM", monthCulture),
+        month.AverageDays
+    }).ToArray();
+    var path = new System.Text.StringBuilder();
+    var connected = false;
+    foreach (var dot in dots)
+    {
+        if (!dot.AverageDays.HasValue)
+        {
+            connected = false;
+            continue;
+        }
+        path.Append(connected ? "L" : "M").Append(dot.X.ToString("0.##", CultureInfo.InvariantCulture)).Append(' ')
+            .Append(dot.Y.ToString("0.##", CultureInfo.InvariantCulture)).Append(' ');
+        connected = true;
+    }
+    var maximumBar = Math.Max(1, Model.Departments.Select(d => d.Count).DefaultIfEmpty().Max());
+    var supplierMax = Math.Max(1, Model.TopSuppliers.Select(s => s.Awards).DefaultIfEmpty().Max());
+}
+<div class="analytics-live-heading">
+    <nav class="analytics-dashboard-admin" aria-label="@UiText.T(Context, "Report administration")">
+        <a asp-action="Access">@UiText.T(Context, "Manage report access")</a>
+        <a asp-action="Contracts">@UiText.T(Context, "Add final contract")</a>
+    </nav>
+    <p class="analytics-freshness">
+        <span class="analytics-live-dot" aria-hidden="true"></span>
+        @UiText.T(Context, "Updated")
+        <time datetime="@DateTime.SpecifyKind(Model.GeneratedAt, DateTimeKind.Utc).ToString("O")">@Model.GeneratedAt.ToJordan("dd MMM yyyy · HH:mm")</time>
+    </p>
+</div>
+<div class="analytics-metrics">
+    @foreach (var metric in Model.Metrics)
+    {
+        var appearance = AnalyticsMetricAppearance.For(metric.Label, metric.Icon);
+        var route = new Dictionary<string, string>(filterRoute);
+        if (metric.Parameter != null && metric.Selection != null) route[metric.Parameter] = metric.Selection;
+        if (metric.Parameter == "tenderStatus" && Model.Filter.TenderStatus?.ToString() != metric.Selection && Model.Filter.TenderStatus.HasValue)
+        {
+            <div class="analytics-metric" data-metric-color="@appearance.Color">@metricContent((metric, appearance.Icon))</div>
+        }
+        else
+        {
+            <a class="analytics-metric" data-metric-color="@appearance.Color" asp-action="@metric.Action" asp-all-route-data="route" title="@(metric.Label == "Approval rate" ? UiText.T(Context, "Approved out of approved and rejected requests") : null)">
+                @metricContent((metric, appearance.Icon))
+            </a>
+        }
+    }
+</div>
+<div class="analytics-visuals">
+    <partial name="_AnalyticsDonut" model='("Purchase requests by status", "report", "PurchaseRequests", Model.Filter, Model.RequestStatuses)' />
+    <partial name="_AnalyticsDonut" model='("Tenders overview", "tender", "Tenders", Model.Filter, Model.TenderStatuses)' />
+    <section class="analytics-insight analytics-approval">
+        <header class="analytics-insight-head">
+            <h2><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("history"))</svg>@UiText.T(Context, "Average approval duration")</h2>
+            <a asp-action="PurchaseRequests" asp-route-section="review-history" asp-all-route-data="filterRoute">@UiText.T(Context, "View details") <span class="analytics-link-arrow" aria-hidden="true">→</span></a>
+        </header>
+        <div class="analytics-approval-body">
+            <div class="analytics-duration">
+                <strong><bdi>@(Model.AverageApprovalDays?.ToString("0.##", CultureInfo.InvariantCulture) ?? "—")</bdi></strong>
+                <span>@UiText.T(Context, "Days to approve")</span>
+            </div>
+            @if (dots.Any(dot => dot.AverageDays.HasValue))
+            {
+                <figure class="analytics-trend" dir="ltr">
+                    <svg viewBox="0 0 300 116" role="img" aria-label="@UiText.T(Context, "Monthly average approval duration in days")">
+                        <path class="analytics-trend-grid" d="M12 20H288M12 47H288M12 74H288M12 102H288" />
+                        <path class="analytics-trend-line" d="@path.ToString()" />
+                        @foreach (var dot in dots.Where(item => item.AverageDays.HasValue))
+                        {
+                            <circle cx="@dot.X.ToString("0.##", CultureInfo.InvariantCulture)" cy="@dot.Y.ToString("0.##", CultureInfo.InvariantCulture)" r="3.6">
+                                <title>@dot.Period · @dot.AverageDays!.Value.ToString("0.##", CultureInfo.InvariantCulture) @UiText.T(Context, "days")</title>
+                            </circle>
+                        }
+                    </svg>
+                    <figcaption>
+                        @foreach (var dot in dots)
+                        {
+                            <span>@dot.Period</span>
+                        }
+                    </figcaption>
+                </figure>
+            }
+            else
+            {
+                <p class="analytics-insight-empty">@UiText.T(Context, "No approvals in the displayed months.")</p>
+            }
+        </div>
+    </section>
+</div>
+<div class="analytics-operations">
+    <section class="analytics-insight">
+        <header class="analytics-insight-head">
+            <h2><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg>@UiText.T(Context, "Top suppliers by awards")</h2>
+            <a asp-action="Management" asp-route-section="supplier-awards" asp-all-route-data="filterRoute">@UiText.T(Context, "View details") <span class="analytics-link-arrow" aria-hidden="true">→</span></a>
+        </header>
+        @if (Model.TopSuppliers.Count == 0)
+        {
+            <p class="analytics-insight-empty">@UiText.T(Context, "No awarded tenders match these filters.")</p>
+        }
+        else
+        {
+            <div class="analytics-supplier-scroll">
+                <table class="analytics-supplier-table" data-no-enhance>
+                    <thead><tr><th scope="col">@UiText.T(Context, "Supplier")</th><th scope="col">@UiText.T(Context, "Awards")</th><th scope="col">@UiText.T(Context, "Share")</th></tr></thead>
+                    <tbody>
+                        @foreach (var supplier in Model.TopSuppliers)
+                        {
+                            var route = new Dictionary<string, string>(filterRoute)
+                            {
+                                ["supplierId"] = supplier.SupplierId.ToString(CultureInfo.InvariantCulture), ["section"] = "supplier-awards"
+                            };
+                            var share = (supplier.Awards * 100d / Model.TotalSupplierAwards).ToString("0.#", CultureInfo.InvariantCulture) + "%";
+                            var width = (supplier.Awards * 100d / supplierMax).ToString("0.#", CultureInfo.InvariantCulture) + "%";
+                            <tr>
+                                <th scope="row"><a asp-action="Management" asp-all-route-data="route">@supplier.Name</a></th>
+                                <td><bdi>@supplier.Awards</bdi><span class="analytics-bar" aria-hidden="true"><i style="width:@width"></i></span></td>
+                                <td><bdi>@share</bdi></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+    <section class="analytics-insight">
+        <header class="analytics-insight-head">
+            <h2><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("building"))</svg>@UiText.T(Context, "Tenders by department")</h2>
+            <a asp-action="Tenders" asp-all-route-data="filterRoute">@UiText.T(Context, "View details") <span class="analytics-link-arrow" aria-hidden="true">→</span></a>
+        </header>
+        @if (Model.Departments.Count == 0)
+        {
+            <p class="analytics-insight-empty">@UiText.T(Context, "No matching records.")</p>
+        }
+        else
+        {
+            <div class="analytics-dept-scroll">
+                <div class="analytics-dept-chart" style="--department-count:@Model.Departments.Count">
+                    @foreach (var department in Model.Departments)
+                    {
+                        var route = new Dictionary<string, string>(filterRoute) { [department.Parameter] = department.Selection };
+                        var barHeight = (department.Count * 100d / maximumBar).ToString("0.#", CultureInfo.InvariantCulture) + "%";
+                        <a class="analytics-dept-column" asp-action="@department.Action" asp-all-route-data="route" title="@department.Label">
+                            <span class="analytics-dept-plot"><span class="analytics-dept-bar" style="--bar-height:@barHeight"><bdi>@department.Count</bdi></span></span>
+                            <span class="analytics-dept-name">@department.Label</span>
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+    </section>
+    <nav class="analytics-insight analytics-quick-actions" aria-label="@UiText.T(Context, "Quick actions")">
+        <header class="analytics-insight-head"><h2><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg>@UiText.T(Context, "Quick actions")</h2></header>
+        <div class="analytics-quick-links">
+            <a href="#analytics-reports"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chart"))</svg>@UiText.T(Context, "Browse reports")</a>
+            <a asp-action="Export" asp-all-route-data="spreadsheetExport" data-no-modal><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>@UiText.T(Context, "Export overview to Excel")</a>
+            <a asp-action="Export" asp-all-route-data="summaryExport" data-no-modal><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>@UiText.T(Context, "Export overview to PDF")</a>
+            <a href="#analytics-filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>@UiText.T(Context, "Filters")</a>
+        </div>
+        <div class="analytics-quick-followups">
+            @foreach (var followup in Model.Followups)
+            {
+                var route = new Dictionary<string, string>(filterRoute);
+                if (followup.Parameter != null && followup.Selection != null) route[followup.Parameter] = followup.Selection;
+                <a asp-action="@followup.Action" asp-all-route-data="route"><span>@UiText.T(Context, followup.Label)</span><bdi>@followup.Value</bdi></a>
+            }
+        </div>
+    </nav>
+</div>

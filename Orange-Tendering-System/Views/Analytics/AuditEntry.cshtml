@@ -1,0 +1,24 @@
+@model Orange_Tendering_System.Models.Entities.AuditLog
+@{
+    Layout = "/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = $"Audit entry #{Model.Id}";
+    ViewData["WorkspaceSection"] = "Reports & Analytics";
+}
+<partial name="_PageHeader" />
+<p><a class="pg-btn" asp-action="Governance" asp-route-section="audit-trail" asp-fragment="report-sections">@UiText.T(Context, "Audit trail")</a></p>
+<section class="ws-panel pg-panel">
+    <dl class="ui-facts">
+        <div><dt>Time (Jordan)</dt><dd>@Model.CreatedAt.ToJordan("yyyy-MM-dd HH:mm:ss")</dd></div>
+        <div><dt>Action</dt><dd>@Model.Action</dd></div>
+        <div><dt>User</dt><dd>@(Model.User?.FullName ?? Model.UserId ?? "System")</dd></div>
+        <div><dt>Record</dt><dd>@Model.EntityName @Model.EntityId</dd></div>
+    </dl>
+    @if (!string.IsNullOrWhiteSpace(Model.OldValues))
+    {
+        <h2>Previous values</h2><pre style="white-space:pre-wrap;overflow-wrap:anywhere">@Model.OldValues</pre>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.NewValues))
+    {
+        <h2>Recorded values</h2><pre style="white-space:pre-wrap;overflow-wrap:anywhere">@Model.NewValues</pre>
+    }
+</section>

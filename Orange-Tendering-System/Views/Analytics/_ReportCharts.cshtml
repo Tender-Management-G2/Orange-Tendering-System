@@ -1,0 +1,39 @@
+@using System.Globalization
+@model Orange_Tendering_System.Services.ReportModel
+@{
+    var charts = AnalyticsReportCharts.Create(Model);
+    var comparison = charts.Comparison.Where(point => point.Count > 0).OrderByDescending(point => point.Count)
+        .ThenBy(point => point.Label).Take(6).ToArray();
+    var maximum = comparison.FirstOrDefault()?.Count ?? 1;
+    var distribution = Model.Key == "purchase-requests" ? charts.Distribution : charts.Distribution.Where(point => point.Count > 0).ToArray();
+    var approvalTime = Model.Key == "purchase-requests" ? Model.Kpis.Single(kpi => kpi.Label == "Average submission-to-approval time") : null;
+}
+<div class="analytics-report-charts" data-analytics-region="charts">
+    <partial name="_AnalyticsDonut" model='(charts.DistributionTitle, "report", "", Model.Filter, distribution)' />
+    <section class="analytics-insight">
+        <header class="analytics-insight-head">
+            <h2><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chart"))</svg>@UiText.T(Context, charts.ComparisonTitle)</h2>
+        </header>
+        @if (comparison.Length == 0)
+        {
+            <p class="analytics-insight-empty">@UiText.T(Context, "No matching records.")</p>
+        }
+        else
+        {
+            <ol class="analytics-report-plot analytics-dept-chart" style="--department-count:@comparison.Length">
+                @foreach (var point in comparison)
+                {
+                    var height = (100d * point.Count / maximum).ToString("0.##", CultureInfo.InvariantCulture);
+                    <li class="analytics-dept-column">
+                        <span class="analytics-dept-plot"><span class="analytics-dept-bar" style="--bar-height:@(height)%"><bdi>@point.Count</bdi></span></span>
+                        <span class="analytics-dept-name">@UiText.T(Context, point.Label)</span>
+                    </li>
+                }
+            </ol>
+        }
+        @if (approvalTime != null)
+        {
+            <p class="analytics-chart-metric">@UiText.T(Context, approvalTime.Label) <strong><bdi>@approvalTime.Value</bdi></strong></p>
+        }
+    </section>
+</div>

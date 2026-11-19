@@ -1,18 +1,12 @@
-@model List<(string Key, string Title, string Description)>
+@using Orange_Tendering_System.Services
+@model IReadOnlyList<ReportDefinition>
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
-    ViewData["Title"] = "Reports & Analytics"; ViewData["WorkspaceSection"] = "Analytics & Exports";
-    ViewData["Description"] = "Reports calculated live from the system records, with PDF and Excel export. You see only the reports your role may open.";
-    var actionFor = new Dictionary<string, string> { ["purchase-requests"] = "PurchaseRequests", ["tenders"] = "Tenders", ["suppliers"] = "Suppliers", ["evaluations"] = "Evaluations", ["governance"] = "Governance", ["management"] = "Management" };
+    ViewData["Title"] = "Reports & Analytics";
+    ViewData["WorkspaceSection"] = "Analytics & Exports";
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/analytics.css" asp-append-version="true" />
 }
 <partial name="_PageHeader" />
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>Available reports</h2></div>
-    <div class="pg-cards">
-        @foreach (var r in Model)
-        {
-            <a class="pg-card" asp-controller="Analytics" asp-action="@actionFor[r.Key]"><span>@r.Title</span><strong style="font-size:15px">@r.Description</strong><small>Open report · export PDF / Excel</small></a>
-        }
-    </div>
-    @if (User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Admin)) { <p><a class="pg-btn" asp-area="Admin" asp-controller="AuditLogs" asp-action="Index">Audit logs</a></p> }
-</section>
+<partial name="_ReportCatalog" model="(Model, new AnalyticsFilter(), (AnalyticsFilterForm?)null)" />

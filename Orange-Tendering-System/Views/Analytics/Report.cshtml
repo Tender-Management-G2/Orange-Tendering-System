@@ -1,8 +1,67 @@
-@model Orange_Tendering_System.Services.ReportModel
+@using System.Globalization
+@using Orange_Tendering_System.Services
+@model AnalyticsReportPage
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
-    ViewData["Title"] = Model.Title; ViewData["WorkspaceSection"] = "Analytics & Exports"; ViewData["Description"] = Model.Description;
+    var definition = ReportingService.Catalog.Single(report => report.Key == Model.Report.Key);
+    ViewData["Title"] = UiText.T(Context, definition.Title);
+    ViewData["WorkspaceSection"] = "Analytics & Exports";
+    ViewData["Description"] = UiText.T(Context, definition.Summary);
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/analytics.css" asp-append-version="true" />
+}
+@section Scripts {
+    <script src="~/js/admin-analytics.js" asp-append-version="true" defer></script>
 }
 <partial name="_PageHeader" />
+<div class="analytics-detail" data-analytics-page>
+@if (Model.Report.Header is { } header)
+{
+    var generatedAt = DateTime.SpecifyKind(Model.Report.GeneratedAt, DateTimeKind.Utc);
+    <section class="ws-panel analytics-insight analytics-letterhead" data-analytics-region="letterhead" aria-label="@UiText.T(Context, "Report information")">
+        <div class="analytics-letterhead-brand">
+            <span class="analytics-letterhead-logo" dir="ltr" aria-hidden="true">orange</span>
+            <div>
+                <strong>@UiText.T(Context, AnalyticsReportHeader.CompanyName)</strong>
+                <p>@UiText.T(Context, AnalyticsReportHeader.CompanyAddress)</p>
+                <a href="@AnalyticsReportHeader.WebsiteUrl" dir="ltr">@AnalyticsReportHeader.Website</a>
+            </div>
+        </div>
+        <dl class="analytics-letterhead-meta">
+            <div>
+                <dt>@UiText.T(Context, "Prepared by")</dt>
+                <dd><bdi>@header.PreparedBy</bdi></dd>
+                @if (header.Roles.Count > 0)
+                {
+                    <dd class="analytics-letterhead-role">@string.Join(" · ", header.Roles.Select(role => UiText.T(Context, role)))</dd>
+                }
+            </div>
+            <div>
+                <dt>@UiText.T(Context, "Generated")</dt>
+                <dd><time dir="ltr" datetime="@generatedAt.ToString("O", CultureInfo.InvariantCulture)">@generatedAt.ToJordan("yyyy-MM-dd HH:mm")</time></dd>
+                <dd class="analytics-letterhead-role">@UiText.T(Context, "Jordan time")</dd>
+            </div>
+        </dl>
+    </section>
+}
+@if (TempData["AnalyticsMessage"] is string message)
+{
+    <p class="pg-note" role="status">@message</p>
+}
+<nav class="analytics-detail-nav" data-analytics-region="navigation" aria-label="@UiText.T(Context, "Report sections")">
+    <a asp-action="@(User.IsInRole(SystemRoles.Admin) ? "Index" : "Catalog")" asp-all-route-data="Model.Report.Filter.RouteValues()">
+        <span class="analytics-link-arrow" aria-hidden="true">←</span> @UiText.T(Context, "All reports")
+    </a>
+    @if (Model.Report.Tables.Count > 0)
+    {
+        <a href="#report-sections">@UiText.T(Context, "Report sections")</a>
+    }
+    @if (Model.Report.Key == "governance" && User.IsInRole(SystemRoles.Admin))
+    {
+        <a asp-action="Contracts">@UiText.T(Context, "Add final contract")</a>
+        <a asp-area="Admin" asp-controller="AuditLogs" asp-action="Index">@UiText.T(Context, "Open audit logs")</a>
+    }
+</nav>
 <partial name="_ReportBody" model="Model" />
-<p><a class="pg-btn" asp-action="Index">All reports</a></p>
+</div>

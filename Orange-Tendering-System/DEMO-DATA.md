@@ -62,6 +62,19 @@ versions keep their historical rows and accounts (`officer@`, `committee1@`, `to
 Each supplier must enroll a face or passkey through the normal supplier setup before entering the protected supplier
 workspace. Top Committee members vote on a tender only after an Admin assigns the four seats for that tender.
 
+## Admin reports demo
+
+After starting the local team profile, run from the solution folder to add the reporting fixtures.
+
+~~~powershell
+$env:DEMO_SEED_CONNECTION = 'Server=localhost;Database=OrangeTenderingTeamDev;Trusted_Connection=True;TrustServerCertificate=True'
+dotnet run --project Orange-Tendering-System/Tests/DemoDataSeeder -- --analytics
+~~~
+
+In **Reports & Analytics**, search for **DEMO Analytics**. The fixtures include six tenders, an evaluation past its
+deadline, an excluded offer, expiring supplier documents and a downloadable fictional contract. In **Top Committee
+Statistics**, Atlas Networks shows two awards. The seed can be run again without duplicating the examples.
+
 ## Tests
 
 - `dotnet Tests/AuthSmoke/bin/Release/net10.0/AuthSmoke.dll --team-account-checks` — real SQL Server, provisioning on:

@@ -11,6 +11,8 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Services;
 public static class TopCommitteeCompatibility
 {
     public const CommitteeType LegacyTop = (CommitteeType)1001;
+    internal const TenderStatus LegacyTopReview = (TenderStatus)1001;
+    internal const ReportType LegacyUnifiedEvaluation = (ReportType)1001;
 
     public static DbContextOptions<ApplicationDbContext> Options(DbContextOptions<ApplicationDbContext> original) =>
         new DbContextOptionsBuilder<ApplicationDbContext>(original)
@@ -26,9 +28,9 @@ public static class TopCommitteeCompatibility
             new ValueConverter<CommitteeResponsibility?, string?>(
                 value => value.HasValue ? value.Value.ToString() : null, value => ReadResponsibility(value)));
         builder.Entity<Tender>().Property(t => t.Status).HasConversion(new ValueConverter<TenderStatus, string>(
-            value => value.ToString(), value => ReadTenderStatus(value)));
+            value => value == LegacyTopReview ? "Awaiting Committee Decision" : value.ToString(), value => ReadTenderStatus(value)));
         builder.Entity<TenderReport>().Property(r => r.ReportType).HasConversion(new ValueConverter<ReportType, string>(
-            value => value.ToString(), value => ReadReportType(value)));
+            value => value == LegacyUnifiedEvaluation ? "UnifiedEvaluation" : value.ToString(), value => ReadReportType(value)));
     }
 
     public static string CommitteeStorage(CommitteeType value) => value == LegacyTop ? "TopCommittee" : value.ToString();

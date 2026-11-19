@@ -7,6 +7,11 @@ using Orange_Tendering_System.Services;
 
 var connection = Environment.GetEnvironmentVariable("DEMO_SEED_CONNECTION")
     ?? throw new InvalidOperationException("Set DEMO_SEED_CONNECTION to the intended local database.");
+if (args.SequenceEqual(new[] { "--analytics" }))
+{
+    await AnalyticsDemoSeed.RunAsync(connection);
+    return;
+}
 var password = Environment.GetEnvironmentVariable("DEMO_MANAGER_PASSWORD")
     ?? throw new InvalidOperationException("Set DEMO_MANAGER_PASSWORD for the demo accounts.");
 var reset = string.Equals(Environment.GetEnvironmentVariable("RESET_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase);

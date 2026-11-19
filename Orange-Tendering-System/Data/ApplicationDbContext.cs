@@ -9,6 +9,8 @@ namespace Orange_Tendering_System.Data
         public DbSet<ExecutiveAgentRun> ExecutiveAgentRuns => Set<ExecutiveAgentRun>();
         public DbSet<ExecutiveAgentAction> ExecutiveAgentActions => Set<ExecutiveAgentAction>();
         public DbSet<AdminMaintenancePlan> AdminMaintenancePlans => Set<AdminMaintenancePlan>();
+        public DbSet<ReportRoleAccess> ReportRoleAccess => Set<ReportRoleAccess>();
+        public DbSet<FinalTenderContract> FinalTenderContracts => Set<FinalTenderContract>();
 
         // Organization
         public DbSet<Department> Departments => Set<Department>();

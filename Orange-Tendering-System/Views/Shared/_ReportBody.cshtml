@@ -1,23 +1,194 @@
-@model Orange_Tendering_System.Services.ReportModel
-@* Shared report renderer: the page, the Excel file and the PDF all use the same ReportModel computed from live SQL data. *@
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">@Model.Description · generated @Model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</span></div>
-        <div class="pg-actions"><a class="pg-btn pg-btn-primary" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "pdf" })">Download PDF</a>
-            <a class="pg-btn" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "xlsx" })">Download Excel</a></div></div>
-    <dl class="ui-facts">
-        @foreach (var k in Model.Kpis) { <div><dt>@k.Label</dt><dd><strong style="font-size:22px">@k.Value</strong></dd></div> }
+@using System.Globalization
+@model AnalyticsReportPage
+@{
+    const int pageSize = 40;
+    const string sectionsAnchor = "report-sections";
+    var report = Model.Report;
+    var definition = Orange_Tendering_System.Services.ReportingService.Catalog.Single(item => item.Key == report.Key);
+    var exportPdf = report.Filter.RouteValues();
+    exportPdf["key"] = report.Key;
+    exportPdf["format"] = "pdf";
+    var exportExcel = new Dictionary<string, string>(exportPdf) { ["format"] = "xlsx" };
+    var metrics = report.Kpis.ToList();
+    var shares = new Dictionary<string, string>();
+    if (report.Key == "purchase-requests")
+    {
+        var status = report.Tables.Single(item => item.Key == "status");
+        metrics.RemoveAll(kpi => kpi.Label == "Average submission-to-approval time");
+        metrics.AddRange(status.Rows.Where(row => row[0] is "Under Review" or "Rejected")
+            .Select(row => new Orange_Tendering_System.Services.ReportKpi(row[0], row[1])));
+        shares = status.Rows.ToDictionary(row => row[0], row => row[2]);
+    }
+    string Tone(string value) => value.ToLowerInvariant() switch
+    {
+        "approved" or "accepted" or "awarded" or "compliant" or "verified" => "positive",
+        "rejected" or "non compliant" or "suspended" or "cancelled" => "negative",
+        "under review" or "pending" or "returned" or "pending clarification" or "evaluation" => "warning",
+        _ => "neutral"
+    };
+}
+<section class="ws-panel analytics-insight analytics-report-filters" aria-labelledby="analytics-report-filters-title">
+    <div class="analytics-insight-head">
+        <h2 id="analytics-report-filters-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>@UiText.T(Context, "Filters")</h2>
+    </div>
+    <p class="analytics-date-basis">@UiText.T(Context, definition.DateBasis)</p>
+    <partial name="~/Views/Analytics/_AnalyticsFilters.cshtml" model="Model.Filters" />
+</section>
+<section class="analytics-report-metrics" data-analytics-region="summary" aria-label="@UiText.T(Context, "Report summary")">
+    <dl class="analytics-metrics">
+        @for (var index = 0; index < metrics.Count; index++)
+        {
+            var kpi = metrics[index];
+            var appearance = AnalyticsMetricAppearance.For(kpi.Label, definition.Icon);
+            <div class="analytics-metric" data-metric-color="@appearance.Color">
+                <span class="analytics-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon(appearance.Icon))</svg></span>
+                <dt>@UiText.T(Context, kpi.Label)</dt>
+                <dd><bdi dir="ltr">@kpi.Value</bdi>@if (shares.TryGetValue(kpi.Label, out var share) && share != "—")
+                    { <small><bdi dir="ltr">@share</bdi></small> }</dd>
+            </div>
+        }
     </dl>
 </section>
-@foreach (var t in Model.Tables)
+<partial name="~/Views/Analytics/_ReportCharts.cshtml" model="report" />
+@if (report.Tables.Count > 0)
 {
-    <section class="ws-panel pg-panel">
-        <div class="pg-panel-head"><h2>@t.Title</h2></div>
-        <div class="pg-table-wrap"><table class="pg-table">
-            <thead><tr>@foreach (var c in t.Columns) { <th scope="col">@c</th> }</tr></thead>
-            <tbody>
-            @foreach (var row in t.Rows) { <tr>@foreach (var cell in row) { <td>@cell</td> }</tr> }
-            @if (t.Rows.Count == 0) { <tr><td colspan="@t.Columns.Length"><partial name="_EmptyState" model='"No records yet."' /></td></tr> }
-            </tbody>
-        </table></div>
-    </section>
+    var table = report.Tables[Model.Table];
+    var filter = report.Filter.RouteValues();
+    var selection = new Dictionary<string, string>(filter) { ["section"] = table.Key };
+    var pages = Math.Max(1, (int)Math.Ceiling(table.Rows.Count / (double)pageSize));
+    var current = Math.Clamp(Model.Page, 1, pages);
+    var start = (current - 1) * pageSize;
+    var end = Math.Min(start + pageSize, table.Rows.Count);
+    var links = table.Links.Where(link => link.Row >= start && link.Row < end).ToDictionary(link => (link.Row, link.Column));
+    var previous = new Dictionary<string, string>(selection) { ["tablePage"] = (current - 1).ToString(CultureInfo.InvariantCulture) };
+    var next = new Dictionary<string, string>(selection) { ["tablePage"] = (current + 1).ToString(CultureInfo.InvariantCulture) };
+    var pageNumbers = new[] { 1, current - 1, current, current + 1, pages }.Where(number => number >= 1 && number <= pages)
+        .Distinct().Order().ToArray();
+    var sectionsLabel = UiText.T(Context, "Report sections");
+    var activeTitle = UiText.T(Context, table.Title);
+    var statusColumn = Array.IndexOf(table.Columns, "Status");
+    if (statusColumn < 0) statusColumn = Array.IndexOf(table.Columns, "Compliance");
+    var requestDetails = report.Key == "purchase-requests" && table.Key == "requests";
+    <div class="analytics-report-sections" id="@sectionsAnchor" data-analytics-region="sections">
+        <div class="analytics-report-layout">
+            <nav class="ws-panel analytics-section-nav" aria-label="@sectionsLabel">
+                <ul>
+                    @foreach (var item in report.Tables)
+                    {
+                        var route = new Dictionary<string, string>(filter) { ["section"] = item.Key };
+                        <li>
+                            <a asp-action="@Model.Filters.Action" asp-all-route-data="route" asp-fragment="@sectionsAnchor"
+                               aria-current="@(item.Key == table.Key ? "page" : null)">
+                                <span>@UiText.T(Context, item.Title)</span>
+                                <small aria-hidden="true">@item.Rows.Count</small>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+            <form class="ws-panel analytics-section-picker" method="get" asp-action="@Model.Filters.Action" asp-fragment="@sectionsAnchor">
+                @foreach (var pair in filter)
+                {
+                    <input type="hidden" name="@pair.Key" value="@pair.Value" />
+                }
+                <label for="analytics-section-select">@sectionsLabel</label>
+                <div class="analytics-section-picker-controls">
+                    <select id="analytics-section-select" name="section">
+                        @foreach (var item in report.Tables)
+                        {
+                            <option value="@item.Key" selected="@(item.Key == table.Key)">@UiText.T(Context, item.Title)</option>
+                        }
+                    </select>
+                    <button type="submit" class="analytics-section-open">@UiText.T(Context, "Open section")</button>
+                </div>
+            </form>
+            <section class="ws-panel analytics-insight analytics-table" id="report-table-@Model.Table" aria-labelledby="analytics-table-title">
+                <div class="analytics-insight-head analytics-table-head">
+                    <h2 id="analytics-table-title"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg>@activeTitle</h2>
+                    <nav class="analytics-table-exports" aria-label="@UiText.T(Context, "Report downloads")">
+                        <a class="analytics-export analytics-export-pdf" data-no-modal asp-action="Export" asp-all-route-data="exportPdf">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
+                            @UiText.T(Context, "Download PDF")
+                        </a>
+                        <a class="analytics-export" data-no-modal asp-action="Export" asp-all-route-data="exportExcel">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg>
+                            @UiText.T(Context, "Download Excel")
+                        </a>
+                    </nav>
+                </div>
+                @if (table.Rows.Count == 0)
+                {
+                    <p class="pg-hint">@UiText.T(Context, "No matching records.")</p>
+                }
+                else
+                {
+                    <div class="analytics-data-scroll" tabindex="0" role="region" aria-labelledby="analytics-table-title">
+                        <table class="analytics-data-table" data-no-enhance>
+                            <thead><tr>
+                                @foreach (var column in table.Columns) { <th scope="col">@UiText.T(Context, column)</th> }
+                                @if (requestDetails) { <th scope="col">@UiText.T(Context, "Actions")</th> }
+                            </tr></thead>
+                            <tbody>
+                            @for (var row = start; row < end; row++)
+                            {
+                                <tr>
+                                @for (var column = 0; column < table.Rows[row].Length; column++)
+                                {
+                                    <td>
+                                    @if (links.TryGetValue((row, column), out var link))
+                                    {
+                                        <a asp-action="@link.Action" asp-route-id="@link.Id" data-no-modal>@table.Rows[row][column]</a>
+                                    }
+                                    else if (column == statusColumn)
+                                    {
+                                        var value = table.Rows[row][column];
+                                        <span class="analytics-status-pill" data-tone="@Tone(value)">@UiText.T(Context, value)</span>
+                                    }
+                                    else
+                                    {
+                                        @table.Rows[row][column]
+                                    }
+                                    </td>
+                                }
+                                @if (requestDetails)
+                                {
+                                    var details = new Dictionary<string, string>(filter) { ["section"] = "review-history", ["search"] = table.Rows[row][0] };
+                                    <td><a class="analytics-row-action" asp-action="@Model.Filters.Action" asp-all-route-data="details" asp-fragment="@sectionsAnchor">@UiText.T(Context, "View details")</a></td>
+                                }
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                @if (table.Rows.Count > 0)
+                {
+                    <footer class="analytics-table-footer">
+                    <span>@string.Format(UiText.T(Context, "Showing {0}–{1} of {2} records"), start + 1, end, table.Rows.Count)</span>
+                    @if (pages > 1)
+                    {
+                    <nav class="pg-actions analytics-pagination" aria-label="@UiText.T(Context, "Section pages")">
+                        @if (current > 1)
+                        {
+                            <a class="pg-btn" asp-action="@Model.Filters.Action" asp-all-route-data="previous" asp-fragment="@sectionsAnchor">@UiText.T(Context, "Previous")</a>
+                        }
+                        <span class="ws-sr-only">@string.Format(UiText.T(Context, "Page {0} of {1}"), current, pages)</span>
+                        @for (var index = 0; index < pageNumbers.Length; index++)
+                        {
+                            var number = pageNumbers[index];
+                            if (index > 0 && number > pageNumbers[index - 1] + 1) { <span aria-hidden="true">…</span> }
+                            var pageRoute = new Dictionary<string, string>(selection) { ["tablePage"] = number.ToString(CultureInfo.InvariantCulture) };
+                            <a class="analytics-page-number" aria-current="@(current == number ? "page" : null)" asp-action="@Model.Filters.Action" asp-all-route-data="pageRoute" asp-fragment="@sectionsAnchor">@number</a>
+                        }
+                        @if (current < pages)
+                        {
+                            <a class="pg-btn" asp-action="@Model.Filters.Action" asp-all-route-data="next" asp-fragment="@sectionsAnchor">@UiText.T(Context, "Next")</a>
+                        }
+                    </nav>
+                    }
+                    </footer>
+                }
+            </section>
+        </div>
+    </div>
 }
