@@ -115,6 +115,18 @@ builder.Services.AddSingleton<IExternalInvitationChannel, SmtpInvitationChannel>
 builder.Services.AddScoped<ExternalInvitationDispatcher>();
 builder.Services.AddScoped<SupplierReviewService>();
 builder.Services.AddHostedService<EvaluationDeadlineWorker>();
+// ORANGE RADAR - Sourcing Officer market intelligence (docs/ORANGE_RADAR.md). Local Ollama, Whisper.net and Piper only.
+builder.Services.AddMemoryCache();
+builder.Services.Configure<Orange_Tendering_System.Services.Radar.RadarOptions>(builder.Configuration.GetSection("OrangeRadar"));
+builder.Services.AddHttpClient<Orange_Tendering_System.Services.Radar.RadarOllamaClient>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarDataService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarDocumentDna>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarAnalystService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarBriefingService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarReportService>();
+builder.Services.AddSingleton<Orange_Tendering_System.Services.Radar.RadarSpeechRecognizer>();
+builder.Services.AddSingleton<Orange_Tendering_System.Services.Radar.RadarSpeechSynthesizer>();
 
 
 var app = builder.Build();
@@ -203,6 +215,9 @@ if (app.Environment.IsDevelopment())
         if (teamAccounts) await TeamAccountSeeder.EnsureAsync(app.Services, startup);
         else startup.LogWarning("Team accounts were NOT provisioned: TeamAccounts:Enabled is false in this run's configuration (environment variable, User Secrets or appsettings). Remove that setting for normal team development.");
         if (app.Configuration.GetValue<bool>("DemoData:Enabled")) await DemoDataSeeder.SeedAsync(app.Services);
+        // Fictional ORANGE RADAR market; the seeder itself refuses any database not named *_RadarDemo.
+        if (teamAccounts && app.Configuration.GetValue<bool>("OrangeRadar:DemoDataset:Enabled"))
+            await Orange_Tendering_System.Services.Radar.RadarDemoSeeder.SeedAsync(app.Services, startup);
         if (teamAccounts) await TeamAccountSeeder.VerifyAsync(app.Services, startup, database);
     }
     else

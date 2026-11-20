@@ -18,6 +18,36 @@ public sealed class FinalDecisionService(TenderWorkflowService workflow, IEmailS
     // Used after the Executive Agent has separately confirmed and committed the existing SQL notification action.
     public Task SendPendingEmails(int tenderId, ClaimsPrincipal principal) => SendEmails(tenderId, principal, retryOnly: false);
 
+    // After the unanimous Top Committee approval awarded the tender (committed in the vote's transaction), e-mail each
+    // supplier its own result. Failures stay recorded per recipient and the Officer can retry them from Final Decisions.
+    public async Task SendAwardEmails(int tenderId)
+    {
+        var configured = SmtpEmailSender.IsConfigured(configuration);
+        foreach (var (delivery, email) in await workflow.PendingAwardEmails(tenderId))
+        {
+            if (!configured) { await workflow.RecordSystemEmailResult(delivery.Id, "NotConfigured", "SMTP is not configured; the in-app notification was delivered."); continue; }
+            try
+            {
+                var (subject, body) = Message(delivery.Outcome);
+                await mail.SendEmailAsync(email, subject, body);
+                await workflow.RecordSystemEmailResult(delivery.Id, "Sent", null);
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Supplier result e-mail {DeliveryId} failed", delivery.Id);
+                await workflow.RecordSystemEmailResult(delivery.Id, "Failed", e.Message);
+            }
+        }
+    }
+
+    private static (string Subject, string Body) Message(string outcome) => outcome switch
+    {
+        "Won" => ("Tender result", "<p>Congratulations: your company has been selected for a tender after all mandatory approvals.</p><p>Sign in to the Supplier Portal to see the details of your own offer.</p>"),
+        "Cancelled" => ("Tender cancelled", "<p>A tender you participated in has been cancelled because the company no longer needs it. No supplier was selected and no further offers are accepted. Thank you for participating.</p>"),
+        "Reissued" => ("Tender reissued", "<p>A tender you participated in is being reissued as a new bidding round. Your earlier offer stays on record but will not be evaluated. You will receive a new invitation; please submit a new offer in the Supplier Portal.</p>"),
+        _ => ("Tender result", "<p>A tender you participated in has been awarded. Your company was not selected. Thank you for participating.</p><p>Sign in to the Supplier Portal for details of your own offer.</p>")
+    };
+
     private async Task SendEmails(int tenderId, ClaimsPrincipal principal, bool retryOnly)
     {
         var configured = SmtpEmailSender.IsConfigured(configuration);
@@ -26,13 +56,7 @@ public sealed class FinalDecisionService(TenderWorkflowService workflow, IEmailS
             if (!configured) { await workflow.RecordEmailResult(delivery.Id, "NotConfigured", "SMTP is not configured; the in-app notification was delivered.", principal); continue; }
             try
             {
-                var (subject, body) = delivery.Outcome switch
-                {
-                    "Won" => ("Tender result", "<p>Congratulations: your company has been selected for a tender after all mandatory approvals.</p><p>Sign in to the Supplier Portal to see the details of your own offer.</p>"),
-                    "Cancelled" => ("Tender cancelled", "<p>A tender you participated in has been cancelled because the company no longer needs it. No supplier was selected and no further offers are accepted. Thank you for participating.</p>"),
-                    "Reissued" => ("Tender reissued", "<p>A tender you participated in is being reissued as a new bidding round. Your earlier offer stays on record but will not be evaluated. You will receive a new invitation; please submit a new offer in the Supplier Portal.</p>"),
-                    _ => ("Tender result", "<p>A tender you participated in has been awarded. Your company was not selected. Thank you for participating.</p><p>Sign in to the Supplier Portal for details of your own offer.</p>")
-                };
+                var (subject, body) = Message(delivery.Outcome);
                 await mail.SendEmailAsync(email, subject, body);
                 await workflow.RecordEmailResult(delivery.Id, "Sent", null, principal);
             }

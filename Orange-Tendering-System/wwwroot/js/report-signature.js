@@ -27,7 +27,9 @@
         });
         form.addEventListener('submit', function (event) {
             var decision = form.querySelector('select[name="decision"]');
-            var required = !decision || decision.value === 'Approve' || form.action.indexOf('/TopCommittee/') >= 0;
+            // A draft save (submitter intent=save) never needs a signature.
+            var draft = event.submitter && event.submitter.name === 'intent' && event.submitter.value === 'save';
+            var required = !draft && (!decision || decision.value === 'Approve' || form.action.indexOf('/TopCommittee/') >= 0);
             if (required && !drawn) {
                 event.preventDefault(); event.stopImmediatePropagation(); pad.querySelector('[data-signature-error]').hidden = false; canvas.scrollIntoView({ block: 'center' }); return;
             }

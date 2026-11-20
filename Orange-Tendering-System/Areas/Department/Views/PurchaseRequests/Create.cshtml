@@ -2,11 +2,11 @@
 @{
     ViewData["Title"] = "Create Purchase Request";
     ViewData["WorkspaceSection"] = "New Request";
-    ViewData["Description"] = "Save a draft or submit your department's request directly to the Sourcing Officer.";
+    ViewData["Description"] = "Tell the Sourcing Officer what your department needs, how many and by when.";
 }
-<partial name="_PageHeader" />
+<header class="pr-create-head"><nav aria-label="Breadcrumb"><a asp-action="Index">Purchase Requests</a><span aria-hidden="true">›</span><strong>New Request</strong></nav><div class="pr-create-title"><svg class="pr-create-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M9 4h22l8 8v29H9zM31 4v9h8M16 21h15M16 28h12M16 35h8"/><path d="m32 32 3 5 5 2-5 2-3 5-2-5-5-2 5-2z"/></svg><div><h1>New Purchase Request</h1><p>Tell us what your department needs.</p></div><span class="pr-draft">▤ &nbsp;Draft</span></div></header>
 <form asp-action="Create" method="post" enctype="multipart/form-data" class="pg-form department-form" data-om="popup">
     <partial name="_RequestForm" model="Model" />
 </form>
-@section Styles { <style>.department-form{display:grid;gap:20px}.department-form [role=alert],.department-form .field-validation-error{color:#b43e24}.department-form [role=alert]:empty{display:none}.department-form .pg-table input{min-width:110px}</style> }
+@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /><link rel="stylesheet" href="~/css/department-request-create.css" asp-append-version="true" /> }
 @section Scripts { <partial name="_FormScripts" /> }

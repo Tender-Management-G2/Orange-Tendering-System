@@ -1,3 +1,5 @@
+> Updated by [WORKFLOW_REDESIGN.md](WORKFLOW_REDESIGN.md) (accept → prepare, pre-tender review, one-step offers, automatic award).
+
 # Unified Officer Tender flow
 
 The Sourcing Officer sidebar starts with **Dashboard → Request → Tender**. The remaining entries keep their order.

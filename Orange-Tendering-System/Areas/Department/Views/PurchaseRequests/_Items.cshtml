@@ -1,5 +1,5 @@
 @model List<RequestItemForm>
 <div class="pg-table-wrap"><table class="pg-table">
-<thead><tr><th scope="col">Item / service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead>
-<tbody>@foreach (var item in Model) { <tr><td>@item.Name</td><td style="white-space:pre-wrap">@item.Specifications</td><td>@item.Quantity.ToString("0.###")</td><td>@item.Unit</td></tr> }</tbody>
+<thead><tr><th scope="col">#</th><th scope="col">Item / service</th><th scope="col">Category</th><th scope="col">Specifications</th><th scope="col">Quantity</th></tr></thead>
+<tbody>@for (var i = 0; i < Model.Count; i++) { var item = Model[i]; <tr><td>@(i + 1)</td><td><strong>@item.Name</strong></td><td>@(item.CategoryName ?? "—")</td><td style="white-space:pre-wrap">@item.Specifications</td><td>@item.Quantity.ToString("0.###") @item.Unit</td></tr> }</tbody>
 </table></div>

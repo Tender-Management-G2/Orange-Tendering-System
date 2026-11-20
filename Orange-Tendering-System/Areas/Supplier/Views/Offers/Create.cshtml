@@ -1,10 +1,90 @@
 @model SupplierDraftOfferViewModel
-@* Owner: Saja. Create/edit share the same draft form. *@
+@using Orange_Tendering_System.Services
 @{
-    ViewData["Title"] = Model.BidId.HasValue ? "Edit Draft Offer" : "Create Draft Offer";
+    ViewData["Title"] = "Submit Supplier Offer";
     ViewData["WorkspaceSection"] = "My Offers";
-    ViewData["Description"] = "Prepare your offer for an accepted invitation.";
+    ViewData["BodyClass"] = "supplier-offer-page";
+    var i = Model.Input;
+    var customTerms = !string.IsNullOrEmpty(i.PaymentTerms) && !SupplierOfferService.PaymentTermOptions.Contains(i.PaymentTerms);
+    var taxRate = i.TaxRate ?? 16m;
+    var reference = TenderPassportService.Reference(Model.TenderId);
 }
-<partial name="_PageHeader" />
-<partial name="_DraftOfferForm" model="Model" />
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+@section Styles {
+    <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/supplier-offer-create.css" asp-append-version="true" />
+}
+
+<div class="soffer-heading">
+    <nav class="soffer-breadcrumb" aria-label="Breadcrumb"><a asp-controller="Invitations" asp-action="Index">⌂</a><span>›</span><a asp-controller="Invitations" asp-action="Index">My Tenders</a><span>›</span><span>Tender @reference</span><span>›</span><strong>Submit Offer</strong></nav>
+    <div class="soffer-title-row"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 4h22l8 8v28H8zM30 4v9h8M15 21h16M15 28h12M15 35h8"/><path d="m30 37 9-9 4 4-9 9-6 2z"/></svg><div><h1>Submit Supplier Offer</h1><p>Provide your quotation and supporting documents for the tender.</p></div><span class="soffer-open"><i></i> Open</span></div>
+</div>
+
+<form asp-action="Create" asp-route-id="@Model.InvitationId" method="post" enctype="multipart/form-data" class="soffer" data-offer-form data-currency-decimals="@CurrencyRules.Decimals(i.CurrencyCode)">
+    @if (Model.Errors.Count > 0)
+    {
+        <div class="pf-note pf-warn" role="alert"><strong>The offer was not submitted. Please correct:</strong><ul>@foreach (var error in Model.Errors) { <li>@error</li> }</ul><small>Choose the attachment files again before resubmitting.</small></div>
+    }
+
+    <section class="soffer-facts" aria-label="Tender information">
+        <div class="soffer-fact-icon" aria-hidden="true">▤</div>
+        <div><small>Tender ID</small><strong>@reference</strong></div>
+        <div><small>Title</small><strong>@Model.TenderTitle</strong></div>
+        <div><small>Supplier</small><strong>@Model.CompanyName</strong></div>
+        <div><small>Submission Deadline</small><strong>@(Model.Deadline?.ToJordan("d MMM yyyy") ?? "—")</strong></div>
+        <div><small>Required Delivery Date</small><strong>@(Model.NeededBy?.ToString("d MMM yyyy") ?? "Not specified")</strong></div>
+        <div><small>Requested Items</small><strong>@Model.ItemContext.Count item@(Model.ItemContext.Count == 1 ? "" : "s")</strong></div>
+    </section>
+
+    @if (Model.Requirements.Count > 0)
+    {
+        <details class="soffer-tender-requirements"><summary>Read the full tender requirements</summary><dl class="pg-dl">@foreach (var requirement in Model.Requirements) { <div><dt>@requirement.Label</dt><dd style="white-space:pre-line">@requirement.Value</dd></div> }</dl></details>
+    }
+
+    <section class="soffer-section" aria-labelledby="soffer-items-title">
+        <header class="soffer-section-head"><span class="soffer-step">1</span><div><h2 id="soffer-items-title">Item Quotation</h2><p>Provide your offer for each requested item, including product details, specifications, warranty, and unit price.</p></div></header>
+        <div class="soffer-items">
+            @for (var n = 0; n < Model.ItemContext.Count; n++)
+            {
+                var c = Model.ItemContext[n];
+                var line = i.Items.FirstOrDefault(x => x.TenderItemId == c.TenderItemId) ?? new();
+                var priorImage = Model.ExistingDocuments.FirstOrDefault(d => d.DocumentType == "ReferenceImage" && d.FileName.StartsWith($"Item-{c.TenderItemId}-", StringComparison.Ordinal));
+                var warranties = new[] { "Not applicable", "3 months", "6 months", "12 months", "18 months", "24 months", "36 months", "48 months", "60 months" };
+                <article class="soffer-item" data-line>
+                    <div class="soffer-item-title"><span>@(n + 1)</span><h3>@c.Name</h3></div>
+                    <input type="hidden" name="Input.Items[@n].TenderItemId" value="@c.TenderItemId" />
+                    <input type="hidden" name="Input.Items[@n].Quantity" value="@c.Quantity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)" data-qty />
+                    <div class="soffer-item-columns">
+                        <div class="soffer-requirements"><h4>Tender Requirements (Read-Only)</h4><dl><div><dt>Category</dt><dd>@(c.Category ?? "—")</dd></div><div><dt>Required Specifications</dt><dd style="white-space:pre-line">@(c.Specifications ?? "—")</dd></div><div><dt>Requested Quantity</dt><dd><b>@c.Quantity.ToString("0.###") @c.Unit</b></dd></div></dl></div>
+                        <div class="soffer-item-offer"><h4>Your Offer (Supplier Input)</h4>
+                            <div class="soffer-offer-grid">
+                                <div class="soffer-image-box"><div class="soffer-image-preview" data-image-preview><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="13" width="48" height="38" rx="4"/><circle cx="23" cy="26" r="4"/><path d="m10 47 14-13 9 8 10-12 12 14"/></svg><span>Product image</span></div><div class="soffer-image-tools"><label>⇧ Change Image<input type="file" name="doc_ReferenceImage_@c.TenderItemId" accept=".png,.jpg,.jpeg" data-line-image /></label><button type="button" data-clear-image aria-label="Remove image for @c.Name">×</button></div>@if (priorImage != null) { <a asp-controller="Documents" asp-action="Download" asp-route-id="@priorImage.Id" class="soffer-saved-image">Saved: @priorImage.FileName</a> }</div>
+                                <div class="soffer-item-fields"><div class="soffer-item-pair"><label>Brand / Model <em>*</em><input name="Input.Items[@n].OfferedProduct" value="@line.OfferedProduct" maxlength="300" required placeholder="Brand and model" /></label><label>Warranty <em>*</em><select name="Input.Items[@n].Notes" required><option value="">Select warranty</option>@foreach (var warranty in warranties) { <option selected="@(line.Notes == warranty)">@warranty</option> }@if (!string.IsNullOrWhiteSpace(line.Notes) && !warranties.Contains(line.Notes)) { <option selected>@line.Notes</option> }</select></label></div><label>Offered Specifications <em>*</em><textarea name="Input.Items[@n].OfferedSpecifications" rows="3" maxlength="4000" required placeholder="Describe the offered item">@line.OfferedSpecifications</textarea></label></div>
+                                <div class="soffer-price-row"><label>Unit Price (Excl. Tax) <em>*</em><span class="soffer-money-input"><input name="Input.Items[@n].UnitPrice" type="number" min="0" step="0.001" inputmode="decimal" required value="@(line.UnitPrice > 0 ? line.UnitPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" data-price /><b data-currency-label>@i.CurrencyCode</b></span></label><div class="soffer-line-total"><small>Line Total</small><output data-line-total>—</output></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+
+    <section class="soffer-section" aria-labelledby="soffer-terms-title"><header class="soffer-section-head"><span class="soffer-step">2</span><div><h2 id="soffer-terms-title">Commercial Terms</h2><p>Key commercial conditions for your offer.</p></div></header>
+        <div class="soffer-terms-grid"><label>Delivery Lead Time (Days) <em>*</em><input name="Input.DeliveryDays" type="number" min="1" max="3650" step="1" required value="@i.DeliveryDays" /></label><label>Offer Valid Until <em>*</em><input name="Input.ValidUntil" type="date" required value="@i.ValidUntil?.ToString("yyyy-MM-dd")" min="@Model.Deadline?.ToString("yyyy-MM-dd")" /></label><label>Payment Terms <em>*</em><select data-terms-pick>@foreach (var option in SupplierOfferService.PaymentTermOptions) { <option selected="@(i.PaymentTerms == option)">@option</option> }<option value="__custom" selected="@customTerms">Other (describe)…</option></select><input name="Input.PaymentTerms" value="@i.PaymentTerms" maxlength="1000" data-terms-value @(customTerms ? null : "hidden") placeholder="Describe your payment terms" /></label><label>Currency <em>*</em><select name="Input.CurrencyCode" data-currency>@foreach (var currency in CurrencyRules.Offer) { <option selected="@(i.CurrencyCode == currency)">@currency</option> }</select></label></div>
+    </section>
+
+    <section class="soffer-section" aria-labelledby="soffer-costs-title"><header class="soffer-section-head"><span class="soffer-step">3</span><div><h2 id="soffer-costs-title">Additional Costs</h2><p>Only enter costs not already included in the item prices.</p></div></header>
+        <div class="soffer-costs">@foreach (var (key, label, on, amount) in new[] { ("Shipping", "Shipping Cost", i.IncludeShipping, i.ShippingCost), ("Installation", "Installation Cost", i.IncludeInstallation, i.InstallationCost), ("Maintenance", "Maintenance Cost", i.IncludeMaintenance, i.MaintenanceCost), ("Other", "Other Costs", i.IncludeOther, i.OtherCost) }) { var field = key == "Other" ? "OtherCost" : key + "Cost"; <div class="soffer-cost" data-cost data-on="@(on ? "true" : "false")"><label class="soffer-cost-check"><input type="checkbox" name="Input.Include@(key)" value="true" @(on ? "checked" : null) data-cost-toggle /><span>@label</span></label><div class="soffer-cost-value"><input name="Input.@field" type="number" min="0" step="0.001" inputmode="decimal" value="@(amount > 0 ? amount.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" aria-label="@label amount" data-cost-amount /><span data-currency-label>@i.CurrencyCode</span></div>@if (key == "Maintenance") { <input class="soffer-cost-description" name="Input.MaintenanceDescription" value="@i.MaintenanceDescription" maxlength="1000" placeholder="Coverage and duration" data-cost-required /> }@if (key == "Other") { <input class="soffer-cost-description" name="Input.OtherCostDescription" value="@i.OtherCostDescription" maxlength="500" placeholder="Description of other costs" data-cost-required /> }</div> }</div>
+    </section>
+
+    <section class="soffer-section soffer-summary" aria-labelledby="soffer-summary-title"><header class="soffer-section-head"><span class="soffer-step">4</span><div><h2 id="soffer-summary-title">Offer Summary</h2></div></header><div class="soffer-summary-body"><div class="soffer-summary-values" aria-live="polite"><div><span>Items Subtotal</span><strong data-sum="items">—</strong></div><div><span>Additional Costs</span><strong data-sum="charges">—</strong></div><div class="soffer-before"><span>Total Before Tax</span><strong data-sum="before">—</strong></div><div><span data-sum-tax-label>Sales Tax</span><strong data-sum="tax">—</strong></div><div class="soffer-grand"><span>Grand Total</span><strong data-sum="grand">—</strong></div></div><aside class="soffer-tax-note"><strong>ⓘ</strong><p>All prices are exclusive of sales tax. Tax is calculated automatically from the settings below.</p></aside></div>
+        <details class="soffer-tax-settings"><summary>Tax settings and exemptions</summary><div class="soffer-tax-grid"><label><input type="radio" name="Input.TaxMode" value="Rate" @(i.TaxMode != "Amount" ? "checked" : null) data-tax-mode /> Percentage rate</label><div data-tax-rate><input name="Input.TaxRate" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="@taxRate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" aria-label="Tax rate in percent" /><label><input type="checkbox" name="Input.TaxIncludesCharges" value="true" @(i.TaxIncludesCharges ? "checked" : null) /> Apply rate to additional costs too</label></div><label><input type="radio" name="Input.TaxMode" value="Amount" @(i.TaxMode == "Amount" ? "checked" : null) data-tax-mode /> Stated tax amount</label><div data-tax-amount><input name="Input.TaxAmount" type="number" min="0" step="0.001" inputmode="decimal" value="@(i.TaxMode == "Amount" ? i.TaxAmount.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" aria-label="Total tax amount" /></div></div></details>
+    </section>
+
+    <section class="soffer-section" aria-labelledby="soffer-docs-title"><header class="soffer-section-head"><span class="soffer-step">5</span><div><h2 id="soffer-docs-title">Supporting Documents</h2><p>Upload the required documents for your offer. PDF, PNG or JPEG, up to 10 MB each.</p></div></header><div class="soffer-docs">@foreach (var kind in OfferDocumentTypes.All) { var required = Model.RequiredDocuments.Contains(kind.Key); var existing = Model.ExistingDocuments.Where(d => d.DocumentType == kind.Key || (kind.Key == "OtherDocument" && OfferDocumentTypes.Find(d.DocumentType) == null)).ToList(); <div class="soffer-doc" data-doc data-required="@(required ? "true" : "false")" data-key="@kind.Key"><div class="soffer-doc-name"><span aria-hidden="true">▤</span><strong>@kind.Label</strong>@if (required) { <em>Required</em> }</div><ul data-doc-list>@foreach (var document in existing) { <li data-existing><span>@document.FileName <small>(@((document.SizeBytes / 1024.0).ToString("0")) KB, saved)</small></span><label><input type="checkbox" name="Input.RemoveDocumentIds" value="@document.Id" /> remove</label></li> }</ul><label class="soffer-file-button">⇧ Choose File<input type="file" name="doc_@kind.Key" multiple accept=".pdf,.png,.jpg,.jpeg" data-doc-input /></label></div> }</div><p class="pf-error" data-doc-error role="alert" hidden></p></section>
+
+    <section class="soffer-section" aria-labelledby="soffer-notes-title"><header class="soffer-section-head"><span class="soffer-step">6</span><div><h2 id="soffer-notes-title">Additional Notes</h2><p>Add technical details and any clarifications about your offer.</p></div></header><label class="soffer-proposal-label">Technical proposal and implementation approach <em>*</em><textarea name="Input.TechnicalProposal" rows="3" maxlength="10000" required placeholder="Describe your solution and how it meets the tender requirements">@i.TechnicalProposal</textarea></label><details class="soffer-optional"><summary>Warranty terms, deviations and after-sales support (optional)</summary><div class="soffer-optional-grid"><label>Overall warranty period<select name="Input.WarrantyMonths"><option value="">Not applicable</option>@foreach (var months in new[] { 3, 6, 12, 18, 24, 36, 48, 60 }) { <option value="@months" selected="@(i.WarrantyMonths == months)">@months months</option> }</select></label><label>Warranty type<select name="Input.WarrantyType"><option value="">Not applicable</option>@foreach (var type in new[] { "Manufacturer warranty", "Supplier warranty", "Manufacturer and supplier", "On-site warranty" }) { <option selected="@(i.WarrantyType == type)">@type</option> }</select></label><label>Warranty conditions<textarea name="Input.WarrantyTerms" rows="2" maxlength="2000">@i.WarrantyTerms</textarea></label><label>Deviations / clarifications<textarea name="Input.Deviations" rows="2" maxlength="4000">@i.Deviations</textarea></label><label>After-sales support<textarea name="Input.AfterSalesSupport" rows="2" maxlength="2000">@i.AfterSalesSupport</textarea></label></div></details></section>
+
+    <footer class="soffer-submit"><p><span>ⓘ</span> By submitting, you confirm that this offer is final and will be sent to the Sourcing Officer.</p><button type="button" data-submit-offer>➤ &nbsp;Submit Offer</button></footer>
+    <dialog class="pf-confirm" data-confirm-offer aria-labelledby="confirm-title"><h2 id="confirm-title">Submit this offer?</h2><p>Your offer and supporting documents will be sent to the Sourcing Officer. This submitted version cannot be edited directly.</p><p class="pf-muted" data-confirm-total></p><div class="pg-actions"><button type="button" class="pg-btn" data-cancel>Cancel</button><button type="button" class="pg-btn pg-btn-primary" data-ok>Confirm Submission</button></div></dialog>
+</form>
+@section Scripts { <script src="~/js/supplier-offer-form.js" asp-append-version="true"></script> }

@@ -23,79 +23,70 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             return View(await offerService.GetOffersAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!));
         }
 
-        // Create Supplier Offer — Owner: Saja
-        // GET: open an accepted invitation. POST: save a new draft only.
+        // Submit Supplier Offer — one page, one action ("Submit Offer"), confirmed in the browser and validated on the server.
+        // A draft saved before this change opens in the same form and is submitted from it.
         [HttpGet]
         public async Task<IActionResult> Create(int? id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
-                return Challenge();
-            if (id == null || id <= 0)
-                return NotFound();
-
-            var model = await offerService.GetCreateAsync(userId, id.Value);
-            if (model == null)
-                return View("Unavailable", await offerService.GetCreateBlockReasonAsync(userId, id.Value));
-
+            if (string.IsNullOrEmpty(userId)) return Challenge();
+            if (id == null || id <= 0) return NotFound();
+            var model = await offerService.GetOfferFormAsync(userId, id.Value);
+            if (model == null) return View("Unavailable", await offerService.GetCreateBlockReasonAsync(userId, id.Value));
             return View(model);
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(int id,
-            [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input)
+        [HttpPost, ValidateAntiForgeryToken]
+        [RequestSizeLimit(45 * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 45 * 1024 * 1024)]
+        public async Task<IActionResult> Create(int id, [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input)
         {
-            if (input.Items == null || input.Items.Any(item => item == null))
-                return BadRequest();
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
-                return Challenge();
-            if (id <= 0)
-                return NotFound();
-
-            var model = await offerService.GetCreateAsync(userId, id);
-            if (model == null)
-                return View("Unavailable", await offerService.GetCreateBlockReasonAsync(userId, id));
-
-            if (!ModelState.IsValid)
-                return View(model);
-
-            bool saved = await offerService.CreateDraftAsync(userId, id, input);
-            if (saved == false)
+            if (string.IsNullOrEmpty(userId)) return Challenge();
+            if (id <= 0 || input.Items == null || input.Items.Any(item => item == null)) return BadRequest();
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "A field has an invalid value." : e.ErrorMessage).Distinct().ToList();
+            var files = new List<SupplierOfferService.UploadedOfferFile>();
+            foreach (var file in Request.Form.Files)
             {
-                ModelState.AddModelError("", "Draft not saved. Check the invitation, deadline and tender items.");
-                return View(model);
+                if (!file.Name.StartsWith("doc_", StringComparison.Ordinal)) continue;
+                var documentType = file.Name[4..];
+                var storedName = file.FileName;
+                if (documentType.StartsWith("ReferenceImage_", StringComparison.Ordinal))
+                {
+                    if (!int.TryParse(documentType["ReferenceImage_".Length..], out var tenderItemId)
+                        || input.Items.All(item => item.TenderItemId != tenderItemId))
+                    { errors.Add("A product image refers to an item outside this offer."); continue; }
+                    documentType = "ReferenceImage";
+                    storedName = $"Item-{tenderItemId}-{Path.GetFileName(file.FileName)}";
+                }
+                if (file.Length > SupplierOfferService.MaxFileBytes) { errors.Add($"{Path.GetFileName(file.FileName)}: files must be 10 MB or smaller."); continue; }
+                await using var stream = new MemoryStream();
+                await file.CopyToAsync(stream);
+                var (upload, error) = SupplierOfferService.ReadUpload(documentType, storedName, stream.ToArray());
+                if (upload != null) files.Add(upload); else errors.Add(error!);
             }
-
-            TempData.Orange(OrangeFeedback.Toast("Draft saved!", "Your offer is saved as a draft. It has not been submitted."));
-            return RedirectToAction("Index");
+            if (errors.Count == 0)
+            {
+                var (bidId, problems) = await offerService.SubmitOfferAsync(userId, id, input, files);
+                if (bidId is int submitted)
+                {
+                    TempData.Orange(OrangeFeedback.Popup("Offer submitted!", "Your offer and its documents were sent to the Sourcing Officer. This version can no longer be changed.", OrangeVariant.Send));
+                    return RedirectToAction("Details", new { id = submitted });
+                }
+                errors.AddRange(problems);
+            }
+            var model = await offerService.GetOfferFormAsync(userId, id);
+            if (model == null) return View("Unavailable", await offerService.GetCreateBlockReasonAsync(userId, id));
+            model.Input = input; model.Errors = errors;
+            // Files are never kept across a refused submission; the page asks the supplier to choose them again.
+            return View(model);
         }
 
-        // Edit Draft Offer — Owner: Saja · No Trello card
-        // GET /Supplier/Offers/Edit/{id?}. Ownership is checked in the supplier service.
+        // Older "Edit draft" links: the draft opens in the offer form for its invitation.
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
         {
-            var model = await offerService.GetEditAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id);
-            return model == null ? NotFound() : View("Edit", model);
-        }
-
-        [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input)
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var model = await offerService.GetEditAsync(userId, id);
-            if (model == null) return NotFound();
-            if (input.Items == null || input.Items.Any(i => i == null)) return BadRequest();
-            if (!ModelState.IsValid) return View("Edit", model);
-            if (!await offerService.UpdateDraftAsync(userId, id, input))
-            {
-                ModelState.AddModelError("", "Draft not saved. Check the items and submission deadline.");
-                return View("Edit", model);
-            }
-            TempData.Orange(OrangeFeedback.Toast("Draft updated", "Your changes are saved. The offer has not been submitted."));
-            return RedirectToAction("Details", new { id });
+            var offer = await offerService.GetOfferAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id);
+            return offer == null ? NotFound() : offer.CanEdit ? RedirectToAction(nameof(Create), new { id = offer.InvitationId }) : RedirectToAction(nameof(Details), new { id });
         }
 
         // Offer Details — Owner: Saja · No Trello card

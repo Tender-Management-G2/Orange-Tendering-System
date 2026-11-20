@@ -7,7 +7,7 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Services;
 
 // Owner: Saja. First step: create one draft for an accepted invitation.
-public sealed partial class SupplierOfferService(ApplicationDbContext context, TenderWorkflowService workflow)
+public sealed partial class SupplierOfferService(ApplicationDbContext context, TenderWorkflowService workflow, IWebHostEnvironment environment)
 {
     // شروط السماح بالإنشاء تستخدم عند فتح الصفحة وعند الحفظ أيضا.
     private IQueryable<TenderInvitation> AvailableInvitations(string userId, int invitationId)

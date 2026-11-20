@@ -32,7 +32,8 @@
         {
             id = r.Id, deptId = r.DepartmentId, title = r.Title, dept = r.Department.Name, why = r.Justification, priority = r.Priority.ToString(),
             needed = r.NeededBy.HasValue ? r.NeededBy.Value.ToString("d MMM yyyy") : null,
-            items = r.Items.OrderBy(i => i.Id).Select(i => new { name = i.Name, qty = i.Quantity, unit = i.Unit, spec = i.Specifications }).ToList()
+            files = r.Documents.Count,
+            items = r.Items.OrderBy(i => i.Id).Select(i => new { name = i.Name, cat = i.Category != null ? i.Category.Name : null, qty = i.Quantity, unit = i.Unit, spec = i.Specifications }).ToList()
         }).ToListAsync();
     var requestJson = System.Text.Json.JsonSerializer.Serialize(requests);
     var currencies = new[] { "JOD", "USD", "EUR", "SAR", "AED", "EGP" };
@@ -71,11 +72,11 @@
             </section>
 
             <section class="tc-card" aria-labelledby="tc-s2">
-                <header><span class="tc-num">2</span><div><h2 id="tc-s2">Describe the tender</h2><p>Filled in for you from the request. Change anything, or pick a ready-made option from the lists.</p></div></header>
+                <header><span class="tc-num">2</span><div><h2 id="tc-s2">Official tender requirements</h2><p>The department's items above are copied to the tender unchanged. Here you add the official conditions suppliers must meet.</p></div></header>
                 <div class="tc-grid">
                     <label class="tc-field tc-wide"><span>Title</span><input asp-for="Title" required maxlength="200" placeholder="e.g. Network switches for the data center" /></label>
                     <label class="tc-field tc-wide"><span>Description</span><textarea asp-for="Description" required rows="3" placeholder="What is being bought and why"></textarea></label>
-                    <div class="tc-field tc-wide"><span>Technical requirements</span><textarea asp-for="TechnicalRequirements" required rows="4" placeholder="Specifications the suppliers must meet"></textarea></div>
+                    <div class="tc-field tc-wide"><span>Additional technical requirements</span><textarea asp-for="TechnicalRequirements" required rows="3" placeholder="Standards, compatibility, certifications or quality levels beyond the item specifications"></textarea></div>
                     <div class="tc-field tc-wide"><span>Financial and commercial conditions</span>
                         <select class="tc-template" data-target="CommercialConditions" aria-label="Commercial conditions template"><option value="">Quick pick…</option><option>price in the tender currency, valid for 90 days. Payment within 30 days of delivery and acceptance.</option><option>price, valid for 60 days. 30% advance payment, 70% on delivery and acceptance.</option><option>Unit prices, valid for 120 days. Payment in three milestones tied to delivery stages.</option></select>
                         <textarea asp-for="CommercialConditions" required rows="3" placeholder="Pricing validity, payment terms, taxes"></textarea></div>
@@ -88,6 +89,9 @@
                     <label class="tc-field"><span>Estimated procurement value</span><input asp-for="EstimatedValue" type="number" min="0.01" step="0.01" required placeholder="0.00" /></label>
                     <label class="tc-field"><span>Currency</span>
                         <select asp-for="Currency" required>@foreach (var c in currencies) { <option value="@c" selected="@(Model.Currency == c)">@c</option> }</select></label>
+                    <fieldset class="tc-field tc-wide"><span>Documents every supplier must attach</span>
+                        <div class="tc-docs" style="display:flex;flex-wrap:wrap;gap:8px 16px">@foreach (var kind in Orange_Tendering_System.ViewModels.OfferDocumentTypes.All) { <label class="tc-doc"><input type="checkbox" name="RequiredDocuments" value="@kind.Key" @(kind.Key is "OfficialQuotation" or "TechnicalProposal" ? "checked" : null) /> @kind.Label</label> }</div>
+                        <small>Suppliers see these as mandatory uploads; an offer without them cannot be submitted.</small></fieldset>
                     <label class="tc-switch tc-wide"><input asp-for="IsCritical" /><i aria-hidden="true"></i><span><strong>Critical procurement</strong><small>Used only by an explicitly configured final-approval policy.</small></span></label>
                 </div>
             </section>
@@ -151,10 +155,11 @@
         $('tc-pv-dept').textContent = r.dept; $('tc-pv-priority').textContent = r.priority + ' priority'; $('tc-pv-needed').textContent = r.needed ? 'Needed by ' + r.needed : 'No date';
         $('tc-pv-why').textContent = r.why;
         var ul = $('tc-pv-items'); ul.textContent = '';
-        r.items.forEach(function (i) { var li = document.createElement('li'); li.innerHTML = '<b></b><span></span><em></em>'; li.children[0].textContent = i.name; li.children[1].textContent = i.qty + (i.unit ? ' ' + i.unit : ''); li.children[2].textContent = i.spec || ''; ul.appendChild(li); });
+        r.items.forEach(function (i) { var li = document.createElement('li'); li.innerHTML = '<b></b><span></span><em></em>'; li.children[0].textContent = i.name + (i.cat ? ' \u00b7 ' + i.cat : ''); li.children[1].textContent = i.qty + (i.unit ? ' ' + i.unit : ''); li.children[2].textContent = i.spec || ''; ul.appendChild(li); });
+        if (r.files) { var fl = document.createElement('li'); fl.textContent = r.files + ' department attachment(s), available to you and the committees from the request.'; ul.appendChild(fl); }
         setAuto($('Title'), r.title);
         setAuto($('Description'), r.why);
-        setAuto($('TechnicalRequirements'), r.items.map(function (i) { return i.name + ' x ' + i.qty + (i.unit ? ' ' + i.unit : '') + (i.spec ? ': ' + i.spec : ''); }).join('\n'));
+        setAuto($('TechnicalRequirements'), 'Offers must meet the specifications of every requested item. Equivalent or better products are acceptable when declared as deviations.');
     }
     document.querySelectorAll('.tc-template').forEach(function (sel) {
         sel.addEventListener('change', function () { if (!sel.value) return; var t = $(sel.dataset.target); t.value = sel.value; t.dispatchEvent(new Event('input', { bubbles: true })); sel.value = ''; t.focus(); });
@@ -204,7 +209,7 @@
             .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
             .then(function (x) {
                 if (x.ok && x.d && x.d.id) {
-                    var go = function () { window.location.href = form.dataset.listUrl + '?created=' + x.d.id; };
+                    var go = function () { window.location.href = form.dataset.listUrl + '?created=' + x.d.id + '&open=' + x.d.id; };
                     if (motion && x.d.feedback) motion.finish(x.d.feedback).then(go, go); else go();
                     return;
                 }

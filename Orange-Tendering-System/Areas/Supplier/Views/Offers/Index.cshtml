@@ -61,7 +61,7 @@
                         <td class="so-num"><strong>@offer.Total.ToString("N2")</strong> <small>@offer.Terms.CurrencyCode</small></td>
                         <td class="wfl-actions-col">
                             <button type="button" class="wfl-open" data-offer-details data-url="@Url.Action("Details", "Offers", new { area = "Supplier", id = offer.Id })">Details <span aria-hidden="true">&rarr;</span></button>
-                            @if (offer.CanEdit) { <a asp-action="Edit" asp-route-id="@offer.Id" class="pg-btn" data-no-modal>Edit draft</a> }
+                            @if (offer.CanEdit) { <a asp-action="Edit" asp-route-id="@offer.Id" class="pg-btn" data-no-modal>Complete and submit</a> }
                         </td>
                     </tr>
                 }
@@ -69,7 +69,7 @@
             </table>
             <div class="wfl-empty" id="so-empty" @(Model.Count == 0 ? null : "hidden")>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM3 7l3-4h12l3 4M9 12h6" /></svg>
-                <p id="so-empty-text">@(Model.Count == 0 ? "No offers yet. Accept an invitation to create your first draft." : "No offers match these filters.")</p>
+                <p id="so-empty-text">@(Model.Count == 0 ? "No offers yet. Accept an invitation to prepare and submit your first offer." : "No offers match these filters.")</p>
             </div>
         </div>
     </section>

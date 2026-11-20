@@ -18,6 +18,11 @@ namespace Orange_Tendering_System.Models.Entities
         // Mandatory conditions/documents suppliers must meet (checked per bid during compliance review).
         public string? Requirements { get; set; }
 
+        // Offer document types every supplier must attach (OfferDocumentTypes keys, comma separated). Null on older tenders,
+        // which keep the earlier rule: at least one attachment.
+        [MaxLength(500)]
+        public string? RequiredDocuments { get; set; }
+
         public TenderStatus Status { get; set; } = TenderStatus.Draft;
 
         public string CreatedByUserId { get; set; } = string.Empty;

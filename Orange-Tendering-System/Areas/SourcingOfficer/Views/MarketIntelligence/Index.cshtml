@@ -1,0 +1,244 @@
+@*
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Sourcing Officer / Market Intelligence - ORANGE RADAR
+One integrated workspace: market overview, supplier network, price intelligence, forensic intelligence, the contextual panel
+(details, evidence, scenario, live AI analyst) and the historical timeline. All numbers come from the server (Services/Radar);
+the scripts only draw them. docs/ORANGE_RADAR.md describes the feature.
+*@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var arabic = UiLanguage.IsArabic(Context);
+    string L(string en, string ar) => arabic ? ar : en;
+    string U(string action) => Url.Action(action, "MarketIntelligence", new { area = "SourcingOfficer" })!;
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/orange-radar.css" asp-append-version="true" />
+}
+
+<div class="radar" id="radar" data-radar
+     data-csrf="@Antiforgery.GetAndStoreTokens(Context).RequestToken"
+     data-ui-language="@(arabic ? "ar" : "en")"
+     data-url-workspace="@U("Workspace")" data-url-dna="@U("DocumentDna")" data-url-simulate="@U("Simulate")"
+     data-url-compare="@U("CompareDocuments")" data-url-status="@U("Status")" data-url-warm="@U("Warm")" data-url-ask="@U("Ask")"
+     data-url-briefing="@U("Briefing")" data-url-report="@U("Report")" data-url-transcribe="@U("Transcribe")" data-url-speak="@U("Speak")"
+     data-worklet="@Url.Content("~/js/orange-radar-capture.js")">
+
+    <header class="rd-head">
+        <div class="rd-brand">
+            <svg class="rd-mark" viewBox="0 0 48 48" aria-hidden="true">
+                <circle cx="24" cy="24" r="21" /><circle cx="24" cy="24" r="13.5" /><circle cx="24" cy="24" r="6" />
+                <path class="rd-sweep" d="M24 24 L24 3 A21 21 0 0 1 42.2 13.5 Z" />
+                <circle class="rd-blip" cx="33" cy="15" r="2.2" />
+            </svg>
+            <div>
+                <h1>ORANGE <strong>RADAR</strong></h1>
+                <p><span>@L("AI-Powered Supplier Market Intelligence", "ذكاء سوق الموردين المدعوم بالذكاء الاصطناعي")</span><em>@L("See the market. Speak to your data.", "شاهد السوق. تحدّث إلى بياناتك.")</em></p>
+            </div>
+        </div>
+        <div class="rd-controls" role="group" aria-label="@L("Analysis scope", "نطاق التحليل")">
+            <div class="rd-scope"><span class="rd-label">@L("Scope", "النطاق")</span><span class="rd-chip">@L("Suppliers & procurement recorded in this system", "الموردون والمشتريات المسجلة في النظام")</span></div>
+            <label class="rd-date"><span class="rd-label">@L("From", "من")</span><input type="date" id="rd-from" /></label>
+            <label class="rd-date"><span class="rd-label">@L("To", "إلى")</span><input type="date" id="rd-to" /></label>
+            <button type="button" class="rd-btn rd-btn-primary" data-action="run"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z" /></svg>@L("Run analysis", "تشغيل التحليل")</button>
+            <button type="button" class="rd-btn" data-action="brief"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4zM9 20h6M12 16v4" /></svg>@L("Brief me", "لخّص لي")</button>
+            <button type="button" class="rd-btn" data-action="report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("Export report", "تصدير التقرير")</button>
+            <button type="button" class="rd-btn rd-btn-live" data-action="live" aria-pressed="false"><span class="rd-live-dot" aria-hidden="true"></span><span data-live-label>@L("Start live conversation", "ابدأ محادثة مباشرة")</span></button>
+        </div>
+    </header>
+
+    <section class="rd-kpis" aria-label="@L("Market summary", "ملخص السوق")" data-kpis>
+        @for (var i = 0; i < 8; i++) { <div class="rd-kpi is-loading"><span class="rd-kpi-label">&nbsp;</span><strong>&nbsp;</strong><small>&nbsp;</small></div> }
+    </section>
+    <div class="rd-status" role="status" aria-live="polite" data-status></div>
+
+    <div class="rd-body" data-body>
+        <section class="rd-stage" data-stage aria-label="@L("Visualization", "العرض المرئي")">
+            <nav class="rd-tabs" role="tablist" aria-label="@L("Visualization mode", "وضع العرض")">
+                <button role="tab" id="tab-overview" aria-controls="mode-overview" aria-selected="true" data-mode="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M7 17v-6M12 17V5M17 17v-9" /></svg>@L("Market Overview", "نظرة على السوق")</button>
+                <button role="tab" id="tab-network" aria-controls="mode-network" aria-selected="false" data-mode="network" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.5" /><circle cx="19" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" /><path d="M7 7l3.5 9M17 7l-3.5 9M7.5 6h9" /></svg>@L("Supplier Network", "شبكة الموردين")</button>
+                <button role="tab" id="tab-price" aria-controls="mode-price" aria-selected="false" data-mode="price" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6" /></svg>@L("Price Intelligence", "ذكاء الأسعار")</button>
+                <button role="tab" id="tab-forensic" aria-controls="mode-forensic" aria-selected="false" data-mode="forensic" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-7 7v3M19 13v-3a7 7 0 0 0-3-5.7M9 21v-8a3 3 0 0 1 6 0v3M12 21v-6M5 17v1M19 17a4 4 0 0 1-1 3" /></svg>@L("Forensic Intelligence", "الذكاء الجنائي")</button>
+                <span class="rd-tabs-spacer"></span>
+                <button type="button" class="rd-icon" data-action="fullscreen" aria-label="@L("Full screen", "ملء الشاشة")" title="@L("Full screen", "ملء الشاشة")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
+            </nav>
+
+            <div class="rd-modes">
+                <!-- 1. Market overview -->
+                <section class="rd-mode is-active" id="mode-overview" role="tabpanel" aria-labelledby="tab-overview" data-mode-panel="overview">
+                    <div class="rd-grid rd-grid-overview">
+                        <article class="rd-card rd-span-2">
+                            <header><h2>@L("Supplier market landscape", "خريطة سوق الموردين")</h2><p data-def="landscape">Participation (closed rounds with an offer) against historical win rate; bubble size = awarded value, colour = category.</p><button class="rd-link" data-table="landscape">@L("Table", "جدول")</button></header>
+                            <div class="rd-chart" data-chart="landscape" role="img" aria-label="Supplier landscape scatter chart"></div>
+                        </article>
+                        <article class="rd-card">
+                            <header><h2>@L("Competition per round", "المنافسة لكل جولة")</h2><p>Invited suppliers vs. submitted offers in closed rounds. Dashed line: minimum offers.</p><button class="rd-link" data-table="competition">@L("Table", "جدول")</button></header>
+                            <div class="rd-chart" data-chart="competition" role="img" aria-label="Competition bar chart"></div>
+                        </article>
+                        <article class="rd-card">
+                            <header><h2>@L("Historical award distribution", "توزيع الترسيات التاريخي")</h2><p data-award-note>Official award values per currency. Not payments.</p><button class="rd-link" data-table="awards">@L("Table", "جدول")</button></header>
+                            <div class="rd-chart" data-chart="awards" role="img" aria-label="Award distribution chart"></div>
+                        </article>
+                        <article class="rd-card">
+                            <header><h2>@L("Supplier DNA", "الحمض النووي للمورد")</h2><p>Normalized shares (0-100%) with their own denominators. Missing data is shown as missing.</p></header>
+                            <div class="rd-chart" data-chart="dna" role="img" aria-label="Supplier DNA radar chart"></div>
+                            <div class="rd-dna-basis" data-dna-basis></div>
+                        </article>
+                        <article class="rd-card">
+                            <header><h2>@L("Competition by group", "المنافسة حسب الجهة")</h2><p>Average offers per round by requesting department (tenders carry no category).</p></header>
+                            <div class="rd-chart rd-chart-sm" data-chart="groups" role="img" aria-label="Average offers by department"></div>
+                            <div class="rd-pairs" data-pairs></div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 2. Supplier network -->
+                <section class="rd-mode" id="mode-network" role="tabpanel" aria-labelledby="tab-network" data-mode-panel="network">
+                    <div class="rd-network" data-network-wrap>
+                        <div class="rd-cy" data-cy aria-label="Supplier relationship network. Use the relationship table for keyboard access." role="application"></div>
+                        <aside class="rd-graph-controls" aria-label="@L("Graph controls", "أدوات الشبكة")">
+                            <label class="rd-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg><input type="search" placeholder="@L("Find a supplier…", "ابحث عن مورد…")" data-graph-search aria-label="@L("Find a supplier in the network", "ابحث عن مورد في الشبكة")" /></label>
+                            <fieldset><legend>@L("Nodes", "العقد")</legend>
+                                <label><input type="checkbox" data-node-type="supplier" checked disabled /> <i class="rd-sw rd-sw-supplier"></i>Suppliers</label>
+                                <label><input type="checkbox" data-node-type="tender" /> <i class="rd-sw rd-sw-tender"></i>Tenders</label>
+                                <label><input type="checkbox" data-node-type="contact" checked /> <i class="rd-sw rd-sw-contact"></i>Shared contacts</label>
+                                <label><input type="checkbox" data-node-type="document" checked /> <i class="rd-sw rd-sw-document"></i>Documents</label>
+                            </fieldset>
+                            <fieldset data-edge-filters><legend>@L("Relationships", "العلاقات")</legend></fieldset>
+                            <div class="rd-graph-buttons">
+                                <button type="button" data-graph="fit">Fit</button>
+                                <button type="button" data-graph="focus" aria-pressed="false">Focus</button>
+                                <button type="button" data-graph="expand">Expand</button>
+                                <button type="button" data-graph="collapse">Collapse</button>
+                                <button type="button" data-graph="group">Group by type</button>
+                                <button type="button" data-graph="relayout">Re-layout</button>
+                                <button type="button" data-graph="path">Path</button>
+                                <button type="button" data-graph="png">PNG</button>
+                                <button type="button" data-graph="table" aria-pressed="false">Table</button>
+                            </div>
+                            <p class="rd-hint">Click a supplier to focus it, Shift+click to multi-select, double-click to expand its tenders. Click an edge for its evidence.</p>
+                        </aside>
+                        <div class="rd-legend" data-legend aria-label="Graph legend"></div>
+                        <div class="rd-graph-table" data-graph-table hidden></div>
+                        <div class="rd-empty" data-network-empty hidden></div>
+                    </div>
+                </section>
+
+                <!-- 3. Price intelligence -->
+                <section class="rd-mode" id="mode-price" role="tabpanel" aria-labelledby="tab-price" data-mode-panel="price">
+                    <div class="rd-grid rd-grid-price">
+                        <article class="rd-card rd-span-2">
+                            <header><h2>@L("Relative price position over time", "موقع السعر النسبي عبر الزمن")</h2><p>Offer total ÷ round median − 1, same round and currency only. Below 0 = cheaper than the median.</p><button class="rd-link" data-table="positions">@L("Table", "جدول")</button></header>
+                            <div class="rd-chart rd-chart-lg" data-chart="positions" role="img" aria-label="Relative price position chart"></div>
+                        </article>
+                        <article class="rd-card rd-span-2">
+                            <header><h2>@L("Unit prices per tender item", "أسعار الوحدة لكل بند")</h2><p>Same item, quantity, unit, currency and round. Grey bar = min–max range, tick = median.</p><select data-item-select aria-label="Tender item"></select></header>
+                            <div class="rd-chart" data-chart="items" role="img" aria-label="Unit price comparison chart"></div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 4. Forensic intelligence -->
+                <section class="rd-mode" id="mode-forensic" role="tabpanel" aria-labelledby="tab-forensic" data-mode-panel="forensic">
+                    <div class="rd-forensic">
+                        <div class="rd-detectors" data-detectors></div>
+                        <div class="rd-dna-bar">
+                            <div><strong>Document DNA</strong> <span data-dna-state>SHA-256 exact matching runs automatically. Semantic similarity needs the local embedding model.</span></div>
+                            <button type="button" class="rd-btn" data-action="dna">Run Document DNA</button>
+                        </div>
+                        <div class="rd-findings" data-findings></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Guided briefing overlay -->
+            <div class="rd-briefing" data-briefing hidden>
+                <div class="rd-briefing-progress" data-brief-progress></div>
+                <p class="rd-briefing-kicker" data-brief-kicker></p>
+                <h3 data-brief-title></h3>
+                <p class="rd-briefing-text" data-brief-text></p>
+                <dl class="rd-briefing-facts" data-brief-facts></dl>
+                <div class="rd-briefing-controls">
+                    <button type="button" data-brief="prev" aria-label="Previous scene">‹</button>
+                    <button type="button" data-brief="toggle" aria-label="Pause">❚❚</button>
+                    <button type="button" data-brief="next" aria-label="Next scene">›</button>
+                    <button type="button" data-brief="replay">Replay</button>
+                    <button type="button" data-brief="ask">Ask about this</button>
+                    <button type="button" data-brief="stop">Stop</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="rd-resizer" data-resizer role="separator" aria-orientation="vertical" aria-label="Resize panel" tabindex="0"></div>
+
+        <aside class="rd-panel" data-panel aria-label="@L("Context panel", "اللوحة السياقية")">
+            <nav class="rd-panel-tabs" role="tablist">
+                <button role="tab" aria-selected="true" data-panel-tab="analyst">Analyst</button>
+                <button role="tab" aria-selected="false" data-panel-tab="details">Details</button>
+                <button role="tab" aria-selected="false" data-panel-tab="evidence">Evidence</button>
+                <button role="tab" aria-selected="false" data-panel-tab="scenario">Scenario</button>
+                <button type="button" class="rd-icon rd-collapse" data-action="collapse" aria-label="Collapse panel" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+            </nav>
+
+            <section class="rd-panel-body is-active" data-panel-body="analyst">
+                <div class="rd-voice">
+                    <div class="rd-voice-head">
+                        <div><strong>Live AI Market Analyst</strong><small data-voice-model>Local model · checking…</small></div>
+                        <span class="rd-voice-state" data-voice-state>Idle</span>
+                    </div>
+                    <div class="rd-orb-wrap">
+                        <canvas class="rd-wave" data-wave width="560" height="120" aria-hidden="true"></canvas>
+                        <button type="button" class="rd-orb" data-orb aria-label="Start live conversation"><canvas data-orb-canvas width="240" height="240" aria-hidden="true"></canvas><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg></button>
+                    </div>
+                    <div class="rd-voice-controls">
+                        <select data-rd-voice-language aria-label="Conversation language"><option value="auto">Auto (AR/EN)</option><option value="ar">العربية</option><option value="en">English</option></select>
+                        <button type="button" class="rd-icon" data-voice="mute" aria-pressed="false" aria-label="Mute microphone" title="Mute microphone"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg></button>
+                        <button type="button" class="rd-icon" data-voice="speaker" aria-pressed="true" aria-label="Voice replies on" title="Voice replies"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" /></svg></button>
+                        <button type="button" class="rd-icon" data-voice="stop" aria-label="Stop speaking" title="Stop speaking (Esc)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg></button>
+                        <button type="button" class="rd-icon rd-end" data-voice="end" aria-label="End conversation" title="End conversation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c5-5 13-5 18 0l-3 3-3-2v-3a12 12 0 0 0-6 0v3l-3 2z" /></svg></button>
+                        <label class="rd-speed">Speed <input type="range" min="0.8" max="1.3" step="0.05" value="1" data-voice-speed aria-label="Speech speed" /></label>
+                        <label class="rd-bargein" title="Experimental: interrupt the analyst by speaking. Uses browser echo cancellation; explicit Stop is always available."><input type="checkbox" data-voice-bargein /> Barge-in</label>
+                    </div>
+                </div>
+                <ol class="rd-transcript" data-transcript aria-live="polite" aria-label="Conversation transcript">
+                    <li class="rd-msg rd-msg-system">Ask about the market by voice or text. Answers use verified Orange Radar data; figures that cannot be verified are flagged and not read aloud.</li>
+                </ol>
+                <div class="rd-suggestions" data-suggestions></div>
+                <form class="rd-ask" data-ask-form>
+                    <input type="text" maxlength="1200" placeholder="Type a question…" data-ask-input aria-label="Ask the market analyst" />
+                    <button type="submit" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg></button>
+                </form>
+                <p class="rd-metrics" data-voice-metrics></p>
+            </section>
+
+            <section class="rd-panel-body" data-panel-body="details"><div data-details><p class="rd-muted">Select a supplier in any chart or in the network. Shift+click to compare up to four suppliers.</p></div></section>
+            <section class="rd-panel-body" data-panel-body="evidence"><div data-evidence><p class="rd-muted">Select a relationship edge or a finding to inspect its evidence.</p></div></section>
+            <section class="rd-panel-body" data-panel-body="scenario">
+                <div class="rd-scenario">
+                    <h3>Market dependency simulator</h3>
+                    <p class="rd-muted">Hypothetical replay of recorded history without the chosen suppliers. It is not a forecast and changes no supplier status or decision.</p>
+                    <div class="rd-scenario-pick" data-scenario-pick></div>
+                    <button type="button" class="rd-btn rd-btn-primary" data-action="simulate">Run scenario</button>
+                    <div data-scenario-result></div>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <footer class="rd-timeline" aria-label="Historical timeline">
+        <button type="button" class="rd-icon" data-timeline="play" aria-label="Play historical replay"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" /></svg></button>
+        <button type="button" class="rd-icon" data-timeline="reset" aria-label="Reset replay"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5" /></svg></button>
+        <select data-timeline-speed aria-label="Replay speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+        <div class="rd-track">
+            <canvas data-timeline-canvas height="44" aria-hidden="true"></canvas>
+            <input type="range" min="0" max="1000" value="1000" data-timeline-range aria-label="Replay date" />
+        </div>
+        <output data-timeline-date>All history</output>
+    </footer>
+</div>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/lib/cytoscape/cytoscape.min.js" asp-append-version="true"></script>
+    <script src="~/js/orange-radar.js" asp-append-version="true"></script>
+    <script src="~/js/orange-radar-voice.js" asp-append-version="true"></script>
+}

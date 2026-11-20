@@ -1,0 +1,68 @@
+@model Orange_Tendering_System.Services.TenderWorkflowService.ExecutiveSummaryPage
+@using Orange_Tendering_System.Models.Entities
+@{
+    var f = Model.Facts; var r = Model.Review; var tenderId = r.Tender.Id;
+    ViewData["Title"] = "Executive summary"; ViewData["WorkspaceSection"] = "Tender";
+    ViewData["Description"] = "Summarize the signed evaluation report for the Top Committee. The committee's scores, votes and signatures are not changed here.";
+    var submitted = Model.Submitted != null;
+    var evalSigned = r.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null);
+}
+@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /> }
+<partial name="_PageHeader" />
+<div class="pf-page">
+    <section class="ws-panel pg-panel pf-section">
+        <div class="pf-section-head"><span class="pf-step">i</span><div><h2>@f.Title</h2><p>@f.Reference · PR-@f.RequestId · @f.Department</p></div></div>
+        <dl class="pf-facts">
+            <div><dt>Recommended supplier</dt><dd>@(f.Recommended ?? "No single offer (tie)")</dd></div>
+            <div><dt>Recommended offer total</dt><dd class="pf-num">@(f.RecommendedTotal is decimal total ? CurrencyRules.Format(total, f.Currency) : "—")</dd></div>
+            <div><dt>Approved weights</dt><dd>Financial @f.FinancialWeight?.ToString("0.##")% · Technical @f.TechnicalWeight?.ToString("0.##")%</dd></div>
+            <div><dt>Offers</dt><dd>@f.ReceivedOffers received · @f.EligibleOffers evaluated</dd></div>
+            <div><dt>Committee signatures</dt><dd>@evalSigned of 4 on version @f.ReportVersion</dd></div>
+        </dl>
+        @if (f.Ranking.Count > 0)
+        {
+            <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Rank</th><th>Supplier</th><th class="pf-right">Final weighted score</th></tr></thead><tbody>
+            @foreach (var row in f.Ranking) { <tr class="@(row.Rank == 1 ? "pf-best" : null)"><td>@row.Rank</td><td>@row.Supplier</td><td class="pf-right pf-num">@row.Score.ToString("0.0")</td></tr> }
+            </tbody></table></div>
+        }
+        <details class="pf-more"><summary>Read the signed evaluation report (PDF)</summary>
+            <p class="pg-hint">Opening it is recorded; signing requires that you opened this exact version (SHA-256 @r.Report.PdfSha256?[..12]…).</p>
+            <iframe title="Signed evaluation report" src="@Url.Action("Pdf", "Reports", new { area = "SourcingManager", id = r.Report.Id })" style="width:100%;height:70vh;border:1px solid var(--ws-rule);border-radius:12px"></iframe>
+            <p><a class="pg-btn" asp-area="SourcingManager" asp-controller="Reports" asp-action="Pdf" asp-route-id="@r.Report.Id" asp-route-download="true">Download the report (PDF)</a></p>
+        </details>
+    </section>
+
+    @if (ViewData["SummaryError"] is string error) { <p class="pf-note pf-warn" role="alert">@error</p> }
+
+    <form method="post" asp-action="ExecutiveSummary" asp-route-id="@tenderId" class="pg-form ws-panel pg-panel pf-section">
+        <div class="pf-section-head"><span class="pf-step">1</span><div><h2>Executive summary for the Top Committee</h2><p>Pre-filled from the recorded request, ranking and committee recommendations. Correct and complete it in your own words.</p></div></div>
+        <fieldset @(Model.CanEdit && !submitted ? null : "disabled")>
+            <div class="pg-form-grid">
+                <div class="pg-field pg-field-wide"><label asp-for="Input.BusinessNeed" class="pf-required">Business need</label><textarea asp-for="Input.BusinessNeed" rows="3" maxlength="4000"></textarea></div>
+                <div class="pg-field pg-field-wide"><label asp-for="Input.KeyFindings" class="pf-required">Key financial and technical findings</label><textarea asp-for="Input.KeyFindings" rows="4" maxlength="4000"></textarea></div>
+                <div class="pg-field pg-field-wide"><label asp-for="Input.RecommendationReasons" class="pf-required">Main reasons for the recommendation</label><textarea asp-for="Input.RecommendationReasons" rows="4" maxlength="4000"></textarea></div>
+                <div class="pg-field pg-field-wide"><label asp-for="Input.Risks">Important risks and observations</label><textarea asp-for="Input.Risks" rows="3" maxlength="4000"></textarea></div>
+                <div class="pg-field pg-field-wide"><label asp-for="Input.ManagerAssessment" class="pf-required">Your executive assessment</label><textarea asp-for="Input.ManagerAssessment" rows="4" maxlength="4000" placeholder="Your conclusion for the Top Committee"></textarea></div>
+            </div>
+            @if (Model.CanEdit && !submitted)
+            {
+                <div class="pf-section-head" style="margin-top:18px"><span class="pf-step">2</span><div><h2>Submit to the Top Committee</h2><p>Submitting signs your Manager section of the evaluation report and opens the Top Committee decision. You cannot edit the summary afterwards.</p></div></div>
+                <input type="hidden" name="documentHash" value="@r.Report.PdfSha256" />
+                <partial name="_ReportSignaturePad" />
+                <label class="pg-check"><input type="checkbox" name="confirmed" value="true" /> I reviewed the signed evaluation report (version @f.ReportVersion) and submit this summary.</label>
+                <div class="pg-actions">
+                    <button type="submit" name="intent" value="save" class="pg-btn" formnovalidate>Save draft</button>
+                    <button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary" data-confirm="Submit the executive summary to the Top Committee? It will be locked and your Manager signature recorded.">Submit Executive Summary to Top Committee</button>
+                    <a class="pg-btn" asp-action="Index" asp-route-open="@tenderId">Back to the tender</a>
+                </div>
+                <p class="pg-hint">To send the report back for a correction, or to reject it, use the tender page (both require a written reason).</p>
+            }
+            else
+            {
+                <p class="pf-note">@(submitted ? $"Submitted on {Model.Submitted!.SubmittedAt?.ToJordan("d MMM yyyy HH:mm")}. The Top Committee decides from here." : "This report is not awaiting your executive summary.")</p>
+                <div class="pg-actions"><a class="pg-btn" asp-action="Index" asp-route-open="@tenderId">Back to the tender</a></div>
+            }
+        </fieldset>
+    </form>
+</div>
+

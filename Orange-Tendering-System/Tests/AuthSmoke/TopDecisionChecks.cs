@@ -18,8 +18,9 @@ using Orange_Tendering_System.Services;
 using Orange_Tendering_System.ViewModels;
 
 // Top Committee rejection and Re-Tendering on real SQL Server, real PDF preparation/signing and real Identity HTTP checks.
-// Rule under test: one authorized Reject stops the Top approval at once -> Sourcing Manager -> Sourcing Officer, who notifies the
-// suppliers and either cancels the tender (reason 1) or reissues it as a new round of the same tender (reason 2, never beyond round 4).
+// Rules under test (workflow redesign): one authorized Reject stops the Top approval at once and goes straight to the Sourcing Officer
+// (the Manager is informed, no acknowledgement), who notifies the suppliers and either cancels the tender or reissues it as a new round
+// (never beyond round 4). Four distinct approvals of the same report version award the tender automatically, with no Manager step.
 public static class TopDecisionChecks
 {
  public static async Task Run()
@@ -74,7 +75,7 @@ public static class TopDecisionChecks
     var cr=new CommitteeRound{TenderRoundId=round.Id,CommitteeType=CommitteeType.Evaluation,RoundNumber=1,StartedAt=now};db.Add(cr);await db.SaveChangesAsync();
     var criteria=new[]{new EvaluationCriterion{CommitteeRoundId=cr.Id,Name="Financial",Type=CriterionType.Financial,Weight=40,MaxScore=100},new EvaluationCriterion{CommitteeRoundId=cr.Id,Name="Technical",Type=CriterionType.Technical,Weight=60,MaxScore=100}};db.AddRange(criteria);
     var ai=new AiAnalysis{TenderRoundId=round.Id,Status="Completed",Model="fixture-not-live-ai",Findings="Isolated source fixture",EvidenceJson="{}",ReviewedAt=now};db.Add(ai);await db.SaveChangesAsync();
-    var policy=new TenderApprovalPolicy{Version="isolated",TopCommitteeRequirement="All",TopQuorum=3,TopApprovalsRequired=3,RejectVoteBlocksAward=false,TopTieOutcome="Block"};
+    var policy=new TenderApprovalPolicy{Version="isolated",TopCommitteeRequirement="All",TopQuorum=4,TopApprovalsRequired=4,RejectVoteBlocksAward=true,TopTieOutcome="Block"};
     var session=new EvaluationSession{TenderRoundId=round.Id,WeightRoundId=weights.Id,CommitteeRoundId=cr.Id,AiAnalysisId=ai.Id,State=SessionState.Scheduled,StartsAt=now.AddHours(-1),EndsAt=now.AddDays(1),FinalApprovalPolicyJson=JsonSerializer.Serialize(policy)};db.Add(session);await db.SaveChangesAsync();
     foreach(var seat in seats)db.Add(new EvaluationParticipation{EvaluationSessionId=session.Id,CommitteeMemberId=seat.Id,SubmittedAt=now});
     for(int i=0;i<3;i++){
@@ -85,14 +86,16 @@ public static class TopDecisionChecks
     await db.SaveChangesAsync();
    });
    await RunFlow(w=>w.EndEvaluation(tenderId,true,"Isolated complete scores",Principal(officer)));
-   await RunFlow(w=>w.SendReportToCommittee(tenderId,Principal(officer)));
    int report=0;string hash="";await Db(async db=>{var s=await db.Set<EvaluationSession>().Include(x=>x.Report).SingleAsync(x=>x.TenderRound.TenderId==tenderId);report=s.ReportId!.Value;hash=s.Report!.PdfSha256!;});
    foreach(var evaluator in evaluators){await Flow(w=>w.ReportPdf(report,Principal(evaluator)));await RunFlow(w=>w.FinalizeReport(tenderId,"Reviewed",Principal(evaluator),hash,true));}
    await RunFlow(w=>w.Forward(tenderId,Principal(officer)));await Flow(w=>w.ReportPdf(report,Principal(manager)));
-   await RunFlow(w=>w.ManagerDecision(tenderId,"Approve","Reviewed",Principal(manager),hash,true));
+   await Refuse(w=>w.ManagerDecision(tenderId,"Approve","Reviewed",Principal(manager),hash,true),label+": Manager approval without an executive summary is refused","executive summary");
+   await RunFlow(w=>w.SubmitExecutiveSummary(tenderId,Summary(),Principal(manager),hash,true,null));
    foreach(var top in tops)await Flow(w=>w.ReportPdf(report,Principal(top)));
    Check(true,label+": real generated PDF, four evaluation signatures and Manager signature, waiting for Top");return(tenderId,report,hash,supplierIds);
   }
+  ExecutiveSummaryInput Summary()=>new(){BusinessNeed="The department needs the requested equipment for daily work.",KeyFindings="Three compliant offers were evaluated with the approved weights.",
+   RecommendationReasons="The recommended offer has the highest final weighted score.",ManagerAssessment="I support the committee's recommendation for approval."};
   Task Vote((int Tender,int Report,string Hash,List<int> Suppliers) f,int n,VoteDecision decision,TopRejectionReason? reason)=>RunFlow(w=>w.TopVote(f.Tender,decision,"Signed fixture justification",Principal(tops[n]),f.Hash,true,rejectionReason:reason));
   async Task<FinalDecisionNotice?> Notice(int tender){FinalDecisionNotice? n=null;await Db(async db=>n=await db.Set<FinalDecisionNotice>().AsNoTracking().OrderByDescending(x=>x.Id).FirstOrDefaultAsync(x=>x.TenderId==tender));return n;}
   async Task<int> Notes(string userId,string title){int c=0;await Db(async db=>c=await db.Notifications.CountAsync(x=>x.UserId==userId&&x.Title==title));return c;}
@@ -108,7 +111,7 @@ public static class TopDecisionChecks
   await Vote(cancel,0,VoteDecision.Approve,null);
   await Vote(cancel,1,VoteDecision.Reject,TopRejectionReason.NotNeeded);
   var n1=await Notice(cancel.Tender);
-  Check(n1 is { Outcome: FinalDecisionOutcome.Cancel, Status: FinalDecisionStatus.AwaitingManager, RejectionReason: TopRejectionReason.NotNeeded }&&n1.RejectedByUserId==tops[1],"one Reject immediately creates the cancellation notice for the Manager");
+  Check(n1 is { Outcome: FinalDecisionOutcome.Cancel, Status: FinalDecisionStatus.ForwardedToOfficer, RejectionReason: TopRejectionReason.NotNeeded, ManagerAcknowledgedAt: null }&&n1.RejectedByUserId==tops[1],"one Reject immediately sends the cancellation to the Officer (no Manager acknowledgement)");
   await Db(async db=>{
    Check(await db.CommitteeRounds.AnyAsync(x=>x.TenderReportId==cancel.Report&&x.CommitteeType==CommitteeType.Top&&x.Status==CommitteeRoundStatus.Rejected&&x.CompletedAt!=null),"Top round locked as Rejected after one Reject (even after an approval)");
    Check(await db.Tenders.AnyAsync(x=>x.Id==cancel.Tender&&x.Status==TenderStatus.Rejected&&x.AwardedBidId==null),"tender stopped: no award possible");
@@ -116,15 +119,12 @@ public static class TopDecisionChecks
   });
   await Refuse(w=>w.TopVote(cancel.Tender,VoteDecision.Approve,"Late",Principal(tops[2]),cancel.Hash,true),"further Top votes refused after the rejection","stopped");
   await Refuse(w=>w.TopVote(cancel.Tender,VoteDecision.Retender,"Late",Principal(tops[3]),cancel.Hash,true),"a later Re-Tender cannot change the decision","stopped");
-  Check(await Notes(manager,"Top Committee rejected the tender")==1,"Manager notified once of the rejection");
+  Check(await Notes(manager,"Top Committee rejected the tender")==1,"Manager informed once of the rejection");
+  Check(await Notes(officer,"Top Committee rejected the tender")==1,"Officer receives the actionable rejection once");
+  await Db(async db=>Check(await db.CommitteeVotes.Where(x=>x.CommitteeRound.TenderReportId==cancel.Report&&x.CommitteeRound.CommitteeType==CommitteeType.Top&&x.Decision==VoteDecision.Approve).AllAsync(x=>x.Comment==null),"an approval never stores a (hidden) justification text"));
   var details=await Flow(w=>w.TopRejectionDetails(cancel.Report,Principal(tops[0])));Check(details.FinalReason==TopRejectionReason.NotNeeded&&!details.CanAgree,"rejection details show the single final reason");
   await Refuse(w=>w.Award(cancel.Tender,Principal(officer)),"award refused after a rejection");
-  await Refuse(w=>w.NotifySuppliers(cancel.Tender,Principal(officer)),"Officer cannot act before the Manager forwards","acknowledge and forward");
-  await Refuse(w=>w.ManagerAcknowledge(cancel.Tender,null,Principal(tops[0])),"Top member cannot forward the rejection");
-  await Refuse(w=>w.ManagerAcknowledge(cancel.Tender,null,Principal(officer)),"Officer cannot forward the rejection");
-  await RunFlow(w=>w.ManagerAcknowledge(cancel.Tender,"Forwarded",Principal(manager)));
-  await Refuse(w=>w.ManagerAcknowledge(cancel.Tender,"Again",Principal(manager)),"forwarding twice is refused (idempotent)");
-  Check((await Notice(cancel.Tender))!.Status==FinalDecisionStatus.ForwardedToOfficer&&await Notes(officer,"Top Committee rejection forwarded by the Sourcing Manager")==1,"Manager-to-Officer handoff recorded and Officer notified once");
+  await Refuse(w=>w.ManagerAcknowledge(cancel.Tender,"Forwarded",Principal(manager)),"no Manager acknowledgement step exists for a new rejection","No acknowledgement");
   await Refuse(w=>w.NotifySuppliers(cancel.Tender,Principal(manager)),"Manager cannot notify suppliers");
   await RunFlow(w=>w.NotifySuppliers(cancel.Tender,Principal(officer)));
   await Refuse(w=>w.NotifySuppliers(cancel.Tender,Principal(officer)),"cancellation runs once (idempotent)","already notified");
@@ -142,20 +142,18 @@ public static class TopDecisionChecks
   // ---------- 2. RE-TENDER after three approvals: Manager forwards, Officer edits and publishes round 2 ----------
   var reissue=await Fixture("Re-tendering");
   for(int i=0;i<3;i++)await Vote(reissue,i,VoteDecision.Approve,null);
-  Check((await Notice(reissue.Tender)) is { Outcome: FinalDecisionOutcome.Award, Status: FinalDecisionStatus.AwaitingManager },"APPROVE: 3 approvals create the normal approval relay");
-  await RunFlow(w=>w.ManagerAcknowledge(reissue.Tender,"Approved relay",Principal(manager)));
+  Check(await Notice(reissue.Tender)==null,"three approvals are not a decision: 4 of 4 is required");
+  await Db(async db=>Check(await db.Tenders.AnyAsync(x=>x.Id==reissue.Tender&&x.AwardedBidId==null&&x.Status==TenderStatus.TopCommitteeReview),"no award after three approvals"));
   await RunFlow(w=>w.TopVote(reissue.Tender,VoteDecision.Retender,"All offers exceed the budget by 40%",Principal(tops[3]),reissue.Hash,true));
   var n2=await Notice(reissue.Tender);
-  Check(n2 is { Outcome: FinalDecisionOutcome.Retender, Status: FinalDecisionStatus.AwaitingManager, ManagerAcknowledgedAt: null, RejectionReason: null }&&n2.DecisionReason=="All offers exceed the budget by 40%","one Re-Tender after three approvals stops the cycle and goes to the Manager with its reason");
-  Check(await Notes(manager,"Top Committee requested a Re-Tender")==1,"Manager receives the Re-Tender request once");
+  Check(n2 is { Outcome: FinalDecisionOutcome.Retender, Status: FinalDecisionStatus.ForwardedToOfficer, ManagerAcknowledgedAt: null, RejectionReason: null }&&n2.DecisionReason=="All offers exceed the budget by 40%","one Re-Tender after three approvals stops the cycle and goes straight to the Officer with its reason");
+  Check(await Notes(manager,"Top Committee requested a Re-Tender")==1,"Manager informed of the Re-Tender request once");
   await Refuse(w=>w.TopVote(reissue.Tender,VoteDecision.Reject,"Changed my mind",Principal(tops[0]),reissue.Hash,true),"approval cycle locked: an earlier signed vote cannot be changed after the Re-Tender");
   await Db(async db=>Check(await db.CommitteeVotes.CountAsync(x=>x.CommitteeRound.TenderReportId==reissue.Report&&x.CommitteeRound.CommitteeType==CommitteeType.Top)==4,"no extra vote recorded after the Re-Tender"));
   await Refuse(w=>w.Award(reissue.Tender,Principal(officer)),"award refused although three members approved");
-  await Db(async db=>Check(await db.AuditLogs.AnyAsync(x=>x.EntityId==reissue.Tender.ToString()&&x.Action=="TopApprovalRelayReplacedByRejection")&&await db.AuditLogs.AnyAsync(x=>x.EntityId==reissue.Tender.ToString()&&x.Action=="TopRetenderStoppedApproval"),"replaced approval and the Re-Tender stop are audited"));
+  await Db(async db=>Check(await db.AuditLogs.AnyAsync(x=>x.EntityId==reissue.Tender.ToString()&&x.Action=="TopRetenderStoppedApproval"),"the Re-Tender stop is audited"));
   var input=new RetenderInput{Title="Re-tendering (round 2)",Description="Updated scope for the reissued round",Deadline=DateTimeOffset.UtcNow.AddDays(5),SupplierIds=[reissue.Suppliers[0],reissue.Suppliers[1]]};
-  await Refuse(w=>w.PublishRetender(reissue.Tender,input,Principal(officer)),"Officer cannot publish before the Manager forwards","forward");
-  await RunFlow(w=>w.ManagerAcknowledge(reissue.Tender,"Reviewed: re-tender",Principal(manager)));
-  Check(await Notes(officer,"Re-Tender request forwarded by the Sourcing Manager")==1,"Officer receives a visible actionable Re-Tender request");
+  Check(await Notes(officer,"Top Committee requested a Re-Tender")==1,"Officer receives a visible actionable Re-Tender request directly");
   await Refuse(w=>w.NotifySuppliers(reissue.Tender,Principal(officer)),"Re-Tender is not executed by Notify Suppliers","Prepare the new round");
   var plan=await Flow(w=>w.RetenderPlan(reissue.Tender,Principal(officer)));
   Check(plan.Blocked==null&&plan.RoundNumber==1&&reissue.Suppliers.All(id=>plan.Suppliers.Any(x=>x.Id==id&&x.Previous)),"preparation page retains all previous participants");
@@ -205,19 +203,14 @@ public static class TopDecisionChecks
   await RunFlow(w=>w.Setup(reissue.Tender,new SessionInput{AiAnalysisId=ai2,StartsAt=DateTimeOffset.UtcNow.AddSeconds(3),EndsAt=DateTimeOffset.UtcNow.AddHours(1),MeetingUrl="https://meet.jit.si/OrangeTenderRound2Fixture"},Principal(officer)));
   await Task.Delay(4500);
   foreach(var evaluator in evaluators)await RunFlow(w=>w.SubmitEvaluation(reissue.Tender,newBids.Select((b,i)=>new ScoreInput{BidId=b,Financial=80-i*5,Technical=85-i*5,Justification="Round 2 score"}).ToList(),Principal(evaluator)));
-  await RunFlow(w=>w.EndEvaluation(reissue.Tender,true,"All four round 2 evaluations",Principal(officer)));
-  await RunFlow(w=>w.SendReportToCommittee(reissue.Tender,Principal(officer)));
   int report2=0;string hash2="";await Db(async db=>{var s2=await db.Set<EvaluationSession>().Include(x=>x.Report).SingleAsync(x=>x.TenderRoundId==newRound);report2=s2.ReportId!.Value;hash2=s2.Report!.PdfSha256!;});
-  Check(report2!=reissue.Report,"round 2 generates a new report");
+  Check(report2!=reissue.Report,"round 2: the fourth evaluation generates a new report automatically (no Officer step)");
   foreach(var evaluator in evaluators){await Flow(w=>w.ReportPdf(report2,Principal(evaluator)));await RunFlow(w=>w.FinalizeReport(reissue.Tender,"Reviewed round 2",Principal(evaluator),hash2,true));}
   await RunFlow(w=>w.Forward(reissue.Tender,Principal(officer)));await Flow(w=>w.ReportPdf(report2,Principal(manager)));
-  await RunFlow(w=>w.ManagerDecision(reissue.Tender,"Approve","Round 2 reviewed",Principal(manager),hash2,true));
+  await RunFlow(w=>w.SubmitExecutiveSummary(reissue.Tender,Summary(),Principal(manager),hash2,true,null));
   await Db(async db=>Check(await db.CommitteeRounds.AnyAsync(x=>x.TenderReportId==report2&&x.CommitteeType==CommitteeType.Top&&x.Status==CommitteeRoundStatus.InProgress)&&await db.CommitteeRounds.AnyAsync(x=>x.TenderReportId==reissue.Report&&x.Status==CommitteeRoundStatus.Rejected),"fresh Top decision cycle; the old cycle's approvals are not carried over"));
   foreach(var top in tops)await Flow(w=>w.ReportPdf(report2,Principal(top)));
-  for(int i=0;i<3;i++)await RunFlow(w=>w.TopVote(reissue.Tender,VoteDecision.Approve,"Round 2 approved",Principal(tops[i]),hash2,true));
-  await RunFlow(w=>w.ManagerAcknowledge(reissue.Tender,"Round 2 approved",Principal(manager)));
-  await RunFlow(w=>w.Award(reissue.Tender,Principal(officer)));
-  await RunFlow(w=>w.NotifySuppliers(reissue.Tender,Principal(officer)));
+  for(int i=0;i<4;i++)await RunFlow(w=>w.TopVote(reissue.Tender,VoteDecision.Approve,"",Principal(tops[i]),hash2,true));
   await Db(async db=>{
    var t=await db.Tenders.SingleAsync(x=>x.Id==reissue.Tender);
    Check(t.Status==TenderStatus.Awarded&&newBids.Contains(t.AwardedBidId!.Value),"restarted workflow ends in an award from a round-2 bid");
@@ -226,10 +219,9 @@ public static class TopDecisionChecks
 
   // ---------- 3. Round limit: Re-Tender never creates round 5 ----------
   var limit=await Fixture("Round limit",4);
-  await Refuse(w=>w.TopVote(limit.Tender,VoteDecision.Retender,"Try again",Principal(tops[0]),limit.Hash,true),"Re-Tender refused in round 4 of 4 with the next permissible action","Approve or Reject");
+  await Refuse(w=>w.TopVote(limit.Tender,VoteDecision.Retender,"Try again with other suppliers",Principal(tops[0]),limit.Hash,true),"Re-Tender refused in round 4 of 4 with the next permissible action","Approve or Reject");
   await Db(async db=>Check(await db.CommitteeRounds.AnyAsync(x=>x.TenderReportId==limit.Report&&x.CommitteeType==CommitteeType.Top&&x.Status==CommitteeRoundStatus.InProgress),"refused Re-Tender leaves the round-4 approval open"));
   await Vote(limit,0,VoteDecision.Reject,null);
-  await RunFlow(w=>w.ManagerAcknowledge(limit.Tender,"Forward",Principal(manager)));
   // Even a Re-Tender request recorded in round 4 (for example older data) cannot be executed.
   await Db(async db=>{var n=await db.Set<FinalDecisionNotice>().SingleAsync(x=>x.TenderId==limit.Tender);n.Outcome=FinalDecisionOutcome.Retender;n.RejectionReason=null;await db.SaveChangesAsync();});
   var limitPlan=await Flow(w=>w.RetenderPlan(limit.Tender,Principal(officer)));
@@ -253,13 +245,28 @@ public static class TopDecisionChecks
   // ---------- 5. APPROVE: existing successful path when nobody stops it ----------
   var approve=await Fixture("Approval preserved");
   for(int i=0;i<3;i++)await Vote(approve,i,VoteDecision.Approve,null);
-  await RunFlow(w=>w.ManagerAcknowledge(approve.Tender,"Approved",Principal(manager)));
-  await RunFlow(w=>w.Award(approve.Tender,Principal(officer)));
-  await RunFlow(w=>w.NotifySuppliers(approve.Tender,Principal(officer)));
+  await Refuse(w=>w.Award(approve.Tender,Principal(officer)),"Officer cannot award after three approvals");
+  await RunFlow(w=>w.TopVote(approve.Tender,VoteDecision.Approve,"",Principal(tops[0]),approve.Hash,true)); // retry of the same signed vote
+  await Db(async db=>Check(await db.CommitteeVotes.CountAsync(x=>x.CommitteeRound.TenderReportId==approve.Report&&x.CommitteeRound.CommitteeType==CommitteeType.Top)==3
+    &&await db.Tenders.AnyAsync(x=>x.Id==approve.Tender&&x.AwardedBidId==null),"a repeated approval by the same member is idempotent: no second vote, no award"));
+  await RunFlow(w=>w.TopVote(approve.Tender,VoteDecision.Approve,"",Principal(tops[3]),approve.Hash,true));
   await Db(async db=>{
-   Check(await db.Tenders.AnyAsync(x=>x.Id==approve.Tender&&x.Status==TenderStatus.Awarded&&x.AwardedBidId!=null),"no rejection: award path unchanged");
-   Check(await db.Set<SupplierResultDelivery>().CountAsync(x=>x.TenderId==approve.Tender&&(x.Outcome=="Won"||x.Outcome=="Unsuccessful"))==3,"award results delivered as before");
+   var t=await db.Tenders.SingleAsync(x=>x.Id==approve.Tender);
+   var report=await db.TenderReports.SingleAsync(x=>x.Id==approve.Report);
+   Check(t.Status==TenderStatus.Awarded&&t.AwardedBidId==report.RecommendedBidId&&t.AwardedAt!=null&&t.ClosedAt!=null,"the fourth approval awards the recommended offer automatically");
+   Check(t.AwardApprovalEvidenceJson!.Contains("AutomaticOnUnanimousTopApproval"),"award evidence records the automatic unanimous decision");
+   var n=await db.Set<FinalDecisionNotice>().SingleAsync(x=>x.TenderId==approve.Tender);
+   Check(n.Status==FinalDecisionStatus.SuppliersNotified&&n.TopApprovals==4&&n.ManagerAcknowledgedAt==null,"no Sourcing Manager approval after the unanimous Top decision");
+   Check(await db.Set<SupplierResultDelivery>().CountAsync(x=>x.TenderId==approve.Tender&&(x.Outcome=="Won"||x.Outcome=="Unsuccessful"))==3,"each supplier gets its own result automatically");
+   var link="/Workflow/Details/"+approve.Tender;
+   Check(await db.Notifications.CountAsync(x=>x.UserId==requester&&x.Title=="Purchase request awarded"&&x.Message.Contains("Approval preserved"))==1&&await db.Notifications.CountAsync(x=>x.UserId==officer&&x.Title=="Tender awarded"&&x.Link==link)==1
+     &&await db.Notifications.CountAsync(x=>x.UserId==manager&&x.Title=="Tender awarded"&&x.Link==link)==1&&await db.Notifications.CountAsync(x=>x.UserId==tops[0]&&x.Title=="Tender awarded"&&x.Link==link)==1,"department, Officer, Manager and Top members notified once");
+   var supplierMessages=await db.Notifications.Where(x=>x.Title=="Tender result").Select(x=>x.Message).ToListAsync();
+   Check(supplierMessages.All(m=>!m.Contains("score")&&!m.Contains("vote")&&!m.Contains("JOD")),"supplier messages reveal no competitor, score, vote or price");
   });
+  await Refuse(w=>w.TopVote(approve.Tender,VoteDecision.Reject,"Changed my mind after the award",Principal(tops[1]),approve.Hash,true),"a signed approval cannot be turned into a rejection after the award");
+  await Refuse(w=>w.ManagerAcknowledge(approve.Tender,"Approved",Principal(manager)),"no Manager acknowledgement after the award","No acknowledgement");
+  await Refuse(w=>w.NotifySuppliers(approve.Tender,Principal(officer)),"suppliers are not notified twice","already notified");
 
   // ---------- HTTP: real Identity login, role and CSRF filters ----------
   using var client=app.CreateClient(new(){BaseAddress=new Uri("https://localhost"),AllowAutoRedirect=false});

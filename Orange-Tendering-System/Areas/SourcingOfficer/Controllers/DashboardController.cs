@@ -92,7 +92,7 @@ public class DashboardController(ApplicationDbContext db) : Controller
     // Real Manager -> Officer handoffs only:
     //  - the assigned Sourcing Manager rejected a "proceed with fewer suppliers" request, so the Officer may re-tender the round;
     //  - the Manager approved that request, so the Officer can schedule the evaluation;
-    //  - the Manager acknowledged and forwarded a final decision to the Officer.
+    //  - a Top Committee rejection / Re-Tender request reached the Officer (directly; older notices after the Manager's acknowledgement).
     // Each item disappears once the Officer has acted (new round, evaluation scheduled, suppliers notified).
     private async Task<List<OfficerHandoff>> Handoffs()
     {

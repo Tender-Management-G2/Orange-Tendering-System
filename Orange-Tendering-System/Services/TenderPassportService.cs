@@ -131,7 +131,7 @@ public sealed partial class TenderPassportService(ApplicationDbContext db, TimeP
                 TenderStatus.Evaluation => s == null ? "Evaluation Committee" : s.State switch
                 {
                     SessionState.Scheduled => "Evaluation Committee",
-                    SessionState.ReportDraft => s.ReportSentAt == null ? "Sourcing Officer" : "Evaluation Committee",
+                    SessionState.ReportDraft => "Evaluation Committee",
                     _ => "Sourcing Officer"
                 },
                 TenderStatus.OfficerReview => "Sourcing Officer",

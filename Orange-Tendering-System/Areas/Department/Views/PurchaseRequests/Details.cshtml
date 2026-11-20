@@ -35,7 +35,7 @@
 </section>
 <section class="ws-panel pg-panel">
     <h2>Requested items</h2>
-    <partial name="_Items" model='request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm { Name = i.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList()' />
+    <partial name="_Items" model='request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm { Name = i.Name, CategoryId = i.CategoryId, CategoryName = i.Category?.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList()' />
 </section>
 <section class="ws-panel pg-panel">
     <h2>Supporting attachments</h2>

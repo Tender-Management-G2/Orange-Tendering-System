@@ -15,6 +15,10 @@ namespace Orange_Tendering_System.Models.Entities
 
         public string? Specifications { get; set; }
 
+        // Null only for items created before categories existed.
+        public int? CategoryId { get; set; }
+        public ProcurementCategory? Category { get; set; }
+
         [Precision(18, 3)]
         public decimal Quantity { get; set; }
 

@@ -20,6 +20,8 @@ public class RequirementsInput
     [Range(0.01, double.MaxValue)] public decimal EstimatedValue { get; set; }
     [Required, RegularExpression("^[A-Z]{3}$")] public string Currency { get; set; } = "JOD";
     public bool IsCritical { get; set; }
+    // Offer document types every supplier must attach (OfferDocumentTypes keys).
+    public List<string> RequiredDocuments { get; set; } = [];
 }
 public class ScoreInput
 {
@@ -56,6 +58,7 @@ public class BidLineInput
     public string? Specifications { get; set; }
 }
 public record WorkflowListRow(int TenderId, string Title, string Status);
+public record WeightRevisionNotice(string Note, int[] CommitteeMemberIds, Dictionary<int, decimal> PriorFinancial);
 public class WorkflowDetails
 {
     public Tender Tender { get; set; } = null!;

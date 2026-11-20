@@ -50,7 +50,9 @@ public static class RetenderChecks
             var round=new TenderRound{TenderId=t.Id,RoundNumber=1,Status=TenderRoundStatus.Closed,Deadline=DateTime.UtcNow.AddMinutes(-1),CreatedByUserId=officerId,CreatedAt=DateTime.UtcNow};db.Add(round);await db.SaveChangesAsync();
             var invitation=new TenderInvitation{TenderRoundId=round.Id,SupplierId=supplier.Id,InvitedByUserId=officerId,InvitedAt=DateTime.UtcNow};db.Add(invitation);await db.SaveChangesAsync();
             var bid=new Bid{TenderInvitationId=invitation.Id,Status=BidStatus.Submitted,CreatedAt=DateTime.UtcNow};db.Add(bid);
-            db.Add(new WeightRound{TenderId=t.Id,Version=1,State=WeightState.Approved,ApprovedFinancial=40,ApprovedTechnical=60,ApprovedByUserId=officerId,ApprovedAt=DateTime.UtcNow,RequirementsJson="{}"});await db.SaveChangesAsync();oldBid=bid.Id;
+            db.Add(new WeightRound{TenderId=t.Id,Version=1,State=WeightState.Approved,ApprovedFinancial=40,ApprovedTechnical=60,ApprovedByUserId=officerId,ApprovedAt=DateTime.UtcNow,RequirementsJson="{}"});
+            // The tender was already published in round 1, so its Top Committee pre-tender approval exists.
+            db.Add(new PreTenderReview{TenderId=t.Id,Attempt=1,Status=PreTenderReviewStatus.Approved,ApprovalsRequired=4,SubmittedByUserId=officerId,SubmittedAt=DateTime.UtcNow,CompletedAt=DateTime.UtcNow});await db.SaveChangesAsync();oldBid=bid.Id;
         }
         async Task<string> Token(HttpClient c,string url) {
             var text=await (await c.GetAsync(url)).Content.ReadAsStringAsync();

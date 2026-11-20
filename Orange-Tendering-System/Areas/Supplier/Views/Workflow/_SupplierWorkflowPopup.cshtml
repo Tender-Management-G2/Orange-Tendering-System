@@ -25,7 +25,7 @@
         @foreach (var offer in Model.Offers)
         {
             <a class="pg-btn" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Details" asp-route-id="@offer.Id">My offer: @offer.Status</a>
-            @if (offer.CanEdit) { <a class="pg-btn pg-btn-primary" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Edit" asp-route-id="@offer.Id">Edit draft</a> }
+            @if (offer.CanEdit) { <a class="pg-btn pg-btn-primary" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Edit" asp-route-id="@offer.Id">Complete and submit</a> }
         }
     </section>
     <partial name="_SupplierTenderContent" model="Model" />

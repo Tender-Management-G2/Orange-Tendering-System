@@ -127,6 +127,18 @@
     $('[data-ok]', d).addEventListener('click', () => { d.close(); d.remove(); b.dataset.confirmed = '1'; b.click(); });
   });
 
+  /* ---------- Conditional reason: a [data-reason-box] is shown and required only for decisions other than Approve ----------
+     Hidden reasons are disabled and cleared, so a stale value is never posted with an approval (the server ignores it too). */
+  function syncReason(form) {
+    const box = form.querySelector('[data-reason-box]'); if (!box) return;
+    const picked = form.querySelector('[name=decision]:checked') || form.querySelector('select[name=decision]');
+    const need = !!picked && picked.value !== 'Approve';
+    box.hidden = !need;
+    box.querySelectorAll('[data-reason-input]').forEach(i => { i.disabled = !need; i.required = need; if (!need) i.value = ''; });
+  }
+  document.addEventListener('change', ev => { if (ev.target.name === 'decision' && ev.target.form) syncReason(ev.target.form); });
+  document.querySelectorAll('form').forEach(f => { if (f.querySelector('[data-reason-box]')) syncReason(f); });
+
   /* ---------- Table kit ---------- */
   const TONES = [
     [/approved|accepted|compliant|awarded|active|verified|submitted|open|answered|completed|signed|yes|live data/i, 'good'],

@@ -33,6 +33,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Roles", "Roles", "Index", "shield"),
                 new("Departments", "Departments", "Index", "building"),
                 new("Suppliers", "Suppliers", "Index", "layers"),
+                new("Categories", "Categories", "Index", "folder"),
                 new("Settings", "Settings", "Index", "settings"),
                 new("Audit Logs", "AuditLogs", "Index", "list"),
                 new("Analytics & Exports", "Analytics", "Index", "chart", "")
@@ -136,7 +137,8 @@ namespace Orange_Tendering_System.ViewModels
             ["vote"] = "<path d=\"M8 4H5v18h14V4h-3M9 2h6v5H9zM8 14l3 3 5-6\"/>",
             ["folder"] = "<path d=\"M3 6h7l2 3h9v11H3z\"/>",
             ["compare"] = "<path d=\"M8 3v18M16 3v18M3 8h5M16 16h5\"/>",
-            ["report"] = "<path d=\"M12 3v9h9\"/><path d=\"M8 4a9 9 0 1 0 12 12\"/>"
+            ["report"] = "<path d=\"M12 3v9h9\"/><path d=\"M8 4a9 9 0 1 0 12 12\"/>",
+            ["radar"] = "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 12 19 5\"/><circle cx=\"16\" cy=\"9\" r=\"1\"/>"
         };
 
         public static string Icon(string name) => Icons.TryGetValue(name, out var svg) ? svg : Icons["request"];

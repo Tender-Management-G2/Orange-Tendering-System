@@ -165,16 +165,25 @@
             var sync = function () { var b = boxes(), n = b.filter(function (x) { return x.checked; }).length, visible = b.filter(function (x) { return !x.closest('li').hidden; }), picked = visible.filter(function (x) { return x.checked; }).length; cnt.textContent = n + ' selected'; btn.disabled = n === 0; btn.textContent = n ? 'Invite ' + n + ' supplier' + (n > 1 ? 's' : '') : 'Invite selected'; all.checked = visible.length > 0 && picked === visible.length; all.indeterminate = picked > 0 && picked < visible.length; };
             all.addEventListener('change', function () { boxes().filter(function (x) { return !x.closest('li').hidden; }).forEach(function (x) { x.checked = all.checked; }); sync(); });
             f.addEventListener('change', function (e) { if (e.target !== all) sync(); }); sync();
-            var search = f.querySelector('[data-supplier-search]'), category = f.querySelector('select[data-supplier-category]');
+            var search = f.querySelector('[data-supplier-search]'), category = f.querySelector('select[data-supplier-category]'), docs = f.querySelector('[data-supplier-docs]'), history = f.querySelector('[data-supplier-history]');
             if (search && category) {
                 var filterSuppliers = function () {
                     var term = search.value.trim().toLowerCase();
                     f.querySelectorAll('li[data-supplier-name]').forEach(function (row) {
-                        row.hidden = (term && row.dataset.supplierName.indexOf(term) < 0) || (category.value && row.dataset.supplierCategory !== category.value);
+                        var d = row.dataset, hide = (term && d.supplierName.indexOf(term) < 0) || (category.value && d.supplierCategory !== category.value);
+                        if (docs && docs.value === 'verified') hide = hide || Number(d.verified) === 0;
+                        if (docs && docs.value === 'clean') hide = hide || Number(d.issues) > 0;
+                        if (history && history.value === 'offers') hide = hide || Number(d.offers) === 0;
+                        if (history && history.value === 'awards') hide = hide || Number(d.awards) === 0;
+                        if (history && history.value === 'new') hide = hide || Number(d.offers) > 0;
+                        row.hidden = !!hide;
                     });
                     sync();
                 };
-                search.addEventListener('input', filterSuppliers); category.addEventListener('change', filterSuppliers);
+                [search, category, docs, history].forEach(function (c) { if (c) { c.addEventListener('input', filterSuppliers); c.addEventListener('change', filterSuppliers); } });
+                var reset = f.querySelector('[data-supplier-reset]');
+                if (reset) reset.addEventListener('click', function () { search.value = ''; category.value = ''; if (docs) docs.value = ''; if (history) history.value = ''; boxes().forEach(function (x) { x.checked = false; }); filterSuppliers(); });
+                filterSuppliers();
             }
         });
         body.querySelectorAll('.wf-step[data-phase]').forEach(function (st) {

@@ -18,14 +18,14 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
         .Where(r => r.DepartmentId == departmentId).Include(r => r.Tenders);
 
     public Task<PurchaseRequest?> Load(int departmentId, int id) => Requests(departmentId)
-        .Include(r => r.Items).Include(r => r.Documents).Include(r => r.Reviews)
+        .Include(r => r.Items).ThenInclude(i => i.Category).Include(r => r.Documents).Include(r => r.Reviews)
         .ThenInclude(r => r.ReviewedByUser).Include(r => r.Department).Include(r => r.CreatedByUser)
         .AsSplitQuery().SingleOrDefaultAsync(r => r.Id == id);
 
     private static RequestSnapshot Snapshot(PurchaseRequest request) => new(request.Title,
         request.Justification, request.Priority, request.NeededBy,
         request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm
-        { Name = i.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList(),
+        { Name = i.Name, CategoryId = i.CategoryId, CategoryName = i.Category?.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList(),
         request.Documents.OrderBy(d => d.Id).Select(d => d.FileName).ToList());
 
     public static string Version(PurchaseRequest request) => Convert.ToHexString(SHA256.HashData(
@@ -44,6 +44,17 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
         ReturnComment = request.Status == PurchaseRequestStatus.Returned
             ? request.Reviews.OrderByDescending(r => r.SubmissionNumber).FirstOrDefault()?.Comment : null
     };
+
+    // "Laptop + 2 more items — IT Department": meaningful, consistent and searchable; at most 200 characters.
+    public static string GenerateTitle(IReadOnlyList<string> itemNames, string department)
+    {
+        var first = itemNames.FirstOrDefault(n => !string.IsNullOrWhiteSpace(n))?.Trim() ?? "Request";
+        var more = itemNames.Count - 1;
+        var suffix = (more > 0 ? $" + {more} more item{(more == 1 ? "" : "s")}" : "") + " — " + department;
+        var room = Math.Max(10, 200 - suffix.Length);
+        if (first.Length > room) first = first[..(room - 1)].TrimEnd() + "…";
+        return (first + suffix).Length <= 200 ? first + suffix : (first + suffix)[..200];
+    }
 
     public async Task<int> Save(ApplicationUser user, RequestForm form, bool submit, string storageRoot)
     {
@@ -64,13 +75,16 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
             var oldSnapshot = form.Id == 0 ? null : JsonSerializer.Serialize(Snapshot(request));
             if (form.Id == 0) db.PurchaseRequests.Add(request);
             else db.PurchaseRequestItems.RemoveRange(request.Items);
-            request.Title = form.Title.Trim();
+            var department = await db.Departments.Where(d => d.Id == request.DepartmentId).Select(d => d.Name).SingleAsync();
+            await db.ProcurementCategories.LoadAsync(); // category names for the stored snapshot
+            request.Title = GenerateTitle(form.Items.Select(i => i.Name.Trim()).ToList(), department);
             request.Justification = form.Justification.Trim();
             request.Priority = form.Priority;
             request.NeededBy = form.NeededBy?.Date;
             request.Items = form.Items.Select(i => new PurchaseRequestItem
             {
-                Name = i.Name.Trim(), Specifications = i.Specifications?.Trim(),
+                Name = i.Name.Trim(), Specifications = i.Specifications?.Trim(), CategoryId = i.CategoryId,
+                Category = i.CategoryId is int c ? db.ProcurementCategories.Local.FirstOrDefault(x => x.Id == c) : null,
                 Quantity = i.Quantity, Unit = i.Unit.Trim()
             }).ToList();
 

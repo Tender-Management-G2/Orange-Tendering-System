@@ -1,24 +1,84 @@
 @model Orange_Tendering_System.Controllers.MeetingsController.MeetingInfo
+@using Orange_Tendering_System.Controllers
 @{
     Layout = WorkspaceNavigation.LayoutFor(User);
-    ViewData["Title"] = "Evaluation meeting"; ViewData["WorkspaceSection"] = "Weighted Evaluation";
-    ViewData["Description"] = "Video meeting of the evaluation committee: " + Model.Title;
+    ViewData["Title"] = "Evaluation meeting"; ViewData["WorkspaceSection"] = "Tender";
+    ViewData["Description"] = "Evaluation committee meeting: " + Model.Title;
+    var startIso = DateTime.SpecifyKind(Model.StartsAt, DateTimeKind.Utc).ToString("O");
+    var endIso = DateTime.SpecifyKind(Model.EndsAt, DateTimeKind.Utc).ToString("O");
+    var live = Model.Phase == MeetingsController.MeetingPhase.Live;
+    var workspaceArea = Model.IsEvaluator ? "EvaluationCommittee" : "SourcingOfficer";
 }
+@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /> }
 <partial name="_PageHeader" />
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">Scheduled <time data-local="@DateTime.SpecifyKind(Model.StartsAt, DateTimeKind.Utc).ToString("O")">@Model.StartsAt.ToJordan("yyyy-MM-dd HH:mm")</time> – <time data-local="@DateTime.SpecifyKind(Model.EndsAt, DateTimeKind.Utc).ToString("O")">@Model.EndsAt.ToJordan("yyyy-MM-dd HH:mm")</time></span></div>
-        <div class="pg-actions"><a class="pg-btn" data-no-modal target="_blank" rel="noopener noreferrer" href="@Model.Url">Open in a new tab</a>
-            <a class="pg-btn" data-no-modal asp-area="" asp-controller="Workflow" asp-action="Details" asp-route-id="@Model.TenderId">Back to the tender</a></div></div>
-    <div id="meet" data-room="@Model.Room" data-name="@Model.DisplayName" style="width:100%;height:640px;border-radius:14px;overflow:hidden;background:#000"></div>
-    <p class="pg-hint">Allow camera and microphone when your browser asks. This meeting room is private to the Sourcing Officer and the four committee members.</p>
-</section>
+<div class="pf-page">
+    <section class="ws-panel pg-panel pf-lobby" data-meeting data-start="@startIso" data-end="@endIso" data-phase="@Model.Phase">
+        <div class="pf-lobby-head">
+            <div>
+                <span class="pf-eyebrow">T-@Model.TenderId.ToString("0000") · Evaluation meeting</span>
+                <h2>@Model.Title</h2>
+                <p class="pg-hint">
+                    <time data-local="@startIso">@Model.StartsAt.ToJordan("ddd d MMM yyyy, HH:mm")</time> –
+                    <time data-local="@endIso">@Model.EndsAt.ToJordan("HH:mm")</time> (Jordan time)
+                </p>
+            </div>
+            <div class="pf-lobby-clock" aria-live="polite">
+                <span class="pf-status pf-status-@Model.Phase.ToString().ToLowerInvariant()" data-phase-label>@(Model.Phase switch { MeetingsController.MeetingPhase.Before => "Not started", MeetingsController.MeetingPhase.Live => "In progress", _ => "Ended" })</span>
+                <strong data-countdown>@(Model.Phase == MeetingsController.MeetingPhase.Before ? (Model.StartsAt - Model.UtcNow).ToString(@"d\.hh\:mm\:ss") : "")</strong>
+                <small data-countdown-label>@(Model.Phase == MeetingsController.MeetingPhase.Before ? "until the meeting starts" : "")</small>
+            </div>
+        </div>
+        <dl class="pf-facts">
+            <div><dt>Offers under evaluation</dt><dd>@Model.EligibleOffers eligible offer(s)</dd></div>
+            <div><dt>Final evaluations submitted</dt><dd>@Model.SubmittedCount of 4</dd></div>
+            <div><dt>Your evaluation</dt><dd>@(Model.IsEvaluator ? (Model.Submitted ? "Submitted (final)" : "Not submitted yet") : "Officer — no score")</dd></div>
+            <div><dt>Video room</dt><dd>@(Model.Provider == "Jitsi" ? "Opens inside the system at the start time" : "Zoom link, available at the start time")</dd></div>
+        </dl>
+        <div class="pg-actions">
+            <a class="pg-btn pg-btn-primary" asp-area="@workspaceArea" asp-controller="Workflow" asp-action="@(Model.IsEvaluator ? "Meeting" : "Details")" asp-route-id="@Model.TenderId">@(Model.IsEvaluator ? "Open the evaluation workspace" : "Open the tender")</a>
+            <a class="pg-btn" data-no-modal target="_blank" rel="noopener noreferrer" href="@Model.Url" data-room-link @(live ? null : "hidden")>Open the video room in a new tab</a>
+        </div>
+        @if (Model.Phase == MeetingsController.MeetingPhase.Before)
+        {
+            <p class="pf-note" data-before-note>You can prepare now: the evaluation workspace shows the purchase request, the tender requirements, the approved weights, every eligible offer with its documents, and the AI analysis. Scoring and the video room open automatically at the start time.</p>
+        }
+        else if (Model.Phase == MeetingsController.MeetingPhase.After)
+        {
+            <p class="pf-note">The meeting time has ended. @(Model.IsEvaluator && !Model.Submitted ? "Your evaluation is still open until you submit it once." : "Submitted evaluations, the generated report and its signatures are in the evaluation workspace.")</p>
+        }
+    </section>
+    @if (Model.Provider == "Jitsi")
+    {
+        <section class="ws-panel pg-panel" data-room-panel @(live ? null : "hidden")>
+            <div id="meet" data-room="@Model.Room" data-name="@Model.DisplayName" class="pf-room"></div>
+            <p class="pg-hint">Allow camera and microphone when your browser asks. This room is private to the Sourcing Officer and the four committee members.</p>
+        </section>
+    }
+</div>
 @section Scripts {
-    <script src="https://meet.jit.si/external_api.js"></script>
+    @if (Model.Provider == "Jitsi") { <script src="https://meet.jit.si/external_api.js"></script> }
     <script>
-        window.addEventListener('load', function () {
-            var holder = document.getElementById('meet');
-            if (!window.JitsiMeetExternalAPI) { holder.innerHTML = '<p style="color:#fff;padding:24px">The video service could not be loaded. Use "Open in a new tab".</p>'; return; }
-            new JitsiMeetExternalAPI('meet.jit.si', { roomName: holder.dataset.room, parentNode: holder, width: '100%', height: 640, userInfo: { displayName: holder.dataset.name } });
-        });
+    (function () {
+        var box = document.querySelector('[data-meeting]'); if (!box) return;
+        var start = Date.parse(box.dataset.start), end = Date.parse(box.dataset.end), opened = false;
+        var clock = box.querySelector('[data-countdown]'), label = box.querySelector('[data-countdown-label]'), phase = box.querySelector('[data-phase-label]');
+        function two(n) { return (n < 10 ? '0' : '') + n; }
+        function fmt(ms) { var s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400); s %= 86400; return (d ? d + 'd ' : '') + two(Math.floor(s / 3600)) + ':' + two(Math.floor(s % 3600 / 60)) + ':' + two(s % 60); }
+        function openRoom() {
+            if (opened) return; opened = true;
+            document.querySelectorAll('[data-room-link],[data-room-panel]').forEach(function (n) { n.hidden = false; });
+            var note = document.querySelector('[data-before-note]'); if (note) note.hidden = true;
+            var holder = document.getElementById('meet'); if (!holder) return;
+            if (!window.JitsiMeetExternalAPI) { holder.innerHTML = '<p class="pf-room-error">The video service could not be loaded. Use "Open the video room in a new tab".</p>'; return; }
+            new JitsiMeetExternalAPI('meet.jit.si', { roomName: holder.dataset.room, parentNode: holder, width: '100%', height: 600, userInfo: { displayName: holder.dataset.name } });
+        }
+        function tick() {
+            var now = Date.now();
+            if (now < start) { clock.textContent = fmt(start - now); label.textContent = 'until the meeting starts'; phase.textContent = 'Not started'; }
+            else if (now < end) { clock.textContent = fmt(end - now); label.textContent = 'until the scheduled end'; phase.textContent = 'In progress'; phase.className = 'pf-status pf-status-live'; openRoom(); }
+            else { clock.textContent = ''; label.textContent = ''; phase.textContent = 'Ended'; phase.className = 'pf-status pf-status-after'; }
+        }
+        tick(); window.setInterval(tick, 1000);
+    })();
     </script>
 }

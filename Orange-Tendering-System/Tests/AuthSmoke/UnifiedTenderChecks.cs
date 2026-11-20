@@ -132,7 +132,15 @@ public static class UnifiedTenderChecks
         var reviewToken = await Token(officerClient, "/SourcingOfficer/PurchaseRequests/Review/" + request.Id);
         var review = await officerClient.PostAsync("/SourcingOfficer/PurchaseRequests/Review/" + request.Id,
             new FormUrlEncodedContent(new Dictionary<string, string> { ["decision"] = "Accepted", ["comment"] = "Accepted for test", ["__RequestVerificationToken"] = reviewToken }));
-        Check(review.StatusCode == HttpStatusCode.Redirect, "accept request from details");
+        Check(review.StatusCode == HttpStatusCode.Redirect && review.Headers.Location?.ToString() == "/SourcingOfficer/PurchaseRequests/Prepare/" + request.Id, "accepting leads straight to tender preparation");
+        var prepare = await officerClient.GetAsync("/SourcingOfficer/PurchaseRequests/Prepare/" + request.Id);
+        Check(prepare.Headers.Location?.ToString() == "/SourcingOfficer/Workflow?request=" + request.Id, "preparation opens the tender form for the accepted request");
+        var repeatAccept = await officerClient.PostAsync("/SourcingOfficer/PurchaseRequests/Review/" + request.Id,
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["decision"] = "Accepted", ["comment"] = "Accepted for test", ["__RequestVerificationToken"] = reviewToken }));
+        Check(repeatAccept.StatusCode == HttpStatusCode.Redirect && await db.PurchaseRequestReviews.CountAsync(r => r.PurchaseRequestId == request.Id && r.Decision == ReviewDecision.Accepted) == 1,
+            "a repeated acceptance records no second decision and resumes preparation");
+        Check(await db.Notifications.CountAsync(n => n.UserId == officer.Id && n.Title == "Prepare the tender" && n.Link == "/SourcingOfficer/PurchaseRequests/Prepare/" + request.Id) == 1,
+            "the Officer gets one actionable task linking to the preparation");
         var legacy = await officerClient.GetAsync("/SourcingOfficer/Tenders");
         Check(legacy.Headers.Location?.ToString() == "/SourcingOfficer/Workflow", "legacy tender list redirects to canonical page");
         var workflowHtml = await officerClient.GetStringAsync("/SourcingOfficer/Workflow?request=" + request.Id);
@@ -155,7 +163,7 @@ public static class UnifiedTenderChecks
         var input = new RequirementsInput { PurchaseRequestId = request.Id, Title = "Unified tender", Description = "Public description",
             TechnicalRequirements = "Laptop specifications", CommercialConditions = "JOD", DeliveryExpectations = "30 days", MandatoryCompliance = "Warranty",
             SourcingManagerId = manager.Id, DepartmentRepresentativeId = evaluator.Id, FinancialRepresentativeId = financial.Id, TechnicalRepresentativeId = technical.Id,
-            EstimatedValue = 1000, Currency = "JOD" };
+            EstimatedValue = 1000, Currency = "JOD", RequiredDocuments = ["OfficialQuotation"] };
         var id = await flow.Create(input, Principal(officer));
         var assignedEvaluation = await db.CommitteeMembers.Where(m => m.TenderId == id && m.CommitteeType == CommitteeType.Evaluation)
             .Select(m => m.UserId).ToListAsync();
@@ -172,6 +180,8 @@ public static class UnifiedTenderChecks
         Check(managerApprovalRejected, "the manager cannot approve weights assigned to the Sourcing Officer");
         await flow.ApproveWeights(id, Principal(officer));
         await flow.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(3), Principal(officer));
+        Check(await db.Tenders.AnyAsync(t => t.Id == id && t.Status == TenderStatus.Bidding)
+            && !await db.PreTenderReviews.AnyAsync(r => r.TenderId == id), "approved weights allow bidding without a Top Committee pre-tender review");
         await flow.Invite(id, supplier.Id, Principal(officer));
         await flow.Invite(id, competitor.Id, Principal(officer));
         var dormant = new Supplier { CompanyName = "INACTIVE_SUPPLIER", RegistrationNumber = suffix + "D", Email = "inactive@unified.test", Status = SupplierStatus.Approved };
@@ -223,7 +233,9 @@ public static class UnifiedTenderChecks
         var supplierRows = await flow.List(Principal(supplierUser));
         Check(supplierRows.Single().Status == "Open", "supplier list exposes availability only");
         var create = await supplierClient.GetAsync("/Supplier/Offers/Create/" + invitation.Id);
-        Check(create.StatusCode == HttpStatusCode.OK && (await create.Content.ReadAsStringAsync()).Contains("Save draft"), "eligible supplier can prepare an offer");
+        var createHtml = await create.Content.ReadAsStringAsync();
+        Check(create.StatusCode == HttpStatusCode.OK && createHtml.Contains("Submit Offer") && !createHtml.Contains("Save draft") && createHtml.Contains("Official quotation")
+            && createHtml.Contains("One tax rate"), "offer page has one Submit Offer action, required documents and an explicit tax method");
         var offerService = scope.ServiceProvider.GetRequiredService<SupplierOfferService>();
         var draft = await offerService.GetCreateAsync(supplierUser.Id, invitation.Id);
         draft!.Input.TechnicalProposal = "Test proposal"; draft.Input.DeliveryDays = 12;
@@ -331,9 +343,11 @@ public static class UnifiedTenderChecks
         using (var lateClient = await Login(financial))
         {
             var afterMeeting = await Ajax(lateClient, "/EvaluationCommittee/Workflow/Details/" + id);
-            Check(afterMeeting.Contains("wp-scores") && afterMeeting.Contains("Financial (0"), "financial and technical score inputs remain visible after the meeting ends");
-            Check(afterMeeting.Contains("Sign and submit my final evaluation") && afterMeeting.Contains("data-pad"), "evaluation form asks for the member's signature after scoring every supplier");
-            Check(afterMeeting.Contains("Download the AI analysis (PDF)") && afterMeeting.Contains("AI analysis for this meeting"), "AI analysis travels with the meeting to the committee");
+            Check(afterMeeting.Contains("Open the evaluation workspace") && afterMeeting.Contains("AI analysis for this meeting"), "the popup leads the member to the evaluation workspace");
+            var workspace = await lateClient.GetStringAsync("/EvaluationCommittee/Workflow/Meeting/" + id);
+            Check(workspace.Contains("data-evaluation-form") && workspace.Contains("step=\"0.1\"") && workspace.Contains("Approved evaluation model"), "financial and technical score inputs (one decimal) remain available after the meeting ends");
+            Check(workspace.Contains("Sign and submit my evaluation") && workspace.Contains("data-report-signature") && workspace.Contains("recommendation.RecommendedBidId"), "one submission carries scores, recommendation and signature");
+            Check(workspace.Contains("Download the AI analysis (PDF)") && workspace.Contains("advisory"), "AI analysis travels with the meeting and is marked advisory");
             var aiPdf = await lateClient.GetAsync("/EvaluationCommittee/Workflow/AiAnalysisPdf/" + id);
             var aiBytes = await aiPdf.Content.ReadAsByteArrayAsync();
             Check(aiPdf.StatusCode == HttpStatusCode.OK && aiPdf.Content.Headers.ContentType?.MediaType == "application/pdf" && aiBytes.Length > 500 && aiBytes[0] == (byte)'%' && aiBytes[1] == (byte)'P', "committee member downloads the AI analysis as a PDF");
@@ -386,11 +400,15 @@ public static class UnifiedTenderChecks
         Check(session.State == SessionState.ReportDraft && session.ReportId != null, "complete post-meeting evaluations automatically generate the report");
         var reportId = session.ReportId!.Value;
         var hash = session.Report!.PdfSha256!;
-        Check(!(await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee,
-            "committee signing stays closed until the Officer sends the report");
-        await flow.SendReportToCommittee(id, Principal(officer));
-        Check((await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee,
-            "Officer sending the report opens committee signing");
+        Check((await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee && session.ReportSentAt != null,
+            "committee signing opens as soon as the report is generated (no Officer send step)");
+        var officerDraftPopup = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
+        Check(!officerDraftPopup.Contains("/SendReport/") && !officerDraftPopup.Contains("RegenerateReport"), "the Officer has no send-for-signing or regenerate action");
+        var sendToken = await Token(officerClient, "/SourcingOfficer/Workflow");
+        var oldSend = await officerClient.PostAsync("/SourcingOfficer/Workflow/SendReport/" + id, new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = sendToken }));
+        Check(oldSend.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed, "the retired send-for-signing endpoint no longer exists (HTTP " + (int)oldSend.StatusCode + ")");
+        var earlyForward = false; try { await flow.Forward(id, Principal(officer)); } catch (WorkflowException) { earlyForward = true; }
+        Check(earlyForward, "an unsigned report cannot be forwarded to the Manager");
         var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=").Concat(new byte[250]).ToArray();
         foreach (var signer in new[] { technical, financial, evaluator, manager })
         {
@@ -412,6 +430,7 @@ public static class UnifiedTenderChecks
         }
         var finalReport = await db.TenderReports.AsNoTracking().SingleAsync(x => x.Id == reportId);
         Check(finalReport.Status == ReportStatus.Submitted && finalReport.PdfSha256 == hash, "four signatures finalize the report without changing canonical PDF hash");
+        Check(await db.Notifications.CountAsync(n => n.UserId == officer.Id && n.Title == "Signed evaluation report received") == 1, "the completed, signed report reaches the Officer");
         var officerReview = await officerClient.GetStringAsync($"/SourcingOfficer/Reports/Review/{reportId}");
         Check(officerReview.Contains("technical") && officerReview.Contains("financial") && officerReview.Contains("department") && officerReview.Contains("manager"), "Officer review displays all four signer identities");
         Check((await officerClient.GetAsync($"/SourcingOfficer/Reports/Pdf/{reportId}")).StatusCode == HttpStatusCode.OK, "Officer can download the PDF with all persisted signatures");
