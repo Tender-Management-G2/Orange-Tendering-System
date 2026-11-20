@@ -1,36 +1,48 @@
-# AGENTS.md — repository rules for every agent (Codex, Claude, others)
+# AGENTS.md — repository rules for every agent
 
-## Authoritative workspace (owner decision, 2026-11-16)
+## Current workspace (owner update, 2026-11-20)
 
-- Local repository: `C:\Users\user\Desktop\Orange-Tendering-System`
-- Development branch: `tariq22222`
-- Visual Studio solution: `Orange-Tendering-System.slnx` in that folder
-- Application ports: `http://localhost:5254` and `https://localhost:7182` (`Orange-Tendering-System/Properties/launchSettings.json`)
+- Repository worktree: `C:\Users\user\Desktop\Orange\Projects\Orange-Tendering\Orange-Tendering-System-FinalVersion`
+- Current integration and development branch: `Workv5` (case-sensitive)
+- Remote branch: `origin/Workv5`
+- Visual Studio solution: `Orange-Tendering-System.slnx` at the worktree root
+- Web project: `Orange-Tendering-System/Orange-Tendering-System.csproj`
+- Application URLs: `http://localhost:5254` and `https://localhost:7182`, as defined in `Orange-Tendering-System/Properties/launchSettings.json`
 
-All development, builds, tests, commits and pushes happen here. Other folders (`Orange-Tendering-System-WorkV2`, `WorkV1`, `Orange-Tendering-System-AuthIntegration`, earlier test copies) are preserved but inactive:
-do not develop in them, delete them, reset them or discard their uncommitted changes.
+This replaces the 2026-11-16 workspace instruction that named `C:\Users\user\Desktop\Orange-Tendering-System`, `tariq22222`, and `WorkV2`. That directory is not the current worktree. Use `Workv5` for continuing this integration unless the owner explicitly selects another branch or worktree.
 
-## Before writing, building, committing or pushing
+## Check before editing, building, committing, or pushing
 
 ```powershell
-git rev-parse --show-toplevel   # must be C:\Users\user\Desktop\Orange-Tendering-System
-git branch --show-current       # must be tariq22222
-git status --short              # know what is already uncommitted
+git rev-parse --show-toplevel   # expect the worktree path above
+git branch --show-current       # expect Workv5 unless the owner directed another branch
+git status --short              # inspect existing local changes
+git worktree list               # identify other active worktrees
 ```
 
-If the root or branch is wrong, stop before writing any file and report the mismatch. Do not switch branches silently,
-and do not create another clone, worktree or copy without the owner's explicit permission.
+If the root or branch differs from the intended task, stop and report it before writing. Do not silently switch branches or edit a different worktree. Preserve uncommitted changes already present. If another agent is actively editing the same worktree, coordinate before touching overlapping files.
 
-## Working rules
+## Working and publishing rules
 
-- Push only with `git push origin WorkV2`. Never force-push. Do not push to `main`, `WorkV1` or `Ahmad` unless the
-  owner asks for that branch explicitly.
-- One agent per working tree at a time. Before editing, check for recent file changes and running `codex.exe` /
-  Claude sessions; if another agent is active in this folder, coordinate instead of editing the same files.
-- Commit only intended project files. Never commit User Secrets, SMTP credentials, biometric data, OTP codes,
-  personal settings (such as local port changes), test databases, build output or `node_modules`.
-- Run the application from this folder only: Visual Studio with `Orange-Tendering-System.slnx`, or
-  `powershell -ExecutionPolicy Bypass -File scripts\Run-WorkV2.ps1`, which refuses to start on the wrong folder,
-  branch or an occupied port. Stop any other copy that holds 5254/7182 instead of moving to other ports.
-- Project and domain rules live in `TenderingOrangeSystem.md` and `docs/`; authentication details in
-  `docs/BIOMETRIC_SIGNIN.md`.
+- Build and test from this worktree. Keep test data isolated from the working application database.
+- Commit only intended source and documentation. Never commit User Secrets, SMTP credentials, biometric data, OTP codes, personal settings, test databases, build output, `.codex-seed-run/`, or `node_modules`.
+- Push changes to this branch with `git push origin Workv5`. Never force-push. Push to another branch only when the owner explicitly requests it.
+- Before integrating another branch, fetch its current remote head and compare the relevant files and rendered behavior. An ancestor relationship alone does not prove that later commits preserved a page or feature.
+- Other worktrees and old copies remain independent. Do not reset, clean, delete, or overwrite them as part of Workv5 work.
+
+## Running the application
+
+Use Visual Studio with `Orange-Tendering-System.slnx`, or from this worktree root:
+
+```powershell
+dotnet run --project Orange-Tendering-System/Orange-Tendering-System.csproj --launch-profile https
+```
+
+Check that ports 5254 and 7182 are available before starting another copy. `scripts/Run-WorkV2.ps1` still checks the obsolete path and `tariq22222`; do not use that script for Workv5 unless it is updated separately.
+
+## Project references
+
+- Domain and workflow rules: `TenderingOrangeSystem.md` and root `docs/`.
+- Authentication: `docs/BIOMETRIC_SIGNIN.md`.
+- Workv5 integration sources, conflicts, file inventory, and the Evaluation Committee follow-up: `Orange-Tendering-System/docs/WORKV5_MERGE_REPORT.md`.
+- Current report implementations: Amal analytics under `/Analytics`; Haya admin report pages under `/HayaAdminReports`.
