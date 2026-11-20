@@ -1,0 +1,65 @@
+@model Orange_Tendering_System.ViewModels.ReportsAnalyticsLandingViewModel
+@functions {
+    static string Icon(string key) => key switch
+    {
+        "requests" => "<path d=\"M6 3h9l4 4v14H6zM15 3v5h4M9 12h7M9 16h7\"/>",
+        "tenders" => "<path d=\"M4 19V9m5 10V5m5 14v-8m5 8V3\"/><path d=\"M2 21h20\"/>",
+        "suppliers" => "<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20v-2c0-3 3-5 6-5s6 2 6 5v2M17 11a3 3 0 1 0-1-5.8M17 13c2.5.3 4 2 4 5v2\"/>",
+        "approval" => "<path d=\"M12 3 19 6v5c0 5-3.1 8-7 10-3.9-2-7-5-7-10V6z\"/><path d=\"m9 12 2 2 4-4\"/>",
+        "purchase-requests" => "<path d=\"M5 4h14v11H5zM8 8h8M8 12h6M8 19h10\"/>",
+        "tender-reports" => "<path d=\"m5 19 14-14M7 5l12 12\"/><path d=\"M4 20h16\"/>",
+        "suppliers-reports" => "<circle cx=\"8\" cy=\"9\" r=\"3\"/><circle cx=\"16\" cy=\"9\" r=\"3\"/><path d=\"M2 20c0-4 3-6 6-6s6 2 6 6M10 20c0-4 3-6 6-6s6 2 6 6\"/>",
+        "evaluations" => "<path d=\"M12 4v16M5 7h14M4 7l-2 8h6L5 7m14 0-3 8h6l-3-8M8 20h8\"/>",
+        "governance" => "<path d=\"M12 3 19 6v5c0 5-3.1 8-7 10-3.9-2-7-5-7-10V6z\"/><path d=\"m9 12 2 2 4-4\"/>",
+        "management" => "<circle cx=\"12\" cy=\"9\" r=\"5\"/><path d=\"m12 5 1.3 2.5 2.7.4-2 2 .5 2.8-2.5-1.2-2.5 1.2.5-2.8-2-2 2.7-.4zM8 14l-2 7 6-3 6 3-2-7\"/>",
+        _ => "<path d=\"M6 4h12v4H6zM6 10h12v4H6zM6 16h12v4H6z\"/>"
+    };
+}
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Reports & Analytics";
+    ViewData["WorkspaceSection"] = "Reports & Analytics";
+    ViewData["Description"] = "Monitor procurement performance and system activity using live database records.";
+    ViewData["BodyClass"] = "reports-analytics-home";
+    var actions = new Dictionary<string, string> { ["purchase-requests"] = "PurchaseRequests", ["tenders"] = "Tenders", ["suppliers"] = "Suppliers", ["evaluations"] = "Evaluations", ["governance"] = "Governance", ["management"] = "Management", ["reports-management"] = "ReportsManagement" };
+    string Kpi(string label) => Model.Dashboard.Kpis.FirstOrDefault(x => x.Label == label)?.Value ?? "0";
+    var requestChart = Model.Dashboard.Charts.FirstOrDefault(x => x.Title == "Purchase Requests by Status");
+    var tenderChart = Model.Dashboard.Charts.FirstOrDefault(x => x.Title == "Tenders by Status");
+    var requestMax = requestChart?.Points.Count > 0 ? requestChart.Points.Max(x => x.Value) : 0;
+    var tenderTotal = tenderChart?.Points.Sum(x => x.Value) ?? 0;
+    string ColorFor(string label) => label.ToLowerInvariant() switch { var x when x.Contains("open") || x.Contains("submitted") => "#1e88e5", var x when x.Contains("review") => "#ffb127", var x when x.Contains("accepted") || x.Contains("approved") || x.Contains("awarded") => "#17b26a", var x when x.Contains("rejected") => "#e54444", var x when x.Contains("returned") => "#8d36e8", var x when x.Contains("closed") => "#ff7900", _ => "#a8afb9" };
+    var cursor = 0m;
+    var slices = new List<string>();
+    if (tenderChart != null && tenderTotal > 0) {
+        for (var i = 0; i < tenderChart.Points.Count; i++) { var end = cursor + tenderChart.Points[i].Value * 100 / tenderTotal; slices.Add($"{ColorFor(tenderChart.Points[i].Label)} {cursor.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}% {end.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%"); cursor = end; }
+    }
+}
+<partial name="_PageHeader" />
+
+<section class="ra-kpis" aria-label="Reports summary">
+    <a asp-action="PurchaseRequests" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("requests"))</svg></span><strong>@Kpi("Total Purchase Requests")</strong><small>Purchase Requests</small></a>
+    <a asp-action="Tenders" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("tenders"))</svg></span><strong>@Kpi("Total Tenders")</strong><small>Total Tenders</small></a>
+    <a asp-action="Suppliers" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("suppliers"))</svg></span><strong>@Kpi("Total Suppliers")</strong><small>Registered Suppliers</small></a>
+    <a asp-action="PurchaseRequests" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("approval"))</svg></span><strong>@Kpi("Approval Rate")</strong><small>Approval Rate</small><em>Approved ÷ all non-draft requests</em></a>
+</section>
+
+<section class="ra-chart-grid">
+    <article class="ws-panel pg-panel ra-overview-chart"><div class="pg-panel-head"><h2>Purchase Requests Overview</h2></div>
+        @if (requestChart == null || requestChart.Points.Count == 0) { <partial name="_EmptyState" model='"No purchase request data yet."' /> }
+        else { <div class="ra-bars">@foreach (var point in requestChart.Points) { var height = requestMax == 0 ? 0 : point.Value * 100 / requestMax; <div class="ra-bar-item"><strong>@point.Value.ToString("0")</strong><i style="height:@height.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></i><span>@point.Label</span></div> }</div> }
+    </article>
+    <article class="ws-panel pg-panel ra-overview-chart"><div class="pg-panel-head"><h2>Tender Statistics</h2></div>
+        @if (tenderChart == null || tenderTotal == 0) { <partial name="_EmptyState" model='"No tender data yet."' /> }
+        else { <div class="ra-donut-layout"><div class="ra-donut" style="background:conic-gradient(@string.Join(",", slices))"><span>@tenderTotal.ToString("0")<small>Tenders</small></span></div><ul class="ra-legend">@for (var i = 0; i < tenderChart.Points.Count; i++) { <li><i style="background:@ColorFor(tenderChart.Points[i].Label)"></i><span>@tenderChart.Points[i].Label</span><strong>@tenderChart.Points[i].Value.ToString("0")</strong></li> }</ul></div> }
+    </article>
+</section>
+
+<section class="ws-panel pg-panel reports-center">
+    <div class="reports-center-heading"><span class="reports-center-heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(Icon("tenders"))</svg></span><div><h2>Reports Center</h2><span>Select a report to view detailed information and insights.</span></div><span class="reports-center-art" aria-hidden="true"><i></i><i></i><i></i><b></b></span></div>
+    <div class="reports-center-grid">
+        @foreach (var report in Model.Reports)
+        {
+            <a class="reports-center-card" data-search-item asp-action="@actions[report.Key]"><span class="ra-report-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(Icon(report.Key == "tenders" ? "tender-reports" : report.Key == "suppliers" ? "suppliers-reports" : report.Key))</svg></span><span class="ra-report-copy"><strong>@report.Title</strong><small>@(report.Key switch { "purchase-requests" => "Track requests, statuses, departments, and approvals.", "tenders" => "Monitor tender stages, participation, and awards.", "suppliers" => "Review registrations, verification, and performance.", "evaluations" => "Compare bids and review technical and financial evaluations.", "governance" => "Track approvals, committee decisions, and audit history.", "management" => "Review supplier participation, awards, and committee statistics.", _ => "Search, filter, view, and export reports." })</small></span><b aria-hidden="true">→</b></a>
+        }
+    </div>
+</section>
