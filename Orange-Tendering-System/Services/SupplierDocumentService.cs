@@ -35,27 +35,21 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
         return (path, Path.GetFileName(doc.FileName), "application/octet-stream");
     }
 
-    public async Task<string?> UploadAsync(string userId, IFormFile file, int? bidId = null, int? messageId = null)
+    public async Task<string?> UploadAsync(string userId, IFormFile file, int? bidId = null, int? messageId = null, bool samplePhoto = false)
     {
-        if (file == null || file.Length <= 0 || file.Length > 10 * 1024 * 1024)
-            return "Choose a file up to 10 MB.";
-        var name = Path.GetFileName(file.FileName);
-        if (name.Length == 0 || name.Length > 260) return "Invalid file name.";
-        var extension = Path.GetExtension(name).ToLowerInvariant();
-        await using var memory = new MemoryStream();
-        await file.CopyToAsync(memory);
-        var bytes = memory.ToArray();
-        if (bytes.Length > 10 * 1024 * 1024 || !ValidSignature(bytes, extension))
-            return "Only valid PDF, PNG or JPEG files are allowed.";
+        UploadFile upload;
+        try
+        {
+            upload = await ReadUploadAsync(file);
+            if (samplePhoto && (!bidId.HasValue || !upload.IsImage))
+                return "Choose a PNG or JPEG image to attach as a sample photo.";
+        }
+        catch (WorkflowException e) { return e.Message; }
 
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var account = await communication.Accounts(userId).SingleOrDefaultAsync();
         if (account == null) return "Your approved supplier account is required.";
-        var doc = new Document
-        {
-            FileName = name, SizeBytes = bytes.Length, UploadedByUserId = userId, UploadedAt = clock.GetUtcNow().UtcDateTime,
-            ContentType = extension == ".pdf" ? "application/pdf" : extension == ".png" ? "image/png" : "image/jpeg"
-        };
+        var doc = NewDocument(userId, upload);
         if (bidId.HasValue)
         {
             var tenderId = await context.Bids.Where(b => b.Id == bidId).Select(b => (int?)b.TenderInvitation.TenderRound.TenderId).SingleOrDefaultAsync();
@@ -69,7 +63,8 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
                 && b.TenderInvitation.TenderRound.Deadline > now
                 && (!b.TenderInvitation.TenderRound.OpensAt.HasValue || b.TenderInvitation.TenderRound.OpensAt <= now));
             if (!allowed) return "Attachments can only be added to your open draft before the deadline.";
-            doc.BidId = bidId; doc.DocumentType = "OfferAttachment";
+            doc.BidId = bidId;
+            doc.DocumentType = samplePhoto ? Document.OfferSamplePhotoType : "OfferAttachment";
         }
         else if (messageId.HasValue)
         {
@@ -92,20 +87,12 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
             doc.VerificationStatus = DocumentVerificationStatus.Pending;
         }
 
-        Directory.CreateDirectory(StorageRoot);
-        var relative = Path.Combine("App_Data", "SupplierUploads", Guid.NewGuid().ToString("N") + extension);
-        var fullPath = Path.Combine(environment.ContentRootPath, relative);
-        doc.StoragePath = relative;
         try
         {
-            await File.WriteAllBytesAsync(fullPath, bytes);
+            await StoreAsync(doc, upload);
             context.Documents.Add(doc);
             await context.SaveChangesAsync();
-            context.AuditLogs.Add(new AuditLog
-            {
-                UserId = userId, EntityName = nameof(Document), EntityId = doc.Id.ToString(),
-                Action = "UploadSupplierDocument", CreatedAt = clock.GetUtcNow().UtcDateTime
-            });
+            AddUploadAudit(doc);
             await context.SaveChangesAsync();
             if (bidId.HasValue && !await context.Bids.AnyAsync(b => b.Id == bidId && b.Status == BidStatus.Draft && b.TenderInvitation.TenderRound.Deadline > clock.GetUtcNow().UtcDateTime))
                 throw new WorkflowException("The attachment deadline has passed. Nothing was submitted.");
@@ -113,10 +100,83 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
         }
         catch
         {
-            if (File.Exists(fullPath)) File.Delete(fullPath);
+            DeleteStoredFiles([doc]);
             throw;
         }
         return null;
+    }
+
+    // The caller owns the tender lock and database transaction for the draft and its attachments.
+    internal async Task<List<Document>> StoreOfferAttachmentsAsync(string userId, Bid bid, IReadOnlyList<IFormFile> files)
+    {
+        var documents = new List<Document>();
+        try
+        {
+            foreach (var file in files)
+            {
+                var upload = await ReadUploadAsync(file);
+                var doc = NewDocument(userId, upload);
+                doc.Bid = bid;
+                doc.DocumentType = upload.IsImage ? Document.OfferSamplePhotoType : "OfferAttachment";
+                documents.Add(doc);
+                await StoreAsync(doc, upload);
+            }
+            return documents;
+        }
+        catch
+        {
+            DeleteStoredFiles(documents);
+            throw;
+        }
+    }
+
+    internal void DeleteStoredFiles(IEnumerable<Document> documents)
+    {
+        foreach (var doc in documents)
+        {
+            var path = PrivateDocumentPaths.Resolve(environment.ContentRootPath, doc.StoragePath);
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    internal void AddUploadAudit(Document doc) => context.AuditLogs.Add(new AuditLog
+    {
+        UserId = doc.UploadedByUserId, EntityName = nameof(Document), EntityId = doc.Id.ToString(),
+        Action = "UploadSupplierDocument", CreatedAt = clock.GetUtcNow().UtcDateTime
+    });
+
+    private Document NewDocument(string userId, UploadFile upload) => new()
+    {
+        FileName = upload.Name, SizeBytes = upload.Bytes.Length, UploadedByUserId = userId, UploadedAt = clock.GetUtcNow().UtcDateTime,
+        ContentType = upload.Extension == ".pdf" ? "application/pdf" : upload.Extension == ".png" ? "image/png" : "image/jpeg",
+        StoragePath = Path.Combine("App_Data", "SupplierUploads", Guid.NewGuid().ToString("N") + upload.Extension)
+    };
+
+    private Task StoreAsync(Document doc, UploadFile upload)
+    {
+        Directory.CreateDirectory(StorageRoot);
+        return File.WriteAllBytesAsync(Path.Combine(environment.ContentRootPath, doc.StoragePath), upload.Bytes);
+    }
+
+    private static async Task<UploadFile> ReadUploadAsync(IFormFile? file)
+    {
+        const long maxBytes = 10 * 1024 * 1024;
+        if (file == null || file.Length is <= 0 or > maxBytes)
+            throw new WorkflowException("Choose a file up to 10 MB.");
+        var name = Path.GetFileName(file.FileName);
+        if (name.Length == 0 || name.Length > 260) throw new WorkflowException("Invalid file name.");
+        var extension = Path.GetExtension(name).ToLowerInvariant();
+        await using var memory = new MemoryStream();
+        await file.CopyToAsync(memory);
+        var bytes = memory.ToArray();
+        if (bytes.Length > maxBytes || !ValidSignature(bytes, extension))
+            throw new WorkflowException($"{name}: choose a valid PDF, PNG or JPEG file.");
+        return new UploadFile(name, extension, bytes);
+    }
+
+    private sealed record UploadFile(string Name, string Extension, byte[] Bytes)
+    {
+        public bool IsImage => Extension is ".png" or ".jpg" or ".jpeg";
     }
 
     private static bool ValidSignature(byte[] bytes, string extension) => extension switch

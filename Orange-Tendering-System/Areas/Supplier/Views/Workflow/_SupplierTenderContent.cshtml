@@ -21,14 +21,17 @@
                 using var json = JsonDocument.Parse(Model.Requirements);
                 if (json.RootElement.ValueKind == JsonValueKind.Object)
                     foreach (var field in json.RootElement.EnumerateObject())
-                        requirements.Add(new(System.Text.RegularExpressions.Regex.Replace(field.Name, "(?<=[a-z])(?=[A-Z])", " "), field.Value.ToString()));
+                    {
+                        if (field.Name != "SamplePhotosRequired")
+                            requirements.Add(new(System.Text.RegularExpressions.Regex.Replace(field.Name, "(?<=[a-z])(?=[A-Z])", " "), field.Value.ToString()));
+                    }
                 else requirements.Add(new("Requirements", Model.Requirements));
             }
             catch (JsonException) { requirements.Add(new("Requirements", Model.Requirements)); }
         }
     }
-    @if (requirements.Count == 0) { <p>No additional requirements listed.</p> }
     @foreach (var requirement in requirements) { <h4>@requirement.Key</h4><p class="supplier-tender-text">@requirement.Value</p> }
+    <h4>Sample photos</h4><p class="supplier-tender-text">Attach at least one PNG or JPEG sample photo with your offer.</p>
 </section>
 <section class="ws-panel pg-panel">
     <h3>Specifications and quantities</h3>

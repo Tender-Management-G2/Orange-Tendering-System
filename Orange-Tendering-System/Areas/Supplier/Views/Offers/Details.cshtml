@@ -1,5 +1,9 @@
 @model SupplierOfferDetailsViewModel
-@{ ViewData["Title"] = "Offer Details"; ViewData["WorkspaceSection"] = "My Offers"; }
+@{
+    ViewData["Title"] = "Offer Details";
+    ViewData["WorkspaceSection"] = "My Offers";
+    var hasSamplePhoto = Model.Documents.Any(doc => doc.IsSamplePhoto);
+}
 <partial name="_PageHeader" />
 @if (TempData["OfferSuccess"] is string success) { <p class="pg-note" role="status">@success</p> }
 @if (TempData["OfferError"] is string error) { <p class="pg-note" role="alert">@error</p> }
@@ -19,35 +23,36 @@
 <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th>Specifications</th><th>Line total</th></tr></thead><tbody>
 @foreach (var item in Model.Terms.Items) { <tr><td>@item.Name</td><td>@item.Quantity</td><td>@item.UnitPrice.ToString("N2")</td><td>@item.OfferedSpecifications</td><td>@((item.Quantity * item.UnitPrice).ToString("N2"))</td></tr> }
 </tbody></table></div>
-<p>Shipping: @Model.Terms.ShippingCost | Installation: @Model.Terms.InstallationCost | Maintenance: @Model.Terms.MaintenanceCost | Tax: @Model.Terms.TaxAmount | Other: @Model.Terms.OtherCost</p>
-<p><strong>Total: @Model.Total.ToString("N2") @Model.Terms.CurrencyCode</strong></p>
+<partial name="_OfferPriceBreakdown" model="Model.Terms.PriceBreakdown()" />
 </section>
-<section class="ws-panel pg-panel"><h2>Attachments</h2>
-<ul>@foreach (var doc in Model.Documents) { <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a></li> }</ul>
-@if (Model.Documents.Count == 0) { <p>No attachments uploaded.</p> }
-@if (Model.CanEdit) {
-@* The file uploads as soon as it is chosen (no separate button). At least one attachment is required before submission. *@
-<form asp-controller="Documents" asp-action="UploadOffer" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form" data-auto-upload>
-<label for="offer-file">Attach PDF, PNG or JPEG (maximum 10 MB)</label><input id="offer-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" @(Model.Documents.Count == 0 ? "required" : "") aria-describedby="offer-file-status" />
-<p class="pg-hint" id="offer-file-status" role="status" aria-live="polite">@(Model.Documents.Count == 0 ? "At least one attachment is required before you can submit the offer. Choosing a file uploads it immediately." : "Choosing another file uploads it immediately.")</p>
-</form>
-}
+<section class="ws-panel pg-panel">
+    <h2>Attachments</h2>
+    @if (Model.Documents.Count > 0)
+    {
+        <ul>
+            @foreach (var file in Model.Documents)
+            {
+                <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@file.Id">@file.FileName</a>@(file.IsSamplePhoto ? " (Sample photo)" : "")</li>
+            }
+        </ul>
+    }
+    else { <p>No attachments uploaded.</p> }
+    @if (Model.CanEdit)
+    {
+        <p class="pg-hint">@(hasSamplePhoto ? "After submission, editing is locked." : "Open Edit draft to attach at least one sample photo before submitting.")</p>
+        <div class="pg-actions">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn">Edit draft</a>
+            @if (hasSamplePhoto)
+            {
+                <form asp-action="Submit" asp-route-id="@Model.Id" method="post"><button type="submit" class="pg-btn pg-btn-primary">Submit final offer</button></form>
+            }
+            else
+            {
+                <button type="button" class="pg-btn pg-btn-primary" disabled>Submit final offer</button>
+            }
+        </div>
+    }
 </section>
-@if (Model.CanEdit) {
-<section class="ws-panel pg-panel"><h2>Submit offer</h2>
-<p>Check your prices, quantities, specifications and all tender requirements and attachments. After submission, editing is locked.</p>
-<a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn">Edit draft</a>
-@if (Model.Documents.Count == 0)
-{
-<p class="pg-note" role="alert">Add at least one attachment above before submitting the offer.</p>
-<button type="button" class="pg-btn pg-btn-primary" disabled aria-disabled="true">Submit final offer</button>
-}
-else
-{
-<form asp-action="Submit" asp-route-id="@Model.Id" method="post"><button type="submit" class="pg-btn pg-btn-primary">Submit final offer</button></form>
-}
-</section>
-}
 @if (Model.Outcome != null) {
 <section class="ws-panel pg-panel"><h2>Approved result: @Model.Outcome</h2><p style="white-space:pre-wrap">@Model.ResultMessage</p><p>Notified: @Model.NotifiedAt?.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</p></section>
 } else {
@@ -58,17 +63,3 @@ else
 <a asp-controller="Clarifications" asp-action="Create" asp-route-bidId="@Model.Id">Contact Sourcing Officer</a><span> | </span>
 }
 <a asp-controller="Notifications" asp-action="Index">Notifications and results</a></nav>
-<script>
-// Upload the chosen attachment immediately; the server validates type and size and returns to this page.
-document.querySelectorAll('form[data-auto-upload]').forEach(function (form) {
-    var input = form.querySelector('input[type=file]'), status = form.querySelector('[role=status]');
-    input.addEventListener('change', function () {
-        var f = input.files && input.files[0]; if (!f) return;
-        var ok = /\.(pdf|png|jpe?g)$/i.test(f.name), small = f.size <= 10 * 1024 * 1024;
-        if (!ok || !small) { status.textContent = !ok ? 'Choose a PDF, PNG or JPEG file.' : 'The file is larger than 10 MB.'; status.classList.add('text-danger'); input.value = ''; return; }
-        status.classList.remove('text-danger'); status.textContent = 'Uploading ' + f.name + '…'; input.disabled = false;
-        form.requestSubmit ? form.requestSubmit() : form.submit();
-        input.setAttribute('aria-busy', 'true');
-    });
-});
-</script>

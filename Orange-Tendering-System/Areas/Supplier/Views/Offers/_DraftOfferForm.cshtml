@@ -1,18 +1,17 @@
 @model SupplierDraftOfferViewModel
-<form asp-area="Supplier" asp-controller="Offers" asp-action="@(Model.BidId.HasValue ? "Edit" : "Create")" asp-route-id="@(Model.BidId ?? Model.InvitationId)" method="post" class="pg-form">
+<form asp-area="Supplier" asp-controller="Offers" asp-action="@(Model.BidId.HasValue ? "Edit" : "Create")" asp-route-id="@(Model.BidId ?? Model.InvitationId)" method="post" enctype="multipart/form-data" class="pg-form" data-offer-pricing>
     <div asp-validation-summary="All" role="alert"></div>
     <section class="ws-panel pg-panel">
         <h2>@Model.TenderTitle</h2>
-        <p>This saves a draft only. Your offer is not submitted to the Sourcing Officer.</p>
         <div class="pg-form-grid">
             <div class="pg-field">
                 <label asp-for="Input.CurrencyCode">Currency</label>
-                <select asp-for="Input.CurrencyCode"><option>JOD</option><option>USD</option><option>EUR</option></select>
+                <select asp-for="Input.CurrencyCode" data-offer-currency><option>JOD</option><option>USD</option><option>EUR</option></select>
                 <span asp-validation-for="Input.CurrencyCode"></span>
             </div>
             <div class="pg-field">
                 <label asp-for="Input.DeliveryDays">Delivery (days)</label>
-                <input asp-for="Input.DeliveryDays" type="number" min="1" max="3650" />
+                <input asp-for="Input.DeliveryDays" type="number" min="1" max="3650" data-fv-required-when="submitOffer=true" />
                 <span asp-validation-for="Input.DeliveryDays"></span>
             </div>
             <div class="pg-field pg-field-wide">
@@ -22,35 +21,35 @@
             </div>
             <div class="pg-field pg-field-wide">
                 <label asp-for="Input.TechnicalProposal">Technical proposal</label>
-                <textarea asp-for="Input.TechnicalProposal" rows="4" maxlength="10000"></textarea>
+                <textarea asp-for="Input.TechnicalProposal" rows="4" maxlength="10000" data-fv-required-when="submitOffer=true"></textarea>
                 <span asp-validation-for="Input.TechnicalProposal"></span>
             </div>
         </div>
         <div class="pg-form-grid">
             <div class="pg-field"><label asp-for="Input.ValidUntil">Valid until</label><input asp-for="Input.ValidUntil" type="date" /></div>
-            <div class="pg-field"><label asp-for="Input.ShippingCost">Shipping</label><input asp-for="Input.ShippingCost" type="number" min="0" step="0.01" /></div>
-            <div class="pg-field"><label asp-for="Input.InstallationCost">Installation</label><input asp-for="Input.InstallationCost" type="number" min="0" step="0.01" /></div>
-            <div class="pg-field"><label asp-for="Input.MaintenanceCost">Maintenance</label><input asp-for="Input.MaintenanceCost" type="number" min="0" step="0.01" /></div>
-            <div class="pg-field"><label asp-for="Input.TaxAmount">Tax</label><input asp-for="Input.TaxAmount" type="number" min="0" step="0.01" /></div>
-            <div class="pg-field"><label asp-for="Input.OtherCost">Other costs</label><input asp-for="Input.OtherCost" type="number" min="0" step="0.01" /></div>
+            <div class="pg-field"><label asp-for="Input.ShippingCost">Shipping</label><input asp-for="Input.ShippingCost" type="number" min="0" max="999999999" step="0.01" data-offer-extra="shipping" /></div>
+            <div class="pg-field"><label asp-for="Input.InstallationCost">Installation</label><input asp-for="Input.InstallationCost" type="number" min="0" max="999999999" step="0.01" data-offer-extra="installation" /></div>
+            <div class="pg-field"><label asp-for="Input.MaintenanceCost">Maintenance</label><input asp-for="Input.MaintenanceCost" type="number" min="0" max="999999999" step="0.01" data-offer-extra="maintenance" /></div>
+            <div class="pg-field"><label asp-for="Input.OtherCost">Other costs</label><input asp-for="Input.OtherCost" type="number" min="0" max="999999999" step="0.01" data-offer-extra="other" /></div>
         </div>
     </section>
     <section class="ws-panel pg-panel">
         <h2>Item prices</h2>
+        <p class="pg-hint">Enter unit prices before sales tax.</p>
         <div class="pg-table-wrap">
             <table class="pg-table">
                 <thead><tr><th>Item</th><th>Required quantity</th><th>Offered quantity</th><th>Unit price</th><th>Offered specifications</th></tr></thead>
                 <tbody>
                     @for (int i = 0; i < Model.Input.Items.Count; i++)
                     {
-                        <tr>
+                        <tr data-offer-item>
                             <td>
                                 @Model.Input.Items[i].Name
                                 <input asp-for="Input.Items[i].TenderItemId" type="hidden" />
                             </td>
                             <td>@Model.Input.Items[i].RequiredQuantity.ToString("0.###")</td>
-                            <td><input asp-for="Input.Items[i].Quantity" aria-label="Offered quantity" type="number" min="0.001" max="999999999" step="0.001" /><span asp-validation-for="Input.Items[i].Quantity"></span></td>
-                            <td><input asp-for="Input.Items[i].UnitPrice" aria-label="Unit price" type="number" min="0" max="999999999" step="0.01" /><span asp-validation-for="Input.Items[i].UnitPrice"></span></td>
+                            <td><input asp-for="Input.Items[i].Quantity" aria-label="Offered quantity" type="number" min="0.001" max="999999999" step="0.001" data-offer-quantity /><span asp-validation-for="Input.Items[i].Quantity"></span></td>
+                            <td><input asp-for="Input.Items[i].UnitPrice" aria-label="Unit price before tax" type="number" min="0" max="999999999" step="0.01" data-offer-price /><span asp-validation-for="Input.Items[i].UnitPrice"></span></td>
                             <td><textarea asp-for="Input.Items[i].OfferedSpecifications" aria-label="Offered specifications" rows="2" maxlength="4000"></textarea></td>
                         </tr>
                     }
@@ -59,14 +58,40 @@
         </div>
         @if (Model.Input.Items.Count > 0)
         {
-            <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary">Save draft</button></div>
+            <partial name="_OfferPriceBreakdown" model="Model.Input.PriceBreakdown(live: true)" />
         }
         else
         {
             <p>No tender items are available. Please contact the Sourcing Officer.</p>
         }
     </section>
+    @if (Model.Input.Items.Count > 0)
+    {
+        <section class="ws-panel pg-panel">
+            <h2>Attachments</h2>
+            @if (Model.Documents.Count > 0)
+            {
+                <ul>
+                    @foreach (var file in Model.Documents)
+                    {
+                        <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@file.Id">@file.FileName</a>@(file.IsSamplePhoto ? " (Sample photo)" : "")</li>
+                    }
+                </ul>
+            }
+            <div class="pg-field">
+                <label for="offer-attachments">Choose files</label>
+                <input id="offer-attachments" name="attachments" type="file" accept=".png,.jpg,.jpeg,.pdf" multiple data-fv-max-mb="10"
+                       data-fv-required-when="@(Model.Documents.Any(file => file.IsSamplePhoto) ? null : "submitOffer=true")" aria-describedby="offer-attachments-hint" />
+                <small class="pg-hint" id="offer-attachments-hint">Attach at least one PNG or JPEG sample photo before final submission. Supporting PDFs are optional. Maximum 10 MB per file.</small>
+            </div>
+            <div class="pg-actions">
+                <button type="submit" name="submitOffer" value="false" class="pg-btn">Save draft</button>
+                <button type="submit" name="submitOffer" value="true" class="pg-btn pg-btn-primary">Submit offer</button>
+            </div>
+        </section>
+    }
 </form>
+<script src="~/js/supplier-offer-pricing.js" asp-append-version="true" defer></script>
 <nav class="pg-links" aria-label="Related pages">
     <ul><li><a asp-area="Supplier" asp-controller="Invitations" asp-action="Details" asp-route-id="@Model.InvitationId">Back to invitation</a></li></ul>
 </nav>

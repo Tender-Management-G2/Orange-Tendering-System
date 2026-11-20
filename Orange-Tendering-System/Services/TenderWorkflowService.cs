@@ -212,25 +212,6 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         Require(await Role(a, SystemRoles.Supplier) && invitation?.Status == InvitationStatus.Pending && r.Status == TenderRoundStatus.Open && r.Deadline > Now, "Invitation is unavailable or no longer open.");
         invitation!.Status = accept ? InvitationStatus.Accepted : InvitationStatus.Declined; invitation.RespondedAt = Now;
     });
-    public Task SubmitBid(int id, BidInput input, ClaimsPrincipal principal)
-    {
-        DateTime? limit = null;
-        return Change(id, principal, "BidSubmitted", async (t, a) =>
-        {
-            var r = await Round(id); limit = r.Deadline; var w = await Weights(id);
-            var invite = await db.TenderInvitations.Include(x => x.Supplier).SingleOrDefaultAsync(x => x.Id == input.InvitationId && x.TenderRoundId == r.Id && x.SupplierId == a.SupplierId);
-            Require(await Role(a, SystemRoles.Supplier) && invite?.Status == InvitationStatus.Accepted && invite.Supplier.Status == SupplierStatus.Approved, "An accepted invitation and eligible supplier account are required.");
-            Require(t.Status == TenderStatus.Bidding && r.Status == TenderRoundStatus.Open && r.Deadline > Now && w.State == WeightState.Approved, "Bidding is closed or weights are not approved.");
-            Require(!await db.Bids.AnyAsync(x => x.TenderInvitationId == input.InvitationId), "This invitation already has a bid. Submitted bids are immutable; revision policy is required.");
-            var items = await db.TenderItems.Where(x => x.TenderId == id).ToListAsync();
-            Require(input.Lines.Count == items.Count && input.Lines.Select(x => x.TenderItemId).Distinct().Count() == items.Count && input.Lines.All(x => items.Any(y => y.Id == x.TenderItemId) && x.UnitPrice.HasValue && x.UnitPrice >= 0 && decimal.Round(x.UnitPrice.Value, 2) == x.UnitPrice), "Price every tender item exactly once using two decimal places.");
-            var bid = new Bid { TenderInvitationId = input.InvitationId, Status = BidStatus.Submitted, TechnicalProposal = input.TechnicalProposal, CurrencyCode = input.Currency, DeliveryDays = input.DeliveryDays, PaymentTerms = input.PaymentTerms, OtherCost = input.ExtraCosts, CreatedAt = Now, SubmittedAt = Now,
-                Items = input.Lines.Select(x => new BidItem { TenderItemId = x.TenderItemId, UnitPrice = x.UnitPrice!.Value, Quantity = items.Single(y => y.Id == x.TenderItemId).Quantity, OfferedSpecifications = x.Specifications }).ToList() };
-            db.Bids.Add(bid);
-            await NotifyOfficer(id, "Bid received", "An invited supplier submitted an offer. Compliance review is required after bidding closes.");
-        }, () => limit);
-    }
-    // The supplier portal's rich draft enters the same locked workflow boundary as direct submissions.
     public async Task SubmitDraft(int bidId, ClaimsPrincipal principal)
     {
         var tenderId = await db.Bids.Where(b => b.Id == bidId).Select(b => (int?)b.TenderInvitation.TenderRound.TenderId).SingleOrDefaultAsync();
@@ -253,6 +234,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             var expected = await db.TenderItems.Where(i => i.TenderId == t.Id).Select(i => i.Id).ToListAsync();
             Require(expected.Order().SequenceEqual(bid.Items.Select(i => i.TenderItemId).Order()), "Price every tender item exactly once.");
             Require(!await db.Bids.AnyAsync(b => b.TenderInvitationId == bid.TenderInvitationId && b.Id != bidId && b.Status == BidStatus.Submitted), "A final offer already exists.");
+            Require(await db.Documents.AnyAsync(d => d.BidId == bidId && d.DocumentType == Document.OfferSamplePhotoType),
+                "Attach at least one PNG or JPEG sample photo before submitting this offer.");
+            Require(bid.TryApplySalesTax(), "The calculated sales tax is out of range. Check the item prices and quantities.");
             bid.Status = BidStatus.Submitted; bid.SubmittedAt = Now;
             db.AuditLogs.Add(new AuditLog { UserId = actor.Id, EntityName = nameof(Bid), EntityId = bid.Id.ToString(), Action = "SubmitOffer", CreatedAt = Now });
             await NotifyOfficer(t.Id, "Supplier offer submitted", $"Offer #{bid.Id} is ready for compliance review after bidding closes.");

@@ -24,7 +24,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         }
 
         // Create Supplier Offer — Owner: Saja
-        // GET: open an accepted invitation. POST: save a new draft only.
+        // GET: open an accepted invitation. POST: save a draft or submit the offer.
         [HttpGet]
         public async Task<IActionResult> Create(int? id)
         {
@@ -44,7 +44,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(int id,
-            [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input)
+            [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input, IFormFile[]? attachments, [FromForm] bool submitOffer = false)
         {
             if (input.Items == null || input.Items.Any(item => item == null))
                 return BadRequest();
@@ -61,14 +61,21 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            bool saved = await offerService.CreateDraftAsync(userId, id, input);
-            if (saved == false)
+            try
             {
-                ModelState.AddModelError("", "Draft not saved. Check the invitation, deadline and tender items.");
+                if (!await offerService.CreateDraftAsync(userId, id, input, attachments, submitOffer))
+                {
+                    ModelState.AddModelError("", "Check the invitation, deadline and item quantities and prices.");
+                    return View(model);
+                }
+            }
+            catch (WorkflowException e)
+            {
+                ModelState.AddModelError("", e.Message);
                 return View(model);
             }
 
-            TempData.Orange(OrangeFeedback.Toast("Draft saved!", "Your offer is saved as a draft. It has not been submitted."));
+            TempData.Orange(submitOffer ? SubmittedFeedback() : OrangeFeedback.Toast("Draft saved!", "Your offer is saved as a draft. It has not been submitted."));
             return RedirectToAction("Index");
         }
 
@@ -82,19 +89,27 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input)
+        public async Task<IActionResult> Edit(int id, [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input, IFormFile[]? attachments, [FromForm] bool submitOffer = false)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             var model = await offerService.GetEditAsync(userId, id);
             if (model == null) return NotFound();
             if (input.Items == null || input.Items.Any(i => i == null)) return BadRequest();
             if (!ModelState.IsValid) return View("Edit", model);
-            if (!await offerService.UpdateDraftAsync(userId, id, input))
+            try
             {
-                ModelState.AddModelError("", "Draft not saved. Check the items and submission deadline.");
+                if (!await offerService.UpdateDraftAsync(userId, id, input, attachments, submitOffer))
+                {
+                    ModelState.AddModelError("", "Check the item quantities, prices and submission deadline.");
+                    return View("Edit", model);
+                }
+            }
+            catch (WorkflowException e)
+            {
+                ModelState.AddModelError("", e.Message);
                 return View("Edit", model);
             }
-            TempData.Orange(OrangeFeedback.Toast("Draft updated", "Your changes are saved. The offer has not been submitted."));
+            TempData.Orange(submitOffer ? SubmittedFeedback() : OrangeFeedback.Toast("Draft updated", "Your changes are saved. The offer has not been submitted."));
             return RedirectToAction("Details", new { id });
         }
 
@@ -127,10 +142,12 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             if (await offerService.GetOfferAsync(userId, id) == null) return NotFound();
             var error = await offerService.SubmitAsync(userId, id);
-            if (error == null) TempData.Orange(OrangeFeedback.Popup("Offer submitted!", "Your offer is recorded and can no longer be edited."));
+            if (error == null) TempData.Orange(SubmittedFeedback());
             else TempData["OfferError"] = error;
             return RedirectToAction("Details", new { id });
         }
+
+        private static OrangeFeedback SubmittedFeedback() => OrangeFeedback.Popup("Offer submitted!", "Your offer is recorded and can no longer be edited.");
 
         public async Task<IActionResult> DownloadSummary()
         {

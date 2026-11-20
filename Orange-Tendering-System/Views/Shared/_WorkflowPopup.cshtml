@@ -60,7 +60,10 @@
     {
         using var reqDoc = JsonDocument.Parse(Model.Tender.Requirements ?? "");
         var labels = new Dictionary<string, string> { ["TechnicalRequirements"] = "Technical", ["CommercialConditions"] = "Commercial", ["DeliveryExpectations"] = "Delivery", ["MandatoryCompliance"] = "Compliance" };
-        foreach (var prop in reqDoc.RootElement.EnumerateObject()) requirementRows.Add((labels.TryGetValue(prop.Name, out var l) ? l : prop.Name, prop.Value.ToString()));
+        foreach (var prop in reqDoc.RootElement.EnumerateObject())
+        {
+            if (prop.Name != "SamplePhotosRequired") requirementRows.Add((labels.TryGetValue(prop.Name, out var l) ? l : prop.Name, prop.Value.ToString()));
+        }
     }
     catch { requirementRows.Clear(); }
 
@@ -788,7 +791,7 @@
         {
             <div class="wp-side-card">
                 <h4>Documents</h4>
-                <p class="wp-docs wp-docs-col">@foreach (var d in Model.Documents) { <a data-no-modal href="@Url.Action("Download", ViewContext.RouteData.Values["controller"]?.ToString(), new { area, id = d.Id })">&#128206; @d.FileName</a> }</p>
+                <p class="wp-docs wp-docs-col">@foreach (var d in Model.Documents) { <a data-no-modal href="@Url.Action("Download", ViewContext.RouteData.Values["controller"]?.ToString(), new { area, id = d.Id })">&#128206; @(d.DocumentType == Document.OfferSamplePhotoType ? "Sample photo · " : "")@d.FileName</a> }</p>
             </div>
         }
     </aside>

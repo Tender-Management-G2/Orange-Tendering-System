@@ -16,7 +16,7 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
 [Authorize(Roles = SystemRoles.SourcingOfficer)]
-public class BidsController(ApplicationDbContext db, TenderWorkflowService workflow) : Controller
+public class BidsController(ApplicationDbContext db, TenderWorkflowService workflow, ProtectedDocumentStore documents) : Controller
 {
     public async Task<IActionResult> Index(int? id)
     {
@@ -70,8 +70,30 @@ public class BidsController(ApplicationDbContext db, TenderWorkflowService workf
 
     public async Task<IActionResult> Details(int id)
     {
-        var bid = await db.Bids.AsNoTracking().Include(b => b.TenderInvitation).ThenInclude(i => i.Supplier).Include(b => b.TenderInvitation.TenderRound).ThenInclude(r => r.Tender).Include(b => b.Items).ThenInclude(i => i.TenderItem).Include(b => b.Documents).SingleOrDefaultAsync(b => b.Id == id);
+        var bid = await db.Bids.AsNoTracking().Include(b => b.TenderInvitation).ThenInclude(i => i.Supplier).Include(b => b.TenderInvitation.TenderRound).ThenInclude(r => r.Tender).Include(b => b.Items).ThenInclude(i => i.TenderItem).Include(b => b.Documents).SingleOrDefaultAsync(b => b.Id == id && b.Status != BidStatus.Draft);
         return bid == null ? NotFound() : View(bid);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Attachment(int id)
+    {
+        try
+        {
+            var (document, _) = await workflow.AuthorizedDocument(id, User);
+            if (document.Bid is not { Status: not BidStatus.Draft }) return NotFound();
+            var path = documents.Resolve(document);
+            if (!System.IO.File.Exists(path)) return NotFound();
+
+            Response.Headers.CacheControl = "no-store";
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            if (document.ContentType is "image/png" or "image/jpeg" or "application/pdf")
+            {
+                Response.Headers["Content-Security-Policy"] = "sandbox";
+                return PhysicalFile(path, document.ContentType, enableRangeProcessing: true);
+            }
+            return PhysicalFile(path, "application/octet-stream", Path.GetFileName(document.FileName));
+        }
+        catch (WorkflowException) { return NotFound(); }
     }
 
     public async Task<IActionResult> Compliance(int id)

@@ -6,6 +6,8 @@ namespace Orange_Tendering_System.Models.Entities
     // Exactly one owner column should be set (enforced in application logic).
     public class Document
     {
+        public const string OfferSamplePhotoType = "OfferSamplePhoto";
+
         public int Id { get; set; }
 
         [Required, MaxLength(260)]

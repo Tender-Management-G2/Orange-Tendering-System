@@ -21,8 +21,7 @@ public sealed class SupplierOfferDetailsViewModel
     public List<SupplierDocumentViewModel> Documents { get; set; } = new();
     public string? MissingRequirements { get; set; }
     public string ComplianceStatus { get; set; } = "";
-    public decimal Total => Terms.Items.Sum(i => i.Quantity * i.UnitPrice)
-        + Terms.ShippingCost + Terms.InstallationCost + Terms.MaintenanceCost + Terms.TaxAmount + Terms.OtherCost;
+    public decimal Total => Terms.PriceBreakdown().Total;
 }
 
 public sealed class SupplierDocumentViewModel
@@ -30,6 +29,7 @@ public sealed class SupplierDocumentViewModel
     public int Id { get; set; }
     public string FileName { get; set; } = "";
     public string? DocumentType { get; set; }
+    public bool IsSamplePhoto => DocumentType == Document.OfferSamplePhotoType;
     public DateTime UploadedAt { get; set; }
     public long SizeBytes { get; set; }
 }

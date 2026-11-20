@@ -12,7 +12,7 @@
         <div class="so-requirements"><strong>Requirements set for suppliers</strong><p>@(string.IsNullOrWhiteSpace(Model.TenderInvitation.TenderRound.Tender.Requirements) ? "No mandatory requirements were entered for this tender." : Model.TenderInvitation.TenderRound.Tender.Requirements)</p></div>
         <h3 class="so-subheading">Documents submitted with this offer</h3>
         @if (Model.Documents.Count == 0) { <p class="pg-hint">The supplier did not attach documents to this offer.</p> }
-        else { <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead><tbody>@foreach (var document in Model.Documents) { <tr><td>@document.FileName</td><td>@(document.DocumentType ?? "—")</td><td>@document.UploadedAt.ToLocalTime().ToString("d MMM yyyy")</td></tr> }</tbody></table></div> }
+        else { <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead><tbody>@foreach (var document in Model.Documents) { <tr><td><a asp-action="Attachment" asp-route-id="@document.Id" target="_blank" rel="noopener" data-no-modal>@document.FileName</a></td><td>@(document.DocumentType ?? "—")</td><td>@document.UploadedAt.ToLocalTime().ToString("d MMM yyyy")</td></tr> }</tbody></table></div> }
         <p class="pg-hint">Choose a result below. The form will show only the information needed for that result.</p>
     </section>
 

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -200,19 +201,115 @@ public static class UnifiedTenderChecks
         Check(!summary.Contains("Weights") && !summary.Contains("COMPETITOR_SECRET_NAME"), "supplier tender details are sanitized");
         var supplierRows = await flow.List(Principal(supplierUser));
         Check(supplierRows.Single().Status == "Open", "supplier list exposes availability only");
-        var create = await supplierClient.GetAsync("/Supplier/Offers/Create/" + invitation.Id);
-        Check(create.StatusCode == HttpStatusCode.OK && (await create.Content.ReadAsStringAsync()).Contains("Save draft"), "eligible supplier can prepare an offer");
+        var createUrl = "/Supplier/Offers/Create/" + invitation.Id;
+        var create = await supplierClient.GetAsync(createUrl);
+        var createHtml = await create.Content.ReadAsStringAsync();
+        Check(create.StatusCode == HttpStatusCode.OK && createHtml.Contains("Save draft") && createHtml.Contains("Submit offer") && createHtml.Contains("Attach at least one PNG or JPEG sample photo")
+            && createHtml.Contains("multipart/form-data") && Regex.Matches(createHtml, "type=\"file\"").Count == 1, "prepare offer has one attachment picker and explains the required photo");
+        var legacyPost = await supplierClient.PostAsync("/Supplier/Workflow/SubmitBid/" + id, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["InvitationId"] = invitation.Id.ToString(),
+            ["__RequestVerificationToken"] = await Token(supplierClient, "/Supplier/Offers/Create/" + invitation.Id)
+        }));
+        Check(legacyPost.StatusCode == HttpStatusCode.Redirect && legacyPost.Headers.Location?.OriginalString == "/Supplier/Offers/Create/" + invitation.Id
+            && !await db.Bids.AnyAsync(b => b.TenderInvitationId == invitation.Id), "legacy submission link redirects to the draft without creating an offer");
         var offerService = scope.ServiceProvider.GetRequiredService<SupplierOfferService>();
         var draft = await offerService.GetCreateAsync(supplierUser.Id, invitation.Id);
         draft!.Input.TechnicalProposal = "Test proposal"; draft.Input.DeliveryDays = 12;
-        foreach (var item in draft.Input.Items) item.UnitPrice = 400;
-        Check(await offerService.CreateDraftAsync(supplierUser.Id, invitation.Id, draft.Input), "supplier draft saved through existing service");
+        draft.Input.ShippingCost = 3m;
+        draft.Input.InstallationCost = 30m;
+        draft.Input.MaintenanceCost = 30m;
+        draft.Input.OtherCost = 10m;
+        draft.Input.TaxAmount = 999m;
+        foreach (var item in draft.Input.Items) { item.Quantity = 1m; item.UnitPrice = 100m; }
+        var samplePhotoBytes = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=");
+        var supportingPdf = "%PDF-1.4\n%%EOF"u8.ToArray();
+        async Task<HttpResponseMessage> PostOffer(HttpClient client, string url, SupplierDraftOfferInputModel input, bool submitOffer,
+            params (string Name, byte[] Bytes)[] files)
+        {
+            using var form = new MultipartFormDataContent();
+            void Field(string name, string value) => form.Add(new StringContent(value), name);
+            Field("__RequestVerificationToken", await Token(client, url));
+            Field("submitOffer", submitOffer ? "true" : "false");
+            Field("Input.CurrencyCode", input.CurrencyCode);
+            Field("Input.TechnicalProposal", input.TechnicalProposal ?? "");
+            Field("Input.DeliveryDays", input.DeliveryDays.ToString()!);
+            Field("Input.PaymentTerms", input.PaymentTerms ?? "");
+            Field("Input.ShippingCost", input.ShippingCost.ToString(CultureInfo.InvariantCulture));
+            Field("Input.InstallationCost", input.InstallationCost.ToString(CultureInfo.InvariantCulture));
+            Field("Input.MaintenanceCost", input.MaintenanceCost.ToString(CultureInfo.InvariantCulture));
+            Field("Input.OtherCost", input.OtherCost.ToString(CultureInfo.InvariantCulture));
+            Field("Input.TaxAmount", input.TaxAmount.ToString(CultureInfo.InvariantCulture));
+            for (var i = 0; i < input.Items.Count; i++)
+            {
+                var item = input.Items[i];
+                Field($"Input.Items[{i}].TenderItemId", item.TenderItemId.ToString());
+                Field($"Input.Items[{i}].Quantity", item.Quantity.ToString(CultureInfo.InvariantCulture));
+                Field($"Input.Items[{i}].UnitPrice", item.UnitPrice.ToString(CultureInfo.InvariantCulture));
+            }
+            foreach (var file in files) form.Add(new ByteArrayContent(file.Bytes), "attachments", file.Name);
+            return await client.PostAsync(url, form);
+        }
+        using var invalid = await PostOffer(supplierClient, createUrl, draft.Input, false, ("sample.png", samplePhotoBytes), ("invalid.pdf", samplePhotoBytes));
+        Check(invalid.StatusCode == HttpStatusCode.OK && (await invalid.Content.ReadAsStringAsync()).Contains("invalid.pdf")
+            && !await db.Bids.AnyAsync(b => b.TenderInvitationId == invitation.Id), "an invalid attachment rolls back the whole new draft");
+        using var saved = await PostOffer(supplierClient, createUrl, draft.Input, false, ("sample.png", samplePhotoBytes), ("offer.pdf", supportingPdf));
+        Check(saved.StatusCode == HttpStatusCode.Redirect, "draft, photo and PDF are saved together from Prepare my offer");
         var bid = await db.Bids.SingleAsync(b => b.TenderInvitationId == invitation.Id);
+        Check(bid.TaxAmount == 27.68m, "saved sales tax uses 16% of all costs and ignores the posted tax amount");
+        var offerUrl = "/Supplier/Offers/Details/" + bid.Id;
+        var firstPhoto = await db.Documents.SingleAsync(d => d.BidId == bid.Id && d.DocumentType == Document.OfferSamplePhotoType);
+        Check((await officerClient.GetAsync($"/SourcingOfficer/Bids/Attachment/{firstPhoto.Id}")).StatusCode == HttpStatusCode.NotFound,
+            "officer cannot open an unsubmitted draft attachment");
+        var withAttachments = await supplierClient.GetStringAsync(offerUrl);
+        Check(withAttachments.Contains("sample.png") && withAttachments.Contains("offer.pdf") && !withAttachments.Contains("type=\"file\"")
+            && Regex.Matches(withAttachments, "<h2>Attachments</h2>").Count == 1, "offer details show both files in one read-only list");
+        Check(withAttachments.Contains("Services and fees subtotal") && withAttachments.Contains("73.00") && withAttachments.Contains("173.00")
+            && withAttachments.Contains("27.68") && withAttachments.Contains("200.68"), "supplier invoice shows each subtotal, sales tax and grand total");
+        var priceDisclosure = Regex.Match(withAttachments, "<details class=\"offer-invoice\"([^>]*)>\\s*<summary[^>]*>(.*?)</summary>", RegexOptions.Singleline);
+        Check(priceDisclosure.Success && !Regex.IsMatch(priceDisclosure.Groups[1].Value, "\\bopen\\b")
+            && priceDisclosure.Groups[2].Value.Contains("200.68") && priceDisclosure.Groups[2].Value.Contains("Details")
+            && !withAttachments.Contains("data-offer-amount=\"tax-base\""), "grand total stays visible with a collapsed details toggle and no tax equation");
+        // Leave only the PDF in place to exercise the required-photo rule and the edit upload path.
+        File.Delete(PrivateDocumentPaths.Resolve(root, firstPhoto.StoragePath));
+        db.Documents.Remove(firstPhoto);
+        await db.SaveChangesAsync();
+        var withoutPhoto = await supplierClient.GetStringAsync(offerUrl);
+        Check(withoutPhoto.Contains("Open Edit draft to attach at least one sample photo") && Regex.IsMatch(withoutPhoto, "<button[^>]*disabled[^>]*>Submit final offer"), "offer details direct suppliers to edit and disable submission when a photo is missing");
         // A screening flag must not act as a predicted-outcome gate on a supplier's draft submission.
         bid.ComplianceStatus = ComplianceStatus.NonCompliant; await db.SaveChangesAsync();
-        Check(await offerService.SubmitAsync(supplierUser.Id, bid.Id) is string noFile && noFile.Contains("attachment"), "offer cannot be submitted without an attachment");
-        db.Add(new Document { FileName = "offer.pdf", StoragePath = "test/offer.pdf", ContentType = "application/pdf", SizeBytes = 10, UploadedByUserId = supplierUser.Id, UploadedAt = DateTime.UtcNow, BidId = bid.Id, DocumentType = "OfferAttachment" }); await db.SaveChangesAsync();
-        Check(await offerService.SubmitAsync(supplierUser.Id, bid.Id) == null, "submission is not blocked by internal screening or predicted outcome"); db.RemoveRange(db.Documents.Where(d => d.BidId == bid.Id && d.StoragePath == "test/offer.pdf")); await db.SaveChangesAsync(); // compliance later checks the real upload path
+        Check(await offerService.SubmitAsync(supplierUser.Id, bid.Id) is string missingPhoto && missingPhoto.Contains("sample photo"), "a generic attachment does not satisfy the required sample photo");
+        var editUrl = "/Supplier/Offers/Edit/" + bid.Id;
+        var editHtml = await supplierClient.GetStringAsync(editUrl);
+        Check(editHtml.Contains("offer.pdf") && Regex.Matches(editHtml, "type=\"file\"").Count == 1, "Edit draft uses the same picker and lists existing files");
+        using var edited = await PostOffer(supplierClient, editUrl, draft.Input, false, ("sample.png", samplePhotoBytes));
+        Check(edited.StatusCode == HttpStatusCode.Redirect, "supplier adds a photo while saving edits to a draft");
+        try
+        {
+            var withPhoto = await supplierClient.GetStringAsync(offerUrl);
+            Check(withPhoto.Contains("sample.png") && withPhoto.Contains("offer.pdf") && Regex.IsMatch(withPhoto, "<button(?![^>]*disabled)[^>]*>Submit final offer"), "saving the sample photo enables submission and preserves previous attachments");
+            Check(await offerService.SubmitAsync(supplierUser.Id, bid.Id) == null, "submission accepts the required photo and ignores internal screening flags");
+            var officerOffer = await officerClient.GetStringAsync($"/SourcingOfficer/Bids/Details/{bid.Id}");
+            Check(officerOffer.Contains("Offer price breakdown") && officerOffer.Contains("200.68") && officerOffer.Contains("Sales tax (16%)"), "officer offer details show the same detailed final prices");
+            var files = await db.Documents.AsNoTracking().Where(d => d.BidId == bid.Id).ToListAsync();
+            foreach (var file in files)
+            {
+                var attachmentUrl = $"/SourcingOfficer/Bids/Attachment/{file.Id}";
+                Check(officerOffer.Contains(attachmentUrl), "officer offer details link to " + file.FileName);
+                using var attachment = await officerClient.GetAsync(attachmentUrl);
+                Check(attachment.StatusCode == HttpStatusCode.OK && attachment.Content.Headers.ContentType?.MediaType == file.ContentType
+                    && (await attachment.Content.ReadAsByteArrayAsync()).SequenceEqual(file.DocumentType == Document.OfferSamplePhotoType ? samplePhotoBytes : supportingPdf),
+                    "officer opens the original attachment " + file.FileName);
+                Check((await supplierClient.GetAsync(attachmentUrl)).StatusCode != HttpStatusCode.OK, "supplier cannot use the officer attachment route");
+            }
+        }
+        finally
+        {
+            var uploadedFiles = await db.Documents.Where(d => d.BidId == bid.Id).ToListAsync();
+            foreach (var file in uploadedFiles) File.Delete(PrivateDocumentPaths.Resolve(root, file.StoragePath));
+            db.Documents.RemoveRange(uploadedFiles);
+            await db.SaveChangesAsync(); // Later checks exercise the normal compliance attachment rules.
+        }
         var privateOffer = await offerService.GetOfferAsync(supplierUser.Id, bid.Id);
         Check(privateOffer!.ComplianceStatus == "" && privateOffer.Outcome == null, "internal screening and unannounced outcome not exposed");
         var waitingPopup = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
@@ -236,8 +333,44 @@ public static class UnifiedTenderChecks
             var account = additional[index];
             var own = await db.TenderInvitations.SingleAsync(i => i.SupplierId == account.Company.Id);
             await flow.Respond(id, own.Id, true, Principal(account.User));
-            await flow.SubmitBid(id, new BidInput { InvitationId = own.Id, TechnicalProposal = "Additional offer", DeliveryDays = 15, PaymentTerms = "30 days",
-                Lines = await db.TenderItems.Where(i => i.TenderId == id).Select(i => new BidLineInput { TenderItemId = i.Id, UnitPrice = 450 }).ToListAsync() }, Principal(account.User));
+            var additionalDraft = (await offerService.GetCreateAsync(account.User.Id, own.Id))!;
+            additionalDraft.Input.TechnicalProposal = "Additional offer";
+            additionalDraft.Input.DeliveryDays = 15;
+            additionalDraft.Input.PaymentTerms = "30 days";
+            foreach (var item in additionalDraft.Input.Items) item.UnitPrice = 450;
+            using var client = await Login(account.User);
+            var submissionUrl = "/Supplier/Offers/Create/" + own.Id;
+            if (index == 0)
+            {
+                using var rejected = await PostOffer(client, submissionUrl, additionalDraft.Input, true, ("support.pdf", supportingPdf));
+                Check(rejected.StatusCode == HttpStatusCode.OK && (await rejected.Content.ReadAsStringAsync()).Contains("Attach at least one PNG or JPEG sample photo before submitting this offer.")
+                    && !await db.Bids.AnyAsync(b => b.TenderInvitationId == own.Id), "direct submission without a photo leaves no draft");
+            }
+            else
+            {
+                using var savedDraft = await PostOffer(client, submissionUrl, additionalDraft.Input, false);
+                Check(savedDraft.StatusCode == HttpStatusCode.Redirect, "additional supplier saves own draft");
+                var draftId = await db.Bids.Where(b => b.TenderInvitationId == own.Id).Select(b => b.Id).SingleAsync();
+                submissionUrl = "/Supplier/Offers/Edit/" + draftId;
+                additionalDraft.Input.TechnicalProposal = "Edited proposal";
+                using var rejected = await PostOffer(client, submissionUrl, additionalDraft.Input, true, ("support.pdf", supportingPdf));
+                Check(rejected.StatusCode == HttpStatusCode.OK && await db.Bids.AnyAsync(b => b.Id == draftId && b.Status == BidStatus.Draft && b.TechnicalProposal == "Additional offer" && !b.Documents.Any()),
+                    "failed submission rolls back edits and attachments to an existing draft");
+            }
+            using var submitted = await PostOffer(client, submissionUrl, additionalDraft.Input, true, ("sample.png", samplePhotoBytes));
+            var additionalBid = await db.Bids.AsNoTracking().Include(b => b.Documents).SingleAsync(b => b.TenderInvitationId == own.Id);
+            try
+            {
+                Check(submitted.StatusCode == HttpStatusCode.Redirect && additionalBid.Status == BidStatus.Submitted && additionalBid.SubmittedAt.HasValue
+                    && additionalBid.TechnicalProposal == additionalDraft.Input.TechnicalProposal && additionalBid.Documents.Count == 1
+                    && additionalBid.Documents.Single().DocumentType == Document.OfferSamplePhotoType,
+                    index == 0 ? "Prepare my offer saves and submits the offer and photo in one request" : "Edit draft saves latest changes and submits in one request");
+            }
+            finally
+            {
+                foreach (var file in additionalBid.Documents) File.Delete(PrivateDocumentPaths.Resolve(root, file.StoragePath));
+                await db.Documents.Where(d => d.BidId == additionalBid.Id).ExecuteDeleteAsync();
+            }
         }
         await SubmitAdditional(0);
         var twoRejected = false;

@@ -81,10 +81,7 @@ else {
 <form asp-area="Supplier" asp-controller="Workflow" asp-action="Respond" asp-route-id="@id" method="post"><input type="hidden" name="invitationId" value="@invitation.Id" /><button name="accept" value="true">Accept invitation</button> <button name="accept" value="false">Decline invitation</button></form>
 }
 @if (invitation.TenderRoundId == round?.Id && invitation.Status == InvitationStatus.Accepted && Model.Bids.All(x => x.TenderInvitationId != invitation.Id) && round?.Status == TenderRoundStatus.Open && round.Deadline > Model.UtcNow) {
-<form asp-area="Supplier" asp-controller="Workflow" asp-action="SubmitBid" asp-route-id="@id" method="post"><input type="hidden" name="InvitationId" value="@invitation.Id" /><label>Technical proposal<textarea name="TechnicalProposal" maxlength="10000" required></textarea></label><label>Currency<input name="Currency" value="JOD" pattern="[A-Z]{3}" required /></label><label>Delivery days<input name="DeliveryDays" type="number" min="1" max="3650" required /></label><label>Payment terms<textarea name="PaymentTerms" maxlength="1000" required></textarea></label><label>Additional costs (tax, shipping, installation and other costs)<input name="ExtraCosts" type="number" min="0" step="0.01" value="0" required /></label>
-@{ var lineIndex = 0; }
-@foreach (var item in Model.Tender.Items) { <input type="hidden" name="Lines[@lineIndex].TenderItemId" value="@item.Id" /><label>@item.Name · @item.Quantity @item.Unit · Unit price<input name="Lines[@lineIndex].UnitPrice" type="number" min="0" step="0.01" required /></label><label>Offered specifications<textarea name="Lines[@lineIndex].Specifications"></textarea></label> lineIndex++; }
-<p>Submission is final. Upload supporting documents below immediately after submission and before the deadline.</p><button>Submit financial and technical offer</button></form>
+<a asp-area="Supplier" asp-controller="Offers" asp-action="Create" asp-route-id="@invitation.Id">Prepare my offer</a>
 }
 }
 @foreach (var bid in Model.Bids) { <p>Your bid #@bid.Id · @bid.Status · Compliance: @bid.ComplianceStatus · @bid.ComplianceNotes</p>

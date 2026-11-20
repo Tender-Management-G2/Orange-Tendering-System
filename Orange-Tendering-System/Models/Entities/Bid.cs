@@ -9,6 +9,8 @@ namespace Orange_Tendering_System.Models.Entities
     [Index(nameof(TenderInvitationId), nameof(RevisionNumber), IsUnique = true)]
     public class Bid
     {
+        public const int SalesTaxPercent = 16;
+
         public int Id { get; set; }
 
         public int TenderInvitationId { get; set; }
@@ -63,5 +65,21 @@ namespace Orange_Tendering_System.Models.Entities
 
         public ICollection<BidItem> Items { get; set; } = new List<BidItem>();
         public ICollection<Document> Documents { get; set; } = new List<Document>();
+
+        public decimal ProductsSubtotal => Items.Sum(item => item.Quantity * item.UnitPrice);
+        public decimal SubtotalBeforeTax => ProductsSubtotal + ShippingCost + InstallationCost + MaintenanceCost + OtherCost;
+
+        public decimal CalculateSalesTax() => CalculateSalesTax(SubtotalBeforeTax);
+
+        public static decimal CalculateSalesTax(decimal subtotalBeforeTax) =>
+            decimal.Round(subtotalBeforeTax * SalesTaxPercent / 100m, 2, MidpointRounding.AwayFromZero);
+
+        public bool TryApplySalesTax()
+        {
+            var tax = CalculateSalesTax();
+            if (tax is < 0 or > 9_999_999_999_999_999.99m) return false; // TaxAmount is decimal(18, 2).
+            TaxAmount = tax;
+            return true;
+        }
     }
 }

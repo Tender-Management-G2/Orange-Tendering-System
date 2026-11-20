@@ -67,6 +67,7 @@ public static class TopDecisionChecks
     var now=DateTime.UtcNow;
     var pr=new PurchaseRequest{DepartmentId=dept,CreatedByUserId=requester,Title=label,Justification="SQL-only fixture",Status=PurchaseRequestStatus.Accepted};db.Add(pr);await db.SaveChangesAsync();
     var t=new Tender{Title=label,PurchaseRequestId=pr.Id,CreatedByUserId=officer,Status=TenderStatus.Evaluation,CreatedAt=now};db.Add(t);await db.SaveChangesAsync();tenderId=t.Id;
+    db.Add(new TenderItem{TenderId=t.Id,Name="Fixture item",Quantity=1,Unit="unit"});
     var round=new TenderRound{TenderId=t.Id,RoundNumber=roundNumber,Status=TenderRoundStatus.Closed,CreatedByUserId=officer,CreatedAt=now,Deadline=now.AddDays(-1)};db.Add(round);
     var weights=new WeightRound{TenderId=t.Id,Version=1,State=WeightState.Approved,ApprovedFinancial=40,ApprovedTechnical=60,ApprovedByUserId=manager,ApprovedAt=now,RequirementsJson="{}"};db.Add(weights);
     var seats=evaluators.Select((u,i)=>new CommitteeMember{TenderId=t.Id,UserId=u,CommitteeType=CommitteeType.Evaluation,Responsibility=(CommitteeResponsibility)i,AssignedAt=now}).ToArray();db.AddRange(seats);
@@ -189,14 +190,32 @@ public static class TopDecisionChecks
   var round2Suppliers=new[]{reissue.Suppliers[0],reissue.Suppliers[1],freshA};
   foreach(var sup in round2Suppliers){
    int inv=0;await Db(async db=>inv=await db.TenderInvitations.Where(x=>x.TenderRoundId==newRound&&x.SupplierId==sup).Select(x=>x.Id).SingleAsync());
-   await RunFlow(w=>w.Respond(reissue.Tender,inv,true,Principal(supplierUsers[sup])));
-   await RunFlow(w=>w.SubmitBid(reissue.Tender,new BidInput{InvitationId=inv,TechnicalProposal="Fresh round 2 offer",Currency="JOD",DeliveryDays=10,PaymentTerms="30 days"},Principal(supplierUsers[sup])));
+   var supplierUserId=supplierUsers[sup];
+   await RunFlow(w=>w.Respond(reissue.Tender,inv,true,Principal(supplierUserId)));
+   using var offerScope=app.Services.CreateScope();
+   var offers=offerScope.ServiceProvider.GetRequiredService<SupplierOfferService>();
+   var offerDb=offerScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+   var draft=(await offers.GetCreateAsync(supplierUserId,inv))!;
+   draft.Input.TechnicalProposal="Fresh round 2 offer";
+   draft.Input.DeliveryDays=10;
+   draft.Input.PaymentTerms="30 days";
+   foreach(var item in draft.Input.Items) item.UnitPrice=100;
+   Check(await offers.CreateDraftAsync(supplierUserId,inv,draft.Input),"supplier saves a round 2 draft");
+   var bidId=await offerDb.Bids.Where(b=>b.TenderInvitationId==inv).Select(b=>b.Id).SingleAsync();
+   offerDb.Documents.Add(new Document{BidId=bidId,FileName="round2-sample.png",StoragePath="fixture/round2-sample.png",ContentType="image/png",
+    SizeBytes=68,UploadedByUserId=supplierUserId,UploadedAt=DateTime.UtcNow,DocumentType=Document.OfferSamplePhotoType});
+   await offerDb.SaveChangesAsync();
+   Check(await offers.SubmitAsync(supplierUserId,bidId)==null,"supplier submits the round 2 draft with a sample photo");
   }
-  await Refuse(w=>w.SubmitBid(reissue.Tender,new BidInput{InvitationId=0,TechnicalProposal="x",Currency="JOD",DeliveryDays=1,PaymentTerms="x"},Principal(supplierUsers[reissue.Suppliers[2]])),"supplier not invited to round 2 cannot bid");
+  using(var offerScope=app.Services.CreateScope()){
+   var offers=offerScope.ServiceProvider.GetRequiredService<SupplierOfferService>();
+   var invitationId=await offerScope.ServiceProvider.GetRequiredService<ApplicationDbContext>().TenderInvitations
+    .Where(x=>x.TenderRoundId==newRound&&x.SupplierId==round2Suppliers[0]).Select(x=>x.Id).SingleAsync();
+   Check(!await offers.CreateDraftAsync(supplierUsers[reissue.Suppliers[2]],invitationId,new()),"supplier not invited to round 2 cannot bid");
+  }
   await RunFlow(w=>w.CloseBidding(reissue.Tender,Principal(officer)));
   var newBids=new List<int>();
-  await Db(async db=>{newBids=await db.Bids.Where(x=>x.TenderInvitation.TenderRoundId==newRound).Select(x=>x.Id).ToListAsync();
-   foreach(var b in newBids)db.Documents.Add(new Document{BidId=b,FileName="round2-offer.txt",StoragePath="fixture/round2-offer.txt",ContentType="text/plain",SizeBytes=10,UploadedByUserId=officer,UploadedAt=DateTime.UtcNow});await db.SaveChangesAsync();});
+  await Db(async db=>newBids=await db.Bids.Where(x=>x.TenderInvitation.TenderRoundId==newRound).Select(x=>x.Id).ToListAsync());
   Check(newBids.Count==3,"three NEW bids submitted for round 2");
   foreach(var b in newBids)await RunFlow(w=>w.Compliance(reissue.Tender,b,ComplianceStatus.Compliant,"Round 2 compliance","",Principal(officer)));
   await RunFlow(w=>w.Proceed(reissue.Tender,Principal(officer)));

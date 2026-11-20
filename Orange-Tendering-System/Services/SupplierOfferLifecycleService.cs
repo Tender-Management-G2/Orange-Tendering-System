@@ -76,11 +76,12 @@ public sealed partial class SupplierOfferService
         return new SupplierDraftOfferViewModel
         {
             BidId = id, InvitationId = details.InvitationId,
-            TenderTitle = details.TenderTitle, Input = details.Terms
+            TenderTitle = details.TenderTitle, Input = details.Terms, Documents = details.Documents
         };
     }
 
-    public async Task<bool> UpdateDraftAsync(string userId, int id, SupplierDraftOfferInputModel input)
+    public async Task<bool> UpdateDraftAsync(string userId, int id, SupplierDraftOfferInputModel input,
+        IReadOnlyList<IFormFile>? attachments = null, bool submitOffer = false)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var tenderId = await OwnOffers(userId).Where(b => b.Id == id).Select(b => (int?)b.TenderInvitation.TenderRound.TenderId).SingleOrDefaultAsync();
@@ -88,7 +89,8 @@ public sealed partial class SupplierOfferService
         await context.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={tenderId.Value}").SingleAsync();
         var bid = await OwnOffers(userId).Include(b => b.Items).SingleOrDefaultAsync(b => b.Id == id);
         if (bid == null || bid.Status != BidStatus.Draft) return false;
-        if (!await AvailableInvitations(userId, bid.TenderInvitationId).AnyAsync()) return false;
+        var deadline = await AvailableInvitations(userId, bid.TenderInvitationId).Select(i => i.TenderRound.Deadline).SingleOrDefaultAsync();
+        if (deadline is not DateTime openUntil) return false;
         if (!bid.Items.Select(i => i.TenderItemId).OrderBy(i => i)
             .SequenceEqual(input.Items.Select(i => i.TenderItemId).OrderBy(i => i))) return false;
 
@@ -100,17 +102,13 @@ public sealed partial class SupplierOfferService
             item.UnitPrice = decimal.Round(posted.UnitPrice, 2);
             item.OfferedSpecifications = posted.OfferedSpecifications?.Trim();
         }
-        AddOfferAudit(userId, id, "UpdateDraftOffer");
-        await context.SaveChangesAsync();
-        await transaction.CommitAsync();
+        if (!bid.TryApplySalesTax()) return false;
+        await SaveOfferAsync(userId, bid, openUntil, transaction, attachments, submitOffer);
         return true;
     }
 
     public async Task<string?> SubmitAsync(string userId, int id)
     {
-        // Supplier portal rule: an offer is submitted only with at least one supporting attachment.
-        if (!await context.Documents.AnyAsync(d => d.BidId == id && OwnOffers(userId).Any(b => b.Id == id)))
-            return "Add at least one attachment (PDF, PNG or JPEG) before submitting the offer.";
         try
         {
             await workflow.SubmitDraft(id, new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
@@ -141,13 +139,12 @@ public sealed partial class SupplierOfferService
         bid.ShippingCost = decimal.Round(input.ShippingCost, 2);
         bid.InstallationCost = decimal.Round(input.InstallationCost, 2);
         bid.MaintenanceCost = decimal.Round(input.MaintenanceCost, 2);
-        bid.TaxAmount = decimal.Round(input.TaxAmount, 2);
         bid.OtherCost = decimal.Round(input.OtherCost, 2);
     }
 
-    private void AddOfferAudit(string userId, int id, string action) => context.AuditLogs.Add(new AuditLog
+    private void AddOfferAudit(string userId, int id, string action, string? newValues) => context.AuditLogs.Add(new AuditLog
     {
-        UserId = userId, EntityName = nameof(Bid), EntityId = id.ToString(), Action = action, CreatedAt = DateTime.UtcNow
+        UserId = userId, EntityName = nameof(Bid), EntityId = id.ToString(), Action = action, NewValues = newValues, CreatedAt = DateTime.UtcNow
     });
 
     private SupplierOfferDetailsViewModel ToDetails(Bid bid)
@@ -168,7 +165,8 @@ public sealed partial class SupplierOfferService
             {
                 CurrencyCode = bid.CurrencyCode, TechnicalProposal = bid.TechnicalProposal, PaymentTerms = bid.PaymentTerms,
                 DeliveryDays = bid.DeliveryDays, ValidUntil = bid.ValidUntil, ShippingCost = bid.ShippingCost,
-                InstallationCost = bid.InstallationCost, MaintenanceCost = bid.MaintenanceCost, TaxAmount = bid.TaxAmount,
+                InstallationCost = bid.InstallationCost, MaintenanceCost = bid.MaintenanceCost,
+                TaxAmount = bid.Status == BidStatus.Draft ? bid.CalculateSalesTax() : bid.TaxAmount,
                 OtherCost = bid.OtherCost,
                 Items = bid.Items.OrderBy(i => i.Id).Select(i => new SupplierDraftItemInputModel
                 {

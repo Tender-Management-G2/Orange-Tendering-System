@@ -39,22 +39,6 @@ public class SessionInput
     // Creates an unguessable Jitsi room (meet.jit.si) so evaluation meetings work without any Zoom account or credentials.
     public bool CreateJitsiMeeting { get; set; }
 }
-public class BidInput
-{
-    public int InvitationId { get; set; }
-    [Required, MaxLength(10000)] public string TechnicalProposal { get; set; } = "";
-    [Required, RegularExpression("^[A-Z]{3}$")] public string Currency { get; set; } = "JOD";
-    [Range(1, 3650)] public int DeliveryDays { get; set; }
-    [Required, MaxLength(1000)] public string PaymentTerms { get; set; } = "";
-    [Range(typeof(decimal), "0", "9999999999999999.99")] public decimal ExtraCosts { get; set; }
-    public List<BidLineInput> Lines { get; set; } = [];
-}
-public class BidLineInput
-{
-    public int TenderItemId { get; set; }
-    [Required] public decimal? UnitPrice { get; set; }
-    public string? Specifications { get; set; }
-}
 public record WorkflowListRow(int TenderId, string Title, string Status);
 public class WorkflowDetails
 {

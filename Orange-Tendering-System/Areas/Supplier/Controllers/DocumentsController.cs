@@ -30,10 +30,10 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         }
 
         [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(12 * 1024 * 1024)]
-        public async Task<IActionResult> UploadOffer(int id, IFormFile file)
+        public async Task<IActionResult> UploadOffer(int id, IFormFile file, bool samplePhoto = false)
         {
-            var error = await documents.UploadAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, file, bidId: id);
-            if (error == null) TempData.Orange(OrangeFeedback.Toast("Attachment uploaded", "The file is attached to your offer.", OrangeVariant.Upload));
+            var error = await documents.UploadAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, file, bidId: id, samplePhoto: samplePhoto);
+            if (error == null) TempData.Orange(OrangeFeedback.Toast(samplePhoto ? "Sample photo uploaded" : "Attachment uploaded", "The file is attached to your offer.", OrangeVariant.Upload));
             else TempData["OfferError"] = error;
             return RedirectToAction("Details", "Offers", new { id });
         }

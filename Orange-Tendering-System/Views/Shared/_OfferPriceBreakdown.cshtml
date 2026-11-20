@@ -1,0 +1,53 @@
+@model Orange_Tendering_System.ViewModels.OfferPriceBreakdown
+@using Orange_Tendering_System.Models.Entities
+
+<details class="offer-invoice" data-offer-totals="@(Model.Live ? Bid.SalesTaxPercent.ToString() : null)" hidden="@Model.Live">
+    <summary class="offer-invoice-header">
+        <span class="offer-invoice-summary-price">
+            <span class="offer-invoice-total-label">Grand total</span>
+            <span class="offer-invoice-total" aria-live="@(Model.Live ? "polite" : null)" aria-atomic="true">
+                <strong data-offer-amount="total">@Model.Total.ToString("N2")</strong>
+                <span data-offer-invoice-currency>@Model.Currency</span>
+            </span>
+        </span>
+        <span class="offer-invoice-toggle">
+            <span class="offer-invoice-show">Details</span>
+            <span class="offer-invoice-hide">Hide details</span>
+        </span>
+    </summary>
+    <section class="offer-invoice-grid" aria-label="Offer price breakdown">
+        <div>
+            <h4>Products</h4>
+            <dl class="offer-invoice-rows">
+                <div><dt>Products subtotal</dt><dd data-offer-amount="products">@Model.Products.ToString("N2")</dd></div>
+            </dl>
+            <h4>Services and fees</h4>
+            <dl class="offer-invoice-rows">
+                <div><dt>Shipping</dt><dd data-offer-amount="shipping">@Model.Shipping.ToString("N2")</dd></div>
+                <div><dt>Installation</dt><dd data-offer-amount="installation">@Model.Installation.ToString("N2")</dd></div>
+                <div><dt>Maintenance</dt><dd data-offer-amount="maintenance">@Model.Maintenance.ToString("N2")</dd></div>
+                <div><dt>Other costs</dt><dd data-offer-amount="other">@Model.Other.ToString("N2")</dd></div>
+                <div class="offer-invoice-subtotal"><dt>Services and fees subtotal</dt><dd data-offer-amount="services">@Model.Services.ToString("N2")</dd></div>
+            </dl>
+        </div>
+        <div class="offer-invoice-summary">
+            <h4>Tax</h4>
+            <dl class="offer-invoice-rows">
+                <div><dt>Subtotal before tax</dt><dd data-offer-amount="subtotal">@Model.Subtotal.ToString("N2")</dd></div>
+                <div>
+                    <dt>
+                        @if (Model.ShowStandardTaxRate)
+                        {
+                            <span>Sales tax (@(Bid.SalesTaxPercent)%)</span>
+                        }
+                        else
+                        {
+                            <span>Sales tax as submitted</span>
+                        }
+                    </dt>
+                    <dd data-offer-amount="tax">@Model.Tax.ToString("N2")</dd>
+                </div>
+            </dl>
+        </div>
+    </section>
+</details>

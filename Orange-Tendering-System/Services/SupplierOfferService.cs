@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.ViewModels;
@@ -7,7 +8,7 @@ using Orange_Tendering_System.ViewModels;
 namespace Orange_Tendering_System.Services;
 
 // Owner: Saja. First step: create one draft for an accepted invitation.
-public sealed partial class SupplierOfferService(ApplicationDbContext context, TenderWorkflowService workflow)
+public sealed partial class SupplierOfferService(ApplicationDbContext context, TenderWorkflowService workflow, SupplierDocumentService documents)
 {
     // شروط السماح بالإنشاء تستخدم عند فتح الصفحة وعند الحفظ أيضا.
     private IQueryable<TenderInvitation> AvailableInvitations(string userId, int invitationId)
@@ -64,6 +65,7 @@ public sealed partial class SupplierOfferService(ApplicationDbContext context, T
             {
                 InvitationId = i.Id,
                 TenderTitle = i.TenderRound.Tender.Title,
+                Deadline = i.TenderRound.Deadline,
                 Input = new SupplierDraftOfferInputModel
                 {
                     Items = i.TenderRound.Tender.Items.OrderBy(item => item.Id)
@@ -78,7 +80,8 @@ public sealed partial class SupplierOfferService(ApplicationDbContext context, T
             }).SingleOrDefaultAsync();
     }
 
-    public async Task<bool> CreateDraftAsync(string userId, int invitationId, SupplierDraftOfferInputModel input)
+    public async Task<bool> CreateDraftAsync(string userId, int invitationId, SupplierDraftOfferInputModel input,
+        IReadOnlyList<IFormFile>? attachments = null, bool submitOffer = false)
     {
         // المعاملة تمنع إنشاء نسختين لنفس الدعوة عند تكرار الضغط.
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -86,7 +89,7 @@ public sealed partial class SupplierOfferService(ApplicationDbContext context, T
         if (!tenderId.HasValue) return false;
         await context.Tenders.FromSqlInterpolated($"SELECT * FROM Tenders WITH (UPDLOCK,HOLDLOCK) WHERE Id={tenderId.Value}").SingleAsync();
         var model = await GetCreateAsync(userId, invitationId);
-        if (model == null)
+        if (model?.Deadline is not DateTime deadline)
             return false;
 
         // نرفض الأصناف المكررة أو التابعة لعطاء آخر أو الناقصة.
@@ -120,22 +123,38 @@ public sealed partial class SupplierOfferService(ApplicationDbContext context, T
                 OfferedSpecifications = item.OfferedSpecifications?.Trim()
             });
         }
+        if (!bid.TryApplySalesTax()) return false;
 
-        // 3. نضيف العرض ثم نحفظه في قاعدة البيانات.
-        context.Bids.Add(bid);
-        await context.SaveChangesAsync();
-
-        context.AuditLogs.Add(new AuditLog
-        {
-            UserId = userId,
-            Action = "CreateDraftOffer",
-            EntityName = nameof(Bid),
-            EntityId = bid.Id.ToString(),
-            NewValues = "{\"Status\":\"Draft\",\"RevisionNumber\":1}",
-            CreatedAt = DateTime.UtcNow
-        });
-        await context.SaveChangesAsync();
-        await transaction.CommitAsync();
+        await SaveOfferAsync(userId, bid, deadline, transaction, attachments, submitOffer);
         return true;
+    }
+
+    private async Task SaveOfferAsync(string userId, Bid bid, DateTime deadline, IDbContextTransaction transaction,
+        IReadOnlyList<IFormFile>? attachments, bool submitOffer)
+    {
+        var newDocuments = await documents.StoreOfferAttachmentsAsync(userId, bid, attachments ?? []);
+        try
+        {
+            var isNew = bid.Id == 0;
+            if (isNew) context.Bids.Add(bid);
+            context.Documents.AddRange(newDocuments);
+            await context.SaveChangesAsync();
+
+            AddOfferAudit(userId, bid.Id, isNew ? "CreateDraftOffer" : "UpdateDraftOffer",
+                isNew ? "{\"Status\":\"Draft\",\"RevisionNumber\":1}" : null);
+            foreach (var document in newDocuments) documents.AddUploadAudit(document);
+            await context.SaveChangesAsync();
+            // The existing submission workflow joins this transaction so a rejected submission also rolls back the draft edits and uploads.
+            if (submitOffer && await SubmitAsync(userId, bid.Id) is string submissionError)
+                throw new WorkflowException(submissionError);
+
+            TenderWorkflowService.Require(workflow.Now < deadline, "The bidding deadline has passed. The offer was not saved.");
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            documents.DeleteStoredFiles(newDocuments);
+            throw;
+        }
     }
 }
