@@ -35,24 +35,49 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
     ViewData["Title"] = "My Workspaces";
     ViewData["WorkspaceSection"] = "My Workspace";
     ViewData["Description"] = "The workspaces your roles give you access to.";
+    var isAdmin = User.IsInRole(SystemRoles.Admin);
+    var mine = WorkspaceNavigation.Workspaces.Where(w => User.IsInRole(w.Role)).ToList();
+    if (isAdmin) ViewData["BodyClass"] = "admin-workspace-home";
 }
 <partial name="_PageHeader" />
-<partial name="_ScaffoldNotice" />
-
-<section class="ws-panel pg-panel" aria-labelledby="workspaces-title">
-    <h2 id="workspaces-title">Your workspaces</h2>
-    @{ var mine = WorkspaceNavigation.Workspaces.Where(w => User.IsInRole(w.Role)).ToList(); }
-    @if (mine.Count == 0)
-    {
-        <partial name="_EmptyState" model='"Your account has no workspace role yet. Roles are assigned by Admin (they are not seeded yet)."' />
-    }
-    else
-    {
-        <div class="pg-links"><ul>
+@if (isAdmin)
+{
+    <section class="admin-workspace-picker" aria-labelledby="workspaces-title">
+        <h2 id="workspaces-title">Your workspaces</h2>
+        <ul class="admin-workspace-cards">
             @foreach (var w in mine)
             {
-                <li><a asp-area="@w.Area" asp-controller="Dashboard" asp-action="Index">@w.Label</a></li>
+                <li>
+                    <a class="admin-workspace-card" asp-area="@w.Area" asp-controller="Dashboard" asp-action="Index">
+                        <span class="admin-workspace-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon(w.Role == SystemRoles.Admin ? "shield" : "home"))</svg>
+                        </span>
+                        <strong>@w.Label</strong>
+                        <span class="admin-workspace-arrow" aria-hidden="true">→</span>
+                    </a>
+                </li>
             }
-        </ul></div>
-    }
-</section>
+        </ul>
+    </section>
+}
+else
+{
+    <partial name="_ScaffoldNotice" />
+
+    <section class="ws-panel pg-panel" aria-labelledby="workspaces-title">
+        <h2 id="workspaces-title">Your workspaces</h2>
+        @if (mine.Count == 0)
+        {
+            <partial name="_EmptyState" model='"Your account has no workspace role yet. Roles are assigned by Admin (they are not seeded yet)."' />
+        }
+        else
+        {
+            <div class="pg-links"><ul>
+                @foreach (var w in mine)
+                {
+                    <li><a asp-area="@w.Area" asp-controller="Dashboard" asp-action="Index">@w.Label</a></li>
+                }
+            </ul></div>
+        }
+    </section>
+}

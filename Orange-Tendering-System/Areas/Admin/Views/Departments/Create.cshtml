@@ -11,7 +11,7 @@ PAGE: Create Department
     ViewData["Title"] = "Create Department";
     ViewData["WorkspaceSection"] = "Departments";
     ViewData["Description"] =
-        "Add a department and assign existing employees.";
+        "Add a department.";
 }
 
 <partial name="_PageHeader" />
@@ -73,65 +73,6 @@ PAGE: Create Department
             </div>
 
         </div>
-
-        <!-- ==================================
-             EMPLOYEE ASSIGNMENT
-        =================================== -->
-
-       
-<div class="pg-field pg-field-wide">
-
-    <h3>Assign Employees</h3>
-
-    <p class="pg-hint">
-        Select existing users who are not
-        assigned to another department.
-    </p>
-
-    @if (Model.AvailableEmployees.Any())
-    {
-        <details class="department-employee-dropdown">
-
-            <summary>
-                Select Available Employees
-            </summary>
-
-            <div class="department-employee-options">
-
-                @foreach (var employee in Model.AvailableEmployees)
-                {
-                    <label class="department-employee-option">
-
-                        <input type="checkbox"
-                               name="SelectedEmployeeIds"
-                               value="@employee.Value"
-                               checked="@(Model.SelectedEmployeeIds.Contains(employee.Value))" />
-
-                        <span>@employee.Text</span>
-
-                    </label>
-                }
-
-            </div>
-
-        </details>
-
-        <small class="pg-hint">
-            You can select multiple employees.
-        </small>
-    }
-    else
-    {
-        <p class="pg-hint">
-            No unassigned employees are currently available.
-        </p>
-    }
-
-    <span asp-validation-for="SelectedEmployeeIds"
-          class="text-danger"></span>
-
-</div>
-
 
         <!-- ACTIONS -->
         <div class="pg-actions">

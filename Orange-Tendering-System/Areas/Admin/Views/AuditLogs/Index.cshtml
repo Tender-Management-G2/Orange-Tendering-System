@@ -28,7 +28,15 @@ tokens or biometric data.
 <partial name="_PageHeader" />
 
 <form asp-area="Admin" asp-controller="AuditLogs" asp-action="Index" method="get" class="admin-list-filters admin-audit-filters" data-admin-list-filters>
-<div class="admin-filter-field admin-filter-search"><label>Search</label><input type="text" name="search" value="@Model.Search" placeholder="User, action or entity" aria-label="Search AuditLogs" maxlength="100" /></div><div class="admin-filter-field "><label>From Date</label><input type="date" name="fromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" aria-label="From Date" /></div><div class="admin-filter-field "><label>To Date</label><input type="date" name="toDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" aria-label="To Date" /></div>
+<div class="admin-filter-field admin-filter-search">
+    <label for="audit-log-search">Search</label>
+    <input id="audit-log-search" type="text" name="search" value="@Model.Search" placeholder="User, action or entity" aria-label="Search AuditLogs" maxlength="100" /></div>
+<div class="admin-filter-field">
+    <label for="fromDate">From Date</label>
+    <input id="fromDate" type="date" name="fromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" aria-label="From Date" /></div>
+<div class="admin-filter-field">
+    <label for="toDate">To Date</label>
+    <input id="toDate" type="date" name="toDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" aria-label="To Date" /></div>
 <a asp-area="Admin" asp-controller="AuditLogs" asp-action="Index" class="pg-btn pg-btn-primary admin-clear">Clear</a>
 </form>
 <p class="pg-hint admin-list-status" data-admin-list-status role="status" aria-live="polite"></p>

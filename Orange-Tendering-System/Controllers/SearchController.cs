@@ -9,8 +9,17 @@ namespace Orange_Tendering_System.Controllers
     // JSON backend of the top-bar search box (internal workspaces). Results are role-scoped by InternalDashboardService.
     [Authorize]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public class SearchController(InternalDashboardService service) : Controller
+    public class SearchController(InternalDashboardService service, AdminService adminService) : Controller
     {
+        [HttpGet]
+        [Authorize(Roles = SystemRoles.Admin)]
+        public async Task<IActionResult> AdminVoiceTerm(string? q, string? scope, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Length > 100) return BadRequest();
+            var term = await adminService.ResolveVoiceSearchTermAsync(q.Trim(), scope, cancellationToken);
+            return Json(new { term });
+        }
+
         [HttpGet]
         public async Task<IActionResult> Query(string? q)
         {

@@ -20,7 +20,7 @@
     ViewData["Title"] = "Reports & Analytics";
     ViewData["WorkspaceSection"] = "Reports & Analytics";
     ViewData["Description"] = "Monitor procurement performance and system activity using live database records.";
-    ViewData["BodyClass"] = "reports-analytics-home";
+    ViewData["BodyClass"] = "reports-analytics-home admin-management-page";
     var actions = new Dictionary<string, string> { ["purchase-requests"] = "PurchaseRequests", ["tenders"] = "Tenders", ["suppliers"] = "Suppliers", ["evaluations"] = "Evaluations", ["governance"] = "Governance", ["management"] = "Management", ["reports-management"] = "ReportsManagement" };
     string Kpi(string label) => Model.Dashboard.Kpis.FirstOrDefault(x => x.Label == label)?.Value ?? "0";
     var requestChart = Model.Dashboard.Charts.FirstOrDefault(x => x.Title == "Purchase Requests by Status");
@@ -36,11 +36,36 @@
 }
 <partial name="_PageHeader" />
 
-<section class="ra-kpis" aria-label="Reports summary">
-    <a asp-action="PurchaseRequests" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("requests"))</svg></span><strong>@Kpi("Total Purchase Requests")</strong><small>Purchase Requests</small></a>
-    <a asp-action="Tenders" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("tenders"))</svg></span><strong>@Kpi("Total Tenders")</strong><small>Total Tenders</small></a>
-    <a asp-action="Suppliers" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("suppliers"))</svg></span><strong>@Kpi("Total Suppliers")</strong><small>Registered Suppliers</small></a>
-    <a asp-action="PurchaseRequests" class="ws-panel ra-kpi"><span class="ra-kpi-icon"><svg viewBox="0 0 24 24">@Html.Raw(Icon("approval"))</svg></span><strong>@Kpi("Approval Rate")</strong><small>Approval Rate</small><em>Approved ÷ all non-draft requests</em></a>
+<section class="dash-metrics admin-management-stats" aria-label="Reports summary">
+    <a asp-action="PurchaseRequests" class="dash-metric dash-orange ra-kpi-link">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(Icon("requests"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Total Purchase Requests")</strong>
+            <span>Purchase Requests</span>
+        </div>
+    </a>
+    <a asp-action="Tenders" class="dash-metric dash-blue ra-kpi-link">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(Icon("tenders"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Total Tenders")</strong>
+            <span>Total Tenders</span>
+        </div>
+    </a>
+    <a asp-action="Suppliers" class="dash-metric dash-green ra-kpi-link">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(Icon("suppliers"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Total Suppliers")</strong>
+            <span>Registered Suppliers</span>
+        </div>
+    </a>
+    <a asp-action="PurchaseRequests" class="dash-metric dash-purple ra-kpi-link">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(Icon("approval"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Approval Rate")</strong>
+            <span>Approval Rate</span>
+            <small>Approved ÷ all non-draft requests</small>
+        </div>
+    </a>
 </section>
 
 <section class="ra-chart-grid">
@@ -63,3 +88,7 @@
         }
     </div>
 </section>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-management.css" asp-append-version="true" />
+}

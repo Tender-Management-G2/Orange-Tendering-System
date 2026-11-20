@@ -16,133 +16,44 @@ PAGE: Department Management
 
 <partial name="_PageHeader" />
 
-<style>
-    .admin-department-stats {
-        display: grid;
-        grid-template-columns:
-            repeat(auto-fit, minmax(200px, 1fr));
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-
-    .admin-department-stat {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .admin-department-stat-label {
-        font-size: 14px;
-        opacity: .85;
-    }
-
-    .admin-department-stat-value {
-        font-size: 30px;
-        font-weight: 700;
-    }
-
-    .admin-department-filters {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 24px;
-    }
-
-    .admin-department-filters input,
-    .admin-department-filters select {
-        flex: 1 1 190px;
-        min-width: 150px;
-        height: 46px;
-        box-sizing: border-box;
-    }
-
-    .admin-department-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .admin-department-actions .pg-btn {
-        height: 46px;
-        min-width: 90px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
-    }
-</style>
-
-<!-- ==================================
-     KPI CARDS
-=================================== -->
-
-<div class="admin-department-stats">
-
-    <div class="ws-panel pg-panel admin-department-stat">
-        <span class="admin-department-stat-label">
-            Total Departments
-        </span>
-
-        <strong class="admin-department-stat-value">
-            @Model.TotalDepartments
-        </strong>
-
-        <small class="pg-hint">
-            All registered departments
-        </small>
-    </div>
-
-    <div class="ws-panel pg-panel admin-department-stat">
-        <span class="admin-department-stat-label">
-            Active Departments
-        </span>
-
-        <strong class="admin-department-stat-value">
-            @Model.ActiveDepartments
-        </strong>
-
-        <small class="pg-hint">
-            Currently active departments
-        </small>
-    </div>
-
-    <div class="ws-panel pg-panel admin-department-stat">
-        <span class="admin-department-stat-label">
-            Inactive Departments
-        </span>
-
-        <strong class="admin-department-stat-value">
-            @Model.InactiveDepartments
-        </strong>
-
-        <small class="pg-hint">
-            Deactivated departments
-        </small>
-    </div>
-
-    <div class="ws-panel pg-panel admin-department-stat">
-        <span class="admin-department-stat-label">
-            Assigned Employees
-        </span>
-
-        <strong class="admin-department-stat-value">
-            @Model.AssignedEmployees
-        </strong>
-
-        <small class="pg-hint">
-            Users assigned to departments
-        </small>
-    </div>
-
-</div>
-
-<!-- ==================================
-     SEARCH AND FILTERS
-=================================== -->
+<section class="dash-metrics admin-management-stats" aria-label="Departments statistics">
+    <article class="dash-metric dash-orange">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("building"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.TotalDepartments</strong>
+            <span>Total Departments</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-blue">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.ActiveDepartments</strong>
+            <span>Active Departments</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-purple">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("shield"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.InactiveDepartments</strong>
+            <span>Inactive Departments</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-green">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.AssignedEmployees</strong>
+            <span>Assigned Employees</span>
+        </div>
+    </article>
+</section>
 
 <form asp-area="Admin" asp-controller="Departments" asp-action="Index" method="get" class="admin-list-filters" data-admin-list-filters>
-<div class="admin-filter-field admin-filter-search"><label>Search</label><input type="text" name="search" value="@Model.Search" placeholder="Department name" aria-label="Search Departments" maxlength="100" /></div><div class="admin-filter-field "><label>Status</label><select name="statusFilter"
+<div class="admin-filter-field admin-filter-search">
+    <label for="admin-list-search">Search</label>
+    <input id="admin-list-search" type="text" name="search" value="@Model.Search" placeholder="Department name" aria-label="Search Departments" maxlength="100" /></div>
+<div class="admin-filter-field">
+    <label for="statusFilter">Status</label>
+    <select id="statusFilter" name="statusFilter"
             aria-label="Filter department status">
 
         <option value="All"
@@ -266,7 +177,7 @@ PAGE: Department Management
                                         Details
                                     </a>
 
-                                    <a class="pg-btn"
+                                    <a class="pg-btn pg-btn-primary"
                                        asp-area="Admin"
                                        asp-controller="Departments"
                                        asp-action="Edit"

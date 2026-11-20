@@ -159,3 +159,183 @@ body[data-workspace-role="Admin"] .biz-care-list{list-style:none;padding:0;margi
 
 /* KPI icon system shared by every report page: the same clear, coloured circular treatment as Purchase Requests. */
 .operational-reports-page .op-kpis span::after,.supplier-reports-page .sr-kpis span::after,.top-committee-reports-page .tc-kpis span::after,.reports-management-page .rm-kpis span::after{font-family:Arial,sans-serif;font-size:20px;font-weight:600;line-height:1}.operational-reports-page .op-kpis>div:nth-child(1) span,.supplier-reports-page .sr-kpis>div:nth-child(1) span,.top-committee-reports-page .tc-kpis>div:nth-child(1) span,.reports-management-page .rm-kpis>div:nth-child(1) span{background:#ff790012}.operational-reports-page .op-kpis>div:nth-child(1) span::after,.supplier-reports-page .sr-kpis>div:nth-child(1) span::after,.top-committee-reports-page .tc-kpis>div:nth-child(1) span::after,.reports-management-page .rm-kpis>div:nth-child(1) span::after{content:"▤";color:#ff7900!important}.operational-reports-page .op-kpis>div:nth-child(2) span::after,.supplier-reports-page .sr-kpis>div:nth-child(2) span::after,.top-committee-reports-page .tc-kpis>div:nth-child(2) span::after,.reports-management-page .rm-kpis>div:nth-child(2) span::after{content:"✓";color:#1e88e5!important}.operational-reports-page .op-kpis>div:nth-child(3) span::after,.supplier-reports-page .sr-kpis>div:nth-child(3) span::after,.top-committee-reports-page .tc-kpis>div:nth-child(3) span::after,.reports-management-page .rm-kpis>div:nth-child(3) span::after{content:"□";color:#17b26a!important}.operational-reports-page .op-kpis>div:nth-child(4) span::after,.supplier-reports-page .sr-kpis>div:nth-child(4) span::after,.top-committee-reports-page .tc-kpis>div:nth-child(4) span::after,.reports-management-page .rm-kpis>div:nth-child(4) span::after{content:"◷";color:#8d36e8!important}.operational-reports-page .op-kpis>div:nth-child(5) span::after,.supplier-reports-page .sr-kpis>div:nth-child(5) span::after,.top-committee-reports-page .tc-kpis>div:nth-child(5) span::after,.reports-management-page .rm-kpis>div:nth-child(5) span::after{content:"!";color:#ff7900!important}.operational-reports-page .op-kpis>div:nth-child(6) span::after,.top-committee-reports-page .tc-kpis>div:nth-child(6) span::after{content:"%";color:#1e88e5!important}
+
+/* Compact typography for the Admin workspace and its dialogs. */
+body.so-shell.ws-shell[data-workspace-role="Admin"] {
+  --fs-body: 14px;
+  --fs-body-sm: 14px;
+  --fs-sm: 13px;
+  font-size: var(--fs-body);
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] .ws-nav-item { font-size: 16px; }
+:root[data-theme] body.so-shell.ws-shell[data-workspace-role="Admin"] .ws-search input { font-size: 14px; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.pg-panel, .wfl-heading) h2 { font-size: 21px; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] .pg-panel h3 { font-size: 17px; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.officer-page-hero, .wfl-hero) h1,
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.officer-page-hero, .wfl-hero) h1 strong {
+  font-size: clamp(30px, 3vw, 46px);
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.officer-page-hero, .wfl-hero) p { font-size: 15px; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.pg-btn, .wfl-new, .wfl-reset) { font-size: 13px; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.pg-table, .wfl-table) th { font-size: 12px; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.pg-table, .wfl-table) td { font-size: 13px; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] .admin-list-records .admin-row-actions { width: max-content; }
+
+body[data-workspace-role="Admin"] .ui-dialog-content:has(.admin-supplier-details) > .officer-page-hero { display: none; }
+
+/* Committee landing page uses the shared Admin hero and theme surfaces. */
+body.so-shell.ws-shell.admin-committees-home[data-workspace-role] .officer-page-hero {
+  min-height: clamp(190px, 15vw, 250px);
+}
+body[data-workspace-role="Admin"].admin-committees-home .admin-committee-grid {
+  margin: 0;
+  gap: 18px;
+}
+body[data-workspace-role="Admin"].admin-committees-home .admin-committee-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  min-height: 260px;
+  padding: clamp(19px, 2vw, 28px);
+  border-color: var(--committee-border);
+  background: linear-gradient(128deg, var(--committee-tint), var(--sod-card) 76%);
+}
+.admin-committee-choice--evaluation {
+  --committee-tint: #fff1e3;
+  --committee-border: #eab886;
+  --committee-icon: #a64c00;
+  --committee-icon-bg: #ffdaaf;
+}
+.admin-committee-choice--top {
+  --committee-tint: #e7f4ff;
+  --committee-border: #a7cdeb;
+  --committee-icon: #12689f;
+  --committee-icon-bg: #c8e6fd;
+}
+:root[data-theme="dark"] .admin-committee-choice--evaluation {
+  --committee-tint: #302416;
+  --committee-border: #835020;
+  --committee-icon: #ff990d;
+  --committee-icon-bg: #623712;
+}
+:root[data-theme="dark"] .admin-committee-choice--top {
+  --committee-tint: #142735;
+  --committee-border: #285779;
+  --committee-icon: #5cbeff;
+  --committee-icon-bg: #123f61;
+}
+.admin-committee-choice-heading { display: flex; align-items: center; gap: 14px; }
+.admin-committee-choice-heading h2 { margin: 0; font-size: 20px; color: var(--sod-ink); }
+.admin-committee-choice-heading p { margin: 3px 0 0; color: var(--ws-muted); }
+.admin-committee-choice-icon {
+  display: grid;
+  place-items: center;
+  width: 49px;
+  height: 49px;
+  flex: 0 0 49px;
+  border-radius: 50%;
+  color: var(--committee-icon);
+  background: var(--committee-icon-bg);
+}
+.admin-committee-choice-icon svg {
+  width: 27px;
+  height: 27px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+body[data-workspace-role="Admin"] .admin-committee-choice ul { margin: 0; padding: 0; padding-inline-start: 20px; line-height: 1.95; }
+body[data-workspace-role="Admin"] .admin-committee-choice .pg-btn { margin-top: auto; }
+.admin-committee-choice-arrow { margin-inline-start: 8px; }
+
+/* Admin workspace selection shares the dashboard's theme surfaces. */
+body.so-shell.ws-shell.admin-workspace-home[data-workspace-role="Admin"] .officer-page-hero {
+  min-height: clamp(170px, 15vw, 225px);
+}
+.admin-workspace-picker {
+  padding: clamp(16px, 2vw, 26px);
+  border: 1px solid var(--sod-border);
+  border-radius: 16px;
+  background: linear-gradient(130deg, var(--dash-panel-top), var(--dash-panel-bottom));
+}
+.admin-workspace-picker h2 { margin: 0 0 16px; font-size: 21px; color: var(--dash-title); }
+.admin-workspace-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 330px));
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.admin-workspace-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 79px;
+  padding: 14px;
+  border: 1px solid var(--sod-border);
+  border-radius: 13px;
+  background: var(--sod-card);
+  color: var(--sod-ink);
+  text-decoration: none;
+}
+.admin-workspace-card:hover,
+.admin-workspace-card:focus-visible { border-color: var(--ws-accent); }
+.admin-workspace-card:focus-visible { outline: 2px solid var(--ws-accent); outline-offset: 2px; }
+.admin-workspace-card strong { flex: 1; }
+.admin-workspace-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #ff790026;
+  color: var(--ws-accent);
+}
+.admin-workspace-icon svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.admin-workspace-arrow { color: var(--ws-accent); font-size: 20px; }
+[dir="rtl"] .admin-workspace-arrow { transform: scaleX(-1); }
+
+/* Consistent type scale and a clear sidebar photograph throughout Admin. */
+body.so-shell.ws-shell[data-workspace-role="Admin"] {
+  --admin-kpi-number: clamp(23px, 1.8vw, 30px);
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] .ws-sidebar-brand .ws-brand {
+  font-size: 13px;
+  line-height: 1.35;
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] .ws-nav-item {
+  min-height: 44px;
+  gap: 16px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] .ws-nav-item span { overflow-wrap: anywhere; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] .ws-sidebar-bottom { padding-block-end: 12px; }
+:root[data-theme] body.so-shell.ws-shell[data-workspace-role="Admin"] .ws-sidebar-architecture {
+  position: relative;
+  inset: auto;
+  flex: 1 0 110px;
+  min-height: 110px;
+  height: auto;
+  max-height: 190px;
+  margin-block-start: auto;
+  background:
+    linear-gradient(to bottom, #18191c 0%, transparent 36%),
+    url('../assets/building.webp') center 56% / cover no-repeat;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] .dash-metrics .dash-metric-copy > strong,
+body.so-shell.ws-shell[data-workspace-role="Admin"] .pg-cards > .pg-card > strong,
+body.so-shell.ws-shell[data-workspace-role="Admin"] :is(.pr-kpis, .op-kpis, .sr-kpis, .tc-kpis, .rm-kpis) strong {
+  font-size: var(--admin-kpi-number);
+  line-height: 1.15;
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] .dash-metric-copy > span {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}

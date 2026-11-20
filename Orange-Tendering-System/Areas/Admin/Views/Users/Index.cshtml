@@ -35,117 +35,44 @@ FEATURES:
     <div class="alert alert-success" role="status">@successMessage</div>
 }
 
-<style>
-    .admin-user-stats {
-        display: grid;
-        grid-template-columns: repeat(
-            auto-fit, minmax(210px, 1fr));
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-
-    .admin-user-stat {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .admin-user-stat-label {
-        font-size: 14px;
-        opacity: .85;
-    }
-
-    .admin-user-stat-value {
-        font-size: 30px;
-        font-weight: 700;
-        line-height: 1.2;
-    }
-
-    .admin-user-stat-description {
-        font-size: 13px;
-        opacity: .75;
-    }
-</style>
-
-<!-- =====================================
-     KPI CARDS
-===================================== -->
-
-<div class="admin-user-stats">
-
-    <div class="ws-panel pg-panel admin-user-stat">
-
-        <span class="admin-user-stat-label">
-            Total Users
-        </span>
-
-        <strong class="admin-user-stat-value">
-            @Model.TotalUsers
-        </strong>
-
-        <span class="admin-user-stat-description">
-            All registered accounts
-        </span>
-
-    </div>
-
-    <div class="ws-panel pg-panel admin-user-stat">
-
-        <span class="admin-user-stat-label">
-            Active Users
-        </span>
-
-        <strong class="admin-user-stat-value">
-            @Model.ActiveUsers
-        </strong>
-
-        <span class="admin-user-stat-description">
-            Currently active accounts
-        </span>
-
-    </div>
-
-    <div class="ws-panel pg-panel admin-user-stat">
-
-        <span class="admin-user-stat-label">
-            Inactive Users
-        </span>
-
-        <strong class="admin-user-stat-value">
-            @Model.InactiveUsers
-        </strong>
-
-        <span class="admin-user-stat-description">
-            Disabled accounts
-        </span>
-
-    </div>
-
-    <div class="ws-panel pg-panel admin-user-stat">
-
-        <span class="admin-user-stat-label">
-            Department Users
-        </span>
-
-        <strong class="admin-user-stat-value">
-            @Model.DepartmentUsers
-        </strong>
-
-        <span class="admin-user-stat-description">
-            Assigned to departments
-        </span>
-
-    </div>
-
-</div>
-
-
-<!-- =====================================
-     SEARCH AND FILTERS
-===================================== -->
+<section class="dash-metrics admin-management-stats" aria-label="Users statistics">
+    <article class="dash-metric dash-orange">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.TotalUsers</strong>
+            <span>Total Users</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-blue">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.ActiveUsers</strong>
+            <span>Active Users</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-purple">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("shield"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.InactiveUsers</strong>
+            <span>Inactive Users</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-green">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("building"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.DepartmentUsers</strong>
+            <span>Department Users</span>
+        </div>
+    </article>
+</section>
 
 <form asp-area="Admin" asp-controller="Users" asp-action="Index" method="get" class="admin-list-filters" data-admin-list-filters>
-<div class="admin-filter-field admin-filter-search"><label>Search</label><input type="text" name="search" value="@Model.Search" placeholder="Name or email" aria-label="Search Users" maxlength="100" /></div><div class="admin-filter-field "><label>Role</label><select name="roleFilter"
+<div class="admin-filter-field admin-filter-search">
+    <label for="admin-list-search">Search</label>
+    <input id="admin-list-search" type="text" name="search" value="@Model.Search" placeholder="Name or email" aria-label="Search Users" maxlength="100" /></div>
+<div class="admin-filter-field">
+    <label for="roleFilter">Role</label>
+    <select id="roleFilter" name="roleFilter"
             aria-label="Filter by role">
 
         <option value="All"
@@ -162,7 +89,10 @@ FEATURES:
             </option>
         }
 
-    </select></div><div class="admin-filter-field "><label>Department</label><select name="departmentFilter"
+    </select></div>
+<div class="admin-filter-field">
+    <label for="departmentFilter">Department</label>
+    <select id="departmentFilter" name="departmentFilter"
             aria-label="Filter by department">
 
         <option value="All"
@@ -179,7 +109,10 @@ FEATURES:
             </option>
         }
 
-    </select></div><div class="admin-filter-field "><label>Status</label><select name="statusFilter"
+    </select></div>
+<div class="admin-filter-field">
+    <label for="statusFilter">Status</label>
+    <select id="statusFilter" name="statusFilter"
             aria-label="Filter by status">
 
         <option value="All"
@@ -296,7 +229,7 @@ FEATURES:
                                     Details
                                 </a>
 
-                                <a class="pg-btn"
+                                <a class="pg-btn pg-btn-primary"
                                    asp-area="Admin"
                                    asp-controller="Users"
                                    asp-action="Edit"
