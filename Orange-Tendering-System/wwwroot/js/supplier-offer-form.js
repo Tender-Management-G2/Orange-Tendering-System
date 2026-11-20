@@ -54,17 +54,26 @@
     form.querySelectorAll('[data-line-image]').forEach(function (input) {
         var box = input.closest('.soffer-image-box'), preview = box.querySelector('[data-image-preview]');
         var original = preview.innerHTML, objectUrl;
+        var empty = preview.querySelector('[data-image-empty]').cloneNode(true); empty.hidden = false;
+        var savedRemove = box.querySelector('[data-remove-saved-image]'), savedLink = box.querySelector('[data-saved-image]');
         function showImage() {
             if (objectUrl) URL.revokeObjectURL(objectUrl);
             var file = input.files[0];
-            if (!file) { preview.innerHTML = original; return; }
+            if (!file) { preview.innerHTML = savedRemove && savedRemove.checked ? empty.outerHTML : original; return; }
             objectUrl = URL.createObjectURL(file);
             preview.textContent = '';
             var image = document.createElement('img'); image.src = objectUrl; image.alt = 'Preview of ' + file.name;
             preview.appendChild(image);
         }
-        input.addEventListener('change', function () { showImage(); checkDocs(); });
-        box.querySelector('[data-clear-image]').addEventListener('click', function () { input.value = ''; showImage(); checkDocs(); });
+        input.addEventListener('change', function () {
+            if (input.files.length && savedRemove) { savedRemove.checked = true; savedLink.hidden = true; }
+            showImage(); checkDocs();
+        });
+        box.querySelector('[data-clear-image]').addEventListener('click', function () {
+            input.value = '';
+            if (savedRemove) { savedRemove.checked = true; savedLink.hidden = true; }
+            showImage(); checkDocs();
+        });
     });
     function renderDocs(card) {
         var input = card.querySelector('[data-doc-input]'), list = card.querySelector('[data-doc-list]');
@@ -83,6 +92,7 @@
     function checkDocs() {
         var problems = [], count = 0, total = 0;
         var imageCount = 0;
+        var savedImageCount = form.querySelectorAll('[data-remove-saved-image]:not(:checked)').length;
         form.querySelectorAll('[data-line-image]').forEach(function (input) {
             Array.prototype.forEach.call(input.files, function (file) {
                 count++; imageCount++; total += file.size;
@@ -94,14 +104,13 @@
             var input = card.querySelector('[data-doc-input]');
             Array.prototype.forEach.call(input.files, function (f) {
                 count++; total += f.size;
-                if (!/\.(pdf|png|jpe?g)$/i.test(f.name)) problems.push(f.name + ': only PDF, PNG or JPEG.');
+                if (card.dataset.key === 'ReferenceImage' ? !/\.(png|jpe?g)$/i.test(f.name) : !/\.(pdf|png|jpe?g)$/i.test(f.name))
+                    problems.push(f.name + (card.dataset.key === 'ReferenceImage' ? ': only PNG or JPEG images.' : ': only PDF, PNG or JPEG.'));
                 if (f.size > MAX_FILE) problems.push(f.name + ': larger than 10 MB.');
             });
             var kept = card.querySelectorAll('[data-existing] input:not(:checked)').length;
-            if (card.dataset.required === 'true' && input.files.length + kept + (card.dataset.key === 'ReferenceImage' ? imageCount : 0) === 0) problems.push(card.querySelector('.soffer-doc-name strong').textContent + ' is required.');
+            if (card.dataset.required === 'true' && input.files.length + kept + (card.dataset.key === 'ReferenceImage' ? imageCount + savedImageCount : 0) === 0) problems.push(card.querySelector('.soffer-doc-name strong').textContent + ' is required.');
         });
-        var anyKept = form.querySelectorAll('[data-existing] input:not(:checked)').length;
-        if (count + anyKept === 0) problems.push('Attach at least one supporting document.');
         if (count > MAX_FILES) problems.push('Attach at most ' + MAX_FILES + ' files.');
         if (total > MAX_TOTAL) problems.push('The attachments exceed 40 MB in total.');
         docError.hidden = problems.length === 0; docError.textContent = problems.join(' ');

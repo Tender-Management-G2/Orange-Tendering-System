@@ -29,6 +29,14 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             return PhysicalFile(file.Value.Path, file.Value.Type, file.Value.Name);
         }
 
+        public async Task<IActionResult> Preview(int id)
+        {
+            var image = await documents.GetImagePreviewAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id);
+            if (image == null) return NotFound();
+            Response.Headers.CacheControl = "private, no-store";
+            return PhysicalFile(image.Value.Path, image.Value.Type);
+        }
+
         [HttpPost, ValidateAntiForgeryToken, RequestSizeLimit(12 * 1024 * 1024)]
         public async Task<IActionResult> UploadOffer(int id, IFormFile file)
         {

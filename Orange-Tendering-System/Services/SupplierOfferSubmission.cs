@@ -7,10 +7,8 @@ using Orange_Tendering_System.ViewModels;
 
 namespace Orange_Tendering_System.Services;
 
-// One-step offer submission (no user-facing "Save draft"): the form, its attachments and the final submission are validated and
-// committed together in one serializable transaction holding the tender row lock. A Draft row still exists for a moment inside
-// that transaction (and for drafts saved before this change), because TenderWorkflowService.SubmitDraft is the single
-// authoritative submission gate. All totals are calculated here, never taken from the browser.
+// Draft saving and final submission share the same ownership, file, and transaction checks. Only final submission
+// requires a complete offer and enters the authoritative TenderWorkflowService.SubmitDraft gate.
 public sealed partial class SupplierOfferService
 {
     public const long MaxFileBytes = 10 * 1024 * 1024, MaxTotalBytes = 40 * 1024 * 1024;
@@ -75,9 +73,14 @@ public sealed partial class SupplierOfferService
 
     public sealed record UploadedOfferFile(string DocumentType, string FileName, string ContentType, byte[] Bytes);
 
-    // Validates every field and file, then creates/updates the bid, stores the files and submits it, all or nothing.
-    // Returns the submitted bid id, or the list of problems (nothing is saved then).
-    public async Task<(int? BidId, List<string> Errors)> SubmitOfferAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files)
+    public Task<(int? BidId, List<string> Errors)> SaveDraftAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files) =>
+        SaveOfferAsync(userId, invitationId, input, files, submit: false);
+
+    public Task<(int? BidId, List<string> Errors)> SubmitOfferAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files) =>
+        SaveOfferAsync(userId, invitationId, input, files, submit: true);
+
+    // All changes to an offer, including attachments, are committed together or not at all.
+    private async Task<(int? BidId, List<string> Errors)> SaveOfferAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files, bool submit)
     {
         var errors = new List<string>();
         var form = await GetOfferFormAsync(userId, invitationId);
@@ -86,7 +89,7 @@ public sealed partial class SupplierOfferService
             var existing = await OwnOffers(userId).Where(b => b.TenderInvitationId == invitationId && b.Status == BidStatus.Submitted).Select(b => (int?)b.Id).FirstOrDefaultAsync();
             return (null, [existing != null ? "This offer was already submitted. Submitted offers cannot be changed." : await GetCreateBlockReasonAsync(userId, invitationId)]);
         }
-        var bid = Validate(form, input, files, errors);
+        var bid = Validate(form, input, files, errors, submit);
         if (errors.Count > 0) return (null, errors);
 
         var written = new List<string>();
@@ -125,11 +128,14 @@ public sealed partial class SupplierOfferService
                 context.Documents.Add(new Document { BidId = target.Id, FileName = file.FileName, StoragePath = relative, ContentType = file.ContentType, SizeBytes = file.Bytes.Length,
                     DocumentType = file.DocumentType, UploadedAt = workflow.Now, UploadedByUserId = userId });
             }
-            context.AuditLogs.Add(new AuditLog { UserId = userId, EntityName = nameof(Bid), EntityId = target.Id.ToString(), Action = "OfferPrepared", CreatedAt = workflow.Now,
+            context.AuditLogs.Add(new AuditLog { UserId = userId, EntityName = nameof(Bid), EntityId = target.Id.ToString(), Action = submit ? "OfferPrepared" : "OfferDraftSaved", CreatedAt = workflow.Now,
                 NewValues = JsonSerializer.Serialize(new { Totals = OfferTotals.Of(bid), Files = files.Select(f => new { f.DocumentType, f.FileName, Size = f.Bytes.Length }) }) });
             await context.SaveChangesAsync();
-            // The authoritative gate (owner, invitation, round open, deadline, weights, items) runs inside this same transaction.
-            await workflow.SubmitDraft(target.Id, new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId)], "SupplierPortal")));
+            if (submit)
+            {
+                // The authoritative gate (owner, invitation, round open, deadline, weights, items) runs inside this same transaction.
+                await workflow.SubmitDraft(target.Id, new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId)], "SupplierPortal")));
+            }
             await transaction.CommitAsync();
             foreach (var path in removedFiles) { try { File.Delete(path); } catch (IOException) { } }
             return (target.Id, []);
@@ -148,7 +154,7 @@ public sealed partial class SupplierOfferService
     }
 
     // Field rules. Money uses the currency's decimals (JOD 3, USD/EUR 2): a value with more decimals is refused, not rounded.
-    private Bid Validate(SupplierDraftOfferViewModel form, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files, List<string> errors)
+    private Bid Validate(SupplierDraftOfferViewModel form, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files, List<string> errors, bool submit)
     {
         var currency = input.CurrencyCode;
         if (!CurrencyRules.Offer.Contains(currency)) { errors.Add("Choose JOD, USD or EUR."); currency = "JOD"; }
@@ -171,21 +177,21 @@ public sealed partial class SupplierOfferService
             if (item == null) continue;
             // No partial offers: no approved business rule allows a different quantity.
             if (line.Quantity != item.Quantity) errors.Add($"{item.Name}: offer the requested quantity ({item.Quantity:0.###} {item.Unit}). Partial quantities are not accepted for this tender.");
-            if (line.UnitPrice <= 0) errors.Add($"{item.Name}: enter a unit price above zero.");
+            if (submit && line.UnitPrice <= 0) errors.Add($"{item.Name}: enter a unit price above zero.");
             Money(line.UnitPrice, item.Name + " unit price");
             bid.Items.Add(new BidItem { TenderItemId = item.TenderItemId, Quantity = item.Quantity, UnitPrice = line.UnitPrice,
-                OfferedProduct = Text(line.OfferedProduct, 300, item.Name + " — offered product", true),
-                OfferedSpecifications = Text(line.OfferedSpecifications, 4000, item.Name + " — offered specifications", true),
+                OfferedProduct = Text(line.OfferedProduct, 300, item.Name + " — offered product", submit),
+                OfferedSpecifications = Text(line.OfferedSpecifications, 4000, item.Name + " — offered specifications", submit),
                 Notes = Text(line.Notes, 2000, item.Name + " — notes", false) });
         }
-        if (input.DeliveryDays is not (>= 1 and <= 3650)) errors.Add("Delivery lead time: enter whole calendar days from 1 to 3650.");
+        if ((submit || input.DeliveryDays.HasValue) && input.DeliveryDays is not (>= 1 and <= 3650)) errors.Add("Delivery lead time: enter whole calendar days from 1 to 3650.");
         bid.DeliveryDays = input.DeliveryDays;
-        bid.PaymentTerms = Text(input.PaymentTerms, 1000, "Payment terms", true);
+        bid.PaymentTerms = Text(input.PaymentTerms, 1000, "Payment terms", submit);
         var deadline = form.Deadline?.Date ?? workflow.Now.Date;
-        if (input.ValidUntil == null || input.ValidUntil.Value.Date < deadline) errors.Add($"Offer validity must last at least until the submission deadline ({deadline:d MMM yyyy}).");
-        else if (input.ValidUntil.Value.Date > workflow.Now.Date.AddYears(3)) errors.Add("Offer validity cannot be more than three years ahead.");
+        if (submit && (input.ValidUntil == null || input.ValidUntil.Value.Date < deadline)) errors.Add($"Offer validity must last at least until the submission deadline ({deadline:d MMM yyyy}).");
+        else if (input.ValidUntil?.Date > workflow.Now.Date.AddYears(3)) errors.Add("Offer validity cannot be more than three years ahead.");
         bid.ValidUntil = input.ValidUntil?.Date;
-        bid.TechnicalProposal = Text(input.TechnicalProposal, 10000, "Technical proposal", true);
+        bid.TechnicalProposal = Text(input.TechnicalProposal, 10000, "Additional notes", false);
         if (input.WarrantyMonths is < 0 or > 240) errors.Add("Warranty period: 0 to 240 whole months.");
         bid.WarrantyMonths = input.WarrantyMonths; bid.WarrantyType = Text(input.WarrantyType, 60, "Warranty type", false);
         bid.WarrantyTerms = Text(input.WarrantyTerms, 2000, "Warranty conditions", false);
@@ -195,17 +201,17 @@ public sealed partial class SupplierOfferService
         bid.ShippingCost = input.IncludeShipping ? input.ShippingCost : 0; Money(bid.ShippingCost, "Shipping cost");
         bid.InstallationCost = input.IncludeInstallation ? input.InstallationCost : 0; Money(bid.InstallationCost, "Installation cost");
         bid.MaintenanceCost = input.IncludeMaintenance ? input.MaintenanceCost : 0; Money(bid.MaintenanceCost, "Maintenance cost");
-        bid.MaintenanceDescription = input.IncludeMaintenance ? Text(input.MaintenanceDescription, 1000, "Maintenance coverage and duration", true) : null;
+        bid.MaintenanceDescription = input.IncludeMaintenance ? Text(input.MaintenanceDescription, 1000, "Maintenance coverage and duration", submit) : null;
         bid.OtherCost = input.IncludeOther ? input.OtherCost : 0; Money(bid.OtherCost, "Other costs");
-        bid.OtherCostDescription = input.IncludeOther ? Text(input.OtherCostDescription, 500, "Description of other costs", true) : null;
+        bid.OtherCostDescription = input.IncludeOther ? Text(input.OtherCostDescription, 500, "Description of other costs", submit) : null;
         foreach (var (on, value, label) in new[] { (input.IncludeShipping, input.ShippingCost, "Shipping"), (input.IncludeInstallation, input.InstallationCost, "Installation"), (input.IncludeMaintenance, input.MaintenanceCost, "Maintenance"), (input.IncludeOther, input.OtherCost, "Other costs") })
-            if (on && value <= 0) errors.Add($"{label}: enter the amount, or untick it when it is included in the unit prices or does not apply.");
+            if (submit && on && value <= 0) errors.Add($"{label}: enter the amount, or untick it when it is included in the unit prices or does not apply.");
 
         var subtotal = bid.Items.Sum(i => i.Quantity * i.UnitPrice);
         var charges = bid.ShippingCost + bid.InstallationCost + bid.MaintenanceCost + bid.OtherCost;
         if (input.TaxMode == "Rate")
         {
-            if (input.TaxRate is not (>= 0 and <= 100) || decimal.Round(input.TaxRate.Value, 2) != input.TaxRate) errors.Add("Tax rate: enter a percentage from 0 to 100 with at most two decimals.");
+            if ((submit || input.TaxRate.HasValue) && (input.TaxRate is not (>= 0 and <= 100) || decimal.Round(input.TaxRate.Value, 2) != input.TaxRate)) errors.Add("Tax rate: enter a percentage from 0 to 100 with at most two decimals.");
             bid.TaxRate = input.TaxRate; bid.TaxIncludesCharges = input.TaxIncludesCharges;
             // Tax is calculated once, on the stated taxable base, and rounded to the currency's precision (never counted twice).
             bid.TaxAmount = decimal.Round((subtotal + (input.TaxIncludesCharges ? charges : 0)) * (input.TaxRate ?? 0) / 100m, dec, MidpointRounding.AwayFromZero);
@@ -215,8 +221,7 @@ public sealed partial class SupplierOfferService
 
         // Attachments: every document type the tender requires must be present (new upload or kept draft attachment).
         var kept = form.ExistingDocuments.Where(d => !input.RemoveDocumentIds.Contains(d.Id)).ToList();
-        if (files.Count + kept.Count == 0) errors.Add("Attach at least one supporting document (PDF, PNG or JPEG).");
-        foreach (var key in form.RequiredDocuments)
+        if (submit) foreach (var key in form.RequiredDocuments)
             if (files.All(f => f.DocumentType != key) && kept.All(d => d.DocumentType != key)) errors.Add($"Required document missing: {OfferDocumentTypes.Label(key)}.");
         if (files.Count > MaxFiles || files.Sum(f => (long)f.Bytes.Length) > MaxTotalBytes) errors.Add($"Attach at most {MaxFiles} files, {MaxTotalBytes / 1024 / 1024} MB in total.");
         return bid;
@@ -245,6 +250,8 @@ public sealed partial class SupplierOfferService
             ".jpg" or ".jpeg" when bytes.Length >= 3 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255 => "image/jpeg",
             _ => null
         };
+        if (documentType == "ReferenceImage" && type is not ("image/png" or "image/jpeg"))
+            return (null, $"{name}: product images must be valid PNG or JPEG files.");
         return type == null ? (null, $"{name}: only valid PDF, PNG or JPEG files are accepted.") : (new UploadedOfferFile(documentType, name, type, bytes), null);
     }
 }

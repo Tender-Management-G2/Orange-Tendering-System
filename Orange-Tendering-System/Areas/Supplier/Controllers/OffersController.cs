@@ -23,8 +23,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             return View(await offerService.GetOffersAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!));
         }
 
-        // Submit Supplier Offer — one page, one action ("Submit Offer"), confirmed in the browser and validated on the server.
-        // A draft saved before this change opens in the same form and is submitted from it.
+        // Save and submit use the same form; only submission requires all fields and documents.
         [HttpGet]
         public async Task<IActionResult> Create(int? id)
         {
@@ -44,26 +43,8 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             if (string.IsNullOrEmpty(userId)) return Challenge();
             if (id <= 0 || input.Items == null || input.Items.Any(item => item == null)) return BadRequest();
             var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "A field has an invalid value." : e.ErrorMessage).Distinct().ToList();
-            var files = new List<SupplierOfferService.UploadedOfferFile>();
-            foreach (var file in Request.Form.Files)
-            {
-                if (!file.Name.StartsWith("doc_", StringComparison.Ordinal)) continue;
-                var documentType = file.Name[4..];
-                var storedName = file.FileName;
-                if (documentType.StartsWith("ReferenceImage_", StringComparison.Ordinal))
-                {
-                    if (!int.TryParse(documentType["ReferenceImage_".Length..], out var tenderItemId)
-                        || input.Items.All(item => item.TenderItemId != tenderItemId))
-                    { errors.Add("A product image refers to an item outside this offer."); continue; }
-                    documentType = "ReferenceImage";
-                    storedName = $"Item-{tenderItemId}-{Path.GetFileName(file.FileName)}";
-                }
-                if (file.Length > SupplierOfferService.MaxFileBytes) { errors.Add($"{Path.GetFileName(file.FileName)}: files must be 10 MB or smaller."); continue; }
-                await using var stream = new MemoryStream();
-                await file.CopyToAsync(stream);
-                var (upload, error) = SupplierOfferService.ReadUpload(documentType, storedName, stream.ToArray());
-                if (upload != null) files.Add(upload); else errors.Add(error!);
-            }
+            var (files, fileErrors) = await ReadFilesAsync(input);
+            errors.AddRange(fileErrors);
             if (errors.Count == 0)
             {
                 var (bidId, problems) = await offerService.SubmitOfferAsync(userId, id, input, files);
@@ -79,6 +60,64 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             model.Input = input; model.Errors = errors;
             // Files are never kept across a refused submission; the page asks the supplier to choose them again.
             return View(model);
+        }
+
+        [HttpPost, ValidateAntiForgeryToken]
+        [RequestSizeLimit(45 * 1024 * 1024), RequestFormLimits(MultipartBodyLengthLimit = 45 * 1024 * 1024)]
+        public async Task<IActionResult> SaveDraft(int id, [Bind(Prefix = "Input")] SupplierDraftOfferInputModel input)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Challenge();
+            if (id <= 0 || input.Items == null || input.Items.Any(item => item == null)) return BadRequest();
+            // An empty price or cost is allowed in a draft; an invalid nonempty value is not.
+            var errors = ModelState.Where(entry => !string.IsNullOrWhiteSpace(entry.Value?.AttemptedValue))
+                .SelectMany(entry => entry.Value!.Errors)
+                .Select(error => string.IsNullOrWhiteSpace(error.ErrorMessage) ? "A field has an invalid value." : error.ErrorMessage)
+                .Distinct().ToList();
+            var (files, fileErrors) = await ReadFilesAsync(input);
+            errors.AddRange(fileErrors);
+            if (errors.Count == 0)
+            {
+                var (bidId, problems) = await offerService.SaveDraftAsync(userId, id, input, files);
+                if (bidId != null)
+                {
+                    TempData["OfferDraftSaved"] = "Draft saved. You can return and complete it before the submission deadline.";
+                    return RedirectToAction(nameof(Create), new { id });
+                }
+                errors.AddRange(problems);
+            }
+            var model = await offerService.GetOfferFormAsync(userId, id);
+            if (model == null) return View("Unavailable", await offerService.GetCreateBlockReasonAsync(userId, id));
+            model.Input = input; model.Errors = errors;
+            return View("Create", model);
+        }
+
+        private async Task<(List<SupplierOfferService.UploadedOfferFile> Files, List<string> Errors)> ReadFilesAsync(SupplierDraftOfferInputModel input)
+        {
+            var files = new List<SupplierOfferService.UploadedOfferFile>();
+            var errors = new List<string>();
+            foreach (var file in Request.Form.Files)
+            {
+                if (!file.Name.StartsWith("doc_", StringComparison.Ordinal)) continue;
+                var documentType = file.Name[4..];
+                var storedName = file.FileName;
+                var itemImage = documentType.StartsWith("ReferenceImage_", StringComparison.Ordinal);
+                if (itemImage)
+                {
+                    if (!int.TryParse(documentType["ReferenceImage_".Length..], out var tenderItemId)
+                        || input.Items.All(item => item.TenderItemId != tenderItemId))
+                    { errors.Add("A product image refers to an item outside this offer."); continue; }
+                    documentType = "ReferenceImage";
+                    storedName = $"Item-{tenderItemId}-{Path.GetFileName(file.FileName)}";
+                }
+                if (file.Length > SupplierOfferService.MaxFileBytes) { errors.Add($"{Path.GetFileName(file.FileName)}: files must be 10 MB or smaller."); continue; }
+                await using var stream = new MemoryStream();
+                await file.CopyToAsync(stream);
+                var (upload, error) = SupplierOfferService.ReadUpload(documentType, storedName, stream.ToArray());
+                if (upload != null && (!itemImage || upload.ContentType.StartsWith("image/", StringComparison.Ordinal))) files.Add(upload);
+                else errors.Add(upload != null ? "Product images must be valid PNG or JPEG files." : error!);
+            }
+            return (files, errors);
         }
 
         // Older "Edit draft" links: the draft opens in the offer form for its invitation.

@@ -156,9 +156,20 @@ public static class WorkflowRedesignChecks
         }
 
         // ---- Supplier offer: one-step submission, documents, precision, tax ----
+        var firstInvitationId = await Read(d => d.TenderInvitations.Where(x => x.SupplierId == suppliers[0].Company.Id).Select(x => x.Id).SingleAsync());
+        using (var supplierClient = await Login(suppliers[0].User))
+        {
+            var offerPage = await supplierClient.GetStringAsync("/Supplier/Offers/Create/" + firstInvitationId);
+            Check(!offerPage.Contains("Tender Requirements (Read-Only)") && offerPage.Contains("data-line-image")
+                && offerPage.Contains("data-sum=\"grand\"") && offerPage.Contains("Input.Items[0].Notes")
+                && offerPage.Contains("data-save-draft") && offerPage.Contains("data-key=\"OfficialQuotation\"")
+                && !offerPage.Contains("data-key=\"ReferenceImage\"") && !offerPage.Contains("name=\"Input.TechnicalProposal\" rows=\"2\" maxlength=\"10000\" required"),
+                "supplier offer form is compact, shows only required attachments, and allows draft saving");
+        }
         var pdf = "%PDF-1.4\n% redesign test document\n"u8.ToArray();
         SupplierOfferService.UploadedOfferFile File(string type) => SupplierOfferService.ReadUpload(type, type + ".pdf", pdf).File!;
         Check(SupplierOfferService.ReadUpload("OfficialQuotation", "fake.pdf", "not a pdf"u8.ToArray()).Error != null, "file content is validated by signature, not by name");
+        Check(SupplierOfferService.ReadUpload("ReferenceImage", "photo.pdf", pdf).Error != null, "product images reject PDF files");
         async Task<(int? Bid, List<string> Errors)> Submit(int index, Action<SupplierDraftOfferInputModel> edit, params string[] docs)
         {
             using var sc = factory.Services.CreateScope(); var service = Scoped<SupplierOfferService>(sc);
@@ -182,10 +193,48 @@ public static class WorkflowRedesignChecks
         var noDesc = await Submit(0, i => { i.IncludeOther = true; i.OtherCost = 10; }, "OfficialQuotation", "ProductDatasheet");
         Check(noDesc.Bid == null && noDesc.Errors.Any(e => e.Contains("Description of other costs")), "other costs require a description");
         Check(await Read(d => d.Bids.CountAsync()) == 0, "refused submissions leave no offer or draft behind");
+        using (var supplierClient = await Login(suppliers[0].User))
+        {
+            var offerPage = await supplierClient.GetStringAsync("/Supplier/Offers/Create/" + firstInvitationId);
+            var token = Regex.Match(offerPage, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+            var tenderItems = await Read(d => d.TenderItems.Where(x => x.TenderId == id).OrderBy(x => x.Id).Select(x => new { x.Id, x.Quantity }).ToListAsync());
+            var draftFields = new List<KeyValuePair<string, string>>
+            {
+                new("__RequestVerificationToken", token), new("Input.CurrencyCode", "JOD"), new("Input.TaxMode", "Rate"), new("Input.TaxRate", "16")
+            };
+            for (var index = 0; index < tenderItems.Count; index++)
+            {
+                draftFields.Add(new($"Input.Items[{index}].TenderItemId", tenderItems[index].Id.ToString()));
+                draftFields.Add(new($"Input.Items[{index}].Quantity", tenderItems[index].Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                draftFields.Add(new($"Input.Items[{index}].UnitPrice", ""));
+            }
+            draftFields.Add(new("Input.Items[0].OfferedProduct", "Draft laptop"));
+            var saved = await supplierClient.PostAsync("/Supplier/Offers/SaveDraft/" + firstInvitationId, new FormUrlEncodedContent(draftFields));
+            var savedPage = saved.Headers.Location == null ? "" : await supplierClient.GetStringAsync(saved.Headers.Location);
+            var draftExists = await Read(d => d.Bids.AnyAsync(x => x.TenderInvitationId == firstInvitationId && x.Status == BidStatus.Draft && x.Items.Any(i => i.OfferedProduct == "Draft laptop" && i.UnitPrice == 0)));
+            Check(saved.StatusCode == HttpStatusCode.Redirect && savedPage.Contains("Draft saved") && draftExists,
+                "incomplete supplier offer is saved as a draft without submission");
+        }
+        var secondInvitationId = await Read(d => d.TenderInvitations.Where(x => x.SupplierId == suppliers[1].Company.Id).Select(x => x.Id).SingleAsync());
+        using (var scope = factory.Services.CreateScope())
+        {
+            var service = Scoped<SupplierOfferService>(scope);
+            var page = (await service.GetOfferFormAsync(suppliers[1].User.Id, secondInvitationId))!;
+            var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/rNsAAAAASUVORK5CYII=");
+            var image = SupplierOfferService.ReadUpload("ReferenceImage", $"Item-{page.ItemContext[0].TenderItemId}-sample.png", png).File!;
+            var imageDraft = await service.SaveDraftAsync(suppliers[1].User.Id, secondInvitationId, page.Input, [image]);
+            Check(imageDraft.BidId != null, "product image is saved with an incomplete draft");
+        }
+        using (var supplierClient = await Login(suppliers[1].User))
+        {
+            var savedImagePage = await supplierClient.GetStringAsync("/Supplier/Offers/Create/" + secondInvitationId);
+            Check(savedImagePage.Contains("data-remove-saved-image") && savedImagePage.Contains("/Supplier/Documents/Preview/"),
+                "saved draft image appears in the product preview");
+        }
         // Items: 2 × 500 + 1 × 500 = 1500. Shipping 50.
         var a = await Submit(0, i => { i.Items[0].UnitPrice = 600; i.IncludeShipping = true; i.ShippingCost = 50; i.IncludeInstallation = false; i.InstallationCost = 999; }, "OfficialQuotation", "ProductDatasheet");
-        var b = await Submit(1, i => { i.IncludeShipping = true; i.ShippingCost = 50; i.TaxIncludesCharges = true; }, "OfficialQuotation", "ProductDatasheet", "ReferenceImage");
-        var c3 = await Submit(2, i => { i.TaxMode = "Amount"; i.TaxAmount = 100.5m; i.TaxRate = 99; }, "OfficialQuotation", "ProductDatasheet");
+        var b = await Submit(1, i => { i.IncludeShipping = true; i.ShippingCost = 50; i.TaxIncludesCharges = true; }, "OfficialQuotation", "ProductDatasheet");
+        var c3 = await Submit(2, i => { i.TaxMode = "Amount"; i.TaxAmount = 100.5m; i.TaxRate = 99; i.TechnicalProposal = null; }, "OfficialQuotation", "ProductDatasheet");
         Check(a.Bid != null && b.Bid != null && c3.Bid != null, "three complete offers submitted in one step (" + string.Join("; ", a.Errors.Concat(b.Errors).Concat(c3.Errors)) + ")");
         var bids = await Read(d => d.Bids.Include(x => x.Items).Include(x => x.Documents).Where(x => x.Status == BidStatus.Submitted).ToDictionaryAsync(x => x.Id));
         var bidA = bids[a.Bid!.Value]; var bidB = bids[b.Bid!.Value]; var bidC = bids[c3.Bid!.Value];
@@ -193,8 +242,19 @@ public static class WorkflowRedesignChecks
             "rate tax applies to items only by default; an unticked cost is never charged (1700 + 50 + 272 = 2022)");
         Check(bidB.TaxAmount == 248m && OfferTotals.Of(bidB).GrandTotal == 1798m, "rate tax includes additional costs only when the supplier says so ((1500 + 50) × 16%)");
         Check(bidC.TaxAmount == 100.5m && bidC.TaxRate == null && OfferTotals.Of(bidC).GrandTotal == 1600.5m, "a stated tax amount is used as entered and never doubled with a rate");
+        Check(bidC.TechnicalProposal == null, "additional notes are optional when submitting an offer");
         Check(bidA.Documents.Select(x => x.DocumentType).OrderBy(x => x).SequenceEqual(["OfficialQuotation", "ProductDatasheet"]) && bidB.Documents.Count == 3 && bidA.SubmittedAt != null,
             "attachments are stored privately with their document types and the submission time");
+        var savedImageId = bidB.Documents.Single(d => d.DocumentType == "ReferenceImage").Id;
+        using (var supplierClient = await Login(suppliers[1].User))
+        {
+            var preview = await supplierClient.GetAsync("/Supplier/Documents/Preview/" + savedImageId);
+            Check(preview.StatusCode == HttpStatusCode.OK && preview.Content.Headers.ContentType?.MediaType == "image/png",
+                "saved product image is displayed inline for its supplier");
+        }
+        using (var otherSupplier = await Login(suppliers[0].User))
+            Check((await otherSupplier.GetAsync("/Supplier/Documents/Preview/" + savedImageId)).StatusCode == HttpStatusCode.NotFound,
+                "another supplier cannot view the product image");
         Check(bidA.Items.All(i => i.OfferedProduct == "Product"), "item-level offered product is stored");
         var again = await Submit(0, _ => { }, "OfficialQuotation", "ProductDatasheet");
         Check(again.Bid == null && again.Errors.Any(e => e.Contains("already submitted")), "a second submission of the same offer is refused");

@@ -248,13 +248,6 @@
         body.querySelectorAll('select.wp-quick').forEach(function (q) { q.addEventListener('change', function () { var t = q.parentElement.querySelector('textarea'); if (t && q.value) { t.value = q.value; q.value = ''; t.focus(); } }); });
         var pad = function (n) { return ('0' + n).slice(-2); }, local = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
         body.querySelectorAll('select[data-preset="deadline"]').forEach(function (sel) { sel.addEventListener('change', function () { if (!sel.value) return; var d = new Date(); d.setDate(d.getDate() + Number(sel.value)); d.setHours(17, 0, 0, 0); sel.closest('form').querySelector('input[name=deadline]').value = local(d); }); });
-        body.querySelectorAll('select[data-preset="start"], select[data-preset="duration"]').forEach(function (sel) {
-            sel.addEventListener('change', function () {
-                var f = sel.closest('form'), st = f.querySelector('input[name=StartsAt]'), en = f.querySelector('input[name=EndsAt]'), p = f.querySelector('[data-preset=start]').value, dur = Number(f.querySelector('[data-preset=duration]').value || 60), d = new Date();
-                if (sel.dataset.preset === 'start') { if (!p) return; if (p === '15m') d.setMinutes(d.getMinutes() + 15); else if (p === '1h') d.setHours(d.getHours() + 1); else { d.setDate(d.getDate() + (p === 'd2' ? 2 : 1)); d.setHours(10, 0, 0, 0); } d.setSeconds(0, 0); st.value = local(d); }
-                if (st.value) { var e = new Date(st.value); e.setMinutes(e.getMinutes() + dur); en.value = local(e); }
-            });
-        });
         body.querySelectorAll('table.wp-sortable').forEach(function (tb) {
             tb.querySelectorAll('thead th').forEach(function (th, ci) {
                 th.tabIndex = 0; th.setAttribute('role', 'button'); th.title = 'Click to sort';

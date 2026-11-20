@@ -281,8 +281,8 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             Require(bid.Status == BidStatus.Draft && bid.TenderInvitation.Status == InvitationStatus.Accepted && bid.TenderInvitation.TenderRoundId == round.Id &&
                 t.Status == TenderStatus.Bidding && round.Status == TenderRoundStatus.Open && round.Deadline > Now && (!round.OpensAt.HasValue || round.OpensAt <= Now) && weights.State == WeightState.Approved,
                 "The draft is unavailable, bidding is closed, or the weights are not approved.");
-            Require(!string.IsNullOrWhiteSpace(bid.TechnicalProposal) && bid.DeliveryDays is > 0 && bid.Items.Count > 0 && bid.Items.All(i => i.Quantity > 0 && i.UnitPrice > 0),
-                "Complete the technical proposal, delivery days and positive quantities and prices.");
+            Require(bid.DeliveryDays is > 0 && bid.Items.Count > 0 && bid.Items.All(i => i.Quantity > 0 && i.UnitPrice > 0),
+                "Complete the delivery days and positive quantities and prices.");
             Require(!bid.ValidUntil.HasValue || bid.ValidUntil.Value.Date >= Now.Date, "Offer validity has expired.");
             Require(bid.ShippingCost >= 0 && bid.InstallationCost >= 0 && bid.MaintenanceCost >= 0 && bid.TaxAmount >= 0 && bid.OtherCost >= 0, "Offer costs cannot be negative.");
             var expected = await db.TenderItems.Where(i => i.TenderId == t.Id).Select(i => i.Id).ToListAsync();
