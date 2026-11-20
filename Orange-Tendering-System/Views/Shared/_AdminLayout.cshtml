@@ -56,6 +56,7 @@ through WorkspaceNavigation.LayoutFor.
             <a class="ws-nav-item @Active("Admin", new[] { "Suppliers" })" asp-area="Admin" asp-controller="Suppliers" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("layers"))</svg><span>@UiText.T(Context, "Suppliers")</span></a>
             <a class="ws-nav-item @Active("Admin", new[] { "AuditLogs" })" asp-area="Admin" asp-controller="AuditLogs" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg><span>@UiText.T(Context, "Audit Logs")</span></a>
             <a class="ws-nav-item @Active("", new[] { "Analytics" }, "!Maintenance")" asp-area="" asp-controller="Analytics" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chart"))</svg><span>@UiText.T(Context, "Reports & Analytics")</span></a>
+            <a class="ws-nav-item @Active("", new[] { "HayaAdminReports" })" asp-area="" asp-controller="HayaAdminReports" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("report"))</svg><span>@UiText.T(Context, "Admin Reports")</span></a>
             <a class="ws-nav-item @Active("", new[] { "Analytics" }, "Maintenance")" asp-area="" asp-controller="Analytics" asp-action="Maintenance"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg><span>@UiText.T(Context, "Business &amp; Maintenance")</span></a>
             <a class="ws-nav-item @Active("Admin", new[] { "Committees" })" asp-area="Admin" asp-controller="Committees" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg><span>@UiText.T(Context, "Committees")</span></a>
         </nav>
@@ -82,7 +83,7 @@ through WorkspaceNavigation.LayoutFor.
                    The top bar now holds the same global search as every role (restored after the WorkV3 merge). *@
                 @* Shown on list pages only; forms and detail pages have nothing to filter. *@
                 @if (routeAction.Equals("Maintenance", StringComparison.OrdinalIgnoreCase) ||
-                    routeAction.Equals("Index", StringComparison.OrdinalIgnoreCase) && !routeController.Equals("Analytics", StringComparison.OrdinalIgnoreCase))
+                    routeAction.Equals("Index", StringComparison.OrdinalIgnoreCase) && !routeController.Equals("Analytics", StringComparison.OrdinalIgnoreCase) && !routeController.Equals("HayaAdminReports", StringComparison.OrdinalIgnoreCase))
                 {
                 <form class="pg-toolbar admin-page-search" data-admin-search data-server-search="@(serverSearch ? "true" : "false")" role="search">
                     <input type="search" name="search" placeholder="Search @pageTitle…" aria-label="Search @pageTitle" aria-describedby="admin-search-status" autocomplete="off" />

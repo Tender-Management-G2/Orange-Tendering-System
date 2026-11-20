@@ -161,7 +161,7 @@
     if (!rows.length || (rows.length === 1 && rows[0].cells.length === 1 && rows[0].cells[0].colSpan > 1)) return;
     table.dataset.enhanced = '1';
     const heads = [...head.cells];
-    const statusCols = heads.map((h, i) => /status|state|decision|compliance|result|priority/i.test(h.textContent) ? i : -1).filter(i => i >= 0);
+    const statusCols = heads.map((h, i) => /status|state|decision|compliance|result|priority|verification|approval|recommendation|vote|outcome|expiry|validity/i.test(h.textContent) ? i : -1).filter(i => i >= 0);
     // status pills
     rows.forEach(r => statusCols.forEach(i => {
       const c = r.cells[i]; if (!c || c.children.length > 0 && !c.querySelector('.pg-status, .dash-status-pill')) return;

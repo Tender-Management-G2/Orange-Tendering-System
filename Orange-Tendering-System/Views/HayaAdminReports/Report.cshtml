@@ -1,0 +1,11 @@
+@model Orange_Tendering_System.Services.HayaReportModel
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = Model.Title; ViewData["WorkspaceSection"] = "Analytics & Exports"; ViewData["Description"] = Model.Description; ViewData["BodyClass"] = "reports-detail-page";
+}
+<partial name="_PageHeader" />
+<partial name="_ReportBody" model="Model" />
+<p><a class="pg-btn" asp-action="Index">All reports</a></p>
+
+@section Styles { <link rel="stylesheet" href="~/css/haya-admin-reports.css" asp-append-version="true" /> }
+@section Scripts { <script src="~/js/haya-report-table-tools.js" asp-append-version="true" defer></script> }

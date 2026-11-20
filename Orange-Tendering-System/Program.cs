@@ -94,6 +94,8 @@ builder.Services.AddScoped(services => new ReportingService(
 builder.Services.AddScoped<ReportAccessService>();
 builder.Services.AddScoped<FinalTenderContractService>();
 builder.Services.AddScoped<ReportExport>();
+builder.Services.AddScoped<HayaReportingService>();
+builder.Services.AddScoped<HayaReportExport>();
 builder.Services.AddScoped<Orange_Tendering_System.Areas.TopCommittee.Services.TopCommitteeService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<SettingsService>();

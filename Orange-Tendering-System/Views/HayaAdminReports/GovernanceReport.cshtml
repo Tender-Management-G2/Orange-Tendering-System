@@ -1,0 +1,17 @@
+@model Orange_Tendering_System.Services.HayaReportModel
+@{ Layout = WorkspaceNavigation.LayoutFor(User); ViewData["Title"] = "Approvals & Decision (Reports)"; ViewData["WorkspaceSection"] = "Reports & Analytics"; ViewData["Description"] = "Tracking committee recommendations, manager decisions, voting results, and the full audit trail for tenders."; ViewData["BodyClass"] = "reports-detail-page governance-report"; }
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel governance-filters"><div class="pg-panel-head"><div><h2>Filters</h2><span class="pg-hint">Filter approval and decision records by date range or tender.</span></div><partial name="_ReportExportLinks" model='@(new Orange_Tendering_System.ViewModels.HayaReportExportLinksViewModel("governance", Model.Filters))' /></div><form method="get" asp-action="Governance" class="governance-filter-grid"><label>From<input type="date" name="From" value="@Model.Filters.From?.ToString("yyyy-MM-dd")" /></label><label>To<input type="date" name="To" value="@Model.Filters.To?.ToString("yyyy-MM-dd")" /></label><label>Tender<select name="TenderId"><option value="">All tenders</option>@foreach(var tender in Model.Tenders){<option value="@tender.Id" selected="@(Model.Filters.TenderId==tender.Id)">@tender.Label</option>}</select></label><div><button class="pg-btn pg-btn-primary">Apply Filters</button><a class="pg-btn" asp-action="Governance">Reset</a></div></form></section>
+@foreach (var table in Model.Tables.Where(x => x.Title is "Top Committee Recommendations" or "Sourcing Manager Decisions" or "Top Committee Voting Results" or "Audit Trail" or "Awarded contracts"))
+{
+    <section class="ws-panel pg-panel">
+        <div class="pg-panel-head governance-section-title"><h2><span aria-hidden="true">@(table.Title switch { "Top Committee Recommendations" => "♟", "Sourcing Manager Decisions" => "●", "Top Committee Voting Results" => "▥", "Audit Trail" => "▤", _ => "◉" })</span> @table.Title</h2></div>
+        <div class="pg-table-wrap"><table class="pg-table"><thead><tr>@foreach (var column in table.Columns) { <th>@column</th> }</tr></thead><tbody>
+            @foreach (var row in table.Rows) { <tr>@foreach (var cell in row) { <td>@cell</td> }</tr> }
+            @if (table.Rows.Count == 0) { <tr><td colspan="@table.Columns.Length"><partial name="_EmptyState" model='"No records available."' /></td></tr> }
+        </tbody></table></div>
+    </section>
+}
+
+@section Styles { <link rel="stylesheet" href="~/css/haya-admin-reports.css" asp-append-version="true" /> }
+@section Scripts { <script src="~/js/haya-report-table-tools.js" asp-append-version="true" defer></script> }
