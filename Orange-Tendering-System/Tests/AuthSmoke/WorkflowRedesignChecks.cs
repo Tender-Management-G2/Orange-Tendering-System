@@ -297,6 +297,16 @@ public static class WorkflowRedesignChecks
         await Read(async d => { var s = await d.Set<EvaluationSession>().SingleAsync(x => x.TenderRoundId == roundId); s.StartsAt = DateTime.UtcNow.AddMinutes(-5); await d.SaveChangesAsync(); return 0; });
 
         // ---- During the meeting: precision, recommendation rules, automatic report ----
+        using (var member = await Login(fin))
+        using (var popupRequest = new HttpRequestMessage(HttpMethod.Get, "/EvaluationCommittee/Workflow/Details/" + id))
+        {
+            popupRequest.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var popupResponse = await member.SendAsync(popupRequest);
+            var popup = await popupResponse.Content.ReadAsStringAsync();
+            Check(popupResponse.StatusCode == HttpStatusCode.OK && popup.Contains("class=\"wp-form wp-scores\"")
+                && popup.Contains("name=\"recommendation.RecommendedBidId\"") && popup.Contains("name=\"recommendation.DeviationJustification\"")
+                && popup.Contains("step=\"0.1\""), "Tariq5 popup scoring is available during the meeting with current recommendation and precision rules");
+        }
         await Refuse(w => w.SubmitEvaluation(id, Scores(89.95m, 90), P(fin), null, Rec(bidA.Id)), "a score with two decimals (89.95) is refused, not rounded", "one decimal");
         await Refuse(w => w.SubmitEvaluation(id, Scores(89.5m, 90), P(fin), null, Rec(bidB.Id)), "recommending an offer below one's own top score needs a justification", "deviation");
         await Flow(w => w.SubmitEvaluation(id, Scores(89.5m, 90), P(fin), null, Rec(bidB.Id, "Beta offers local support that the department relies on.")));

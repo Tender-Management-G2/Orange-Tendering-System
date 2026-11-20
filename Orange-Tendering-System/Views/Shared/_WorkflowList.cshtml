@@ -246,6 +246,24 @@
         });
         body.querySelectorAll('[data-all-ok]').forEach(function (b) { b.addEventListener('click', function () { b.closest('form').querySelectorAll('tr[data-bid] [data-f=status]').forEach(function (s) { s.value = 'Compliant'; }); b.closest('form').querySelectorAll('tr[data-bid] [data-f=notes]').forEach(function (s) { s.selectedIndex = 0; }); }); });
         body.querySelectorAll('select.wp-quick').forEach(function (q) { q.addEventListener('change', function () { var t = q.parentElement.querySelector('textarea'); if (t && q.value) { t.value = q.value; q.value = ''; t.focus(); } }); });
+        body.querySelectorAll('form[data-evaluator-scores]').forEach(function (form) {
+            var financialWeight = Number(form.dataset.financialWeight), technicalWeight = Number(form.dataset.technicalWeight);
+            var recommendation = form.querySelector('select[name="recommendation.RecommendedBidId"]');
+            var deviation = form.querySelector('[data-rank-deviation]'), explanation = deviation.querySelector('textarea');
+            if (!Number.isFinite(financialWeight) || !Number.isFinite(technicalWeight) || Math.abs(financialWeight + technicalWeight - 100) > 1e-6) return;
+            var sync = function () {
+                var ranked = Array.prototype.slice.call(form.querySelectorAll('[data-score-row]')).map(function (row) {
+                    var financial = row.querySelector('[data-score="financial"]'), technical = row.querySelector('[data-score="technical"]');
+                    return { id: row.dataset.bid, score: financial.value !== '' && technical.value !== '' && financial.checkValidity() && technical.checkValidity()
+                        ? (Number(financial.value) * financialWeight + Number(technical.value) * technicalWeight) / 100 : null };
+                });
+                var complete = ranked.length > 0 && ranked.every(function (row) { return row.score !== null; });
+                var top = complete ? Math.max.apply(null, ranked.map(function (row) { return row.score; })) : null;
+                var differs = complete && recommendation.value !== '' && !ranked.some(function (row) { return row.id === recommendation.value && Math.abs(row.score - top) < 1e-9; });
+                deviation.hidden = !differs; explanation.disabled = !differs; explanation.required = differs;
+            };
+            form.addEventListener('input', sync); form.addEventListener('change', sync); sync();
+        });
         var pad = function (n) { return ('0' + n).slice(-2); }, local = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
         body.querySelectorAll('select[data-preset="deadline"]').forEach(function (sel) { sel.addEventListener('change', function () { if (!sel.value) return; var d = new Date(); d.setDate(d.getDate() + Number(sel.value)); d.setHours(17, 0, 0, 0); sel.closest('form').querySelector('input[name=deadline]').value = local(d); }); });
         body.querySelectorAll('table.wp-sortable').forEach(function (tb) {

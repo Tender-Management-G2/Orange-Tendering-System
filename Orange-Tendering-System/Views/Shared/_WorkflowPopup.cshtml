@@ -397,11 +397,34 @@
         {
             <div class="wp-actions"><form asp-area="SourcingManager" asp-controller="Workflow" asp-action="DecideProceed" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="decisionId" value="@pendingRequest.Id" /><p class="wp-text">@pendingRequest.Justification</p><label>Your comment<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Approved: the offers received are sufficient.</option><option>Approved: the purchase is time critical.</option><option>Rejected: please re-tender.</option></select><textarea name="comment" maxlength="2000" required rows="2" data-fv-label="Decision comment" data-fv-label-ar="تعليق القرار"></textarea></label><button name="approve" value="true" class="wp-primary">Approve</button><button name="approve" value="false" class="wp-ghost">Reject</button></form></div>
         }
-        @if (Model.IsEvaluator && s != null && (s.State is SessionState.Scheduled or SessionState.Incomplete or SessionState.ReportDraft))
+        @if (Model.IsEvaluator && !submitted && s != null && TenderWorkflowService.EvaluationOpen(s, Model.UtcNow))
+        {
+            var scoreIndex = 0;
+            <div class="wp-actions">
+                <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post" class="wp-form wp-scores" data-evaluator-scores data-financial-weight="@w?.ApprovedFinancial?.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-technical-weight="@w?.ApprovedTechnical?.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                    @foreach (var eligible in s.EligibleBids)
+                    {
+                        <fieldset data-score-row data-bid="@eligible.BidId"><legend>@BidSupplier(eligible.BidId)</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" />
+                            <div class="wp-cols"><label>Financial (0&ndash;100)<input name="scores[@scoreIndex].Financial" data-score="financial" type="number" min="0" max="100" step="0.1" required data-fv-label="Financial score" data-fv-label-ar="الدرجة المالية" /></label><label>Technical (0&ndash;100)<input name="scores[@scoreIndex].Technical" data-score="technical" type="number" min="0" max="100" step="0.1" required data-fv-label="Technical score" data-fv-label-ar="الدرجة الفنية" /></label></div>
+                            <label>Why these scores?<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label></fieldset>
+                        scoreIndex++;
+                    }
+                    <label>Recommended supplier<select name="recommendation.RecommendedBidId" required><option value="">Choose an eligible offer</option>@foreach (var eligible in s.EligibleBids) { <option value="@eligible.BidId">@BidSupplier(eligible.BidId)</option> }</select></label>
+                    <label>Reason for your recommendation<textarea name="recommendation.Reason" maxlength="2000" required rows="2"></textarea></label>
+                    <label data-rank-deviation>Why does your recommendation differ from your own highest score?<textarea name="recommendation.DeviationJustification" maxlength="2000" minlength="20" rows="2"></textarea></label>
+                    <label>Concerns or observations (optional)<textarea name="recommendation.Concerns" maxlength="2000" rows="2"></textarea></label>
+                    <h5 class="wp-sub">Your signature <small>required after scoring every supplier</small></h5>
+                    <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
+                    <button class="wp-primary">Sign and submit my final evaluation</button><small>You submit once for all suppliers together. Scores, recommendation and signature cannot be changed afterwards.</small>
+                </form>
+                <a class="wp-ghost wp-link" data-no-modal asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Meeting" asp-route-id="@id">Open the detailed evaluation workspace</a>
+            </div>
+        }
+        else if (Model.IsEvaluator && s != null && (s.State is SessionState.Scheduled or SessionState.Incomplete or SessionState.ReportDraft))
         {
             <div class="wp-actions">
                 <a class="wp-primary wp-link" data-no-modal asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Meeting" asp-route-id="@id">Open the evaluation workspace <span aria-hidden="true">&rarr;</span></a>
-                <small>@(submitted ? "Your evaluation is submitted. The workspace shows the results, the report and the signatures." : TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? "Compare the offers, score each supplier, recommend one and sign: one submission." : "Available now for preparation: offers, criteria, documents and AI analysis. Scoring opens at the meeting start.")</small>
+                <small>@(submitted ? "Your evaluation is submitted. The workspace shows the results, the report and the signatures." : "Review the offers, criteria, documents and AI analysis. Scoring opens at the meeting start.")</small>
             </div>
         }
         @if (Model.IsOfficer && s != null && s.State == SessionState.Scheduled)

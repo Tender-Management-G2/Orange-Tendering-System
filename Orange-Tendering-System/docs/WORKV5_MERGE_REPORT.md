@@ -154,5 +154,16 @@ M Orange-Tendering-System/wwwroot/js/orange-ui.js
 - اجتاز `git diff --check` فحص المسافات قبل commits الدمج.
 - نجح `dotnet build Orange-Tendering-System.slnx --no-restore -p:UseAppHost=false -p:OutputPath=bin/Workv5-validation/ -v:q` بصفر أخطاء وتحذير واحد في `Areas/TopCommittee/Controllers/DecisionsController.cs` (`CS9107`).
 - محاولة بناء عادية سابقة فشلت لأن عملية تطبيق كانت تستخدم `Orange-Tendering-System.exe`، ولذلك استُخدم مسار إخراج مستقل للبناء الناجح.
-- لم يُشغّل اختبار قاعدة بيانات أو اختبار متصفح للصفحات المنقولة. نجاح البناء يثبت صحة التجميع، ولا يثبت تشغيل كل تقرير مع البيانات الحية.
+- في الدمج الأصلي لم يُشغّل اختبار قاعدة بيانات أو اختبار متصفح لصفحات تقارير haya المنقولة. نجاح بنائها يثبت صحة التجميع، ولا يثبت تشغيل كل تقرير مع البيانات الحية.
 - يحتفظ `Workv5` حالياً بتنفيذي تقارير متوازيين: تقارير Amal عبر `/Analytics` وتقارير haya عبر `/HayaAdminReports`. هذا يتجنب فقدان أي واجهة أثناء الدمج، لكنه يكرر بعض منطق التقارير والتصدير ويحتاج قراراً لاحقاً إذا أُريد توحيدهما في مسار واحد.
+
+## ملحق: مراجعة صفحات لجنة التقييم بعد تنبيه المستخدم
+
+وجود `tariq5` (`969124e`) في تاريخ `Workv5` لم يكن ضماناً لتطابق واجهة لجنة التقييم. أُجريت مقارنة مباشرة بين رأسي الفرعين بعد التنبيه:
+
+- ملفات صفحات Dashboard وCriteria وEvaluations وWeightApprovals وWorkflow/Index، وكذلك `_EvaluationCommitteeLayout.cshtml`، متطابقة من حيث المحتوى.
+- داخل `Areas/EvaluationCommittee` تغيّر `Controllers/WorkflowController.cs` و`Views/Reports/Review.cshtml`، وأُضيفت `Views/Workflow/Meeting.cshtml` ذات 259 سطراً بعد Tariq5.
+- كانت تجربة التقييم الفعلية تعتمد أيضاً على `Views/Shared/_WorkflowPopup.cshtml`. في Tariq5 كان نموذج درجات الموردين والتوقيع داخل النافذة، بينما استبدله Ahmad3 برابط إلى صفحة `Meeting`. لهذا ظهر اختلاف كبير رغم تطابق أغلب ملفات صفحات المنطقة.
+- أُعيد نموذج الدرجات والتوقيع إلى نافذة التقييم أثناء فتح فترة التسجيل، مع حقول التوصية وسببها وتبرير الاختلاف عن أعلى درجة، وقيّد الإدخال إلى منزلة عشرية واحدة وفق خدمة Workv5. بقيت صفحة الاجتماع التفصيلية متاحة كرابط إضافي وللمراجعة قبل الاجتماع وبعد الإرسال.
+- الملفات المعدّلة لهذا التصحيح: `Orange-Tendering-System/Views/Shared/_WorkflowPopup.cshtml` و`Orange-Tendering-System/Views/Shared/_WorkflowList.cshtml` و`Orange-Tendering-System/Tests/AuthSmoke/WorkflowRedesignChecks.cs`. لم يُستبدل متحكم اللجنة أو منطقها بملفات Tariq5 القديمة؛ إذ يعتمد التدفق الحالي على التوصيات والتقرير الآلي.
+- نجح بناء التطبيق ومشروع `AuthSmoke`. ثم نجح فحص `--workflow-redesign-checks` على SQL Server محلي بقاعدة اختبار جديدة `OrangeAuthCheck_Redesign_1E1FA48F`: **57 PASS، 0 FAIL**، بما فيها تحقق HTTP من ظهور نموذج النافذة وقواعد التوصية والدقة. يترك برنامج الفحص قاعدة الاختبار لفحصها لاحقاً؛ لم يغيّر قاعدة التطبيق العاملة.
