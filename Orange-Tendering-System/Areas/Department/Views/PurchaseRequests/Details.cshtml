@@ -1,5 +1,6 @@
 @model RequestDetails
 @using System.Text.Json
+@using Orange_Tendering_System.Models.Entities
 @{
     var request = Model.Request;
     ViewData["Title"] = $"PR-{request.Id} — {request.Title}";
@@ -25,6 +26,7 @@
         <div><dt>Department</dt><dd>@request.Department.Name</dd></div>
         <div><dt>Created by</dt><dd>@request.CreatedByUser?.FullName</dd></div>
         <div><dt>Status</dt><dd>@RequestDisplay.Status(request)</dd></div>
+        <div><dt>Evaluation method</dt><dd>@(request.EvaluationMethod == TenderEvaluationMethod.LowestPrice ? "100% financial" : request.EvaluationMethod == TenderEvaluationMethod.Weighted ? "Committee weight proposals" : "—")</dd></div>
         <div><dt>Priority</dt><dd>@request.Priority</dd></div>
         <div><dt>Needed by</dt><dd>@request.NeededBy?.ToString("yyyy-MM-dd")</dd></div>
         <div><dt>Created</dt><dd>@RequestDisplay.Date(request.CreatedAt)</dd></div>
@@ -35,7 +37,7 @@
 </section>
 <section class="ws-panel pg-panel">
     <h2>Requested items</h2>
-    <partial name="_Items" model='request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm { Name = i.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList()' />
+    <partial name="_Items" model='request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm { Name = i.Name, CategoryId = i.CategoryId, CategoryName = i.Category?.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList()' />
 </section>
 <section class="ws-panel pg-panel">
     <h2>Supporting attachments</h2>

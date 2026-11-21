@@ -140,7 +140,7 @@ public sealed class InternalDashboardService(ApplicationDbContext db)
         var hits = new List<SearchHit>();
         var tenders = ScopedTenders(role, user);
         if (role == SystemRoles.EvaluationCommittee) tenders = tenders.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Evaluation));
-        if (role == SystemRoles.SourcingManager) tenders = tenders.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Evaluation && m.Responsibility == CommitteeResponsibility.SourcingManager));
+        if (role == SystemRoles.SourcingManager) tenders = tenders.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.Responsibility == CommitteeResponsibility.SourcingManager));
         if (role == SystemRoles.TopCommittee) tenders = tenders.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Top));
         // Admin manages accounts and companies; its search must not offer confidential workflow pages it cannot open.
         if (role != SystemRoles.Admin)

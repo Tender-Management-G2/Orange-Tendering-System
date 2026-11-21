@@ -2,25 +2,41 @@
 (() => {
     const body = document.getElementById('department-items');
     const message = document.getElementById('department-item-message');
-    const fields = ['Name', 'Specifications', 'Quantity', 'Unit'];
+    const title = document.querySelector('[data-title-preview]');
+    const fields = ['Name', 'CategoryId', 'Quantity', 'Unit', 'Specifications'];
     function reindex() {
-        [...body.rows].forEach((row, i) => {
+        const rows = body.querySelectorAll('[data-item-row]');
+        rows.forEach((row, i) => {
+            row.querySelector('[data-item-number]').textContent = i + 1;
             fields.forEach(field => {
                 const input = row.querySelector(`[name$=".${field}"]`);
                 input.name = `Items[${i}].${field}`;
                 input.id = `Items_${i}__${field}`;
+                const label = input.closest('.pg-field')?.querySelector('label');
+                if (label) label.htmlFor = input.id;
             });
-            row.querySelector('[data-remove-item]').disabled = body.rows.length <= 1;
+            row.querySelector('[data-remove-item]').disabled = rows.length <= 1;
         });
+        const count = document.querySelector('[data-item-count]');
+        if (count) count.textContent = `(${rows.length})`;
+        preview();
+    }
+    // Same rule as the server (DepartmentRequestService.GenerateTitle); the server's title is the one stored.
+    function preview() {
+        const names = [...body.querySelectorAll('[data-item-name]')].map(i => i.value.trim()).filter(Boolean);
+        if (!names.length) return;
+        const more = body.querySelectorAll('[data-item-row]').length - 1;
+        title.textContent = names[0] + (more > 0 ? ` + ${more} more item${more === 1 ? '' : 's'}` : '') + ' — ' + title.dataset.department;
     }
     document.getElementById('department-add-item').addEventListener('click', () => {
-        if (body.rows.length >= 100) { message.textContent = 'You can add up to 100 items.'; return; }
-        const row = body.rows[0].cloneNode(true);
-        row.querySelectorAll('input,textarea').forEach(input => {
-            input.value = input.name.endsWith('.Quantity') ? '1' : '';
-            input.removeAttribute('value');
-            input.classList.remove('input-validation-error');
+        const rows = body.querySelectorAll('[data-item-row]');
+        if (rows.length >= 100) { message.textContent = 'You can add up to 100 items.'; return; }
+        const row = rows[0].cloneNode(true);
+        row.querySelectorAll('input,textarea,select').forEach(input => {
+            if (input.tagName === 'SELECT') input.selectedIndex = 0;
+            else { input.value = input.name.endsWith('.Quantity') ? '1' : ''; input.removeAttribute('value'); }
             if (input.tagName === 'TEXTAREA') input.textContent = '';
+            input.classList.remove('input-validation-error');
         });
         body.appendChild(row);
         reindex();
@@ -29,13 +45,22 @@
     });
     body.addEventListener('click', event => {
         const button = event.target.closest('[data-remove-item]');
-        if (!button || body.rows.length <= 1) return;
-        button.closest('tr').remove();
+        if (!button || body.querySelectorAll('[data-item-row]').length <= 1) return;
+        button.closest('[data-item-row]').remove();
         reindex();
         document.getElementById('department-add-item').focus();
         message.textContent = 'Item removed.';
     });
+    body.addEventListener('input', event => { if (event.target.matches('[data-item-name]')) preview(); });
+    const attachmentInput = document.getElementById('Attachments');
+    attachmentInput?.addEventListener('change', () => {
+        const count = document.querySelector('[data-file-count]');
+        if (count) count.textContent = attachmentInput.files.length ? `${attachmentInput.files.length} file(s) selected` : '';
+    });
+    const evaluationMethod = document.getElementById("EvaluationMethod");
+    const send = evaluationMethod?.form?.querySelector('[name="intent"][value="submit"]');
+    evaluationMethod?.addEventListener("change", () => { if (send) send.disabled = !evaluationMethod.value; });
     reindex();
-    // Saving and submitting are sent by Orange Motion (data-om on the form and buttons; docs/ORANGE_MOTION.md).
+    // Saving and submitting are sent by Orange Motion (data-om on the buttons; docs/ORANGE_MOTION.md).
 })();
 </script>

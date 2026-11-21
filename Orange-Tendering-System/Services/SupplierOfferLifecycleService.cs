@@ -145,6 +145,16 @@ public sealed partial class SupplierOfferService
         bid.OtherCost = decimal.Round(input.OtherCost, 2);
     }
 
+    private static SupplierDraftOfferInputModel WithItems(SupplierDraftOfferInputModel terms, Bid bid)
+    {
+        terms.Items = bid.Items.OrderBy(i => i.Id).Select(i => new SupplierDraftItemInputModel
+        {
+            TenderItemId = i.TenderItemId, Name = i.TenderItem.Name, RequiredQuantity = i.TenderItem.Quantity, Quantity = i.Quantity, UnitPrice = i.UnitPrice,
+            OfferedProduct = i.OfferedProduct, OfferedSpecifications = i.OfferedSpecifications, Notes = i.Notes
+        }).ToList();
+        return terms;
+    }
+
     private void AddOfferAudit(string userId, int id, string action) => context.AuditLogs.Add(new AuditLog
     {
         UserId = userId, EntityName = nameof(Bid), EntityId = id.ToString(), Action = action, CreatedAt = DateTime.UtcNow
@@ -164,18 +174,7 @@ public sealed partial class SupplierOfferService
                 && round.Deadline.HasValue && round.Deadline > now && (!round.OpensAt.HasValue || round.OpensAt <= now),
             // Internal screening is communicated through explicit clarification requests, not an inferred outcome.
             MissingRequirements = null, ComplianceStatus = string.Empty,
-            Terms = new SupplierDraftOfferInputModel
-            {
-                CurrencyCode = bid.CurrencyCode, TechnicalProposal = bid.TechnicalProposal, PaymentTerms = bid.PaymentTerms,
-                DeliveryDays = bid.DeliveryDays, ValidUntil = bid.ValidUntil, ShippingCost = bid.ShippingCost,
-                InstallationCost = bid.InstallationCost, MaintenanceCost = bid.MaintenanceCost, TaxAmount = bid.TaxAmount,
-                OtherCost = bid.OtherCost,
-                Items = bid.Items.OrderBy(i => i.Id).Select(i => new SupplierDraftItemInputModel
-                {
-                    TenderItemId = i.TenderItemId, Name = i.TenderItem.Name, RequiredQuantity = i.TenderItem.Quantity,
-                    Quantity = i.Quantity, UnitPrice = i.UnitPrice, OfferedSpecifications = i.OfferedSpecifications
-                }).ToList()
-            },
+            Terms = WithItems(ToInput(bid), bid),
             Documents = bid.Documents.Select(d => new SupplierDocumentViewModel
             {
                 Id = d.Id, FileName = d.FileName, DocumentType = d.DocumentType, UploadedAt = d.UploadedAt, SizeBytes = d.SizeBytes

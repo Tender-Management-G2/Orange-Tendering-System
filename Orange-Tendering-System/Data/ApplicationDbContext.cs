@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Models.Entities;
 
@@ -18,6 +18,7 @@ namespace Orange_Tendering_System.Data
         public DbSet<Document> Documents => Set<Document>();
 
         // Purchase requests
+        public DbSet<ProcurementCategory> ProcurementCategories => Set<ProcurementCategory>();
         public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
         public DbSet<PurchaseRequestItem> PurchaseRequestItems => Set<PurchaseRequestItem>();
         public DbSet<PurchaseRequestReview> PurchaseRequestReviews => Set<PurchaseRequestReview>();
@@ -37,6 +38,8 @@ namespace Orange_Tendering_System.Data
         public DbSet<EvaluationScore> EvaluationScores => Set<EvaluationScore>();
         public DbSet<CommitteeVote> CommitteeVotes => Set<CommitteeVote>();
         public DbSet<TenderReport> TenderReports => Set<TenderReport>();
+        public DbSet<PreTenderReview> PreTenderReviews => Set<PreTenderReview>();
+        public DbSet<PreTenderVote> PreTenderVotes => Set<PreTenderVote>();
 
         // Communication and auditing
         public DbSet<Clarification> Clarifications => Set<Clarification>();
@@ -56,6 +59,9 @@ namespace Orange_Tendering_System.Data
         // AI Chat Assistant (per-user history)
         public DbSet<AiChatConversation> AiChatConversations => Set<AiChatConversation>();
         public DbSet<AiChatMessage> AiChatMessages => Set<AiChatMessage>();
+        public DbSet<AiChatFile> AiChatFiles => Set<AiChatFile>();
+        public DbSet<AiKnowledgeDocument> AiKnowledgeDocuments => Set<AiKnowledgeDocument>();
+        public DbSet<AiKnowledgeChunk> AiKnowledgeChunks => Set<AiKnowledgeChunk>();
 
         private void ProtectReportHistory()
         {
@@ -113,6 +119,8 @@ namespace Orange_Tendering_System.Data
             builder.Entity<ReportRevision>();
             builder.Entity<RoundDecision>();
             builder.Entity<ExternalSupplierInvitation>();
+            builder.Entity<Bid>().ToTable(t => t.HasCheckConstraint("CK_Bids_TaxRate", "[TaxRate] IS NULL OR ([TaxRate] >= 0 AND [TaxRate] <= 100)"));
+            builder.Entity<PreTenderReview>().ToTable(t => t.HasCheckConstraint("CK_PreTenderReview_Threshold", "[ApprovalsRequired] >= 1 AND [ApprovalsRequired] <= 4"));
 
             // Supplier and ApplicationUser are linked twice (account's company, and the Admin who reviewed it),
             // so EF needs to be told these are two separate relationships.
@@ -120,6 +128,9 @@ namespace Orange_Tendering_System.Data
                 .HasOne(u => u.Supplier).WithMany().HasForeignKey(u => u.SupplierId);
             builder.Entity<Supplier>()
                 .HasOne(s => s.ReviewedByUser).WithMany().HasForeignKey(s => s.ReviewedByUserId);
+
+            builder.Entity<AiKnowledgeDocument>().HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<AiKnowledgeDocument>().HasMany(x => x.Chunks).WithOne(x => x.Document).HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Cascade);
 
             // One person per Evaluation Committee responsibility within a tender. Top Committee members leave
             // Responsibility null, so the filter ignores them.

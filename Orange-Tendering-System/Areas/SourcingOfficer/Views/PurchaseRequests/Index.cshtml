@@ -26,7 +26,7 @@
                     <td>@request.Department.Name</td><td>@request.Priority</td>
                     <td>@(request.NeededBy?.ToLocalTime().ToString("d MMM yyyy") ?? "—")</td>
                     <td>@request.Status</td>
-                    <td><a class="pg-btn" asp-action="Review" asp-route-id="@request.Id">Details</a></td>
+                    <td><a class="pg-btn" asp-action="Review" asp-route-id="@request.Id">Details</a>@if (request.Status == PurchaseRequestStatus.Accepted) { <a class="pg-btn pg-btn-primary" asp-action="Prepare" asp-route-id="@request.Id">@(request.Tenders.Any() ? "Open tender" : "Prepare tender")</a> }</td>
                 </tr>
             }
             </tbody>

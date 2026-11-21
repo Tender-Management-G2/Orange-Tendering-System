@@ -91,10 +91,26 @@ public class PurchaseRequestsController : Controller
         });
     }
 
+    // Department, requester, date and status come from the signed-in account and the system, never from the form.
+    private async Task<RequestForm> Context(RequestForm form, ApplicationUser user)
+    {
+        form.Categories = await db.ProcurementCategories.AsNoTracking().Where(c => c.IsActive || form.Items.Select(i => i.CategoryId).Contains(c.Id))
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync();
+        form.DepartmentName = await db.Departments.Where(d => d.Id == user.DepartmentId).Select(d => d.Name).SingleAsync();
+        form.RequesterName = string.IsNullOrWhiteSpace(user.FullName) ? user.Email ?? "" : user.FullName;
+        if (form.Id != 0)
+        {
+            var stored = await db.PurchaseRequests.AsNoTracking().Include(r => r.Tenders).SingleAsync(r => r.Id == form.Id);
+            form.Status = RequestDisplay.Status(stored); form.CreatedAt = stored.CreatedAt; form.Title = stored.Title;
+        }
+        return form;
+    }
+
     public async Task<IActionResult> Create()
     {
-        if (await DepartmentUser() is null) return Forbid();
-        return View(new RequestForm());
+        var user = await DepartmentUser();
+        if (user is null) return Forbid();
+        return View(await Context(new RequestForm(), user));
     }
 
     public async Task<IActionResult> Edit(int id)
@@ -104,7 +120,7 @@ public class PurchaseRequestsController : Controller
         var request = await service.Load(user.DepartmentId!.Value, id);
         if (request is null) return NotFound();
         if (!RequestDisplay.Editable(request, user.Id)) return Forbid();
-        return View(DepartmentRequestService.Form(request));
+        return View(await Context(DepartmentRequestService.Form(request), user));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -143,8 +159,20 @@ public class PurchaseRequestsController : Controller
                 ModelState.AddModelError($"Items[{i}].Quantity", "Use at most three decimal places.");
         if (form.NeededBy?.Date < DateTime.UtcNow.Date && intent == "submit")
             ModelState.AddModelError("NeededBy", "Choose today or a future needed-by date when submitting.");
+        if (form.NeededBy?.Date > DateTime.UtcNow.Date.AddYears(3))
+            ModelState.AddModelError("NeededBy", "Choose a needed-by date within the next three years.");
+        var active = await db.ProcurementCategories.Where(c => c.IsActive).Select(c => c.Id).ToListAsync();
+        for (var i = 0; i < form.Items.Count; i++)
+        {
+            if (form.Items[i].CategoryId is int category && !active.Contains(category))
+                ModelState.AddModelError($"Items[{i}].CategoryId", "Choose an active category.");
+            if (!UnitsOfMeasure.All.Contains(form.Items[i].Unit ?? ""))
+                ModelState.AddModelError($"Items[{i}].Unit", "Choose a unit of measure from the list.");
+        }
+        if (intent == "submit" && form.EvaluationMethod is null)
+            ModelState.AddModelError(nameof(form.EvaluationMethod), "Choose an evaluation method before submitting.");
         await ValidateAttachments(form.Attachments);
-        if (!ModelState.IsValid) return View(edit ? "Edit" : "Create", form);
+        if (!ModelState.IsValid) return View(edit ? "Edit" : "Create", await Context(form, user));
         try
         {
             var savedId = await service.Save(user, form, intent == "submit", storageRoot);
@@ -167,7 +195,7 @@ public class PurchaseRequestsController : Controller
             logger.LogError(ex, "Department request save failed");
             ModelState.AddModelError("", "Saving failed. Your changes were not committed. Please try again.");
         }
-        return View(edit ? "Edit" : "Create", form);
+        return View(edit ? "Edit" : "Create", await Context(form, user));
     }
 
     private async Task ValidateAttachments(List<IFormFile> files)

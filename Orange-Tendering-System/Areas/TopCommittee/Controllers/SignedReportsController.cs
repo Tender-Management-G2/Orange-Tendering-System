@@ -14,12 +14,18 @@ namespace Orange_Tendering_System.Areas.TopCommittee.Controllers;
 public sealed class SignedReportsController(IServiceProvider services) : ReportControllerBase(TopCommitteeWorkflow.Create(services))
 {
     [HttpPost]
-    public Task<IActionResult> Vote(int id, VoteDecision decision, string comment, string documentHash, bool confirmed, string? signatureImage = null, TopRejectionReason? rejectionReason = null) =>
+    public Task<IActionResult> Vote(int id, VoteDecision decision, string? comment, string documentHash, bool confirmed, string? signatureImage = null, TopRejectionReason? rejectionReason = null) =>
         Execute(id, async () =>
         {
             var report = await Workflow.ReviewReport(id, User);
             TenderWorkflowService.Require(report.IsCurrent && report.CanVoteTop,
                 "Only the current Manager-approved report awaiting your Top Committee decision can be signed.");
-            await Workflow.TopVote(report.Tender.Id, decision, comment, User, documentHash, confirmed, ReadSignature(signatureImage), rejectionReason);
+            await Workflow.TopVote(report.Tender.Id, decision, comment ?? "", User, documentHash, confirmed, ReadSignature(signatureImage), rejectionReason);
+            // The fourth approval awarded the tender in the vote's own transaction; e-mail the suppliers their own result now.
+            if (decision == VoteDecision.Approve)
+            {
+                try { await HttpContext.RequestServices.GetRequiredService<FinalDecisionService>().SendAwardEmails(report.Tender.Id); }
+                catch (Exception e) { HttpContext.RequestServices.GetRequiredService<ILogger<SignedReportsController>>().LogWarning(e, "Award e-mails for tender {TenderId} were not sent", report.Tender.Id); }
+            }
         });
 }

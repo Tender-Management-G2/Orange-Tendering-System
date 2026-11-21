@@ -1,0 +1,39 @@
+@model List<Orange_Tendering_System.Areas.Admin.Controllers.CategoriesController.CategoryRow>
+@{
+    ViewData["Title"] = "Procurement categories"; ViewData["WorkspaceSection"] = "Categories";
+    ViewData["Description"] = "Categories departments choose for requested items. Used categories are deactivated, never deleted.";
+}
+<partial name="_PageHeader" />
+@if (TempData["FlashError"] is string error) { <p class="pg-note" role="alert">@error</p> }
+<section class="ws-panel pg-panel">
+    <h2>Add a category</h2>
+    <form asp-action="Save" method="post" class="pg-form"><input type="hidden" name="id" value="0" /><input type="hidden" name="isActive" value="true" />
+        <div class="pg-form-grid">
+            <div class="pg-field"><label for="new-name">Name</label><input id="new-name" name="name" maxlength="100" required /></div>
+            <div class="pg-field"><label for="new-desc">Description (optional)</label><input id="new-desc" name="description" maxlength="300" /></div>
+            <div class="pg-field"><label for="new-order">Order</label><input id="new-order" name="sortOrder" type="number" min="0" max="10000" value="@((Model.Select(x => x.Category.SortOrder).DefaultIfEmpty().Max()) + 10)" /></div>
+        </div>
+        <div class="pg-actions"><button class="pg-btn pg-btn-primary">Add category</button></div>
+    </form>
+</section>
+<section class="ws-panel pg-panel">
+    <h2>Categories</h2>
+    <div class="pg-table-wrap"><table class="pg-table">
+        <thead><tr><th>Name</th><th>Description</th><th>Order</th><th>Used by</th><th>Available</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var row in Model)
+        {
+            var c = row.Category; var formId = "cat-" + c.Id;
+            <tr>
+                <td><input form="@formId" name="name" value="@c.Name" maxlength="100" required aria-label="Name" /></td>
+                <td><input form="@formId" name="description" value="@c.Description" maxlength="300" aria-label="Description" /></td>
+                <td><input form="@formId" name="sortOrder" type="number" min="0" max="10000" value="@c.SortOrder" aria-label="Order" style="width:90px" /></td>
+                <td>@row.RequestItems request item(s) · @row.TenderItems tender item(s)</td>
+                <td><label class="pg-check"><input form="@formId" type="checkbox" name="isActive" value="true" @(c.IsActive ? "checked" : null) /> Active</label></td>
+                <td><form id="@formId" asp-action="Save" method="post"><input type="hidden" name="id" value="@c.Id" /><button class="pg-btn">Save</button></form></td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+    <p class="pg-hint">Supplier registration offers the same list of category names, so tender items can be matched with suppliers when inviting.</p>
+</section>

@@ -1,4 +1,42 @@
 @model Orange_Tendering_System.Models.Entities.PurchaseRequest
-@{ ViewData["Title"] = "Request details"; ViewData["WorkspaceSection"] = "Request"; ViewData["Description"] = "Read what the department needs, then choose the next step."; }
-<div class="so-page"><partial name="_PageHeader" /><section class="ws-panel pg-panel"><div class="pg-panel-head"><div><span class="pg-badge">Request #@Model.Id</span> <span class="pg-badge">@Model.Status</span></div><a class="pg-btn" asp-action="Index">← All requests</a></div><h2>@Model.Title</h2><dl class="pg-dl"><div><dt>Department</dt><dd>@Model.Department.Name</dd></div><div><dt>Priority</dt><dd>@Model.Priority</dd></div><div><dt>Needed by</dt><dd>@(Model.NeededBy?.ToLocalTime().ToString("d MMM yyyy")??"Not specified")</dd></div><div><dt>Submitted</dt><dd>@(Model.SubmittedAt?.ToLocalTime().ToString("d MMM yyyy")??"—")</dd></div></dl><h3 class="so-subheading">Why this is needed</h3><p>@Model.Justification</p><h3 class="so-subheading">Requested items</h3><div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Specifications</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>@foreach(var item in Model.Items){<tr><td><strong>@item.Name</strong></td><td>@item.Specifications</td><td>@item.Quantity</td><td>@item.Unit</td></tr>}</tbody></table></div></section>
-@if (Model.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Submitted) {<section class="ws-panel pg-panel"><h2>Choose an outcome</h2><p class="pg-hint">Accept it, then go to the Tender page. Return it if the department must add information. Reject it to close the request.</p><form asp-action="Review" method="post" class="pg-form" data-om="popup" data-om-working="Recording your decision"><input type="hidden" name="id" value="@Model.Id"/><div class="pg-field"><label for="comment">Comment for the department</label><textarea id="comment" name="comment" rows="3" maxlength="2000" placeholder="Explain what needs to change, if anything" data-fv-required-when="decision=Returned|Rejected" data-fv-msg="Please explain why the request is returned or rejected." data-fv-msg-ar="يرجى توضيح سبب إعادة الطلب أو رفضه."></textarea><small class="pg-hint">Required when you return or reject the request.</small></div><div class="pg-actions"><button class="pg-btn pg-btn-primary" name="decision" value="Accepted">Accept request</button><button class="pg-btn" name="decision" value="Returned">Request additional documents / changes</button><button class="pg-btn pg-btn-danger" name="decision" value="Rejected">Reject request</button></div></form></section>} else {<section class="ws-panel pg-panel"><p>This request has already been reviewed. Its current status is @Model.Status.</p></section>} @if (Model.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted) {<a class="pg-btn pg-btn-primary" asp-controller="Workflow" asp-action="Index">Go to Tender</a>}</div>
+@using Orange_Tendering_System.Models.Entities
+@{
+    ViewData["Title"] = "Request details"; ViewData["WorkspaceSection"] = "Request"; ViewData["Description"] = "Read what the department needs, then choose the next step.";
+    var tender = Model.Tenders.FirstOrDefault();
+}
+@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /> }
+<div class="so-page pf-page"><partial name="_PageHeader" />
+<section class="ws-panel pg-panel pf-section">
+    <div class="pg-panel-head"><div><span class="pg-badge">PR-@Model.Id</span> <span class="pg-badge">@Model.Status</span>@if (Model.Reviews.Count > 1) { <span class="pg-badge">Submission @Model.Reviews.Max(r => r.SubmissionNumber)</span> }</div><a class="pg-btn" asp-action="Index">← All requests</a></div>
+    <h2>@Model.Title</h2>
+    <dl class="pf-facts">
+        <div><dt>Department</dt><dd>@Model.Department.Name</dd></div>
+        <div><dt>Requested by</dt><dd>@(Model.CreatedByUser?.FullName ?? "—")</dd></div>
+        <div><dt>Evaluation method</dt><dd>@(Model.EvaluationMethod == TenderEvaluationMethod.LowestPrice ? "100% financial" : "Committee weight proposals")</dd></div>
+        <div><dt>Priority</dt><dd>@Model.Priority</dd></div>
+        <div><dt>Needed by</dt><dd>@(Model.NeededBy?.ToString("d MMM yyyy") ?? "Not specified")</dd></div>
+        <div><dt>Submitted</dt><dd>@(Model.SubmittedAt?.ToJordan("d MMM yyyy HH:mm") ?? "—")</dd></div>
+    </dl>
+    <h3 class="so-subheading">Business justification</h3><p style="white-space:pre-line;margin:0">@Model.Justification</p>
+    <h3 class="so-subheading">Requested items</h3>
+    <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>#</th><th>Item / service</th><th>Category</th><th>Specifications</th><th>Quantity</th></tr></thead><tbody>
+    @{ var n = 0; }
+    @foreach (var item in Model.Items.OrderBy(i => i.Id)) { n++; <tr><td>@n</td><td><strong>@item.Name</strong></td><td>@(item.Category?.Name ?? "—")</td><td style="white-space:pre-line">@item.Specifications</td><td>@item.Quantity.ToString("0.###") @item.Unit</td></tr> }
+    </tbody></table></div>
+    @if (Model.Documents.Count > 0) { <p class="pg-hint">Supporting documents: @foreach (var d in Model.Documents) { <a asp-action="Download" asp-route-id="@d.Id">@d.FileName</a><text> · </text> }</p> }
+</section>
+@if (Model.Status == PurchaseRequestStatus.Submitted)
+{
+    <section class="ws-panel pg-panel"><h2>Choose an outcome</h2><p class="pg-hint">Accepting takes you straight to the tender preparation for this request. Return it if the department must change or add information. Reject it to close the request.</p>
+    <form asp-action="Review" method="post" class="pg-form" data-om="popup" data-om-working="Recording your decision"><input type="hidden" name="id" value="@Model.Id"/>
+        <div class="pg-field"><label for="comment">Comment for the department</label><textarea id="comment" name="comment" rows="3" maxlength="2000" placeholder="Explain what needs to change, if anything" data-fv-required-when="decision=Returned|Rejected" data-fv-msg="Please explain why the request is returned or rejected." data-fv-msg-ar="يرجى توضيح سبب إعادة الطلب أو رفضه."></textarea><small class="pg-hint">Required when you return or reject the request.</small></div>
+        <div class="pg-actions"><button class="pg-btn pg-btn-primary" name="decision" value="Accepted">Accept and prepare the tender</button><button class="pg-btn" name="decision" value="Returned">Return for changes</button><button class="pg-btn pg-btn-danger" name="decision" value="Rejected">Reject request</button></div></form></section>
+}
+else
+{
+    <section class="ws-panel pg-panel"><p>This request has already been reviewed. Its current status is @Model.Status.</p>
+    @if (tender != null) { <a class="pg-btn pg-btn-primary" asp-controller="Workflow" asp-action="Index" asp-route-open="@tender.Id">Open tender T-@tender.Id.ToString("0000")</a> }
+    else if (Model.Status == PurchaseRequestStatus.Accepted) { <a class="pg-btn pg-btn-primary" asp-action="Prepare" asp-route-id="@Model.Id">Prepare the tender</a> }
+    </section>
+}
+</div>

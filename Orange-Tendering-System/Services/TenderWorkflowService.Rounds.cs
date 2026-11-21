@@ -65,7 +65,7 @@ public partial class TenderWorkflowService
     private static int MinimumOffers(int failedRounds) => failedRounds >= 3 ? 2 : 3;
     private static int DistinctSuppliers(IEnumerable<Bid> bids) => bids.Select(x => x.TenderInvitation.SupplierId).Distinct().Count();
     private async Task<CommitteeMember?> ManagerSeat(int tenderId) => await db.CommitteeMembers.SingleOrDefaultAsync(x =>
-        x.TenderId == tenderId && x.CommitteeType == CommitteeType.Evaluation && x.Responsibility == CommitteeResponsibility.SourcingManager);
+        x.TenderId == tenderId && x.Responsibility == CommitteeResponsibility.SourcingManager);
 
     // The officer may re-tender after any closed bidding round, whatever the number of offers, as long as
     // no evaluation has been scheduled for it and a further round is permitted.

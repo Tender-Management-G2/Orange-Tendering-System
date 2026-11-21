@@ -3,49 +3,41 @@
 <partial name="_PageHeader" />
 @if (TempData["OfferSuccess"] is string success) { <p class="pg-note" role="status">@success</p> }
 @if (TempData["OfferError"] is string error) { <p class="pg-note" role="alert">@error</p> }
+@{ var t = Model.Terms; var totals = OfferTotals.Of(t.Items.Sum(x => x.Quantity * x.UnitPrice), t.ShippingCost + t.InstallationCost + t.MaintenanceCost + t.OtherCost, t.TaxAmount); string M(decimal v) => CurrencyRules.Format(v, t.CurrencyCode); }
 <section class="ws-panel pg-panel">
 <h2>@Model.TenderTitle — Offer #@Model.Id</h2>
 <dl class="pg-dl">
-<div><dt>Status / revision</dt><dd>@Model.Status / @Model.Revision</dd></div>
-<div><dt>Deadline (Jordan time)</dt><dd>@Model.Deadline?.ToJordan("yyyy-MM-dd HH:mm")</dd></div>
+<div><dt>Status</dt><dd>@(Model.Status == Orange_Tendering_System.Models.Entities.BidStatus.Draft ? "Not submitted yet" : Model.Status.ToString()) (revision @Model.Revision)</dd></div>
 <div><dt>Submitted (Jordan time)</dt><dd>@(Model.SubmittedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "Not submitted")</dd></div>
-<div><dt>Delivery</dt><dd>@Model.Terms.DeliveryDays days</dd></div>
-<div><dt>Payment terms</dt><dd>@Model.Terms.PaymentTerms</dd></div>
-<div><dt>Technical proposal</dt><dd style="white-space:pre-wrap">@Model.Terms.TechnicalProposal</dd></div>
-<div><dt>Valid until</dt><dd>@Model.Terms.ValidUntil?.ToString("yyyy-MM-dd")</dd></div>
-
-<div><dt>Missing requirements</dt><dd>@(Model.MissingRequirements ?? "None recorded")</dd></div>
+<div><dt>Deadline (Jordan time)</dt><dd>@Model.Deadline?.ToJordan("yyyy-MM-dd HH:mm")</dd></div>
+<div><dt>Delivery lead time</dt><dd>@t.DeliveryDays calendar days after order confirmation</dd></div>
+<div><dt>Offer valid until</dt><dd>@t.ValidUntil?.ToString("yyyy-MM-dd")</dd></div>
+<div><dt>Payment terms</dt><dd>@t.PaymentTerms</dd></div>
+<div><dt>Warranty</dt><dd>@(t.WarrantyMonths is int wm ? wm + " months" : "Not applicable") @t.WarrantyType</dd></div>
+<div><dt>Technical proposal</dt><dd style="white-space:pre-wrap">@t.TechnicalProposal</dd></div>
+@if (!string.IsNullOrWhiteSpace(t.WarrantyTerms)) { <div><dt>Warranty conditions</dt><dd style="white-space:pre-wrap">@t.WarrantyTerms</dd></div> }
+@if (!string.IsNullOrWhiteSpace(t.Deviations)) { <div><dt>Deviations</dt><dd style="white-space:pre-wrap">@t.Deviations</dd></div> }
+@if (!string.IsNullOrWhiteSpace(t.AfterSalesSupport)) { <div><dt>After-sales support</dt><dd style="white-space:pre-wrap">@t.AfterSalesSupport</dd></div> }
 </dl>
-<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th>Specifications</th><th>Line total</th></tr></thead><tbody>
-@foreach (var item in Model.Terms.Items) { <tr><td>@item.Name</td><td>@item.Quantity</td><td>@item.UnitPrice.ToString("N2")</td><td>@item.OfferedSpecifications</td><td>@((item.Quantity * item.UnitPrice).ToString("N2"))</td></tr> }
+<div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item</th><th>Offered product / specifications</th><th>Quantity</th><th>Unit price (excl. tax)</th><th>Line total</th></tr></thead><tbody>
+@foreach (var item in t.Items) { <tr><td>@item.Name</td><td><b>@item.OfferedProduct</b><br /><span style="white-space:pre-wrap">@item.OfferedSpecifications</span>@if (!string.IsNullOrWhiteSpace(item.Notes)) { <br /><small>@item.Notes</small> }</td><td>@item.Quantity.ToString("0.###")</td><td>@M(item.UnitPrice)</td><td>@M(item.Quantity * item.UnitPrice)</td></tr> }
 </tbody></table></div>
-<p>Shipping: @Model.Terms.ShippingCost | Installation: @Model.Terms.InstallationCost | Maintenance: @Model.Terms.MaintenanceCost | Tax: @Model.Terms.TaxAmount | Other: @Model.Terms.OtherCost</p>
-<p><strong>Total: @Model.Total.ToString("N2") @Model.Terms.CurrencyCode</strong></p>
+<dl class="pg-dl">
+<div><dt>Items subtotal</dt><dd>@M(totals.ItemsSubtotal)</dd></div>
+<div><dt>Additional costs</dt><dd>@M(totals.AdditionalCharges)@if (totals.AdditionalCharges > 0) { <small> (shipping @t.ShippingCost.ToString("0.###"), installation @t.InstallationCost.ToString("0.###"), maintenance @t.MaintenanceCost.ToString("0.###")@(t.MaintenanceDescription != null ? " — " + t.MaintenanceDescription : ""), other @t.OtherCost.ToString("0.###")@(t.OtherCostDescription != null ? " — " + t.OtherCostDescription : ""))</small> }</dd></div>
+<div><dt>Total before tax</dt><dd>@M(totals.TotalBeforeTax)</dd></div>
+<div><dt>Tax</dt><dd>@M(totals.Tax) @(t.TaxRate is decimal rate ? $"({rate:0.##}% on {(t.TaxIncludesCharges ? "items and additional costs" : "items")})" : "(stated amount)")</dd></div>
+<div><dt><strong>Grand total (incl. tax)</strong></dt><dd><strong>@M(totals.GrandTotal)</strong></dd></div>
+</dl>
 </section>
 <section class="ws-panel pg-panel"><h2>Attachments</h2>
-<ul>@foreach (var doc in Model.Documents) { <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a></li> }</ul>
+<ul>@foreach (var doc in Model.Documents) { <li>@OfferDocumentTypes.Label(doc.DocumentType): <a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a> <small>(@((doc.SizeBytes / 1024.0).ToString("0")) KB)</small></li> }</ul>
 @if (Model.Documents.Count == 0) { <p>No attachments uploaded.</p> }
-@if (Model.CanEdit) {
-@* The file uploads as soon as it is chosen (no separate button). At least one attachment is required before submission. *@
-<form asp-controller="Documents" asp-action="UploadOffer" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form" data-auto-upload>
-<label for="offer-file">Attach PDF, PNG or JPEG (maximum 10 MB)</label><input id="offer-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" @(Model.Documents.Count == 0 ? "required" : "") aria-describedby="offer-file-status" />
-<p class="pg-hint" id="offer-file-status" role="status" aria-live="polite">@(Model.Documents.Count == 0 ? "At least one attachment is required before you can submit the offer. Choosing a file uploads it immediately." : "Choosing another file uploads it immediately.")</p>
-</form>
-}
 </section>
 @if (Model.CanEdit) {
-<section class="ws-panel pg-panel"><h2>Submit offer</h2>
-<p>Check your prices, quantities, specifications and all tender requirements and attachments. After submission, editing is locked.</p>
-<a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn">Edit draft</a>
-@if (Model.Documents.Count == 0)
-{
-<p class="pg-note" role="alert">Add at least one attachment above before submitting the offer.</p>
-<button type="button" class="pg-btn pg-btn-primary" disabled aria-disabled="true">Submit final offer</button>
-}
-else
-{
-<form asp-action="Submit" asp-route-id="@Model.Id" method="post"><button type="submit" class="pg-btn pg-btn-primary">Submit final offer</button></form>
-}
+<section class="ws-panel pg-panel"><h2>This offer has not been submitted</h2>
+<p>Complete it in the offer form, attach the required documents and submit it before the deadline.</p>
+<a asp-action="Create" asp-route-id="@Model.InvitationId" class="pg-btn pg-btn-primary">Complete and submit the offer</a>
 </section>
 }
 @if (Model.Outcome != null) {
@@ -58,17 +50,3 @@ else
 <a asp-controller="Clarifications" asp-action="Create" asp-route-bidId="@Model.Id">Contact Sourcing Officer</a><span> | </span>
 }
 <a asp-controller="Notifications" asp-action="Index">Notifications and results</a></nav>
-<script>
-// Upload the chosen attachment immediately; the server validates type and size and returns to this page.
-document.querySelectorAll('form[data-auto-upload]').forEach(function (form) {
-    var input = form.querySelector('input[type=file]'), status = form.querySelector('[role=status]');
-    input.addEventListener('change', function () {
-        var f = input.files && input.files[0]; if (!f) return;
-        var ok = /\.(pdf|png|jpe?g)$/i.test(f.name), small = f.size <= 10 * 1024 * 1024;
-        if (!ok || !small) { status.textContent = !ok ? 'Choose a PDF, PNG or JPEG file.' : 'The file is larger than 10 MB.'; status.classList.add('text-danger'); input.value = ''; return; }
-        status.classList.remove('text-danger'); status.textContent = 'Uploading ' + f.name + '…'; input.disabled = false;
-        form.requestSubmit ? form.requestSubmit() : form.submit();
-        input.setAttribute('aria-busy', 'true');
-    });
-});
-</script>

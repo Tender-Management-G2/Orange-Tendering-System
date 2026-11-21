@@ -121,6 +121,7 @@ public partial class TenderWorkflowService
         Require(t.Status is not (TenderStatus.Awarded or TenderStatus.Rejected or TenderStatus.Cancelled), "Closed tenders cannot be changed.");
         var existing = await db.CommitteeMembers.Where(x => x.TenderId == t.Id).ToListAsync();
         Require(CommitteeVersion(existing) == input.Version, "Committee membership changed since you opened this page. Reload and review the current members.");
+        Require(input.CommitteeType != CommitteeType.Evaluation || !await IsLowestPrice(t), "Financial-only tenders have no Evaluation Committee.");
         Require(input.CommitteeType == CommitteeType.Evaluation
             ? t.Status == TenderStatus.Draft && !await EvaluationMembershipLocked(t.Id)
             : !await TopMembershipLocked(t.Id), "Membership is locked because this committee's work has already started.");

@@ -15,9 +15,26 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         TenderWorkflowService.Require(financial.HasValue && technical.HasValue, "Both weight percentages must be supplied.");
         return Workflow.Propose(id, financial.Value, technical.Value, User);
     });
-    // Final scores for every supplier are submitted together with the member's signature drawn in the meeting.
-    [HttpPost] public Task<IActionResult> SubmitEvaluation(int id, List<ScoreInput> scores, string? signatureImage) =>
-        Execute(id, () => Workflow.SubmitEvaluation(id, scores, User, ReportControllerBase.ReadSignature(signatureImage)));
+    // The evaluation workspace (meeting page): readable before, during and after the meeting; scoring opens at the start time.
+    [HttpGet]
+    public async Task<IActionResult> Meeting(int id)
+    {
+        try
+        {
+            Response.Headers.CacheControl = "no-store";
+            return View(await Workflow.EvaluationWorkspace(id, User));
+        }
+        catch (WorkflowException e) { ViewData.Model = e.Message; return View("WorkflowError"); }
+    }
+    // Final scores for every supplier, the member's recommendation and signature are submitted together, once.
+    [HttpPost] public async Task<IActionResult> SubmitEvaluation(int id, List<ScoreInput> scores, string? signatureImage, [Bind(Prefix = "recommendation")] MemberRecommendationInput recommendation)
+    {
+        var result = await Execute(id, () => Workflow.SubmitEvaluation(id, scores, User, ReportControllerBase.ReadSignature(signatureImage), recommendation ?? new()));
+        // A page post (not the popup) returns to the workspace, where the generated report and signing appear.
+        if (IsAjax) return result;
+        if (result is ViewResult { ViewData.Model: string error }) TempData["WorkflowMessage"] = "Not submitted: " + error;
+        return RedirectToAction(nameof(Meeting), new { id });
+    }
     [HttpPost] public Task<IActionResult> GenerateReport(int id, string justification) => Execute(id, () => Workflow.GenerateReport(id, justification, User));
     [HttpPost] public Task<IActionResult> FinalizeReport(int id, string comment = "", string? documentHash = null, bool confirmed = false) => Execute(id, () => Workflow.FinalizeReport(id, comment, User, documentHash, confirmed));
 }

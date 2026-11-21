@@ -5,15 +5,15 @@ using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Services;
 
-// Final decision relay. Order is enforced by data, not by UI: Top Committee approvals (policy, 3 of 4) create the notice for the
-// assigned Sourcing Manager; the Manager acknowledges and forwards it to the single Officer; only then can the Officer award and
-// press "Notify Suppliers". Nothing here ever tells a supplier anything on its own.
+// Final decision records. Since the workflow redesign the unanimous Top Committee approval awards the tender itself
+// (TenderWorkflowService.Award.cs) and Top rejections go straight to the Officer. ManagerAcknowledge and the Officer's
+// Award remain only for notices created by the earlier relay (status AwaitingManager), so historical tenders can finish.
 public partial class TenderWorkflowService
 {
     public const int MaxEmailAttempts = 3;
 
     private async Task<string?> AssignedManagerId(int tenderId, EvaluationSession? s) =>
-        (await db.CommitteeMembers.Where(x => x.TenderId == tenderId && x.CommitteeType == CommitteeType.Evaluation && x.Responsibility == CommitteeResponsibility.SourcingManager)
+        (await db.CommitteeMembers.Where(x => x.TenderId == tenderId && x.Responsibility == CommitteeResponsibility.SourcingManager)
             .Select(x => x.UserId).FirstOrDefaultAsync()) ?? s?.Report?.ReviewedByUserId;
 
     // Called while a Top vote is being recorded (inside the tender's serialized transaction) and when a Manager approves a tender
@@ -38,7 +38,7 @@ public partial class TenderWorkflowService
         var notice = await db.Set<FinalDecisionNotice>().Where(x => x.TenderId == tenderId).OrderByDescending(x => x.Id).FirstOrDefaultAsync();
         Require(notice != null, "No final decision is waiting for acknowledgement.");
         Require(await Role(a, SystemRoles.SourcingManager) && notice!.ManagerUserId == a.Id, "Only the Sourcing Manager assigned to this tender may acknowledge the final decision.");
-        Require(notice.Status == FinalDecisionStatus.AwaitingManager, "This final decision was already acknowledged and forwarded.");
+        Require(notice.Status == FinalDecisionStatus.AwaitingManager, "No acknowledgement is needed: this decision was already forwarded to the Sourcing Officer.");
         notice.Status = FinalDecisionStatus.ForwardedToOfficer; notice.ManagerAcknowledgedAt = Now; notice.ManagerComment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim()[..Math.Min(comment.Trim().Length, 1000)];
         if (notice.Outcome == FinalDecisionOutcome.Award)
             await NotifyOfficer(tenderId, "Final decision forwarded by the Sourcing Manager", "Review the decision, award the tender if required and use Notify Suppliers to announce the results.");

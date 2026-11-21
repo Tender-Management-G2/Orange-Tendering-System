@@ -24,6 +24,7 @@ using System.Security.Claims;
 
 if (args.Contains("--executive-agent-checks")) { await ExecutiveAgentChecks.Run(); return; }
 if (args.Contains("--executive-navigation-checks")) { ExecutiveNavigationChecks.Run(); return; }
+if (args.Contains("--ai-agent-intent-checks")) { await AiAgentIntentChecks.Run(); return; }
 if (args.Contains("--executive-knowledge-checks")) { await ExecutiveKnowledgeChecks.Run(args.Contains("--live-model")); return; }
 if (args.Contains("--executive-model-diagnose")) { await ExecutiveModelDiagnosis.Run(); return; }
 if (args.Contains("--executive-model-failure-checks")) { await ExecutiveModelFailureChecks.Run(); return; }
@@ -32,8 +33,10 @@ if (args.Contains("--executive-agent-browser-host")) { await ExecutiveAgentBrows
 if (args.Contains("--theme-browser-host")) { await ThemeBrowserHost.Run(); return; }
 if (args.Contains("--seed-saja-demo")) { await SajaDemoFixture.Run(); return; }
 if (args.Contains("--unified-tender-checks")) { await UnifiedTenderChecks.Run(); return; }
+if (args.Contains("--workflow-redesign-checks")) { await WorkflowRedesignChecks.Run(); return; }
 if (args.Contains("--verify-saja-demo")) { await SajaDemoFixture.Run(verifyExisting: true); return; }
 if (args.Contains("--ai-help-checks")) { await AiHelpChecks.Run(); return; }
+if (args.Contains("--ai-assistant-checks")) { await AiAssistantChecks.Run(args.Contains("--live-model")); return; }
 if (args.Contains("--clarification-workflow-checks")) { await ClarificationWorkflowChecks.Run(); return; }
 if (args.Contains("--top-decision-checks")) { await TopDecisionChecks.Run(); return; }
 if (args.Contains("--search-checks")) { await SearchChecks.Run(); return; }

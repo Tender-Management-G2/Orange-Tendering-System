@@ -7,6 +7,13 @@ public static class WeightedCalculation
         if (value < 0 || value > 100 || decimal.Round(value, 4) != value)
             throw new WorkflowException("Values must be between 0 and 100 with at most four decimal places.");
     }
+    // Precision of a value a person typed (scores: one decimal, weights: two). Stored and calculated values keep full precision;
+    // a manually entered 89.9558 is refused, never silently rounded.
+    public static void EnteredPrecision(decimal value, int decimals, string label)
+    {
+        if (decimal.Round(value, decimals) != value)
+            throw new WorkflowException($"{label} accept at most {(decimals == 1 ? "one decimal place (for example 89.5)" : $"{decimals} decimal places")}.");
+    }
     public static void Weights(decimal financial, decimal technical)
     {
         Range(financial); Range(technical);
@@ -56,6 +63,9 @@ public class TenderApprovalPolicy
     public int? TopApprovalsRequired { get; set; }
     public bool? RejectVoteBlocksAward { get; set; }
     public string? TopTieOutcome { get; set; }
+    // Pre-tender review of the prepared tender (not the award). UNRESOLVED business rule: no approved threshold exists yet,
+    // so it is explicit configuration, kept separate from the final 4/4 award rule. Null blocks submission (fail closed).
+    public int? PreTenderApprovalsRequired { get; set; }
     public bool WeightConfigured => !string.IsNullOrWhiteSpace(Version) && (WeightApproverUserIds.Length > 0 || WeightApproverRoles.Length > 0);
     public bool FinalConfigured => !string.IsNullOrWhiteSpace(Version) &&
         (TopCommitteeRequirement == "None" ||

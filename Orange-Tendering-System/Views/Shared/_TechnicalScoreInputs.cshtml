@@ -1,0 +1,29 @@
+@model (IReadOnlyList<Orange_Tendering_System.Models.Entities.TechnicalCriterionWeight> Criteria, int Index, string LegacySelector)
+@if (Model.Criteria.Count == 0)
+{
+    <div class="evaluation-score-line">
+        <label for="technical-score-@Model.Index">Technical score <small>/ 100</small></label>
+        <input id="technical-score-@Model.Index" name="scores[@Model.Index].Technical" data-score="@Model.LegacySelector"
+               type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required />
+    </div>
+}
+else
+{
+    <table class="evaluation-criteria" data-technical-scores>
+        <thead><tr><th scope="col">Technical criterion</th><th scope="col">Weight</th><th scope="col">Score / 100</th></tr></thead>
+        <tbody>
+            @for (var index = 0; index < Model.Criteria.Count; index++)
+            {
+                var criterion = Model.Criteria[index];
+                <tr>
+                    <th scope="row">@criterion.Name</th>
+                    <td>@criterion.Weight.ToString("0.##")%</td>
+                    <td><input name="scores[@Model.Index].TechnicalScores[@index]" aria-label="@criterion.Name score out of 100"
+                        data-technical-weight="@criterion.Weight.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                        type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required /></td>
+                </tr>
+            }
+        </tbody>
+        <tfoot><tr><th scope="row" colspan="2">Technical result</th><td><output data-technical-result>—</output> / 100</td></tr></tfoot>
+    </table>
+}

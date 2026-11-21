@@ -15,9 +15,10 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
     {
         var tender = await db.Tenders.Include(x => x.Items).SingleAsync(x => x.Id == session.TenderRound.TenderId);
         var weights = session.WeightRound;
-        TenderWorkflowService.Require(weights.State == WeightState.Approved && weights.ApprovedFinancial + weights.ApprovedTechnical == 100m && session.Submissions.Count == 4, "Only complete evaluations with approved locked weights can generate a report.");
+        var financialOnly = session.AiAnalysisId == null;
+        TenderWorkflowService.Require(weights.State == WeightState.Approved && weights.ApprovedFinancial + weights.ApprovedTechnical == 100m && (financialOnly ? weights.ApprovedFinancial == 100m : session.Submissions.Count == 4), "Only complete evaluations with approved locked weights can generate a report.");
         var committee = await db.CommitteeMembers.Include(x => x.User).Where(x => x.TenderId == tender.Id && x.CommitteeType == CommitteeType.Evaluation).OrderBy(x => x.Responsibility).ToListAsync();
-        TenderWorkflowService.Require(committee.Count == 4 && committee.All(x => x.Responsibility != null), "Four assigned evaluation members are required.");
+        TenderWorkflowService.Require(financialOnly ? committee.Count == 0 : committee.Count == 4 && committee.All(x => x.Responsibility != null), "Four assigned evaluation members are required.");
         var bids = await db.Bids.Include(x => x.Items).ThenInclude(x => x.TenderItem).Include(x => x.Documents).Include(x => x.TenderInvitation).ThenInclude(x => x.Supplier)
             .Where(x => x.TenderInvitation.TenderRoundId == session.TenderRoundId && x.Status == BidStatus.Submitted).OrderBy(x => x.Id).ToListAsync();
         var scores = await db.EvaluationScores.Include(x => x.EvaluationCriterion).Where(x => x.EvaluationCriterion.CommitteeRoundId == session.CommitteeRoundId).ToListAsync();
@@ -33,27 +34,35 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
                 var technical = pair.Single(x => x.EvaluationCriterion.Type == CriterionType.Technical);
                 raw.Add(new(bid.BidId, member.Id, financial.Score, technical.Score,
                     WeightedCalculation.Member(financial.Score, technical.Score, weights.ApprovedFinancial!.Value, weights.ApprovedTechnical!.Value),
-                    string.Join("\n", pair.OrderBy(x => x.EvaluationCriterion.Type).Select(x => x.Comment).Distinct())));
+                    string.Join("\n", pair.OrderBy(x => x.EvaluationCriterion.Type).Select(x => x.Comment).Distinct())
+                    + TechnicalObservations(technical.TechnicalBreakdownJson)));
             }
         }
-        var ranking = WeightedCalculation.Rank(raw.GroupBy(x => x.BidId).Select(g => (g.Key, WeightedCalculation.Final(g.Select(x => x.Weighted)))));
+        var ranking = financialOnly ? TenderWorkflowService.RankPrices(bids.Where(b => session.EligibleBids.Any(e => e.BidId == b.Id))) : WeightedCalculation.Rank(raw.GroupBy(x => x.BidId).Select(g => (g.Key, WeightedCalculation.Final(g.Select(x => x.Weighted)))));
         var stored = JsonSerializer.Deserialize<List<RankedBid>>(report.RankingSnapshotJson ?? "[]") ?? [];
         TenderWorkflowService.Require(ranking.OrderBy(x => x.BidId).SequenceEqual(stored.OrderBy(x => x.BidId)), "Recalculated results differ from the approved original inputs. A score-revision policy is required; no score was overwritten.");
-        var ai = await db.Set<AiAnalysis>().SingleAsync(x => x.Id == session.AiAnalysisId);
+        var ai = financialOnly ? null : await db.Set<AiAnalysis>().SingleAsync(x => x.Id == session.AiAnalysisId);
         return new(report.Id, report.VersionNumber, tender.Id, tender.Title, tender.Description, tender.PurchaseRequestId,
             Utc(report.CreatedAt), weights.RequirementsJson,
             tender.Items.OrderBy(x => x.Id).Select(x => new[] { x.Name, N(x.Quantity) + " " + x.Unit, x.Specifications ?? "" }).ToArray(),
             weights.Version, weights.ApprovedFinancial!.Value, weights.ApprovedTechnical!.Value, weights.ApprovedByUserId!, Utc(weights.ApprovedAt!.Value),
             committee.Select(x => new ReportSeat(x.Id, x.UserId, Name(x.User), x.Responsibility!.ToString()!)).ToList(),
             bids.Select(x => new ReportBid(x.Id, x.TenderInvitation.Supplier.CompanyName, x.TenderInvitation.SupplierId, x.CurrencyCode,
-                x.Items.Sum(i => i.Quantity * i.UnitPrice) + x.ShippingCost + x.InstallationCost + x.MaintenanceCost + x.TaxAmount + x.OtherCost,
+                TenderWorkflowService.TotalOfferPrice(x),
                 x.TechnicalProposal ?? "", x.DeliveryDays, x.PaymentTerms ?? "", x.ComplianceStatus.ToString(), x.ComplianceNotes ?? "", x.MissingRequirements ?? "",
                 x.Items.OrderBy(i => i.TenderItemId).Select(i => new[] { i.TenderItem.Name, N(i.Quantity), N(i.UnitPrice) + " " + x.CurrencyCode, i.OfferedSpecifications ?? "" }).ToArray(),
                 x.Documents.OrderBy(d => d.Id).Select(d => $"Document #{d.Id}: {d.FileName} ({d.SizeBytes} bytes)").ToArray(),
                 [ ["Shipping", N(x.ShippingCost)], ["Installation", N(x.InstallationCost)], ["Maintenance", N(x.MaintenanceCost)], ["Tax", N(x.TaxAmount)], ["Other", N(x.OtherCost)] ],
                 x.RevisionNumber, x.SubmittedAt.HasValue ? Utc(x.SubmittedAt.Value) : "Not recorded", x.ValidUntil.HasValue ? Utc(x.ValidUntil.Value) : "Not provided")).ToList(),
-            raw, ranking, ai.Model, ai.Findings ?? "No findings", ai.EvidenceJson, Explanation(report.Content), ReportCryptography.Hash(report.Content));
+            raw, ranking, ai?.Model ?? "Financial-only comparison", ai?.Findings ?? "No findings", ai?.EvidenceJson ?? "", Explanation(report.Content), ReportCryptography.Hash(report.Content));
     }
+    private static string TechnicalObservations(string? breakdown)
+    {
+        if (breakdown == null) return "";
+        var rows = JsonSerializer.Deserialize<TechnicalCriterionScore[]>(breakdown) ?? [];
+        return "\n" + string.Join("\n", rows.Select(row => $"{row.Name} ({N(row.Weight)}% of technical): {N(row.Score)}/100"));
+    }
+
     public static string Explanation(string content, int depth = 0)
     {
         if (depth > 20) return "Earlier narrative is preserved in the previous report versions.";
@@ -80,7 +89,7 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
             .Select(x => new { x.VersionNumber, x.Status, x.ReviewComment, x.ReviewedByUserId, x.ReviewedAt }).ToListAsync();
         var returns = await db.Set<ReportRevision>().AsNoTracking().Where(x => x.TenderReport.TenderRoundId == report.TenderRoundId).OrderBy(x => x.Id).ToListAsync();
         var history = new[] { new[] { "Weight approval v" + session.WeightRound.Version, "Approved and locked", session.WeightRound.ApprovedByUserId + " " + Utc(session.WeightRound.ApprovedAt!.Value) },
-            new[] { "Report v" + report.VersionNumber, "Generated from all four completed member evaluations", report.CreatedByUserId + " " + Utc(report.CreatedAt) } }
+            new[] { "Report v" + report.VersionNumber, session.AiAnalysisId == null ? "Generated from compliant offer totals" : "Generated from all four completed member evaluations", report.CreatedByUserId + " " + Utc(report.CreatedAt) } }
             .Concat(prior.Select(x => new[] { "Version " + x.VersionNumber, x.Status + ": " + x.ReviewComment, (x.ReviewedByUserId ?? "") + " " + (x.ReviewedAt.HasValue ? Utc(x.ReviewedAt.Value) : "") }))
             .Concat(returns.Select(x => new[] { x.SourceStage + " -> " + x.TargetStage, x.Feedback + " Required action: " + x.RequiredAction, x.ReturningUserId + " " + Utc(x.RequestedAt) })).ToArray();
         report.SourceSha256 = Fingerprint(inputs);
@@ -130,6 +139,7 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
         await AssertIntegrity(report, session);
         var allReceipts = await db.Set<ReportSignature>().Where(x => x.TenderReportId == report.Id && x.InvalidatedAt == null).ToListAsync();
         TenderWorkflowService.Require(allReceipts.Where(x => x.Method == SignatureMethod.CertificateCms).All(ReportCryptography.CertificateTrustValid), "Current certificate trust/revocation validation failed. Historical receipts remain viewable, but further approval is blocked.");
+        if (session.AiAnalysisId == null) return;
         var signatures = await db.Set<ReportSignature>().Where(x => x.TenderReportId == report.Id && x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null && x.Decision == "Approve").ToListAsync();
         var members = await db.CommitteeMembers.Where(x => x.TenderId == session.TenderRound.TenderId && x.CommitteeType == CommitteeType.Evaluation).Select(x => x.UserId).ToListAsync();
         TenderWorkflowService.Require(signatures.Count == 4 && members.Count == 4 && signatures.All(x => members.Contains(x.UserId)), "All four current-version committee signatures are required before forwarding or subsequent approval.");

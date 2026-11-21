@@ -30,17 +30,40 @@ namespace Orange_Tendering_System.Models.Entities
 
         public DateTime? ValidUntil { get; set; }
 
-        // Extra costs on top of the item prices. The bid total is calculated, not stored.
-        [Precision(18, 2)]
+        // Extra costs on top of the item prices. The bid total is calculated, not stored. A cost that does not apply (or is
+        // already included in the unit prices) is zero. Money keeps three decimals (JOD fils).
+        [Precision(19, 3)]
         public decimal ShippingCost { get; set; }
-        [Precision(18, 2)]
+        [Precision(19, 3)]
         public decimal InstallationCost { get; set; }
-        [Precision(18, 2)]
+        [Precision(19, 3)]
         public decimal MaintenanceCost { get; set; }
-        [Precision(18, 2)]
-        public decimal TaxAmount { get; set; }
-        [Precision(18, 2)]
+        [MaxLength(1000)]
+        public string? MaintenanceDescription { get; set; }
+        [Precision(19, 3)]
         public decimal OtherCost { get; set; }
+        [MaxLength(500)]
+        public string? OtherCostDescription { get; set; }
+
+        // Total tax in the offer currency, always calculated/validated by the server. TaxRate is set when the supplier chose
+        // "one rate on the taxable total"; it is null when the supplier stated a total tax amount (mixed rates, exemptions).
+        [Precision(19, 3)]
+        public decimal TaxAmount { get; set; }
+        [Precision(5, 2)]
+        public decimal? TaxRate { get; set; }
+        // With a rate: true when the supplier states that the additional charges are taxable too (otherwise items only).
+        public bool TaxIncludesCharges { get; set; }
+
+        // Warranty and technical terms (optional where they do not apply, e.g. pure services).
+        public int? WarrantyMonths { get; set; }
+        [MaxLength(60)]
+        public string? WarrantyType { get; set; }
+        [MaxLength(2000)]
+        public string? WarrantyTerms { get; set; }
+        [MaxLength(4000)]
+        public string? Deviations { get; set; }
+        [MaxLength(2000)]
+        public string? AfterSalesSupport { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? SubmittedAt { get; set; }

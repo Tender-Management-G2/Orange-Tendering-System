@@ -35,6 +35,17 @@ public sealed class SupplierDocumentService(ApplicationDbContext context, IWebHo
         return (path, Path.GetFileName(doc.FileName), "application/octet-stream");
     }
 
+    public async Task<(string Path, string Type)?> GetImagePreviewAsync(string userId, int id)
+    {
+        var doc = await OwnDocuments(userId).AsNoTracking()
+            .SingleOrDefaultAsync(d => d.Id == id && (d.ContentType == "image/png" || d.ContentType == "image/jpeg"));
+        if (doc == null) return null;
+        string path;
+        try { path = PrivateDocumentPaths.Resolve(environment.ContentRootPath, doc.StoragePath); }
+        catch (WorkflowException) { return null; }
+        return File.Exists(path) ? (path, doc.ContentType) : null;
+    }
+
     public async Task<string?> UploadAsync(string userId, IFormFile file, int? bidId = null, int? messageId = null)
     {
         if (file == null || file.Length <= 0 || file.Length > 10 * 1024 * 1024)

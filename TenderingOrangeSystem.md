@@ -142,6 +142,8 @@ The existing `Models/SystemRoles.cs` defines these seven role values with the ex
 
 ### 4.8 Workflow overview
 
+> **Superseded (20 November 2026):** the current workflow — automatic report generation and signing inside the Evaluation Committee stage, the Sourcing Manager's executive summary, the Top Committee pre-tender review, and the automatic award on 4/4 Top approval without a Manager acknowledgement — is documented with an updated diagram in [docs/WORKFLOW_REDESIGN.md](docs/WORKFLOW_REDESIGN.md). The diagram below is kept as the earlier baseline.
+
 ```mermaid
 flowchart TD
     A[Department drafts and submits Purchase Request] --> B[Sourcing Officer reviews]

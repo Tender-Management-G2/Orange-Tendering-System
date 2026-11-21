@@ -13,11 +13,15 @@ public static class SupplierCategories
     public const string Food = "Food & Hospitality";
     public const string Facilities = "Cleaning & Facilities";
     public const string Telecommunications = "Telecommunications";
+    public const string Software = "Software & Licenses";
+    public const string Electrical = "Electrical Equipment";
+    public const string Marketing = "Marketing & Advertising";
     public const string Other = "Other";
 
+    // Same names as the starting procurement categories (WorkflowRedesign migration), so request items match suppliers.
     public static readonly IReadOnlyList<string> All =
     [
         InformationTechnology, OfficeSupplies, Furniture, Construction, Transport,
-        ProfessionalServices, Medical, Food, Facilities, Telecommunications, Other
+        ProfessionalServices, Medical, Food, Facilities, Telecommunications, Software, Electrical, Marketing, Other
     ];
 }

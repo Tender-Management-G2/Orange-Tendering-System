@@ -1,53 +1,60 @@
 @model RequestForm
+@using Orange_Tendering_System.Models.Entities
 <input asp-for="Id" type="hidden" />
 <input asp-for="Version" type="hidden" />
-<div asp-validation-summary="All" role="alert"></div>
+<div asp-validation-summary="All" class="pf-note pf-warn" role="alert"></div>
 @if (!string.IsNullOrWhiteSpace(Model.ReturnComment))
 {
-    <aside class="pg-note"><strong>Sourcing Officer's return comments</strong><p>@Model.ReturnComment</p></aside>
+    <aside class="pf-note pf-warn"><strong>Returned by the Sourcing Officer:</strong> @Model.ReturnComment</aside>
 }
-<section class="ws-panel pg-panel">
-    <h2>Request information</h2>
+@* Filled in by the system: never typed by the employee. *@
+<section class="pr-department-strip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5l8-2v18M4 21h16V9l-8-2M2 21h20M8 8h1M8 12h1M8 16h1M15 12h1M15 16h1"/></svg><strong>Department:</strong><b>@Model.DepartmentName</b><small>ⓘ &nbsp;Department is assigned automatically</small>
+</section>
+
+<section class="ws-panel pg-panel pf-section pr-card">
+    <div class="pr-card-head"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg> Requested Items <em data-item-count>(@Model.Items.Count)</em></h2><button type="button" class="pr-add" id="department-add-item"><span aria-hidden="true">＋</span> Add Item</button></div>
+    <div class="pr-items-head" aria-hidden="true"><span>#</span><span>Item / Service Name *</span><span>Category *</span><span>Quantity *</span><span>Unit *</span><span>Specifications (Minimum Requirements) *</span><span>Action</span></div>
+    <div class="pf-items" id="department-items">
+    @for (var i = 0; i < Model.Items.Count; i++)
+    {
+        var item = Model.Items[i];
+        <div class="pf-item" data-item-row>
+            <span class="pf-item-n" data-item-number>@(i + 1)</span>
+            <div class="pf-item-grid">
+                <div class="pg-field"><label for="Items_@(i)__Name" class="pf-required">Item / service name</label><input id="Items_@(i)__Name" name="Items[@i].Name" value="@item.Name" maxlength="200" required placeholder="e.g. Laptop" data-item-name /></div>
+                <div class="pg-field"><label for="Items_@(i)__CategoryId" class="pf-required">Category</label>
+                    <select id="Items_@(i)__CategoryId" name="Items[@i].CategoryId" required><option value="">Choose…</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(item.CategoryId == c.Id)">@c.Name</option> }</select></div>
+                <div class="pg-field"><label for="Items_@(i)__Quantity" class="pf-required">Quantity</label><input id="Items_@(i)__Quantity" name="Items[@i].Quantity" value="@item.Quantity.ToString("0", System.Globalization.CultureInfo.InvariantCulture)" type="number" min="1" max="999999999999999" step="1" inputmode="numeric" required /></div>
+                <div class="pg-field"><label for="Items_@(i)__Unit" class="pf-required">Unit</label>
+                    <select id="Items_@(i)__Unit" name="Items[@i].Unit" required><option value="">Choose…</option>@foreach (var u in UnitsOfMeasure.All) { <option selected="@(item.Unit == u)">@u</option> }@if (!string.IsNullOrEmpty(item.Unit) && !UnitsOfMeasure.All.Contains(item.Unit)) { <option value="" disabled>@item.Unit (choose a listed unit)</option> }</select></div>
+                <div class="pg-field pf-spec"><label for="Items_@(i)__Specifications" class="pf-required">Specifications (Minimum Requirements)</label><input id="Items_@(i)__Specifications" name="Items[@i].Specifications" value="@item.Specifications" maxlength="10000" minlength="3" required placeholder="e.g. Intel Core i7, 16 GB RAM, 512 GB SSD" /></div>
+                <button type="button" class="pg-btn pf-item-remove" data-remove-item aria-label="Remove item"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            </div>
+        </div>
+    }
+    </div>
+    <span id="department-item-message" class="pg-hint" role="status" aria-live="polite"></span>
+</section>
+
+<section class="ws-panel pg-panel pf-section pr-card">
+    <div class="pr-card-head"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg> Request Details</h2></div>
     <div class="pg-form-grid">
-        <div class="pg-field"><label asp-for="Title"></label><input asp-for="Title" maxlength="200" required /><span asp-validation-for="Title"></span></div>
-        <div class="pg-field"><label asp-for="Priority"></label><select asp-for="Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select></div>
-        <div class="pg-field"><label asp-for="NeededBy">Needed by</label><input asp-for="NeededBy" type="date" required /><span asp-validation-for="NeededBy"></span></div>
-        <div class="pg-field pg-field-wide"><label asp-for="Justification">Justification / reason</label><textarea asp-for="Justification" rows="4" maxlength="10000" required></textarea><span asp-validation-for="Justification"></span></div>
+        <div class="pg-field"><label asp-for="NeededBy" class="pf-required">Needed by</label><input asp-for="NeededBy" type="date" required min="@DateTime.UtcNow.ToString("yyyy-MM-dd")" /><span asp-validation-for="NeededBy"></span></div>
+        <div class="pg-field"><label asp-for="EvaluationMethod">Evaluation method</label>
+            <select asp-for="EvaluationMethod"><option value="">Choose before sending</option><option value="Weighted">Committee weight proposals</option><option value="LowestPrice">100% financial — lowest compliant price</option></select>
+            <span asp-validation-for="EvaluationMethod"></span></div>
+        <div class="pg-field"><label asp-for="Priority">Priority</label><select asp-for="Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select></div>
+        <div class="pg-field pg-field-wide"><label asp-for="Justification" class="pf-required">Business justification</label><textarea asp-for="Justification" rows="3" maxlength="10000" required placeholder="Why the department needs these items"></textarea><span asp-validation-for="Justification"></span></div>
     </div>
 </section>
-<section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>Requested items</h2><button type="button" class="pg-btn" id="department-add-item">Add item</button></div>
-    <p class="pg-hint">At least one item. Quantities must be positive, with up to three decimal places.</p>
-    <div class="pg-table-wrap"><table class="pg-table">
-        <thead><tr><th scope="col">Item / service</th><th scope="col">Specifications</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Action</th></tr></thead>
-        <tbody id="department-items">
-        @for (var i = 0; i < Model.Items.Count; i++)
-        {
-            <tr>
-                <td><input asp-for="Items[i].Name" aria-label="Item name" maxlength="200" required /></td>
-                <td><textarea asp-for="Items[i].Specifications" aria-label="Item specifications" maxlength="10000" rows="2"></textarea></td>
-                <td><input asp-for="Items[i].Quantity" aria-label="Quantity" type="number" min="0.001" max="999999999999999.999" step="0.001" required /></td>
-                <td><input asp-for="Items[i].Unit" aria-label="Unit" maxlength="30" required /></td>
-                <td><button type="button" class="pg-btn" data-remove-item>Remove</button></td>
-            </tr>
-        }
-        </tbody>
-    </table></div>
-    <p id="department-item-message" class="pg-hint" role="status" aria-live="polite"></p>
-</section>
-<section class="ws-panel pg-panel">
-    <h2>Supporting attachments</h2>
+
+<section class="ws-panel pg-panel pf-section pr-card pr-doc-card">
+    <div class="pr-doc-copy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 7-7a4 4 0 0 1 6 6l-9 9a6 6 0 0 1-9-9l9-9"/></svg><div><h2>Supporting Documents <small>(Optional)</small></h2><p>Technical documents, reference images or additional specifications.</p></div></div>
     @if (Model.ExistingDocuments.Count > 0)
     {
-        <ul>@foreach (var document in Model.ExistingDocuments) { <li>@document.FileName</li> }</ul>
-        <p class="pg-hint">Existing attachments are preserved.</p>
+        <ul>@foreach (var document in Model.ExistingDocuments) { <li>@document.FileName <small class="pf-muted">(kept)</small></li> }</ul>
     }
-    <div class="pg-field"><label asp-for="Attachments">Add files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" data-fv-max-mb="5" /><span asp-validation-for="Attachments"></span>
-    <small class="pg-hint">PDF, PNG, JPEG, DOCX or XLSX. Up to five files per save, 5 MB each and 10 MB combined. Reselect new files if validation fails.</small></div>
-    <div class="pg-actions">
-        <button type="submit" name="intent" value="save" class="pg-btn" data-om="toast" data-om-working="Saving your draft">@(Model.Id == 0 ? "Save draft" : "Save changes")</button>
-        <button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary" data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">@(Model.Id == 0 ? "Submit to Sourcing Officer" : "Submit / resubmit to Sourcing Officer")</button>
-        <a class="pg-btn" asp-action="Index">Cancel</a>
-    </div>
-    <p class="pg-hint">Submission goes directly to the Sourcing Officer. Submitted requests are read-only until returned for corrections.</p>
+    <div class="pg-field pr-file-field"><label asp-for="Attachments">↥ &nbsp;Choose Files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" data-fv-max-mb="5" /><span asp-validation-for="Attachments"></span><small data-file-count></small></div>
 </section>
+<section class="pr-title-strip"><span aria-hidden="true">⚑</span><div>Request Title (Auto-generated)<strong data-title-preview data-department="@Model.DepartmentName">@(string.IsNullOrEmpty(Model.Title) ? "Generated from your items" : Model.Title)</strong></div></section>
+<div class="pr-form-actions"><button type="submit" name="intent" value="save" class="pg-btn" data-om="toast" data-om-working="Saving your draft">▣ &nbsp;@(Model.Id == 0 ? "Save Draft" : "Save Changes")</button><button type="submit" name="intent" value="submit" disabled="@(Model.EvaluationMethod == null)" class="pg-btn pg-btn-primary" data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">➤ &nbsp;@(Model.Id == 0 ? "Submit Request" : "Resubmit Request")</button></div>

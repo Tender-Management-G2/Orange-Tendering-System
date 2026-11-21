@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 
 namespace Orange_Tendering_System.Models.Entities
@@ -17,9 +18,18 @@ namespace Orange_Tendering_System.Models.Entities
         [Precision(18, 3)]
         public decimal Quantity { get; set; }
 
-        [Precision(18, 2)]
+        // Unit price excluding tax.
+        [Precision(19, 3)]
         public decimal UnitPrice { get; set; }
 
+        // Offered product or service, brand and model where relevant.
+        [MaxLength(300)]
+        public string? OfferedProduct { get; set; }
+
         public string? OfferedSpecifications { get; set; }
+
+        // Item warranty, notes or deviations from the requested specification.
+        [MaxLength(2000)]
+        public string? Notes { get; set; }
     }
 }

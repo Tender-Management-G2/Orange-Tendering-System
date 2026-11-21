@@ -23,6 +23,7 @@ namespace Orange_Tendering_System.Models.Entities
 
         [MaxLength(2000)]
         public string? Comment { get; set; }
+        public string? TechnicalBreakdownJson { get; set; }
 
         public DateTime ScoredAt { get; set; }
     }

@@ -100,7 +100,7 @@
         <footer class="so-actions">
             @if (Model.CanEdit)
             {
-                <a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn" data-no-modal>Edit draft</a>
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn" data-no-modal>Complete and submit</a>
                 <a asp-action="Details" asp-route-id="@Model.Id" class="pg-btn pg-btn-primary" data-no-modal>Upload &amp; submit…</a>
             }
             <a asp-action="History" asp-route-id="@Model.Id" class="pg-btn" data-no-modal>History</a>

@@ -30,13 +30,14 @@
     var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted && !r.Tenders.Any()).OrderByDescending(r => r.Id)
         .Select(r => new
         {
-            id = r.Id, deptId = r.DepartmentId, title = r.Title, dept = r.Department.Name, why = r.Justification, priority = r.Priority.ToString(),
+            id = r.Id, deptId = r.DepartmentId, title = r.Title, dept = r.Department.Name, why = r.Justification, priority = r.Priority.ToString(), lowestPrice = r.EvaluationMethod == Orange_Tendering_System.Models.Entities.TenderEvaluationMethod.LowestPrice,
             needed = r.NeededBy.HasValue ? r.NeededBy.Value.ToString("d MMM yyyy") : null,
-            items = r.Items.OrderBy(i => i.Id).Select(i => new { name = i.Name, qty = i.Quantity, unit = i.Unit, spec = i.Specifications }).ToList()
+            files = r.Documents.Count,
+            items = r.Items.OrderBy(i => i.Id).Select(i => new { name = i.Name, cat = i.Category != null ? i.Category.Name : null, qty = i.Quantity, unit = i.Unit, spec = i.Specifications }).ToList()
         }).ToListAsync();
     var requestJson = System.Text.Json.JsonSerializer.Serialize(requests);
     var currencies = new[] { "JOD", "USD", "EUR", "SAR", "AED", "EGP" };
-    var seats = new (string Field, string Title, string Hint, string Icon, List<(string Id, string Label, int? Dept)> Pool, string Value)[]
+    var seats = new (string Field, string Title, string Hint, string Icon, List<(string Id, string Label, int? Dept)> Pool, string? Value)[]
     {
         ("SourcingManagerId", "Sourcing Manager", "Reviews the signed report: approve, reject or return", "M", managers, Model.SourcingManagerId),
         ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", departmentRepresentatives, Model.DepartmentRepresentativeId),
@@ -46,7 +47,7 @@
 }
 <dialog id="tc-dialog" class="tc-dialog" aria-labelledby="tc-title">
     <div class="tc-dialog-head">
-        <div><span class="tc-eyebrow">NEW TENDER</span><h2 id="tc-title">Prepare a new tender</h2><p>Pick an accepted request, describe the tender and choose the four committee members. It appears in your list as soon as you create it.</p></div>
+        <div><span class="tc-eyebrow">NEW TENDER</span><h2 id="tc-title">Prepare a new tender</h2><p>Pick an accepted request and prepare the tender according to its evaluation method.</p></div>
         <button type="button" class="tc-x" data-tc-close aria-label="Close">&times;</button>
     </div>
     <div class="tc-dialog-body tc">
@@ -65,17 +66,17 @@
                 @if (requests.Count == 0) { <p class="tc-note">There are no accepted purchase requests yet. Accept a request first, then come back.</p> }
                 <div class="tc-preview" id="tc-preview" hidden>
                     <div class="tc-preview-head"><strong id="tc-pv-title"></strong><span class="tc-chip" id="tc-pv-dept"></span><span class="tc-chip tc-chip-warm" id="tc-pv-priority"></span><span class="tc-chip" id="tc-pv-needed"></span></div>
-                    <p id="tc-pv-why"></p>
+                    <p id="tc-pv-method"></p><p id="tc-pv-why"></p>
                     <ul class="tc-items" id="tc-pv-items"></ul>
                 </div>
             </section>
 
             <section class="tc-card" aria-labelledby="tc-s2">
-                <header><span class="tc-num">2</span><div><h2 id="tc-s2">Describe the tender</h2><p>Filled in for you from the request. Change anything, or pick a ready-made option from the lists.</p></div></header>
+                <header><span class="tc-num">2</span><div><h2 id="tc-s2">Official tender requirements</h2><p>The department's items above are copied to the tender unchanged. Here you add the official conditions suppliers must meet.</p></div></header>
                 <div class="tc-grid">
                     <label class="tc-field tc-wide"><span>Title</span><input asp-for="Title" required maxlength="200" placeholder="e.g. Network switches for the data center" /></label>
                     <label class="tc-field tc-wide"><span>Description</span><textarea asp-for="Description" required rows="3" placeholder="What is being bought and why"></textarea></label>
-                    <div class="tc-field tc-wide"><span>Technical requirements</span><textarea asp-for="TechnicalRequirements" required rows="4" placeholder="Specifications the suppliers must meet"></textarea></div>
+                    <div class="tc-field tc-wide"><span>Additional technical requirements</span><textarea asp-for="TechnicalRequirements" required rows="3" placeholder="Standards, compatibility, certifications or quality levels beyond the item specifications"></textarea></div>
                     <div class="tc-field tc-wide"><span>Financial and commercial conditions</span>
                         <select class="tc-template" data-target="CommercialConditions" aria-label="Commercial conditions template"><option value="">Quick pick…</option><option>price in the tender currency, valid for 90 days. Payment within 30 days of delivery and acceptance.</option><option>price, valid for 60 days. 30% advance payment, 70% on delivery and acceptance.</option><option>Unit prices, valid for 120 days. Payment in three milestones tied to delivery stages.</option></select>
                         <textarea asp-for="CommercialConditions" required rows="3" placeholder="Pricing validity, payment terms, taxes"></textarea></div>
@@ -88,12 +89,15 @@
                     <label class="tc-field"><span>Estimated procurement value</span><input asp-for="EstimatedValue" type="number" min="0.01" step="0.01" required placeholder="0.00" /></label>
                     <label class="tc-field"><span>Currency</span>
                         <select asp-for="Currency" required>@foreach (var c in currencies) { <option value="@c" selected="@(Model.Currency == c)">@c</option> }</select></label>
+                    <fieldset class="tc-field tc-wide"><span>Documents every supplier must attach</span>
+                        <div class="tc-docs" style="display:flex;flex-wrap:wrap;gap:8px 16px">@foreach (var kind in Orange_Tendering_System.ViewModels.OfferDocumentTypes.All) { <label class="tc-doc"><input type="checkbox" name="RequiredDocuments" value="@kind.Key" @(kind.Key is "OfficialQuotation" or "TechnicalProposal" ? "checked" : null) /> @kind.Label</label> }</div>
+                        <small>Suppliers see these as mandatory uploads; an offer without them cannot be submitted.</small></fieldset>
                     <label class="tc-switch tc-wide"><input asp-for="IsCritical" /><i aria-hidden="true"></i><span><strong>Critical procurement</strong><small>Used only by an explicitly configured final-approval policy.</small></span></label>
                 </div>
             </section>
 
             <section class="tc-card" aria-labelledby="tc-s3">
-                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p>Choose active users assigned to each role by Admin. The department representative must belong to the requesting department.</p></div></header>
+                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p id="tc-s3-hint">Choose active users assigned to each role by Admin.</p></div></header>
                 <div class="tc-seats">
                     @foreach (var s in seats)
                     {
@@ -124,7 +128,7 @@
                     <li data-check="request"><b></b>Purchase request chosen</li>
                     <li data-check="details"><b></b>Tender described</li>
                     <li data-check="value"><b></b>Value entered</li>
-                    <li data-check="committee"><b></b>Four different committee members</li>
+                    <li data-check="committee"><b></b>Required reviewers assigned</li>
                 </ul>
                 <dl class="tc-sum">
                     <div><dt>Request</dt><dd id="tc-sum-pr">Not chosen</dd></div>
@@ -147,22 +151,33 @@
     function showRequest() {
         var r = requests.filter(function (x) { return String(x.id) === pr.value; })[0], box = $('tc-preview');
         if (!r) { box.hidden = true; return; }
+        $('tc-pv-method').textContent = r.lowestPrice ? "100% financial — lowest compliant price" : "Committee weight proposals";
         box.hidden = false; $('tc-pv-title').textContent = 'PR-' + ('0000' + r.id).slice(-4) + ' · ' + r.title;
         $('tc-pv-dept').textContent = r.dept; $('tc-pv-priority').textContent = r.priority + ' priority'; $('tc-pv-needed').textContent = r.needed ? 'Needed by ' + r.needed : 'No date';
         $('tc-pv-why').textContent = r.why;
         var ul = $('tc-pv-items'); ul.textContent = '';
-        r.items.forEach(function (i) { var li = document.createElement('li'); li.innerHTML = '<b></b><span></span><em></em>'; li.children[0].textContent = i.name; li.children[1].textContent = i.qty + (i.unit ? ' ' + i.unit : ''); li.children[2].textContent = i.spec || ''; ul.appendChild(li); });
+        r.items.forEach(function (i) { var li = document.createElement('li'); li.innerHTML = '<b></b><span></span><em></em>'; li.children[0].textContent = i.name + (i.cat ? ' \u00b7 ' + i.cat : ''); li.children[1].textContent = i.qty + (i.unit ? ' ' + i.unit : ''); li.children[2].textContent = i.spec || ''; ul.appendChild(li); });
+        if (r.files) { var fl = document.createElement('li'); fl.textContent = r.files + ' department attachment(s), available to you and the committees from the request.'; ul.appendChild(fl); }
         setAuto($('Title'), r.title);
         setAuto($('Description'), r.why);
-        setAuto($('TechnicalRequirements'), r.items.map(function (i) { return i.name + ' x ' + i.qty + (i.unit ? ' ' + i.unit : '') + (i.spec ? ': ' + i.spec : ''); }).join('\n'));
+        setAuto($('TechnicalRequirements'), 'Offers must meet the specifications of every requested item. Equivalent or better products are acceptable when declared as deviations.');
     }
     document.querySelectorAll('.tc-template').forEach(function (sel) {
         sel.addEventListener('change', function () { if (!sel.value) return; var t = $(sel.dataset.target); t.value = sel.value; t.dispatchEvent(new Event('input', { bubbles: true })); sel.value = ''; t.focus(); });
     });
     var seatSelects = Array.prototype.slice.call(document.querySelectorAll('.tc-seat-select'));
     function seats() {
-        var chosen = seatSelects.map(function (s) { return s.value; });
         var rq = requests.filter(function (x) { return String(x.id) === pr.value; })[0];
+        const currency = $("Currency");
+        [...currency.options].forEach(option => { option.disabled = !!rq?.lowestPrice && !["JOD", "USD", "EUR"].includes(option.value); });
+        if (currency.selectedOptions[0]?.disabled) currency.value = "JOD";
+        $('tc-s3').textContent = rq?.lowestPrice ? "Assign the Sourcing Manager" : "Choose the evaluation committee";
+        $('tc-s3-hint').textContent = rq?.lowestPrice ? "The Manager will review the financial recommendation." : "The department representative must belong to the requesting department.";
+        seatSelects.forEach(function (s) {
+            s.disabled = !!rq?.lowestPrice && s.id !== "SourcingManagerId";
+            s.closest(".tc-seat").hidden = s.disabled;
+        });
+        var chosen = seatSelects.map(s => s.disabled ? "" : s.value);
         seatSelects.forEach(function (s, i) {
             var deptOnly = s.id === 'DepartmentRepresentativeId' && rq;
             Array.prototype.forEach.call(s.options, function (o) { o.disabled = !!o.value && (chosen.some(function (c, j) { return j !== i && c === o.value; }) || (deptOnly && o.dataset.dept !== String(rq.deptId))); });
@@ -176,18 +191,20 @@
     seatSelects.forEach(function (s) { var av = s.closest('.tc-seat').querySelector('.tc-avatar'); av.dataset.icon = av.textContent; });
     var requiredIds = ['tc-pr', 'Title', 'Description', 'TechnicalRequirements', 'CommercialConditions', 'DeliveryExpectations', 'MandatoryCompliance', 'EstimatedValue', 'Currency', 'SourcingManagerId', 'DepartmentRepresentativeId', 'FinancialRepresentativeId', 'TechnicalRepresentativeId'];
     function progress() {
-        var done = requiredIds.filter(function (id) { var e = $(id); return e && e.value && e.value.trim(); }).length;
-        var pct = Math.round(done * 100 / requiredIds.length);
+        var activeIds = requiredIds.filter(id => !$(id).disabled);
+        var done = activeIds.filter(function (id) { var e = $(id); return e && e.value && e.value.trim(); }).length;
+        var pct = Math.round(done * 100 / activeIds.length);
         $('tc-meter').setAttribute('aria-valuenow', pct); $('tc-meter').firstElementChild.style.width = pct + '%';
-        $('tc-meter-text').textContent = done + ' of ' + requiredIds.length + ' required fields done';
+        $('tc-meter-text').textContent = done + ' of ' + activeIds.length + ' required fields done';
         function ok(name, v) { var li = document.querySelector('[data-check=' + name + ']'); li.classList.toggle('is-ok', !!v); }
         var has = function (ids) { return ids.every(function (id) { return $(id).value && $(id).value.trim(); }); };
-        var vals = seatSelects.map(function (s) { return s.value; }).filter(Boolean);
-        var distinct = vals.length === 4 && new Set(vals).size === 4;
+        var activeSeats = seatSelects.filter(s => !s.disabled);
+        var vals = activeSeats.map(s => s.value).filter(Boolean);
+        var distinct = vals.length === activeSeats.length && new Set(vals).size === activeSeats.length;
         ok('request', has(['tc-pr'])); ok('details', has(['Title', 'Description', 'TechnicalRequirements', 'CommercialConditions', 'DeliveryExpectations', 'MandatoryCompliance'])); ok('value', has(['EstimatedValue'])); ok('committee', distinct);
         var opt = pr.options[pr.selectedIndex]; $('tc-sum-pr').textContent = pr.value ? opt.text.split(' · ')[0] + ' · ' + (opt.text.split(' · ')[1] || '').split(' (')[0] : 'Not chosen';
         var v = parseFloat($('EstimatedValue').value); $('tc-sum-value').textContent = isFinite(v) && v > 0 ? v.toLocaleString(undefined, { minimumFractionDigits: 2 }) + ' ' + $('Currency').value : '—';
-        $('tc-sum-committee').textContent = vals.length + ' of 4 seats' + (vals.length === 4 && !distinct ? ' (people must differ)' : '');
+        $('tc-sum-committee').textContent = vals.length + ' of ' + activeSeats.length + ' assigned';
     }
     pr.addEventListener('change', function () { showRequest(); progress(); });
     form.addEventListener('input', function () { seats(); progress(); }); form.addEventListener('change', function () { seats(); progress(); });
@@ -196,15 +213,15 @@
     form.addEventListener('submit', function (e) {
         e.preventDefault(); alertBox.hidden = true;
         if (!form.checkValidity()) { form.reportValidity(); return; }
-        var vals = seatSelects.map(function (s) { return s.value; });
-        if (new Set(vals).size !== 4) { showErrors(['Choose four different people for the four committee seats.']); return; }
+        var vals = seatSelects.filter(s => !s.disabled).map(s => s.value);
+        if (new Set(vals).size !== vals.length) { showErrors(['Choose four different people for the four committee seats.']); return; }
         var b = $('tc-submit'); b.disabled = true; b.firstChild.textContent = 'Creating… ';
         var motion = window.OrangeMotion ? OrangeMotion.begin({ mode: 'popup', title: 'Creating the tender', description: 'Saving the requirements and committee seats.' }) : null;
         fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
             .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
             .then(function (x) {
                 if (x.ok && x.d && x.d.id) {
-                    var go = function () { window.location.href = form.dataset.listUrl + '?created=' + x.d.id; };
+                    var go = function () { window.location.href = form.dataset.listUrl + '?created=' + x.d.id + '&open=' + x.d.id; };
                     if (motion && x.d.feedback) motion.finish(x.d.feedback).then(go, go); else go();
                     return;
                 }

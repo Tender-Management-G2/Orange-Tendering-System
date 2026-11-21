@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
@@ -17,6 +17,7 @@ public class OllamaSettings
     public int TimeoutSeconds { get; set; } = 120;
     public int NumGpu { get; set; } = 99;
     public int ContextLength { get; set; } = 4096;
+    public string? EmbeddingModel { get; set; } = "bge-m3";
 }
 public class OllamaBidAnalysisService(OllamaChatClient ollama, ApplicationDbContext db, TenderWorkflowService workflow,
     ProtectedDocumentStore documents, IOptions<OllamaSettings> settings, ILogger<OllamaBidAnalysisService> logger)
@@ -91,14 +92,17 @@ public sealed class OllamaChatClient(HttpClient http, IOptions<OllamaSettings> s
     public bool IsConfigured => Uri.TryCreate(settings.Value.BaseUrl, UriKind.Absolute, out var u) && u.Scheme is "http" or "https" && !string.IsNullOrWhiteSpace(settings.Value.Model);
 
     /// <summary>Posts a chat to Ollama /api/chat and returns the assistant message content.</summary>
-    public async Task<string> ChatAsync(IEnumerable<object> messages, bool json, double temperature, CancellationToken ct)
+    public Task<string> ChatAsync(IEnumerable<object> messages, bool json, double temperature, CancellationToken ct) => ChatAsync(messages, json, temperature, null, ct);
+
+    /// <summary>Same as above with a per-request context window (e.g. document analysis); null uses Ollama:ContextLength.</summary>
+    public async Task<string> ChatAsync(IEnumerable<object> messages, bool json, double temperature, int? contextLength, CancellationToken ct)
     {
         var config = settings.Value;
         if (!IsConfigured) throw new InvalidOperationException("Configure Ollama:BaseUrl and Ollama:Model. No service address or model is assumed.");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         linked.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(config.TimeoutSeconds, 5, 300)));
         // Request all model layers on the GPU; bound the context's VRAM allocation.
-        var options = new { temperature, num_gpu = config.NumGpu, num_ctx = config.ContextLength };
+        var options = new { temperature, num_gpu = config.NumGpu, num_ctx = contextLength ?? config.ContextLength };
         object body = json
             ? new { model = config.Model, stream = false, format = "json", messages, options }
             : new { model = config.Model, stream = false, messages, options };

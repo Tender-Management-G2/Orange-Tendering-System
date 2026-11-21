@@ -1,0 +1,259 @@
+@model EvaluationWorkspaceModel
+@using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.Services
+@using System.Text.Json
+@{
+    var d = Model.Details; var t = d.Tender; var s = d.Session!; var w = s.WeightRound;
+    ViewData["Title"] = "Evaluation workspace"; ViewData["WorkspaceSection"] = "Tender";
+    ViewData["Description"] = $"{TenderPassportService.Reference(t.Id)} · {t.Title}";
+    var startIso = DateTime.SpecifyKind(s.StartsAt, DateTimeKind.Utc).ToString("O");
+    var members = t.CommitteeMembers.Where(x => x.CommitteeType == CommitteeType.Evaluation).OrderBy(x => x.Responsibility).ToList();
+    string Who(string id) => Model.People.TryGetValue(id, out var n) ? n : "Member";
+    string Seat(CommitteeResponsibility? r) => r switch { CommitteeResponsibility.SourcingManager => "Sourcing Manager", CommitteeResponsibility.DepartmentRepresentative => "Department", CommitteeResponsibility.FinancialRepresentative => "Financial", CommitteeResponsibility.TechnicalRepresentative => "Technical", CommitteeResponsibility.TechnicalRepresentative2 => "Technical 2", _ => "Member" };
+    string Money(decimal v, string c) => CurrencyRules.Format(v, c);
+    string Name(int bidId) => Model.Offers.FirstOrDefault(o => o.Bid.Id == bidId)?.Supplier.Name ?? "Offer #" + bidId;
+    var currencies = Model.Offers.Select(o => o.Bid.CurrencyCode).Distinct().ToList();
+    var lowest = currencies.Count == 1 ? Model.Lowest : null; // never compare totals across currencies (no approved exchange-rate rule)
+    var fastest = Model.Offers.Where(o => o.Bid.DeliveryDays != null).Select(o => o.Bid.DeliveryDays).DefaultIfEmpty().Min();
+    var longestWarranty = Model.Offers.Select(o => o.Bid.WarrantyMonths ?? 0).DefaultIfEmpty().Max();
+    var reportReady = s.Report != null;
+    var mySigned = Model.Report?.Signatures.Any(x => x.UserId == d.UserId && x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null) == true;
+    List<(string Label, string Value)> AiRows()
+    {
+        var rows = new List<(string, string)>();
+        if (string.IsNullOrWhiteSpace(Model.Ai?.Findings)) return rows;
+        string Flat(JsonElement e) => e.ValueKind switch { JsonValueKind.String => e.GetString() ?? "", JsonValueKind.Array => string.Join("\n", e.EnumerateArray().Select(x => "• " + Flat(x))), JsonValueKind.Object => string.Join("; ", e.EnumerateObject().Select(p => p.Name + ": " + Flat(p.Value))), _ => e.ToString() };
+        try { using var doc = JsonDocument.Parse(Model.Ai!.Findings!); if (doc.RootElement.ValueKind == JsonValueKind.Object) foreach (var p in doc.RootElement.EnumerateObject()) rows.Add((System.Text.RegularExpressions.Regex.Replace(p.Name, "(?<=[a-z])(?=[A-Z])", " "), Flat(p.Value))); else rows.Add(("Findings", Flat(doc.RootElement))); }
+        catch (JsonException) { rows.Add(("Findings", Model.Ai!.Findings!)); }
+        return rows;
+    }
+    var aiRows = AiRows();
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/evaluation-scores.css" asp-append-version="true" />
+}
+<partial name="_PageHeader" />
+<div class="pf-page">
+    @if (TempData["WorkflowMessage"] is string message) { <p class="pf-note" role="status">@message</p> }
+
+    @* A. Tender and meeting summary *@
+    <section class="ws-panel pg-panel pf-section">
+        <div class="pf-lobby-head">
+            <div><span class="pf-eyebrow">@TenderPassportService.Reference(t.Id) · Round @s.TenderRound.RoundNumber · Evaluation</span><h2>@t.Title</h2>
+                <p class="pg-hint">Requesting department: @Model.Request.Department.Name · PR-@Model.Request.Id · Meeting <time data-local="@startIso">@s.StartsAt.ToJordan("ddd d MMM yyyy HH:mm")</time>–@s.EndsAt.ToJordan("HH:mm") (Jordan time)</p></div>
+            <div class="pg-actions" style="margin:0">
+                <a class="pg-btn" asp-area="" asp-controller="Meetings" asp-action="Join" asp-route-id="@t.Id">Meeting room</a>
+                <a class="pg-btn" asp-action="Index" asp-route-open="@t.Id">Tender timeline</a>
+            </div>
+        </div>
+        <dl class="pf-facts">
+            <div><dt>Status</dt><dd>@(Model.BeforeStart ? "Before the meeting — preparation" : reportReady ? "Report " + s.Report!.Status : s.State == SessionState.Scheduled ? "Scoring open" : s.State.ToString())</dd></div>
+            <div><dt>Suppliers under evaluation</dt><dd>@Model.Offers.Count eligible offer(s)</dd></div>
+            <div><dt>Final evaluations</dt><dd>@s.Submissions.Count of 4 submitted</dd></div>
+            <div><dt>Your evaluation</dt><dd>@(Model.Mine?.SubmittedAt is DateTime at ? "Submitted " + at.ToJordan("d MMM HH:mm") : d.IsEvaluator ? (Model.CanScore ? "Open — not submitted" : Model.BeforeStart ? "Opens at the meeting start" : "Not open") : "Officer (no score)")</dd></div>
+        </dl>
+        <div class="pg-table-wrap" style="margin-top:12px"><table class="pg-table" style="min-width:0"><thead><tr><th>Committee member</th><th>Seat</th><th>Evaluation</th></tr></thead><tbody>
+            @foreach (var m in members) { var done = s.Invitations.FirstOrDefault(x => x.CommitteeMemberId == m.Id)?.SubmittedAt; <tr><td>@Who(m.UserId)</td><td>@Seat(m.Responsibility)</td><td>@(done is DateTime doneAt ? "Submitted " + doneAt.ToJordan("d MMM HH:mm") : "Pending")</td></tr> }
+        </tbody></table></div>
+    </section>
+
+    @* B. Approved evaluation model (read-only, locked) *@
+    <section class="ws-panel pg-panel pf-section">
+        <div class="pf-section-head"><span class="pf-step">1</span><div><h2>Approved evaluation model</h2><p>Defined by the four committee members before bidding, approved by the Sourcing Officer and locked. It cannot change during the evaluation.</p></div></div>
+        <div class="pf-model">
+            <div class="pf-weight"><span class="pf-muted">Financial criterion weight</span><br /><strong>@w.ApprovedFinancial?.ToString("0.##")%</strong><div class="pf-bar"><i style="width:@(w.ApprovedFinancial?.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></i></div>
+                <p class="pg-hint">Score 0–100 (one decimal). Consider total price including tax and additional charges, payment terms, offer validity and currency.</p></div>
+            <div class="pf-weight"><span class="pf-muted">Technical criterion weight</span><br /><strong>@w.ApprovedTechnical?.ToString("0.##")%</strong><div class="pf-bar"><i style="width:@(w.ApprovedTechnical?.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></i></div>
+                <p class="pg-hint">Score 0–100 (one decimal). Consider compliance with the specifications, proposed solution, delivery lead time, warranty, deviations and supporting documents.</p></div>
+            <div class="pf-weight"><span class="pf-muted">Model</span><br /><b>Version @w.Version · <span class="pf-chip pf-chip-good">Approved &amp; locked</span></b>
+                <p class="pg-hint">Approved @w.ApprovedAt?.ToJordan("d MMM yyyy HH:mm"). Member score = Financial × @w.ApprovedFinancial?.ToString("0.##")% + Technical × @w.ApprovedTechnical?.ToString("0.##")%. Final score = average of the four member scores, at full precision. Rank by final score; an exact tie at rank 1 blocks the award.</p></div>
+        </div>
+        @foreach (var r in Model.Requirements.Where(x => x.Label == "Mandatory requirements")) { <p class="pf-note"><b>Mandatory requirements (pass/fail, checked in compliance):</b> @r.Value</p> }
+        <p class="pg-hint">Mandatory requirements are not weighted: only offers the Sourcing Officer recorded as compliant are evaluated. No automatic price or delivery formula is approved, so both criteria are scored by each member.</p>
+    </section>
+
+    @* C. Original request and tender requirements *@
+    <section class="ws-panel pg-panel pf-section">
+        <div class="pf-section-head"><span class="pf-step">2</span><div><h2>What the department needs</h2><p>@Model.Request.Title · needed by @(Model.Request.NeededBy?.ToString("d MMM yyyy") ?? "not specified") · priority @Model.Request.Priority</p></div></div>
+        <p style="white-space:pre-line;margin:0">@Model.Request.Justification</p>
+        <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Item / service</th><th>Category</th><th>Specifications</th><th class="pf-right">Quantity</th></tr></thead><tbody>
+            @foreach (var i in t.Items.OrderBy(x => x.Id)) { var category = i.CategoryId == null ? null : Model.Request.Items.FirstOrDefault(x => x.CategoryId == i.CategoryId)?.Category?.Name; <tr><td><strong>@i.Name</strong></td><td>@(category ?? "—")</td><td style="white-space:pre-line">@i.Specifications</td><td class="pf-right pf-num">@i.Quantity.ToString("0.###") @i.Unit</td></tr> }
+        </tbody></table></div>
+        <details class="pf-more"><summary>Tender requirements and conditions</summary><dl class="pg-dl">@foreach (var r in Model.Requirements) { <div><dt>@r.Label</dt><dd style="white-space:pre-line">@r.Value</dd></div> }</dl></details>
+        @if (d.Documents.Any(x => x.TenderId == t.Id)) { <p class="pg-hint">Tender documents: @foreach (var doc in d.Documents.Where(x => x.TenderId == t.Id)) { <a asp-action="Download" asp-route-id="@doc.Id">@doc.FileName</a><text> · </text> }</p> }
+    </section>
+
+    @* D. Supplier comparison *@
+    <section class="ws-panel pg-panel pf-section">
+        <div class="pf-section-head"><span class="pf-step">3</span><div><h2>Supplier comparison</h2><p>Verified data from the submitted offers and supplier records. Highlighted cells are the best value in that row.</p></div></div>
+        @if (Model.Offers.Count == 0) { <p class="pg-hint">No eligible offers.</p> }
+        else
+        {
+            @if (currencies.Count > 1) { <p class="pf-note pf-warn">Offers are in different currencies (@string.Join(", ", currencies)). No exchange-rate rule is approved, so totals are not compared automatically.</p> }
+            <div class="pg-table-wrap"><table class="pf-compare">
+                <thead><tr><th></th>@foreach (var o in Model.Offers) { <th>@o.Supplier.Name</th> }</tr></thead>
+                <tbody>
+                    <tr><th>Company status</th>@foreach (var o in Model.Offers) { <td><span class="pf-chip @(o.Supplier.Status == SupplierStatus.Approved ? "pf-chip-good" : "pf-chip-bad")">@o.Supplier.Status</span> <small class="pf-muted">@o.Supplier.Category</small></td> }</tr>
+                    <tr><th>Offer compliance</th>@foreach (var o in Model.Offers) { <td><span class="pf-chip @(o.Bid.ComplianceStatus == ComplianceStatus.Compliant ? "pf-chip-good" : "pf-chip-bad")">@o.Bid.ComplianceStatus</span></td> }</tr>
+                    <tr><th>Grand total (incl. tax)</th>@foreach (var o in Model.Offers) { <td class="pf-num @(lowest == o.GrandTotal ? "pf-best" : null)"><b>@Money(o.GrandTotal, o.Bid.CurrencyCode)</b></td> }</tr>
+                    <tr><th>Items subtotal</th>@foreach (var o in Model.Offers) { <td class="pf-num">@Money(o.ItemsSubtotal, o.Bid.CurrencyCode)</td> }</tr>
+                    <tr><th>Additional charges</th>@foreach (var o in Model.Offers) { <td class="pf-num">@Money(o.AdditionalCharges, o.Bid.CurrencyCode)@if (o.AdditionalCharges > 0) { <br /><small class="pf-muted">Shipping @o.Bid.ShippingCost.ToString("0.###") · Installation @o.Bid.InstallationCost.ToString("0.###") · Maintenance @o.Bid.MaintenanceCost.ToString("0.###") · Other @o.Bid.OtherCost.ToString("0.###")</small> }</td> }</tr>
+                    <tr><th>Tax</th>@foreach (var o in Model.Offers) { <td class="pf-num">@Money(o.Bid.TaxAmount, o.Bid.CurrencyCode)<br /><small class="pf-muted">@(o.Bid.TaxRate is decimal rate ? $"{rate:0.##}% on the taxable total" : "stated amount")</small></td> }</tr>
+                    <tr><th>Delivery lead time</th>@foreach (var o in Model.Offers) { <td class="@(o.Bid.DeliveryDays != null && o.Bid.DeliveryDays == fastest ? "pf-best" : null)">@(o.Bid.DeliveryDays is int days ? days + " days" : "—")</td> }</tr>
+                    <tr><th>Warranty</th>@foreach (var o in Model.Offers) { <td class="@(longestWarranty > 0 && o.Bid.WarrantyMonths == longestWarranty ? "pf-best" : null)">@(o.Bid.WarrantyMonths is int months ? months + " months" : "—") @o.Bid.WarrantyType</td> }</tr>
+                    <tr><th>Payment terms</th>@foreach (var o in Model.Offers) { <td>@(o.Bid.PaymentTerms ?? "—")</td> }</tr>
+                    <tr><th>Offer valid until</th>@foreach (var o in Model.Offers) { <td>@(o.Bid.ValidUntil?.ToString("d MMM yyyy") ?? "—")</td> }</tr>
+                    <tr><th>Deviations</th>@foreach (var o in Model.Offers) { <td style="white-space:pre-line">@(string.IsNullOrWhiteSpace(o.Bid.Deviations) ? "None declared" : o.Bid.Deviations)</td> }</tr>
+                    <tr><th>Documents</th>@foreach (var o in Model.Offers) { var missing = Model.RequiredDocuments.Where(k => o.Documents.All(x => x.DocumentType != k)).ToList(); <td>@o.Documents.Count file(s)@if (missing.Count > 0) { <br /><span class="pf-chip pf-chip-bad">Missing: @string.Join(", ", missing.Select(OfferDocumentTypes.Label))</span> }</td> }</tr>
+                    <tr><th>Supplier history <small>(verified)</small></th>@foreach (var o in Model.Offers) { <td><small>@o.Supplier.PastSubmittedOffers earlier offer(s) · @o.Supplier.PastAwards award(s) · @o.Supplier.VerifiedDocuments verified company document(s)</small></td> }</tr>
+                </tbody>
+            </table></div>
+            @foreach (var o in Model.Offers)
+            {
+                <details class="pf-more"><summary>Full offer: @o.Supplier.Name (offer #@o.Bid.Id, submitted @o.Bid.SubmittedAt?.ToJordan("d MMM HH:mm"))</summary>
+                    <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Requested</th><th>Offered product / specifications</th><th class="pf-right">Qty</th><th class="pf-right">Unit price (excl. tax)</th><th class="pf-right">Line total</th></tr></thead><tbody>
+                    @foreach (var l in o.Lines) { <tr><td><strong>@l.Item</strong><br /><small class="pf-muted">@l.RequestedQuantity.ToString("0.###") @l.Unit · @l.RequestedSpecifications</small></td><td><b>@l.OfferedProduct</b><br /><span style="white-space:pre-line">@l.OfferedSpecifications</span>@if (!string.IsNullOrWhiteSpace(l.Notes)) { <br /><small>Notes: @l.Notes</small> }</td><td class="pf-right pf-num">@l.OfferedQuantity.ToString("0.###")</td><td class="pf-right pf-num">@Money(l.UnitPrice, o.Bid.CurrencyCode)</td><td class="pf-right pf-num">@Money(l.LineTotal, o.Bid.CurrencyCode)</td></tr> }
+                    </tbody></table></div>
+                    <dl class="pg-dl">
+                        <div><dt>Technical proposal</dt><dd style="white-space:pre-line">@o.Bid.TechnicalProposal</dd></div>
+                        @if (!string.IsNullOrWhiteSpace(o.Bid.WarrantyTerms)) { <div><dt>Warranty conditions</dt><dd style="white-space:pre-line">@o.Bid.WarrantyTerms</dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(o.Bid.AfterSalesSupport)) { <div><dt>After-sales support</dt><dd style="white-space:pre-line">@o.Bid.AfterSalesSupport</dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(o.Bid.MaintenanceDescription)) { <div><dt>Maintenance coverage</dt><dd>@o.Bid.MaintenanceDescription</dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(o.Bid.OtherCostDescription)) { <div><dt>Other costs</dt><dd>@o.Bid.OtherCostDescription</dd></div> }
+                        @if (!string.IsNullOrWhiteSpace(o.Bid.ComplianceNotes)) { <div><dt>Officer's compliance note</dt><dd>@o.Bid.ComplianceNotes</dd></div> }
+                    </dl>
+                    <p class="pg-hint">Documents (images are supplier-provided, not verified products):
+                        @foreach (var doc in o.Documents) { <a asp-action="Download" asp-route-id="@doc.Id">@OfferDocumentTypes.Label(doc.DocumentType): @doc.FileName</a><text> · </text> }</p>
+                </details>
+            }
+        }
+    </section>
+
+    @* E. AI analysis (advisory) *@
+    <section class="ws-panel pg-panel pf-section">
+        <div class="pf-section-head"><span class="pf-step">4</span><div><h2>AI analysis <span class="pf-ai-tag">advisory · not verified</span></h2><p>Generated by @(Model.Ai?.Model ?? "the local model") from the offers' recorded data and reviewed by the Sourcing Officer. It cannot change criteria, weights, scores, votes or the award.</p></div></div>
+        @if (Model.Ai == null) { <p class="pg-hint">No AI analysis is attached. Evaluate from the verified data above.</p> }
+        else
+        {
+            <div class="pf-ai">@foreach (var row in aiRows) { <article><span class="pf-ai-tag">AI · @row.Label</span><div style="white-space:pre-line">@row.Value</div></article> }</div>
+            <p class="pg-hint"><a asp-action="AiAnalysisPdf" asp-route-id="@t.Id">Download the AI analysis (PDF)</a> · Statements are interpretations; check them against the offers and documents above.</p>
+        }
+    </section>
+
+    @* F. Scoring, recommendation and signature (one submission) *@
+    <section class="ws-panel pg-panel pf-section" id="evaluate">
+        <div class="pf-section-head"><span class="pf-step">5</span><div><h2>Your evaluation and recommendation</h2><p>Score each offer on the two approved criteria (whole numbers from 0 to 99), recommend one supplier and sign. You submit once; it cannot be edited.</p></div></div>
+        @if (Model.CanScore)
+        {
+            <form asp-action="SubmitEvaluation" asp-route-id="@t.Id" method="post" class="pg-form" data-evaluation-form data-wf="@w.ApprovedFinancial?.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-wt="@w.ApprovedTechnical?.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                <div asp-validation-summary="All" role="alert"></div>
+                @for (var i = 0; i < Model.Offers.Count; i++)
+                {
+                    var o = Model.Offers[i];
+                    <fieldset class="pf-item evaluation-card" data-score-row data-bid="@o.Bid.Id" data-name="@o.Supplier.Name">
+                        <legend><b>@o.Supplier.Name</b> <span class="pf-muted">· @Money(o.GrandTotal, o.Bid.CurrencyCode)</span></legend>
+                        <input type="hidden" name="scores[@i].BidId" value="@o.Bid.Id" />
+                        <div class="evaluation-score-line">
+                            <label for="f@(i)">Financial score <small>/ 100</small></label>
+                            <input id="f@(i)" name="scores[@i].Financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required data-score="f" />
+                        </div>
+                        <partial name="_TechnicalScoreInputs" model='(w.ReadTechnicalCriteria(), i, "t")' />
+                        <div class="pg-field"><label for="j@(i)">Score justification</label><textarea id="j@(i)" name="scores[@i].Justification" rows="2" maxlength="2000" required></textarea></div>
+                        <small class="pf-muted">Your weighted score (display only): <b data-weighted>—</b></small>
+                    </fieldset>
+                }
+                <div class="pg-form-grid">
+                    <div class="pg-field"><label for="rec" class="pf-required">Recommended supplier</label>
+                        <select id="rec" name="recommendation.RecommendedBidId" required><option value="">Choose an eligible offer</option>@foreach (var o in Model.Offers) { <option value="@o.Bid.Id">@o.Supplier.Name</option> }</select>
+                        <small class="pf-muted" data-own-top></small></div>
+                    <div class="pg-field pg-field-wide"><label for="reason" class="pf-required">Reason for your recommendation</label><textarea id="reason" name="recommendation.Reason" rows="3" maxlength="2000" required></textarea></div>
+                    <div class="pg-field pg-field-wide" data-deviation hidden><label for="dev" class="pf-required">Why not the offer your own scores rank first?</label><textarea id="dev" name="recommendation.DeviationJustification" rows="2" maxlength="2000" minlength="20" disabled></textarea></div>
+                    <div class="pg-field pg-field-wide"><label for="concerns">Concerns or observations (optional)</label><textarea id="concerns" name="recommendation.Concerns" rows="2" maxlength="2000"></textarea>
+                        <small class="pf-muted">Need information from a supplier first? <a asp-area="" asp-controller="Clarifications" asp-action="Index">Request a clarification</a> before submitting.</small></div>
+                </div>
+                <partial name="~/Views/Shared/_ReportSignaturePad.cshtml" />
+                <label class="pg-check"><input type="checkbox" required /> These are my final, independent scores and recommendation. I understand they cannot be changed.</label>
+                <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary" data-confirm="Submit your final evaluation? Your scores, recommendation and signature are recorded once and cannot be changed.">Sign and submit my evaluation</button></div>
+            </form>
+        }
+        else if (Model.Mine?.SubmittedAt != null)
+        {
+            <p class="pf-note">You submitted your evaluation on @Model.Mine.SubmittedAt.Value.ToJordan("d MMM yyyy HH:mm"). It is final.</p>
+            <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Supplier</th><th class="pf-right">Financial</th><th class="pf-right">Technical</th><th>Justification</th></tr></thead><tbody>
+            @foreach (var g in d.Scores.Where(x => x.CommitteeMemberId == Model.MySeat!.Id).GroupBy(x => x.BidId)) { <tr><td>@Name(g.Key)</td><td class="pf-right pf-num">@g.First(x => x.EvaluationCriterion.Type == CriterionType.Financial).Score.ToString("0.0")</td><td class="pf-right pf-num">@g.First(x => x.EvaluationCriterion.Type == CriterionType.Technical).Score.ToString("0.0")</td><td>@g.First().Comment</td></tr> }
+            </tbody></table></div>
+            @if (Model.Mine.RecommendedBidId is int myRec) { <p class="pg-hint">Your recommendation: <b>@Name(myRec)</b> — @Model.Mine.RecommendationReason</p> }
+        }
+        else if (Model.BeforeStart && d.IsEvaluator)
+        {
+            <p class="pf-note">Scoring opens at the meeting start (<time data-local="@startIso">@s.StartsAt.ToJordan("d MMM HH:mm")</time>). Until then, review the offers, documents and analysis above. This page refreshes the form automatically at the start time.</p>
+        }
+        else { <p class="pg-hint">@(d.IsOfficer ? "Sourcing Officers do not score." : "Evaluation is not open.")</p> }
+    </section>
+
+    @* G. Results, recommendations and the committee report *@
+    @if (d.Ranking.Count > 0)
+    {
+        <section class="ws-panel pg-panel pf-section">
+            <div class="pf-section-head"><span class="pf-step">6</span><div><h2>Results and recommendations</h2><p>Calculated by the system from all four evaluations and the approved weights. Scores are shown with one decimal; ranking uses full precision.</p></div></div>
+            <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Rank</th><th>Supplier</th><th class="pf-right">Final score</th>@foreach (var m in members) { <th class="pf-right">@Seat(m.Responsibility)</th> }</tr></thead><tbody>
+            @foreach (var r in d.Ranking.OrderBy(x => x.Rank))
+            {
+                <tr class="@(r.Rank == 1 ? "pf-best" : null)"><td>@r.Rank@(r.Tied ? " (tie)" : "")</td><td>@Name(r.BidId)</td><td class="pf-right pf-num"><b>@r.Score.ToString("0.0")</b></td>
+                @foreach (var m in members)
+                {
+                    var f = d.Scores.FirstOrDefault(x => x.CommitteeMemberId == m.Id && x.BidId == r.BidId && x.EvaluationCriterion.Type == CriterionType.Financial)?.Score;
+                    var te = d.Scores.FirstOrDefault(x => x.CommitteeMemberId == m.Id && x.BidId == r.BidId && x.EvaluationCriterion.Type == CriterionType.Technical)?.Score;
+                    <td class="pf-right pf-num">@(f != null && te != null ? WeightedCalculation.Member(f.Value, te.Value, w.ApprovedFinancial!.Value, w.ApprovedTechnical!.Value).ToString("0.0") : "—")<br /><small class="pf-muted">F @f?.ToString("0.0") · T @te?.ToString("0.0")</small></td>
+                }</tr>
+            }
+            </tbody></table></div>
+            <h3 style="margin:8px 0 0;font-size:16px">Member recommendations</h3>
+            <ul class="pf-ai" style="list-style:none;padding:0">
+            @foreach (var m in members) { var p = s.Invitations.FirstOrDefault(x => x.CommitteeMemberId == m.Id); <li><article><b>@Who(m.UserId)</b> (@Seat(m.Responsibility)): @(p?.RecommendedBidId is int rb ? "recommends " + Name(rb) : "no recommendation recorded")<div style="white-space:pre-line">@p?.RecommendationReason</div>@if (!string.IsNullOrWhiteSpace(p?.Concerns)) { <small>Concerns: @p.Concerns</small> }</article></li> }
+            </ul>
+            @if (Model.Report != null)
+            {
+                var signed = Model.Report.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null);
+                <p class="pf-note">Evaluation report version @Model.Report.Report.VersionNumber — @signed of 4 signatures.@(s.State == SessionState.Finalized ? " Completed and sent to the Sourcing Officer." : "")</p>
+                <div class="pg-actions">
+                    @if (Model.Report.CanSignCommittee && !mySigned) { <a class="pg-btn pg-btn-primary" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Review" asp-route-id="@Model.Report.Report.Id">Review and sign the report</a> }
+                    else { <a class="pg-btn" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Review" asp-route-id="@Model.Report.Report.Id">Open the report</a> }
+                    <a class="pg-btn" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Pdf" asp-route-id="@Model.Report.Report.Id" asp-route-download="true">Download PDF</a>
+                </div>
+            }
+        </section>
+    }
+</div>
+@section Scripts {
+<script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
+<script>
+(function () {
+    var form = document.querySelector('[data-evaluation-form]');
+    if (!form) {
+        // Before the start: reload once the scoring window opens, so the form appears without manual refresh.
+        var start = Date.parse('@startIso'), wait = start - Date.now();
+        if (wait > 0 && wait < 864e5) window.setTimeout(function () { location.reload(); }, wait + 1500);
+        return;
+    }
+    var wf = parseFloat(form.dataset.wf), wt = parseFloat(form.dataset.wt);
+    var rec = form.querySelector('[name="recommendation.RecommendedBidId"]'), dev = form.querySelector('[data-deviation]'), devInput = dev.querySelector('textarea'), ownTop = form.querySelector('[data-own-top]');
+    function update() {
+        var best = null, bestIds = [];
+        form.querySelectorAll('[data-score-row]').forEach(function (row) {
+            var f = row.querySelector('[data-score=f]'), out = row.querySelector('[data-weighted]');
+            var technical = OrangeTechnicalEvaluation.score(row, '[data-score=t]');
+            if (f.value === '' || technical === null || !f.checkValidity()) { out.textContent = '—'; return; }
+            var score = (parseFloat(f.value) * wf + technical * wt) / 100;
+            out.textContent = score.toFixed(1);
+            if (best === null || score > best + 1e-9) { best = score; bestIds = [row.dataset.bid]; } else if (Math.abs(score - best) < 1e-9) bestIds.push(row.dataset.bid);
+        });
+        ownTop.textContent = bestIds.length ? 'Your scores rank first: ' + bestIds.map(function (id) { return form.querySelector('[data-score-row][data-bid="' + id + '"]').dataset.name; }).join(', ') : '';
+        var deviates = rec.value !== '' && bestIds.length > 0 && bestIds.indexOf(rec.value) < 0;
+        dev.hidden = !deviates; devInput.disabled = !deviates; devInput.required = deviates;
+    }
+    form.addEventListener('input', update); form.addEventListener('change', update); update();
+})();
+</script>
+}

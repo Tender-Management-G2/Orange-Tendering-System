@@ -1,0 +1,21 @@
+@model List<(string Key, string Title, string Description)>
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Reports & Analytics"; ViewData["WorkspaceSection"] = "Analytics & Exports";
+    ViewData["Description"] = "Reports calculated live from the system records, with PDF and Excel export. You see only the reports your role may open.";
+    var actionFor = new Dictionary<string, string> { ["analytics-dashboard"] = "Dashboard", ["purchase-requests"] = "PurchaseRequests", ["tenders"] = "Tenders", ["suppliers"] = "Suppliers", ["evaluations"] = "Evaluations", ["governance"] = "Governance", ["management"] = "Management", ["reports-management"] = "ReportsManagement" };
+}
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel reports-center">
+    <div class="pg-panel-head"><div><h2>Reports Center</h2><span class="pg-hint">Select a report to view detailed information, live statistics and exports.</span></div></div>
+    <div class="pg-cards reports-center-grid">
+        @foreach (var r in Model)
+        {
+            <a class="pg-card reports-center-card" asp-controller="HayaAdminReports" asp-action="@actionFor[r.Key]"><span aria-hidden="true">@if (r.Key == "analytics-dashboard") { <text>▥</text> } else if (r.Key == "purchase-requests") { <text>▤</text> } else if (r.Key == "tenders") { <text>▧</text> } else if (r.Key == "suppliers") { <text>♟</text> } else if (r.Key == "evaluations") { <text>⚖</text> } else if (r.Key == "governance") { <text>✓</text> } else if (r.Key == "management") { <text>♚</text> } else { <text>≡</text> }</span><strong>@r.Title</strong><small>@r.Description</small><b aria-hidden="true">→</b></a>
+        }
+    </div>
+    @if (User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Admin)) { <p><a class="pg-btn" asp-area="Admin" asp-controller="AuditLogs" asp-action="Index">Audit logs</a></p> }
+</section>
+
+@section Styles { <link rel="stylesheet" href="~/css/haya-admin-reports.css" asp-append-version="true" /> }
+@section Scripts { <script src="~/js/haya-report-table-tools.js" asp-append-version="true" defer></script> }

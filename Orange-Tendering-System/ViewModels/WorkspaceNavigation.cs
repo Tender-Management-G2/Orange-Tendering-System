@@ -33,6 +33,7 @@ namespace Orange_Tendering_System.ViewModels
                 new("Roles", "Roles", "Index", "shield"),
                 new("Departments", "Departments", "Index", "building"),
                 new("Suppliers", "Suppliers", "Index", "layers"),
+                new("Categories", "Categories", "Index", "folder"),
                 new("Settings", "Settings", "Index", "settings"),
                 new("Audit Logs", "AuditLogs", "Index", "list"),
                 new("Analytics & Exports", "Analytics", "Index", "chart", "")
@@ -137,6 +138,7 @@ namespace Orange_Tendering_System.ViewModels
             ["folder"] = "<path d=\"M3 6h7l2 3h9v11H3z\"/>",
             ["compare"] = "<path d=\"M8 3v18M16 3v18M3 8h5M16 16h5\"/>",
             ["report"] = "<path d=\"M12 3v9h9\"/><path d=\"M8 4a9 9 0 1 0 12 12\"/>",
+            ["radar"] = "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 12 19 5\"/><circle cx=\"16\" cy=\"9\" r=\"1\"/>",
             ["unlock"] = "<rect x=\"5\" y=\"10\" width=\"14\" height=\"11\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8-1m-4 8v3\"/>",
             ["lock"] = "<rect x=\"5\" y=\"10\" width=\"14\" height=\"11\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8 0v3m-4 4v3\"/>",
             ["trend"] = "<path d=\"M3 19h18M5 15l5-5 4 3 6-7m-5 0h5v5\"/>",

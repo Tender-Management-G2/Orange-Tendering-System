@@ -24,7 +24,9 @@
     var officerArabic = area == "SourcingOfficer" && Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
 }
 <link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/evaluation-scores.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/tender-passport.css" asp-append-version="true" />
+<script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
 <script src="~/js/tender-passport.js" asp-append-version="true" defer></script>
 <div class="dash-board @(area == "Supplier" ? "dash-supplier" : "dash-internal") wfl">
     <section class="dash-welcome wfl-hero" aria-labelledby="wfl-title">
@@ -153,6 +155,7 @@
         }).catch(function () { body.innerHTML = '<div class="wf-loading wf-loading-error">The server could not be reached.</div>'; });
     }
     function wire() {
+        OrangeTechnicalEvaluation.wire(body);
         var sl = body.querySelector('#wp-fin');
         if (sl) { var tl = body.querySelector('#wp-tech'), fl = body.querySelector('#wp-fin-label'), tt = body.querySelector('#wp-tech-label'); var sync = function () { var v = Number(sl.value); tl.value = 100 - v; fl.textContent = v + '%'; tt.textContent = (100 - v) + '%'; sl.style.setProperty('--p', v + '%'); }; sl.addEventListener('input', sync); sync(); }
         var f = body.querySelector('#financial-weight'), t = body.querySelector('#technical-weight');
@@ -165,16 +168,25 @@
             var sync = function () { var b = boxes(), n = b.filter(function (x) { return x.checked; }).length, visible = b.filter(function (x) { return !x.closest('li').hidden; }), picked = visible.filter(function (x) { return x.checked; }).length; cnt.textContent = n + ' selected'; btn.disabled = n === 0; btn.textContent = n ? 'Invite ' + n + ' supplier' + (n > 1 ? 's' : '') : 'Invite selected'; all.checked = visible.length > 0 && picked === visible.length; all.indeterminate = picked > 0 && picked < visible.length; };
             all.addEventListener('change', function () { boxes().filter(function (x) { return !x.closest('li').hidden; }).forEach(function (x) { x.checked = all.checked; }); sync(); });
             f.addEventListener('change', function (e) { if (e.target !== all) sync(); }); sync();
-            var search = f.querySelector('[data-supplier-search]'), category = f.querySelector('select[data-supplier-category]');
+            var search = f.querySelector('[data-supplier-search]'), category = f.querySelector('select[data-supplier-category]'), docs = f.querySelector('[data-supplier-docs]'), history = f.querySelector('[data-supplier-history]');
             if (search && category) {
                 var filterSuppliers = function () {
                     var term = search.value.trim().toLowerCase();
                     f.querySelectorAll('li[data-supplier-name]').forEach(function (row) {
-                        row.hidden = (term && row.dataset.supplierName.indexOf(term) < 0) || (category.value && row.dataset.supplierCategory !== category.value);
+                        var d = row.dataset, hide = (term && d.supplierName.indexOf(term) < 0) || (category.value && d.supplierCategory !== category.value);
+                        if (docs && docs.value === 'verified') hide = hide || Number(d.verified) === 0;
+                        if (docs && docs.value === 'clean') hide = hide || Number(d.issues) > 0;
+                        if (history && history.value === 'offers') hide = hide || Number(d.offers) === 0;
+                        if (history && history.value === 'awards') hide = hide || Number(d.awards) === 0;
+                        if (history && history.value === 'new') hide = hide || Number(d.offers) > 0;
+                        row.hidden = !!hide;
                     });
                     sync();
                 };
-                search.addEventListener('input', filterSuppliers); category.addEventListener('change', filterSuppliers);
+                [search, category, docs, history].forEach(function (c) { if (c) { c.addEventListener('input', filterSuppliers); c.addEventListener('change', filterSuppliers); } });
+                var reset = f.querySelector('[data-supplier-reset]');
+                if (reset) reset.addEventListener('click', function () { search.value = ''; category.value = ''; if (docs) docs.value = ''; if (history) history.value = ''; boxes().forEach(function (x) { x.checked = false; }); filterSuppliers(); });
+                filterSuppliers();
             }
         });
         body.querySelectorAll('.wf-step[data-phase]').forEach(function (st) {
@@ -237,15 +249,27 @@
         });
         body.querySelectorAll('[data-all-ok]').forEach(function (b) { b.addEventListener('click', function () { b.closest('form').querySelectorAll('tr[data-bid] [data-f=status]').forEach(function (s) { s.value = 'Compliant'; }); b.closest('form').querySelectorAll('tr[data-bid] [data-f=notes]').forEach(function (s) { s.selectedIndex = 0; }); }); });
         body.querySelectorAll('select.wp-quick').forEach(function (q) { q.addEventListener('change', function () { var t = q.parentElement.querySelector('textarea'); if (t && q.value) { t.value = q.value; q.value = ''; t.focus(); } }); });
+        body.querySelectorAll('form[data-evaluator-scores]').forEach(function (form) {
+            var financialWeight = Number(form.dataset.financialWeight), technicalWeight = Number(form.dataset.technicalWeight);
+            var recommendation = form.querySelector('select[name="recommendation.RecommendedBidId"]');
+            var deviation = form.querySelector('[data-rank-deviation]'), explanation = deviation.querySelector('textarea');
+            if (!Number.isFinite(financialWeight) || !Number.isFinite(technicalWeight) || Math.abs(financialWeight + technicalWeight - 100) > 1e-6) return;
+            var sync = function () {
+                var ranked = Array.prototype.slice.call(form.querySelectorAll('[data-score-row]')).map(function (row) {
+                    var financial = row.querySelector('[data-score="financial"]');
+                    var technical = OrangeTechnicalEvaluation.score(row, '[data-score="technical"]');
+                    return { id: row.dataset.bid, score: financial.value !== '' && financial.checkValidity() && technical !== null
+                        ? (Number(financial.value) * financialWeight + technical * technicalWeight) / 100 : null };
+                });
+                var complete = ranked.length > 0 && ranked.every(function (row) { return row.score !== null; });
+                var top = complete ? Math.max.apply(null, ranked.map(function (row) { return row.score; })) : null;
+                var differs = complete && recommendation.value !== '' && !ranked.some(function (row) { return row.id === recommendation.value && Math.abs(row.score - top) < 1e-9; });
+                deviation.hidden = !differs; explanation.disabled = !differs; explanation.required = differs;
+            };
+            form.addEventListener('input', sync); form.addEventListener('change', sync); sync();
+        });
         var pad = function (n) { return ('0' + n).slice(-2); }, local = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
         body.querySelectorAll('select[data-preset="deadline"]').forEach(function (sel) { sel.addEventListener('change', function () { if (!sel.value) return; var d = new Date(); d.setDate(d.getDate() + Number(sel.value)); d.setHours(17, 0, 0, 0); sel.closest('form').querySelector('input[name=deadline]').value = local(d); }); });
-        body.querySelectorAll('select[data-preset="start"], select[data-preset="duration"]').forEach(function (sel) {
-            sel.addEventListener('change', function () {
-                var f = sel.closest('form'), st = f.querySelector('input[name=StartsAt]'), en = f.querySelector('input[name=EndsAt]'), p = f.querySelector('[data-preset=start]').value, dur = Number(f.querySelector('[data-preset=duration]').value || 60), d = new Date();
-                if (sel.dataset.preset === 'start') { if (!p) return; if (p === '15m') d.setMinutes(d.getMinutes() + 15); else if (p === '1h') d.setHours(d.getHours() + 1); else { d.setDate(d.getDate() + (p === 'd2' ? 2 : 1)); d.setHours(10, 0, 0, 0); } d.setSeconds(0, 0); st.value = local(d); }
-                if (st.value) { var e = new Date(st.value); e.setMinutes(e.getMinutes() + dur); en.value = local(e); }
-            });
-        });
         body.querySelectorAll('table.wp-sortable').forEach(function (tb) {
             tb.querySelectorAll('thead th').forEach(function (th, ci) {
                 th.tabIndex = 0; th.setAttribute('role', 'button'); th.title = 'Click to sort';

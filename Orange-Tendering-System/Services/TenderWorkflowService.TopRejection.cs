@@ -8,7 +8,7 @@ namespace Orange_Tendering_System.Services;
 
 // Top Committee final decision: exactly three actions. APPROVE keeps the existing relay (TopVote/RecordFinalDecision/Award).
 // REJECT (the company no longer needs the tender) and RE-TENDER each stop the current Top approval at once, even after earlier
-// approvals, and travel Top Committee -> assigned Sourcing Manager -> the single Sourcing Officer:
+// approvals, and go straight to the single Sourcing Officer (the assigned Sourcing Manager is informed, no acknowledgement step):
 //   Reject    -> the Officer notifies participating suppliers and the requesting department; the tender is cancelled.
 //   Re-Tender -> the Officer edits permitted details, the deadline and the invitation list (>= 3 suppliers) and publishes the next
 //                round of the same tender (never beyond round MaxRounds); compliance, AI, evaluation and approvals restart.
@@ -42,27 +42,31 @@ public partial class TenderWorkflowService
             // The approval threshold was reached earlier but nothing was awarded: the stopping decision replaces that approval.
             Require(t.AwardedBidId == null && notice.Status != FinalDecisionStatus.SuppliersNotified, "This tender was already awarded and announced.");
             Audit(actor, t.Id, "TopApprovalRelayReplacedByRejection", new { notice.Id, PreviousStatus = notice.Status, notice.ManagerAcknowledgedAt, notice.ManagerComment, notice.TopApprovals, notice.TopVotes });
-            notice.Status = FinalDecisionStatus.AwaitingManager; notice.ManagerAcknowledgedAt = null; notice.ManagerComment = null;
+            notice.Status = FinalDecisionStatus.ForwardedToOfficer; notice.ManagerAcknowledgedAt = null; notice.ManagerComment = null;
         }
         else
         {
-            notice = new FinalDecisionNotice { TenderId = t.Id, TenderReportId = s.ReportId, CreatedAt = Now, ManagerUserId = await AssignedManagerId(t.Id, s), Status = FinalDecisionStatus.AwaitingManager };
+            notice = new FinalDecisionNotice { TenderId = t.Id, TenderReportId = s.ReportId, CreatedAt = Now, ManagerUserId = await AssignedManagerId(t.Id, s), Status = FinalDecisionStatus.ForwardedToOfficer };
             db.Add(notice);
         }
         notice.Outcome = outcome; notice.RejectionReason = outcome == FinalDecisionOutcome.Cancel ? TopRejectionReason.NotNeeded : null;
         notice.RejectedByUserId = actor.Id; notice.RejectedAt = Now; notice.DecisionReason = comment.Trim();
         notice.TopApprovals = approves; notice.TopVotes = votes;
         var what = outcome == FinalDecisionOutcome.Cancel ? "rejected the tender (the company no longer needs it)" : "requested a Re-Tender";
+        await NotifyOfficer(t.Id, outcome == FinalDecisionOutcome.Cancel ? "Top Committee rejected the tender" : "Top Committee requested a Re-Tender",
+            outcome == FinalDecisionOutcome.Cancel
+                ? $"A Top Committee member {what}. Reason: {comment.Trim()}. Notify the suppliers and the requesting department; the tender is then cancelled."
+                : $"A Top Committee member {what}. Reason: {comment.Trim()}. Prepare the new round: details, deadline and at least 3 invited suppliers (maximum {MaxRounds} rounds).");
         if (notice.ManagerUserId != null)
             Notify(notice.ManagerUserId, t.Id, outcome == FinalDecisionOutcome.Cancel ? "Top Committee rejected the tender" : "Top Committee requested a Re-Tender",
-                $"A Top Committee member {what}. Reason: {comment.Trim()}. The Top approval is stopped. Review it and forward it to the Sourcing Officer.");
+                $"A Top Committee member {what}. Reason: {comment.Trim()}. The Top approval is stopped and the Sourcing Officer carries out the outcome. No action is needed from you.");
         foreach (var member in (await Members(t.Id, CommitteeType.Top)).Where(x => x.UserId != actor.Id))
             Notify(member.UserId, t.Id, "Top Committee approval stopped", $"A member {what}. No further votes or signatures are accepted for this report.");
         Audit(actor, t.Id, outcome == FinalDecisionOutcome.Cancel ? "TopRejectionStoppedApproval" : "TopRetenderStoppedApproval",
             new { s.ReportId, CommitteeRoundId = round.Id, Decision = decision, Outcome = outcome, Reason = comment.Trim(), Approves = approves, Votes = votes });
     }
 
-    // REJECT: the Officer's single step after the Manager forwarded it (called by NotifySuppliers under the tender lock, at most once).
+    // REJECT: the Officer's single step (called by NotifySuppliers under the tender lock, at most once).
     private async Task ExecuteRejectionOutcome(Tender t, ApplicationUser officer, FinalDecisionNotice notice)
     {
         Require(notice.Outcome == FinalDecisionOutcome.Cancel, "A Re-Tender request is carried out with \"Prepare the new round\", not with Notify Suppliers.");
@@ -136,7 +140,7 @@ public partial class TenderWorkflowService
         var notice = await db.Set<FinalDecisionNotice>().Where(x => x.TenderId == id).OrderByDescending(x => x.Id).FirstOrDefaultAsync();
         Require(notice?.Outcome == FinalDecisionOutcome.Retender, "There is no Re-Tender request for this tender.");
         Require(notice!.Status != FinalDecisionStatus.SuppliersNotified, $"Round {notice.NewRoundNumber} was already published.");
-        Require(notice.Status == FinalDecisionStatus.ForwardedToOfficer, "The Sourcing Manager must review and forward the Re-Tender request first.");
+        Require(notice.Status == FinalDecisionStatus.ForwardedToOfficer, "This Re-Tender request is still awaiting the (legacy) Sourcing Manager acknowledgement.");
         Require(t.Status == TenderStatus.Rejected && t.AwardedBidId == null, "This tender is not waiting for a Re-Tender.");
         var s = await Session(id);
         Require(s.ReportId == notice.TenderReportId, "The Re-Tender request belongs to an older report version.");
