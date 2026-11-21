@@ -26,16 +26,17 @@ public sealed partial class SupplierOfferService
         if (invitation == null || invitation.Bids.Any(b => b.Status != BidStatus.Draft)) return null;
         var tender = invitation.TenderRound.Tender;
         var draft = invitation.Bids.OrderByDescending(b => b.Id).FirstOrDefault();
-        var neededBy = await context.PurchaseRequests.Where(p => p.Id == tender.PurchaseRequestId).Select(p => p.NeededBy).SingleAsync();
+        var request = await context.PurchaseRequests.Where(p => p.Id == tender.PurchaseRequestId).Select(p => new { p.NeededBy, p.EvaluationMethod }).SingleAsync();
         var model = new SupplierDraftOfferViewModel
         {
             InvitationId = invitation.Id, BidId = draft?.Id, TenderId = tender.Id, TenderTitle = tender.Title, CompanyName = invitation.Supplier.CompanyName,
-            Deadline = invitation.TenderRound.Deadline, NeededBy = neededBy, RequiredDocuments = OfferDocumentTypes.Parse(tender.RequiredDocuments),
+            Deadline = invitation.TenderRound.Deadline, NeededBy = request.NeededBy, RequiredCurrency = request.EvaluationMethod == TenderEvaluationMethod.LowestPrice ? tender.Currency : null, RequiredDocuments = OfferDocumentTypes.Parse(tender.RequiredDocuments),
             Requirements = PublicRequirements(tender),
             ItemContext = tender.Items.OrderBy(x => x.Id).Select(x => new OfferItemContext(x.Id, x.Name, x.Category?.Name, x.Specifications, x.Quantity, x.Unit)).ToList(),
             ExistingDocuments = draft?.Documents.Select(d => new SupplierDocumentViewModel { Id = d.Id, FileName = d.FileName, DocumentType = d.DocumentType, SizeBytes = d.SizeBytes, UploadedAt = d.UploadedAt }).ToList() ?? []
         };
         model.Input = draft == null ? new SupplierDraftOfferInputModel { ValidUntil = (invitation.TenderRound.Deadline ?? workflow.Now).Date.AddDays(90) } : ToInput(draft);
+        if (model.RequiredCurrency != null) model.Input.CurrencyCode = model.RequiredCurrency;
         model.Input.Items = tender.Items.OrderBy(x => x.Id).Select(x =>
         {
             var line = draft?.Items.FirstOrDefault(i => i.TenderItemId == x.Id);

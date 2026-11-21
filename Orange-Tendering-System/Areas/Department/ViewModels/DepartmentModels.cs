@@ -12,6 +12,7 @@ public class RequestForm
     [BindNever] public string Title { get; set; } = "";
     [Required(ErrorMessage = "Explain why the department needs these items."), StringLength(10000)] public string Justification { get; set; } = "";
     [EnumDataType(typeof(RequestPriority))] public RequestPriority Priority { get; set; } = RequestPriority.Normal;
+    [EnumDataType(typeof(TenderEvaluationMethod))] public TenderEvaluationMethod? EvaluationMethod { get; set; }
     [Required, DataType(DataType.Date)] public DateTime? NeededBy { get; set; }
     public List<RequestItemForm> Items { get; set; } = [new()];
     public List<IFormFile> Attachments { get; set; } = [];
@@ -43,7 +44,7 @@ public class RequestItemForm : IValidatableObject
 }
 
 public record RequestSnapshot(string Title, string Justification, RequestPriority Priority,
-    DateTime? NeededBy, List<RequestItemForm> Items, List<string>? Attachments = null);
+    DateTime? NeededBy, List<RequestItemForm> Items, List<string>? Attachments = null, TenderEvaluationMethod? EvaluationMethod = null);
 
 public class RequestList
 {

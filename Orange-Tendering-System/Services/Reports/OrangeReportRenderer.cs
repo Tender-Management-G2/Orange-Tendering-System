@@ -40,6 +40,7 @@ public class OrangeReportRenderer
     public RenderedReport Render(FrozenReport frozen)
     {
         var data = frozen.Inputs;
+        var financialOnly = data.Committee.Count == 0;
         var slots = LedgerSlots(data.Committee.Any(x => x.Seat == "TechnicalRepresentative2"));
         var document = new MigraDoc.DocumentObjectModel.Document();
         document.Info.Title = $"Orange Tender {data.TenderId} - Evaluation Report v{data.Version}";
@@ -73,9 +74,9 @@ public class OrangeReportRenderer
         Table(section, ["At a glance", "Result"], [
             ["Offers evaluated", data.Ranking.Count.ToString()],
             ["Recommended winner", winnerBid == null ? "None" : $"{winnerBid.Supplier} (bid #{winnerBid.Id})"],
-            ["Final weighted score", winner == null ? "-" : Number(Math.Round(winner.Score, 4))],
+            [financialOnly ? "Lowest total price" : "Final weighted score", winner == null ? "-" : Number(Math.Round(winner.Score, 4))],
             ["Approved weights", $"{Number(data.FinancialWeight)}% financial / {Number(data.TechnicalWeight)}% technical"],
-            ["Committee", $"{data.Committee.Count} independent members"]]);
+            ["Evaluation method", financialOnly ? "Lowest compliant total price" : $"{data.Committee.Count} independent committee members"]]);
         Heading(section, "1. Requirements and approved evaluation criteria");
         Table(section, ["Approved criteria", "Value"], [
             ["Financial weight", Number(data.FinancialWeight) + "%"], ["Technical weight", Number(data.TechnicalWeight) + "%"],
@@ -96,25 +97,31 @@ public class OrangeReportRenderer
             Table(section, ["Item", "Quantity", "Unit price", "Offered specification"], bid.Items);
             Body(section, "Supporting documents: " + (bid.Documents.Length == 0 ? "None recorded" : string.Join("; ", bid.Documents)));
         }
-        Heading(section, "3. Four-member independent evaluation");
-        Body(section, "Member score = (Financial score x Approved financial weight + Technical score x Approved technical weight) / 100. Supplier final score = the sum of all four member scores / 4. Official calculations retain full decimal precision; display rounding does not determine ranking.");
-        foreach (var member in data.Committee)
+        if (!financialOnly)
         {
-            Heading(section, SeatLabel(member.Seat) + " - " + member.Name, 11);
-            Table(section, ["Bid", "Financial / 100", "Technical / 100", "Weighted result"], data.Scores.Where(x => x.MemberId == member.MemberId).Select(x => new[] { "#" + x.BidId, Number(x.Financial), Number(x.Technical), Number(x.Weighted) }).ToArray());
-            foreach (var score in data.Scores.Where(x => x.MemberId == member.MemberId)) Body(section, $"Bid #{score.BidId} - observations: {score.Observations}");
+            Heading(section, "3. Four-member independent evaluation");
+            Body(section, "Member score = (Financial score x Approved financial weight + Technical score x Approved technical weight) / 100. Supplier final score = the sum of all four member scores / 4. Official calculations retain full decimal precision; display rounding does not determine ranking.");
+            foreach (var member in data.Committee)
+            {
+                Heading(section, SeatLabel(member.Seat) + " - " + member.Name, 11);
+                Table(section, ["Bid", "Financial / 100", "Technical / 100", "Weighted result"], data.Scores.Where(x => x.MemberId == member.MemberId).Select(x => new[] { "#" + x.BidId, Number(x.Financial), Number(x.Technical), Number(x.Weighted) }).ToArray());
+                foreach (var score in data.Scores.Where(x => x.MemberId == member.MemberId)) Body(section, $"Bid #{score.BidId} - observations: {score.Observations}");
+            }
         }
-        Heading(section, "4. Exact ranking and recommendation");
-        Table(section, ["Rank", "Bid / supplier", "Final weighted score", "Outcome"], data.Ranking.Select(x => new[] { x.Rank.ToString(), $"#{x.BidId} - {data.Bids.Single(b => b.Id == x.BidId).Supplier}", Number(x.Score), x.Tied ? "Exact score tie" : x.Rank == 1 ? "Recommended Winner" : "Ranked" }).ToArray());
+        Heading(section, financialOnly ? "3. Lowest compliant total price" : "4. Exact ranking and recommendation");
+        Table(section, ["Rank", "Bid / supplier", financialOnly ? "Total price" : "Final weighted score", "Outcome"], data.Ranking.Select(x => new[] { x.Rank.ToString(), $"#{x.BidId} - {data.Bids.Single(b => b.Id == x.BidId).Supplier}", Number(x.Score), x.Tied ? "Exact score tie" : x.Rank == 1 ? "Recommended Winner" : "Ranked" }).ToArray());
         if (data.Ranking.Count(x => x.Rank == 1) != 1) Body(section, "AWARD BLOCKED: exact highest-score tie requires an authorized resolution policy.");
         Body(section, "Recommendation justification / permitted revision: " + data.Explanation);
         Body(section, "A recommendation is not an award. Required approvals must be completed separately.");
-        Heading(section, "5. Supplementary AI assistance");
-        Body(section, "Model: " + data.AiModel + ". Human-reviewed supplementary assistance. AI does not set weights, enter scores, exclude bids or select an official winner.");
-        foreach (var line in ReadableJson(data.AiFindings)) Body(section, line);
-        Heading(section, "AI source references and extraction limitations", 10);
-        foreach (var line in ReadableJson(data.AiEvidence)) Body(section, line);
-        Heading(section, "6. Version and approval history at generation");
+        if (!financialOnly)
+        {
+            Heading(section, "5. Supplementary AI assistance");
+            Body(section, "Model: " + data.AiModel + ". Human-reviewed supplementary assistance. AI does not set weights, enter scores, exclude bids or select an official winner.");
+            foreach (var line in ReadableJson(data.AiFindings)) Body(section, line);
+            Heading(section, "AI source references and extraction limitations", 10);
+            foreach (var line in ReadableJson(data.AiEvidence)) Body(section, line);
+        }
+        Heading(section, financialOnly ? "4. Version and approval history at generation" : "6. Version and approval history at generation");
         Table(section, ["Version / stage", "Decision / feedback", "User / UTC"], frozen.ApprovalHistory);
         Body(section, "Later endorsements appear in the predefined signature ledger on protected viewing copies. They bind this immutable canonical version. Electronic acknowledgments are not certificate-backed PDF signatures.");
         var renderer = new PdfDocumentRenderer { Document = document };
@@ -139,7 +146,8 @@ public class OrangeReportRenderer
                 graphics.DrawLine(new XPen(XColors.Silver, 0.6) { DashStyle = XDashStyle.Dash }, 440, y + rowH - 14, 538, y + rowH - 14);
                 graphics.DrawString("Signature", new XFont("Orange Sans", 6), XBrushes.Gray, 440, y + rowH - 6);
                 var label = slots[i];
-                if (i < 4)
+                if (i < 4 && financialOnly) label = "Not required for financial-only tenders";
+                else if (i < 4)
                 {
                     var seat = data.Committee.Single(x => "Evaluation:" + x.Seat == slots[i]);
                     var name = Clip(seat.Name, 40);

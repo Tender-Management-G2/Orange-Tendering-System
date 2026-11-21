@@ -1,0 +1,32 @@
+@model Orange_Tendering_System.Models.Entities.WeightRound
+@{
+    var ar = Context.Request.Cookies["orange-lang"] == "ar";
+    string T(string en, string arabic) => ar ? arabic : en;
+}
+<form dir="@(ar ? "rtl" : null)" data-total-label="@T("Total", "المجموع")" data-add-label="@T("Add", "زيد")"
+      data-reduce-label="@T("Reduce by", "نقّص")" data-complete-label="@T("Weights complete", "الأوزان مكتملة")"
+      data-invalid-label="@T("Enter distinct criterion names and valid percentages", "أدخل أسماء مختلفة ونسبًا صحيحة")" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ApproveWeights" asp-route-id="@Model.TenderId" method="post" class="wp-form" data-approve-weights>
+    @if (Model.TechnicalAverage > 0m)
+    {
+        <h4>@T("Technical criteria", "المعايير الفنية")</h4>
+        <p>@T("Distribute 100% of the technical portion.", "وزّع ١٠٠٪ من الجزء الفني.")</p>
+        <div class="wp-table">
+            <table>
+                <thead><tr><th>@T("Technical criterion", "المعيار الفني")</th><th>@T("Share of technical (%)", "النسبة من الفني")</th><th></th></tr></thead>
+                <tbody data-technical-rows>
+                    @for (var index = 0; index < 4; index++)
+                    {
+                        <tr>
+                            <td><input name="criteria[@index].Name" data-criterion-name aria-label="Technical criterion @(index + 1)" maxlength="120" required /></td>
+                            <td><input name="criteria[@index].Weight" data-criterion-weight aria-label="Percentage for criterion @(index + 1)" type="number" min="0.01" max="100" step="0.01" required /></td>
+                            <td><button type="button" class="wp-ghost" data-remove-criterion aria-label="Remove criterion @(index + 1)">@T("Remove", "حذف")</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <button type="button" class="wp-ghost" data-add-criterion>@T("Add criterion", "إضافة معيار")</button>
+        <p class="wp-hint" data-technical-total aria-invalid="true" role="status" aria-live="polite">@T("Total 0% · Add 100%.", "المجموع ٠٪ · زيد ١٠٠٪.")</p>
+    }
+    <button class="wp-primary" data-approve-button disabled="@(Model.TechnicalAverage > 0m)">@T("Approve and lock weights", "اعتماد الأوزان")</button>
+</form>

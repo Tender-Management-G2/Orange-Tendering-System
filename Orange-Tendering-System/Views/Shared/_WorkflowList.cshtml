@@ -24,7 +24,9 @@
     var officerArabic = area == "SourcingOfficer" && Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
 }
 <link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/evaluation-scores.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/tender-passport.css" asp-append-version="true" />
+<script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
 <script src="~/js/tender-passport.js" asp-append-version="true" defer></script>
 <div class="dash-board @(area == "Supplier" ? "dash-supplier" : "dash-internal") wfl">
     <section class="dash-welcome wfl-hero" aria-labelledby="wfl-title">
@@ -153,6 +155,7 @@
         }).catch(function () { body.innerHTML = '<div class="wf-loading wf-loading-error">The server could not be reached.</div>'; });
     }
     function wire() {
+        OrangeTechnicalEvaluation.wire(body);
         var sl = body.querySelector('#wp-fin');
         if (sl) { var tl = body.querySelector('#wp-tech'), fl = body.querySelector('#wp-fin-label'), tt = body.querySelector('#wp-tech-label'); var sync = function () { var v = Number(sl.value); tl.value = 100 - v; fl.textContent = v + '%'; tt.textContent = (100 - v) + '%'; sl.style.setProperty('--p', v + '%'); }; sl.addEventListener('input', sync); sync(); }
         var f = body.querySelector('#financial-weight'), t = body.querySelector('#technical-weight');
@@ -253,9 +256,10 @@
             if (!Number.isFinite(financialWeight) || !Number.isFinite(technicalWeight) || Math.abs(financialWeight + technicalWeight - 100) > 1e-6) return;
             var sync = function () {
                 var ranked = Array.prototype.slice.call(form.querySelectorAll('[data-score-row]')).map(function (row) {
-                    var financial = row.querySelector('[data-score="financial"]'), technical = row.querySelector('[data-score="technical"]');
-                    return { id: row.dataset.bid, score: financial.value !== '' && technical.value !== '' && financial.checkValidity() && technical.checkValidity()
-                        ? (Number(financial.value) * financialWeight + Number(technical.value) * technicalWeight) / 100 : null };
+                    var financial = row.querySelector('[data-score="financial"]');
+                    var technical = OrangeTechnicalEvaluation.score(row, '[data-score="technical"]');
+                    return { id: row.dataset.bid, score: financial.value !== '' && financial.checkValidity() && technical !== null
+                        ? (Number(financial.value) * financialWeight + technical * technicalWeight) / 100 : null };
                 });
                 var complete = ranked.length > 0 && ranked.every(function (row) { return row.score !== null; });
                 var top = complete ? Math.max.apply(null, ranked.map(function (row) { return row.score; })) : null;

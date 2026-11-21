@@ -218,6 +218,9 @@ button.wfl-open{border:0;font:inherit;cursor:pointer}
 .wp-form button:not(.wp-primary):not(.wp-ghost){min-height:40px;padding:0 20px;border:0;border-radius:999px;background:linear-gradient(135deg,#ffa31a,#ff6a00);color:#161616;font:inherit;font-weight:800;cursor:pointer;justify-self:start}
 .wp-opt{border:1px dashed var(--ws-rule);border-radius:14px;padding:0;background:transparent}.wp-opt>summary{padding:11px 14px;cursor:pointer;font-weight:700;font-size:var(--fs-sm);color:var(--ws-accent);list-style:none}.wp-opt>summary::-webkit-details-marker{display:none}.wp-opt>summary::before{content:"+ ";font-weight:900}.wp-opt[open]>summary::before{content:"\2212 "}
 .wp-opt>.wp-form,.wp-opt>label,.wp-opt>.wp-text{margin:0 14px 14px}.wp-opt summary em{font-style:normal;color:var(--ws-muted);font-weight:600}
+.wf [data-technical-total]{padding:8px 12px;border:1px solid currentColor;border-radius:6px}
+.wf [data-technical-total][aria-invalid=true]{color:var(--ws-danger,#b42318);background:#f0443814}
+.wf [data-approve-button]:disabled{opacity:.55;cursor:not-allowed}
 .wp-warn{padding:10px 14px;border-radius:12px;border:1px solid #ff790066;background:#ff790014;color:var(--ws-ink)}
 .wp-text{white-space:pre-line;font-size:var(--fs-sm);line-height:1.6;color:var(--ws-ink);max-height:220px;overflow:auto}
 .wp-split{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:14px 16px;border-radius:16px;border:1px solid var(--ws-rule);background:var(--ws-bg)}

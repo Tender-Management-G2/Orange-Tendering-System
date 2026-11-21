@@ -48,7 +48,9 @@ else {
 <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post"><p>One final independent proposal per member. Submission cannot be edited.</p><label>Financial weight %<input id="financial-weight" name="financial" type="number" min="0" max="100" step="0.0001" required /></label><label>Technical weight %<input id="technical-weight" name="technical" type="number" min="0" max="100" step="0.0001" required /></label><button>Submit final proposal</button></form>
 }
 @if (Model.CanApproveWeights && w.State == WeightState.AwaitingApproval) {
-<form asp-area="EvaluationCommittee" asp-controller="WeightApprovals" asp-action="Approve" asp-route-id="@id" method="post"><p>Approve the displayed four proposals and exact averages for this requirements version.</p><button>Formally approve and lock weights</button></form>
+<partial name="_ApproveTechnicalWeights" model="w" />
+<script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
+<script>OrangeTechnicalEvaluation.wire(document);</script>
 }
 }
 </section>
@@ -64,7 +66,10 @@ else {
 <p>Deadline: <time data-local="@(round.Deadline.HasValue ? DateTime.SpecifyKind(round.Deadline.Value, DateTimeKind.Utc).ToString("O") : "")">@round.Deadline?.ToJordan("yyyy-MM-dd HH:mm")</time></p>
 @if (round.Deadline <= Model.UtcNow) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post"><button>Close bidding</button></form> }
 }
-@foreach (var bid in Model.Bids.Where(x => x.Status == BidStatus.Submitted)) {
+@if (round?.Status == TenderRoundStatus.Closed && s == null && Model.Tender.PurchaseRequest?.EvaluationMethod == TenderEvaluationMethod.LowestPrice) {
+    <partial name="_FinancialOfferReview" model="Model" />
+}
+else foreach (var bid in Model.Bids.Where(x => x.Status == BidStatus.Submitted)) {
 <p>Bid #@bid.Id · Supplier #@bid.TenderInvitation.SupplierId · @bid.ComplianceStatus · @bid.ComplianceNotes · Missing: @bid.MissingRequirements</p>
 @if (round?.Status == TenderRoundStatus.Closed && s == null) {
 <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Compliance" asp-route-id="@id" method="post"><input type="hidden" name="bidId" value="@bid.Id" /><label>Compliance result<select name="status" required><option value="Compliant">Compliant</option><option value="NonCompliant">Non-Compliant</option><option value="PendingClarification">Pending Clarification</option></select></label><label>Reasons and verification notes<textarea name="notes" maxlength="2000" required></textarea></label><label>Missing requirements / documents<textarea name="missing" maxlength="2000"></textarea></label><button>Record compliance check</button></form>
@@ -115,7 +120,7 @@ else {
 @if (Model.IsEvaluator && !submitted && s.State == SessionState.Scheduled && Model.UtcNow >= s.StartsAt && Model.UtcNow < s.EndsAt) {
 <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post"><p>Scores range from 0–100 and are independent of the approved weight percentages. Submit all eligible suppliers together.</p>
 @{ var scoreIndex = 0; }
-@foreach (var eligible in s.EligibleBids) { <fieldset><legend>Bid #@eligible.BidId</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" /><label>Financial score<input name="scores[@scoreIndex].Financial" type="number" min="0" max="100" step="0.0001" required /></label><label>Technical score<input name="scores[@scoreIndex].Technical" type="number" min="0" max="100" step="0.0001" required /></label><label>Observations and justification<textarea name="scores[@scoreIndex].Justification" maxlength="2000" required></textarea></label></fieldset> scoreIndex++; }
+@foreach (var eligible in s.EligibleBids) { <fieldset><legend>Bid #@eligible.BidId</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" /><label>Financial score<input name="scores[@scoreIndex].Financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required /></label><partial name="_TechnicalScoreInputs" model='(s.WeightRound.ReadTechnicalCriteria(), scoreIndex, "technical")' /><label>Observations and justification<textarea name="scores[@scoreIndex].Justification" maxlength="2000" required></textarea></label></fieldset> scoreIndex++; }
 <button>Submit complete final evaluation</button></form>
 }
 @if (Model.IsOfficer && s.State == SessionState.Scheduled && s.Submissions.Count == 4) {

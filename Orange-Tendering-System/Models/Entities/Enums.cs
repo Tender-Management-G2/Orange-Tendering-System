@@ -25,7 +25,8 @@ namespace Orange_Tendering_System.Models.Entities
 
     public enum TopExecutivePosition { CEO, CFO, CTO, COO }
 
-    public enum CommitteeType { Evaluation, Top }
+    public enum CommitteeType { Evaluation, Top, FinancialReview }
+    public enum TenderEvaluationMethod { Weighted, LowestPrice }
 
     // Keep DepartmentRepresentative for historical tenders. Admin may assign two distinct technical seats.
     // ChiefExecutiveOfficer marks the Top Committee CEO seat; other Top members have no responsibility.

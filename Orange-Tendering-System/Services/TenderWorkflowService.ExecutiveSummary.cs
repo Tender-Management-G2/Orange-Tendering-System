@@ -118,7 +118,7 @@ public partial class TenderWorkflowService
     {
         var request = await db.PurchaseRequests.AsNoTracking().Include(x => x.Department).SingleAsync(x => x.Id == t.PurchaseRequestId);
         var bids = await Submitted(s.TenderRoundId);
-        IReadOnlyList<RankedBid> ranking = s.Submissions.Count == 4 ? await Ranking(s) : Array.Empty<RankedBid>();
+        IReadOnlyList<RankedBid> ranking = s.AiAnalysisId == null || s.Submissions.Count == 4 ? await Ranking(s) : Array.Empty<RankedBid>();
         string Name(int bidId) => bids.FirstOrDefault(b => b.Id == bidId)?.TenderInvitation.Supplier.CompanyName ?? "Offer #" + bidId;
         var recommended = s.Report?.RecommendedBidId is int rb ? bids.FirstOrDefault(b => b.Id == rb) : null;
         var signatures = s.ReportId == null ? 0 : await db.Set<ReportSignature>().CountAsync(x => x.TenderReportId == s.ReportId && x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null);
@@ -137,14 +137,18 @@ public partial class TenderWorkflowService
         var request = await db.PurchaseRequests.AsNoTracking().SingleAsync(x => x.Id == t.PurchaseRequestId);
         var bids = await Submitted(s.TenderRoundId);
         string Name(int? bidId) => bids.FirstOrDefault(b => b.Id == bidId)?.TenderInvitation.Supplier.CompanyName ?? "an offer";
-        var ranking = string.Join("; ", facts.Ranking.Select(r => $"{r.Rank}. {r.Supplier} ({r.Score:0.0})"));
+        var financialOnly = s.AiAnalysisId == null;
+        var ranking = string.Join("; ", facts.Ranking.Select(r => financialOnly
+            ? $"{r.Rank}. {r.Supplier} ({r.Score:0.####} {t.Currency})" : $"{r.Rank}. {r.Supplier} ({r.Score:0.0})"));
         var reasons = s.Invitations.Where(x => !string.IsNullOrWhiteSpace(x.RecommendationReason)).Select(x => $"- Recommends {Name(x.RecommendedBidId)}: {x.RecommendationReason}").ToList();
         var concerns = s.Invitations.Where(x => !string.IsNullOrWhiteSpace(x.Concerns)).Select(x => "- " + x.Concerns).ToList();
         return new ExecutiveSummaryInput
         {
             BusinessNeed = request.Justification,
-            KeyFindings = $"{facts.ReceivedOffers} offer(s) received, {facts.EligibleOffers} eligible and evaluated by the four-member committee with approved weights Financial {facts.FinancialWeight:0.##}% / Technical {facts.TechnicalWeight:0.##}%. Final ranking: {ranking}.",
-            RecommendationReasons = reasons.Count > 0 ? string.Join("\n", reasons) : (facts.Recommended != null ? $"{facts.Recommended} has the highest final weighted score." : ""),
+            KeyFindings = financialOnly
+                ? $"{facts.ReceivedOffers} offer(s) received, {facts.EligibleOffers} eligible. Ranking by total price: {ranking}."
+                : $"{facts.ReceivedOffers} offer(s) received, {facts.EligibleOffers} eligible and evaluated by the four-member committee with approved weights Financial {facts.FinancialWeight:0.##}% / Technical {facts.TechnicalWeight:0.##}%. Final ranking: {ranking}.",
+            RecommendationReasons = reasons.Count > 0 ? string.Join("\n", reasons) : (facts.Recommended != null ? financialOnly ? $"{facts.Recommended} offered the lowest compliant total price." : $"{facts.Recommended} has the highest final weighted score." : ""),
             Risks = concerns.Count > 0 ? string.Join("\n", concerns) : null,
             ManagerAssessment = ""
         };

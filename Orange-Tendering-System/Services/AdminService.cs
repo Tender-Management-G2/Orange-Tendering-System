@@ -1535,6 +1535,63 @@ public async Task<string> UpdateUserAsync(
             return "Success";
         }
 
+        // AI-safe profile update: only the Admin UI service owns the Identity write. This intentionally has no role parameter,
+        // so a chat request can never turn a profile edit into a role replacement or privilege change.
+        public async Task<string> UpdateUserProfileAsync(string userId, string? fullName, string? phoneNumber, int? departmentId, bool? isActive, string adminId)
+        {
+            if (string.IsNullOrWhiteSpace(userId)) return "NotFound";
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) return "NotFound";
+            if (user.SupplierId.HasValue) return "SupplierAccount";
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var nextName = fullName == null ? user.FullName : fullName.Trim();
+            var nextPhone = phoneNumber == null ? user.PhoneNumber : phoneNumber.Trim();
+            var nextDepartment = departmentId ?? user.DepartmentId;
+            var nextActive = isActive ?? user.IsActive;
+
+            // The AI profile tool cannot disable a privileged system account. Role/security changes stay in the
+            // dedicated management workflow, where the administrator can review the full impact.
+            if (roles.Contains(SystemRoles.Admin) && !nextActive) return "ProtectedAdmin";
+
+            if (fullName != null && (nextName.Length < 2 || nextName.Length > 150)) return "InvalidName";
+            if (phoneNumber != null && nextPhone is { Length: > 0 } && (nextPhone.Length is < 6 or > 32 || nextPhone.Any(c => !char.IsDigit(c) && c is not ('+' or '(' or ')' or '-' or ' ' or '.')))) return "InvalidPhone";
+            if (roles.Any(r => r is SystemRoles.RequestingDepartment or SystemRoles.DepartmentRepresentative) && !nextDepartment.HasValue) return "DepartmentRequired";
+            if (departmentId.HasValue && !await _context.Departments.AnyAsync(d => d.Id == departmentId.Value && d.IsActive)) return "InvalidDepartment";
+            if (roles.Contains(SystemRoles.SourcingOfficer) && nextActive && !user.IsActive &&
+                (await _userManager.GetUsersInRoleAsync(SystemRoles.SourcingOfficer)).Any(u => u.IsActive && u.Id != user.Id)) return "OfficerAlreadyActive";
+            if (user.Id == adminId && !nextActive) return "SelfDeactivate";
+
+            var oldValues = new { user.FullName, user.DepartmentId, user.IsActive, PhoneNumberPresent = !string.IsNullOrWhiteSpace(user.PhoneNumber) };
+            var oldActive = user.IsActive;
+            var changed = user.FullName != nextName || user.PhoneNumber != nextPhone || user.DepartmentId != nextDepartment || user.IsActive != nextActive;
+            if (!changed) return "Success";
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            user.FullName = nextName;
+            user.PhoneNumber = nextPhone;
+            user.DepartmentId = nextDepartment;
+            user.IsActive = nextActive;
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded) { await transaction.RollbackAsync(); return "UpdateFailed"; }
+
+            if (oldActive != nextActive)
+            {
+                var stamp = await _userManager.UpdateSecurityStampAsync(user);
+                if (!stamp.Succeeded) { await transaction.RollbackAsync(); return "UpdateFailed"; }
+            }
+            _context.AuditLogs.Add(new AuditLog
+            {
+                UserId = adminId, Action = "AiProfileUpdated", EntityName = "ApplicationUser", EntityId = user.Id,
+                OldValues = JsonSerializer.Serialize(oldValues),
+                NewValues = JsonSerializer.Serialize(new { FullName = user.FullName, user.DepartmentId, user.IsActive, PhoneNumberChanged = phoneNumber != null }),
+                CreatedAt = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return "Success";
+        }
+
 
         // =============================================
         // ADMIN - ROLES MANAGEMENT - INDEX
@@ -1677,6 +1734,11 @@ public async Task<string> UpdateUserAsync(
             if ((roleName == SystemRoles.RequestingDepartment || roleName == SystemRoles.DepartmentRepresentative) &&
                 !user.DepartmentId.HasValue)
                 return "DepartmentRequired";
+
+            // Keep the one-active-Sourcing-Officer rule inside the identity service as well as the user edit workflow.
+            if (roleName == SystemRoles.SourcingOfficer && user.IsActive &&
+                (await _userManager.GetUsersInRoleAsync(SystemRoles.SourcingOfficer)).Any(u => u.IsActive && u.Id != user.Id))
+                return "OfficerAlreadyActive";
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();

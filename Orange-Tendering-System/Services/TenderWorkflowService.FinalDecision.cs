@@ -13,7 +13,7 @@ public partial class TenderWorkflowService
     public const int MaxEmailAttempts = 3;
 
     private async Task<string?> AssignedManagerId(int tenderId, EvaluationSession? s) =>
-        (await db.CommitteeMembers.Where(x => x.TenderId == tenderId && x.CommitteeType == CommitteeType.Evaluation && x.Responsibility == CommitteeResponsibility.SourcingManager)
+        (await db.CommitteeMembers.Where(x => x.TenderId == tenderId && x.Responsibility == CommitteeResponsibility.SourcingManager)
             .Select(x => x.UserId).FirstOrDefaultAsync()) ?? s?.Report?.ReviewedByUserId;
 
     // Called while a Top vote is being recorded (inside the tender's serialized transaction) and when a Manager approves a tender

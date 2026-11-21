@@ -12,6 +12,7 @@
     <dl class="pf-facts">
         <div><dt>Department</dt><dd>@Model.Department.Name</dd></div>
         <div><dt>Requested by</dt><dd>@(Model.CreatedByUser?.FullName ?? "—")</dd></div>
+        <div><dt>Evaluation method</dt><dd>@(Model.EvaluationMethod == TenderEvaluationMethod.LowestPrice ? "100% financial" : "Committee weight proposals")</dd></div>
         <div><dt>Priority</dt><dd>@Model.Priority</dd></div>
         <div><dt>Needed by</dt><dd>@(Model.NeededBy?.ToString("d MMM yyyy") ?? "Not specified")</dd></div>
         <div><dt>Submitted</dt><dd>@(Model.SubmittedAt?.ToJordan("d MMM yyyy HH:mm") ?? "—")</dd></div>

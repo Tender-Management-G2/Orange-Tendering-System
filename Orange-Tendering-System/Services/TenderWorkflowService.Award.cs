@@ -71,7 +71,7 @@ public partial class TenderWorkflowService
         // Internal parties: Officer, Evaluation Committee (includes the Manager's seat), Top Committee and the requesting department.
         var winner = bid.TenderInvitation.Supplier.CompanyName;
         var internalUsers = (await Members(t.Id, CommitteeType.Evaluation)).Select(x => x.UserId).Concat(members.Select(x => x.UserId))
-            .Append((await GlobalOfficer()).Id).Distinct().ToList();
+            .Append((await GlobalOfficer()).Id).Concat(managerId == null ? [] : new[] { managerId }).Distinct().ToList();
         foreach (var userId in internalUsers)
             Notify(userId, t.Id, "Tender awarded", $"The Top Committee approved the recommendation unanimously (4 of 4). The tender is awarded to {winner} and closed. Suppliers were notified of their own result.");
         var pr = await db.PurchaseRequests.AsNoTracking().SingleAsync(x => x.Id == t.PurchaseRequestId);

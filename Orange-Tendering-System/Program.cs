@@ -51,6 +51,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
     options.Events.OnValidatePrincipal = IdentityAccess.ValidateCookieAsync;
+    options.Events.OnSigningIn = Orange_Tendering_System.Services.Assistant.OrangeLogin.OnSigningIn;   // AI welcome: once per login
 });
 builder.Services.AddTransient<SmtpEmailSender>();
 builder.Services.AddTransient<IEmailSender>(services => services.GetRequiredService<SmtpEmailSender>());
@@ -81,6 +82,20 @@ builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<InternalDashboardService>();
 builder.Services.AddScoped<FinalDecisionService>();
 builder.Services.AddScoped<AiChatService>();
+// Orange AI assistant: server-authorized data tools, report generators and private file storage (Services/Assistant).
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AssistantAccess>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AssistantDataTools>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AiChatFileStore>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AssistantActions>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AgentTools>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AgentEngine>();
+builder.Services.AddHttpClient<Orange_Tendering_System.Services.Assistant.OllamaEmbeddingProvider>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.IAiEmbeddingProvider>(sp => sp.GetRequiredService<Orange_Tendering_System.Services.Assistant.OllamaEmbeddingProvider>());
+builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AiKnowledgeService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<Orange_Tendering_System.Services.Assistant.AssistantPdf>();
+builder.Services.AddHostedService<Orange_Tendering_System.Services.Assistant.AiChatFileCleanupWorker>();
 builder.Services.Configure<ExecutiveAgentOptions>(builder.Configuration.GetSection("ExecutiveAgent"));
 builder.Services.AddHttpClient<ExecutiveAgentClient>();
 builder.Services.AddScoped<ExecutiveAgentService>();
@@ -98,6 +113,7 @@ builder.Services.AddScoped<HayaReportingService>();
 builder.Services.AddScoped<HayaReportExport>();
 builder.Services.AddScoped<Orange_Tendering_System.Areas.TopCommittee.Services.TopCommitteeService>();
 builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<ProcurementCategoryService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.Configure<ReportSigningOptions>(builder.Configuration.GetSection("ReportSigning"));
 builder.Services.Configure<ReportRevisionPolicy>(builder.Configuration.GetSection("ReportRevisionPolicy"));

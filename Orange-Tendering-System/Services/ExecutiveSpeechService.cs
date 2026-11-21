@@ -33,7 +33,11 @@ public sealed class ExecutiveSpeechService(IOptions<ExecutiveSpeechOptions> opti
             var input = Path.Combine(folder, "recording.webm"); var wav = Path.Combine(folder, "recording.wav"); var output = Path.Combine(folder, "transcript");
             await using (var file = File.Create(input)) await audio.CopyToAsync(file, ct);
             await Run(options.Value.FfmpegExecutable!, ["-nostdin", "-hide_banner", "-loglevel", "error", "-i", input, "-t", "30", "-ar", "16000", "-ac", "1", "-y", wav], ct);
-            await Run(options.Value.WhisperExecutable!, ["-m", options.Value.ModelPath!, "-f", wav, "-l", language, "-otxt", "-of", output, "-np"], ct);
+            // A vocabulary hint (not an instruction): the system's page and action words, so short commands are spelled correctly.
+            var prompt = language == "ar"
+                ? "Orange. افتح، روح على صفحة، وديني على، الدعوات، عروضي، المناقصات، العطاءات، عطاء، مناقصة، الإشعارات، مهامي، التقارير، طلبات الشراء، وقّع التقرير، اعتمد، صوّت، حوّل، أنشئ عطاء جديد، Excel، PDF."
+                : "Orange. Open, go to the page, invitations, my offers, tenders, tender, notifications, my tasks, reports, purchase requests, sign the report, approve, vote, forward, create a new tender, Excel, PDF.";
+            await Run(options.Value.WhisperExecutable!, ["-m", options.Value.ModelPath!, "-f", wav, "-l", language, "--prompt", prompt, "-otxt", "-of", output, "-np"], ct);
             var text = (await File.ReadAllTextAsync(output + ".txt", ct)).Trim();
             if (text.Length == 0 || text.Length > 2000) throw new AgentException("No usable transcript was produced. Try a shorter recording or type the command.");
             return text;

@@ -15,6 +15,7 @@
     var s = Model.Session;
     var status = Model.Tender.Status;
     var round = Model.Tender.Rounds.OrderByDescending(x => x.RoundNumber).FirstOrDefault();
+    var lowestPrice = Model.Tender.PurchaseRequest?.EvaluationMethod == TenderEvaluationMethod.LowestPrice;
     var mySeat = Model.Tender.CommitteeMembers.FirstOrDefault(x => x.UserId == Model.UserId && x.CommitteeType == CommitteeType.Evaluation);
     var submitted = s != null && mySeat != null && s.Submissions.Any(x => x.CommitteeMemberId == mySeat.Id);
     var revisionLog = w?.State == WeightState.Proposals
@@ -30,7 +31,7 @@
     string Who(string? uid) => uid != null && userNames.TryGetValue(uid, out var n) ? n : "Member";
     string SupplierName(int sid) => supplierNames.TryGetValue(sid, out var n) ? n : "Supplier #" + sid;
     string BidSupplier(int bidId) { var b = Model.Bids.FirstOrDefault(x => x.Id == bidId); return b == null ? "Offer #" + bidId : SupplierName(b.TenderInvitation.SupplierId); }
-    decimal Price(Bid b) => b.Items.Sum(x => x.Quantity * x.UnitPrice) + b.OtherCost + b.ShippingCost + b.InstallationCost + b.MaintenanceCost + b.TaxAmount;
+    decimal Price(Bid b) => TenderWorkflowService.TotalOfferPrice(b);
     string Role(CommitteeResponsibility? r) => r switch { CommitteeResponsibility.SourcingManager => "Sourcing Manager", CommitteeResponsibility.DepartmentRepresentative => "Department", CommitteeResponsibility.FinancialRepresentative => "Financial", CommitteeResponsibility.TechnicalRepresentative => "Technical 1", CommitteeResponsibility.TechnicalRepresentative2 => "Technical 2", CommitteeResponsibility.ChiefExecutiveOfficer => "CEO", _ => "Member" };
 
     var evalMembers = Model.Tender.CommitteeMembers.Where(x => x.CommitteeType == CommitteeType.Evaluation).OrderBy(x => x.Responsibility).ToList();
@@ -154,7 +155,7 @@
                         : ($"Waiting for offers: {submittedSupplierCount} received", "You can close bidding once three distinct suppliers submit, once all invited suppliers submit or decline, or after the deadline.", "wait"))
                     : Model.IsSupplier ? ("Submit your offer", "Accept the invitation, then prepare and submit your offer before the deadline.", "action")
                     : ("Bidding is open", "Suppliers are sending their offers.", "wait");
-            return Model.IsOfficer ? ("Prepare the evaluation", "The system already checked the offers. Continue, run the AI analysis, then schedule the committee evaluation.", "action") : ("Bidding is closed", "The Officer is checking the offers and preparing the evaluation.", "wait");
+            return Model.IsOfficer && lowestPrice ? ("Check offer compliance", "Confirm the screening to send the lowest compliant price to the Manager.", "action") : Model.IsOfficer ? ("Prepare the evaluation", "The system already checked the offers. Continue, run the AI analysis, then schedule the committee evaluation.", "action") : ("Bidding is closed", "The Officer is checking the offers and preparing the evaluation.", "wait");
         }
         if (status == TenderStatus.Evaluation && s != null)
         {
@@ -163,7 +164,7 @@
                     : Model.IsOfficer ? ("The committee is signing the report", "The report was generated automatically. You receive the completed, signed report when all four members have signed it.", "wait")
                     : ("Report ready", "The committee is reviewing and signing the report.", "wait");
             if (Model.IsEvaluator && !submitted && (s.State == SessionState.Scheduled || TenderWorkflowService.EvaluationOpen(s, Model.UtcNow)))
-                return TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? ("Evaluate the offers", "Open the evaluation workspace: compare the offers, score each one (0-100, one decimal), recommend a supplier and sign. You submit once.", "action") : ("Prepare for the meeting", "The evaluation workspace already shows the offers, criteria, documents and AI analysis. Scoring opens at the meeting start.", "wait");
+                return TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? ("Evaluate the offers", "Open the evaluation workspace: compare the offers, score each one (whole numbers from 0 to 99), recommend a supplier and sign. You submit once.", "action") : ("Prepare for the meeting", "The evaluation workspace already shows the offers, criteria, documents and AI analysis. Scoring opens at the meeting start.", "wait");
             if (s.State == SessionState.Scheduled && Model.UtcNow < s.StartsAt) return ("Waiting for the meeting to start", "Scoring opens by itself at the start time shown below. Then the four members score the offers.", "wait");
             return ($"Committee evaluation: {s.Submissions.Count} of 4 submitted", submitted ? "Your evaluation is recorded and cannot be edited." : "Scoring is in progress.", "wait");
         }
@@ -288,7 +289,7 @@
         }
         @if (Model.CanApproveWeights && w != null && w.State == WeightState.AwaitingApproval)
         {
-            <div class="wp-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ApproveWeights" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Approve and lock the weights</button></form>
+            <div class="wp-actions"><partial name="_ApproveTechnicalWeights" model="w" />
                 <details class="wp-opt"><summary>Return weights to selected members for revision</summary>
                     <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ReturnWeights" asp-route-id="@id" method="post" class="wp-form">
                         <p class="wp-hint">Select one or more members. Their previous proposals are kept in the audit history; their forms reopen with the earlier values.</p>
@@ -346,7 +347,11 @@
                 @foreach (var bid in Model.Bids) { <a class="wp-ghost wp-link" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Details" asp-route-id="@bid.Id">My offer: @Words(bid.Status.ToString()) &middot; open</a> }
             </div>
         }
-        @if (Model.IsOfficer && closedRound)
+        @if (Model.IsOfficer && closedRound && lowestPrice)
+        {
+            <partial name="_FinancialOfferReview" model="Model" />
+        }
+        else if (Model.IsOfficer && closedRound)
         {
             var cur = !proceeded ? 1 : reviewedAi.Count == 0 ? 2 : 3;
             <div class="wp-wizard" data-wizard data-current="@cur">
@@ -393,7 +398,7 @@
                 <div class="wp-wnav"><button type="button" class="wp-ghost" data-wback>&larr; Back</button><span class="wp-wnote" data-wnote></span><button type="button" class="wp-primary" data-wnext>Next <span aria-hidden="true">&rarr;</span></button></div>
             </div>
         }
-        @if (Model.IsManager && pendingRequest != null && closedRound)
+        @if (Model.IsManager && !lowestPrice && pendingRequest != null && closedRound)
         {
             <div class="wp-actions"><form asp-area="SourcingManager" asp-controller="Workflow" asp-action="DecideProceed" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="decisionId" value="@pendingRequest.Id" /><p class="wp-text">@pendingRequest.Justification</p><label>Your comment<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Approved: the offers received are sufficient.</option><option>Approved: the purchase is time critical.</option><option>Rejected: please re-tender.</option></select><textarea name="comment" maxlength="2000" required rows="2" data-fv-label="Decision comment" data-fv-label-ar="تعليق القرار"></textarea></label><button name="approve" value="true" class="wp-primary">Approve</button><button name="approve" value="false" class="wp-ghost">Reject</button></form></div>
         }
@@ -405,8 +410,12 @@
                     @foreach (var eligible in s.EligibleBids)
                     {
                         <fieldset data-score-row data-bid="@eligible.BidId"><legend>@BidSupplier(eligible.BidId)</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" />
-                            <div class="wp-cols"><label>Financial (0&ndash;100)<input name="scores[@scoreIndex].Financial" data-score="financial" type="number" min="0" max="100" step="0.1" required data-fv-label="Financial score" data-fv-label-ar="الدرجة المالية" /></label><label>Technical (0&ndash;100)<input name="scores[@scoreIndex].Technical" data-score="technical" type="number" min="0" max="100" step="0.1" required data-fv-label="Technical score" data-fv-label-ar="الدرجة الفنية" /></label></div>
-                            <label>Why these scores?<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label></fieldset>
+                            <div class="evaluation-score-line">
+                                <label for="financial-score-@scoreIndex">Financial score <small>/ 100</small></label>
+                                <input id="financial-score-@scoreIndex" name="scores[@scoreIndex].Financial" data-score="financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required data-fv-label="Financial score" data-fv-label-ar="الدرجة المالية" />
+                            </div>
+                            <partial name="_TechnicalScoreInputs" model='(s!.WeightRound.ReadTechnicalCriteria(), scoreIndex, "technical")' />
+                            <label>Score justification<select class="wp-quick" aria-label="Quick text"><option value="">Use a suggested justification (optional)</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label></fieldset>
                         scoreIndex++;
                     }
                     <label>Recommended supplier<select name="recommendation.RecommendedBidId" required><option value="">Choose an eligible offer</option>@foreach (var eligible in s.EligibleBids) { <option value="@eligible.BidId">@BidSupplier(eligible.BidId)</option> }</select></label>
@@ -549,7 +558,7 @@
 
     @* ============ JOURNEY: the whole tender on one timeline ============ *@
     <div class="wp-timeline">
-        @if (stepIndex >= 2 && !Model.IsSupplier) { @Html.Raw("<details class=\"wp-prev\"><summary>Earlier stages: " + (stepIndex >= 3 ? "tender, weights, offers and committee evaluation" : "tender, weights and offers") + "</summary><div class=\"wp-prev-body\">") }
+        @if (stepIndex >= 2 && !Model.IsSupplier) { @Html.Raw("<details class=\"wp-prev\"><summary>Earlier stages: " + (lowestPrice ? "tender and offers" : stepIndex >= 3 ? "tender, weights, offers and committee evaluation" : "tender, weights and offers") + "</summary><div class=\"wp-prev-body\">") }
         <article class="wp-stage wp-done" data-ph="1">
             <span class="wp-dot">&#10003;</span>
             <div class="wp-stage-body">
@@ -562,6 +571,8 @@
 
         @if (!Model.IsSupplier)
         {
+            @if (!lowestPrice)
+            {
             <article class="wp-stage st-@StageState(2)" data-ph="1">
                 <span class="wp-dot">@(StageState(2) == "done" ? "\u2713" : "2")</span>
                 <div class="wp-stage-body">
@@ -573,6 +584,11 @@
                             @if (finW != null && tecW != null) { <div class="wp-donut" style="--p:@finW.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%" role="img" aria-label="Financial @finW.Value.ToString("0.##") percent, technical @tecW.Value.ToString("0.##") percent"><b>@finW.Value.ToString("0.#")%</b><small>financial</small></div><div class="wp-legend"><span><i class="wp-k1"></i><b>@finW.Value.ToString("0.##")%</b> Financial</span><span><i class="wp-k2"></i><b>@tecW.Value.ToString("0.##")%</b> Technical</span><small>@(w.State == WeightState.Approved ? "Approved and locked" : "Average of the proposals, waiting for approval")</small></div> }
                             else { <div class="wp-legend"><small>The average appears when all four members have proposed.</small></div> }
                         </div>
+                        @if (w.ReadTechnicalCriteria() is { Count: > 0 } criteria)
+                        {
+                            <h5>Technical criteria</h5>
+                            <dl class="wp-rows">@foreach (var criterion in criteria) { <div><dt>@criterion.Name</dt><dd>@criterion.Weight.ToString("0.##")% of technical</dd></div> }</dl>
+                        }
                         @if (evalMembers.Count > 0)
                         {
                             <div class="wp-table"><table class="wp-sortable"><thead><tr><th>Member</th><th>Role</th><th data-num>Financial</th><th data-num>Technical</th></tr></thead><tbody>
@@ -583,6 +599,7 @@
                 </div>
             </article>
 
+            }
             <article class="wp-stage st-@StageState(3)" data-ph="1">
                 <span class="wp-dot">@(StageState(3) == "done" ? "\u2713" : "3")</span>
                 <div class="wp-stage-body">
@@ -610,6 +627,8 @@
             </article>
             @if (stepIndex == 2) { @Html.Raw("</div></details>") }
 
+            @if (!lowestPrice)
+            {
             <article class="wp-stage st-@StageState(4)" data-ph="2">
                 <span class="wp-dot">@(StageState(4) == "done" ? "\u2713" : "4")</span>
                 <div class="wp-stage-body">
@@ -654,7 +673,7 @@
                             <tr class="@(did ? "is-best" : null)"><td><strong>@Who(m.UserId)</strong></td><td>@Role(m.Responsibility)</td><td><span class="wp-tag @(did ? "wp-tag-good" : "")">@(did ? (part!.SignatureImage != null ? "Submitted · signed" : "Submitted") : roomState == "open" ? "Scoring now" : roomState == "before" ? "Invited" : "No submission")</span></td><td>@(did ? part!.SubmittedAt!.Value.ToJordan("HH:mm") : "\u2014")</td></tr>
                         }
                         </tbody></table></div>
-                        <h5 class="wp-sub">Offers to score <small>(compliant offers only)</small></h5>
+                        <h5 class="wp-sub">Compliant offers</h5>
                         <div class="wp-table"><table class="wp-sortable"><thead><tr><th>Supplier</th><th data-num>Total price</th><th data-num>Delivery</th></tr></thead><tbody>
                         @foreach (var eb in s.EligibleBids) { var ob = Model.Bids.FirstOrDefault(b => b.Id == eb.BidId); if (ob == null) { continue; } <tr><td><strong>@SupplierName(ob.TenderInvitation.SupplierId)</strong></td><td data-v="@Price(ob).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">@Price(ob).ToString("N2") @ob.CurrencyCode</td><td data-v="@ob.DeliveryDays">@ob.DeliveryDays days</td></tr> }
                         </tbody></table></div>
@@ -663,17 +682,18 @@
                 </div>
             </article>
 
+            }
             var resultsState = stepIndex == 3 ? "now" : stepIndex > 3 ? "done" : "todo";
             @if (stepIndex >= 3) { @Html.Raw("</div></details>") }
             <article class="wp-stage st-@resultsState" data-ph="3">
                 <span class="wp-dot">@(resultsState == "done" ? "\u2713" : "3")</span>
                 <div class="wp-stage-body">
-                    <header><h4>Weighted results</h4><span class="wp-sum">@(Model.Ranking.Count > 0 ? $"Winner: {BidSupplier(Model.Ranking.OrderBy(x => x.Rank).First().BidId)}" : "Calculated when the evaluation ends")</span></header>
+                    <header><h4>@(lowestPrice ? "Lowest compliant price" : "Weighted results")</h4><span class="wp-sum">@(Model.Ranking.Count > 0 ?  $"Recommended: {BidSupplier(Model.Ranking.OrderBy(x => x.Rank).First().BidId)}" : "Calculated when the evaluation ends")</span></header>
                     @if (Model.Ranking.Count == 0) { <p class="wp-empty">When the evaluation ends, the system calculates each member's weighted score and the final ranking, and generates the report automatically.</p> }
                     else
                     {
-                        <p class="wp-formula">Member score = financial &times; @(finW?.ToString("0.##"))% + technical &times; @(tecW?.ToString("0.##"))%. Final score = the average of the four members.</p>
-                        <ol class="wp-rank wp-podium">@foreach (var r in Model.Ranking.OrderBy(x => x.Rank)) { <li class="@(r.Rank == 1 ? "is-first" : "")"><b>@r.Rank</b><span>@BidSupplier(r.BidId)@if (r.Rank == 1) { <em class="wp-crown">&#9733; Recommended winner</em> }</span><strong>@r.Score.ToString("0.00")</strong>@if (r.Tied) { <em>tie</em> }</li> }</ol>
+                        @if (!lowestPrice) { <p class="wp-formula">Member score = financial &times; @(finW?.ToString("0.##"))% + technical &times; @(tecW?.ToString("0.##"))%. Final score = the average of the four members.</p> }
+                        <ol class="wp-rank wp-podium">@foreach (var r in Model.Ranking.OrderBy(x => x.Rank)) { <li class="@(r.Rank == 1 ? "is-first" : "")"><b>@r.Rank</b><span>@BidSupplier(r.BidId)@if (r.Rank == 1) { <em class="wp-crown">&#9733; Recommended winner</em> }</span><strong>@(lowestPrice ? $"{r.Score:0.####} {Model.Tender.Currency}" : r.Score.ToString("0.00"))</strong>@if (r.Tied) { <em>tie</em> }</li> }</ol>
                         @if (Model.Ranking.Count(x => x.Rank == 1) > 1) { <p class="wp-hint wp-warn">Two suppliers have the exact highest score. A documented tie rule is needed before award.</p> }
                     }
                     @if (Model.Scores.Count > 0 && matrixBids.Count > 0)
@@ -712,12 +732,14 @@
         var topDone = notice != null || status == TenderStatus.Awarded;
         var outcomeDone = rejected ? notice!.Status == FinalDecisionStatus.SuppliersNotified : status == TenderStatus.Awarded && notice?.Status == FinalDecisionStatus.SuppliersNotified;
         var awarded = status == TenderStatus.Awarded;
-        var steps5 = new[] { evalSigned.Count >= 4, sentToManager, managerDone, topDone, outcomeDone };
+        var steps5 = new[] { lowestPrice || evalSigned.Count >= 4, sentToManager, managerDone, topDone, outcomeDone };
         var curStep = Array.FindIndex(steps5, x => !x); if (curStep < 0) { curStep = 5; }
         string AS(int i) => steps5[i] ? "done" : i == curStep ? "now" : "todo";
         <div class="wp-approval">
             <div class="wp-ap-intro"><h3>Approval &amp; award</h3><p>@(Model.IsTop || Model.IsManager || Model.IsOfficer ? "From the signed report to the official award. Every step is recorded with who did it and when." : "From the signed report to the Manager's decision. Every step is recorded with who did it and when.")</p></div>
 
+            @if (!lowestPrice)
+            {
             <article class="wp-ap wp-ap-@AS(0)"><span class="wp-dot">@(steps5[0] ? "\u2713" : "1")</span><div class="wp-ap-body">
                 <header><h4>Committee signatures</h4><span class="wp-sum">@evalSigned.Count of 4 signed</span></header>
                 <div class="wp-table"><table><thead><tr><th>Member</th><th>Role</th><th>Status</th><th>When</th></tr></thead><tbody>
@@ -725,8 +747,9 @@
                 </tbody></table></div>
             </div></article>
 
+            }
             <article class="wp-ap wp-ap-@AS(1)"><span class="wp-dot">@(steps5[1] ? "\u2713" : "2")</span><div class="wp-ap-body">
-                <header><h4>Send the report to the Sourcing Manager</h4><span class="wp-sum">@(sentToManager ? "Sent" : evalSigned.Count >= 4 ? "Ready to send" : "Waiting for signatures")</span></header>
+                <header><h4>@(lowestPrice ? "Financial recommendation" : "Send the report to the Sourcing Manager")</h4><span class="wp-sum">@(sentToManager ? "Sent" : lowestPrice ? "Waiting for screening" : evalSigned.Count >= 4 ? "Ready to send" : "Waiting for signatures")</span></header>
                 @if (rv != null)
                 {
                     <div class="wp-report">
@@ -734,8 +757,8 @@
                         <div class="wp-preview" hidden></div>
                     </div>
                 }
-                <p class="wp-empty">@(sentToManager ? "The Officer sent the fully signed report to the Manager." : evalSigned.Count >= 4 ? "All four members signed. Send the report to the Sourcing Manager for review." : $"{evalSigned.Count} of 4 members signed. The report can be sent as soon as all four have signed.")</p>
-                @if (!sentToManager && rv != null && Model.IsOfficer)
+                <p class="wp-empty">@(lowestPrice ? (sentToManager ? "The system sent the lowest compliant price to the Manager." : "Confirm screening to send the financial recommendation.") : sentToManager ? "The Officer sent the fully signed report to the Manager." : evalSigned.Count >= 4 ? "All four members signed. Send the report to the Sourcing Manager for review." : $"{evalSigned.Count} of 4 members signed. The report can be sent as soon as all four have signed.")</p>
+                @if (!lowestPrice && !sentToManager && rv != null && Model.IsOfficer)
                 {
                     <form asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Forward" asp-route-id="@rv.Report.Id" method="post" class="wp-form"><button class="wp-primary" @(rv.CanForward ? null : "disabled")>Send to the Sourcing Manager <span aria-hidden="true">&rarr;</span></button>@if (!rv.CanForward) { <small>Enabled when all four committee members have signed (@evalSigned.Count of 4).</small> }</form>
                 }

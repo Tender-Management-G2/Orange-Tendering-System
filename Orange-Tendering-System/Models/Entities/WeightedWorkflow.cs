@@ -24,6 +24,11 @@ public class WeightRound
     public ApplicationUser? ApprovedByUser { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public string? ApprovalPolicyJson { get; set; }
+    public string? TechnicalCriteriaJson { get; set; }
+
+    public IReadOnlyList<TechnicalCriterionWeight> ReadTechnicalCriteria() => TechnicalCriteriaJson == null
+        ? []
+        : System.Text.Json.JsonSerializer.Deserialize<TechnicalCriterionWeight[]>(TechnicalCriteriaJson) ?? [];
     public DateTime CreatedAt { get; set; }
     [Timestamp] public byte[] RowVersion { get; set; } = [];
     public ICollection<WeightProposal> Proposals { get; set; } = new List<WeightProposal>();
@@ -57,8 +62,8 @@ public class EvaluationSession
     public CommitteeRound CommitteeRound { get; set; } = null!;
     public int? ReportReviewRoundId { get; set; }
     public CommitteeRound? ReportReviewRound { get; set; }
-    public int AiAnalysisId { get; set; }
-    public AiAnalysis AiAnalysis { get; set; } = null!;
+    public int? AiAnalysisId { get; set; }
+    public AiAnalysis? AiAnalysis { get; set; }
     public DateTime StartsAt { get; set; }
     public DateTime EndsAt { get; set; }
     [MaxLength(1000)] public string MeetingUrl { get; set; } = "";
