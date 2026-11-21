@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Security;
 using System.Text;
@@ -86,6 +87,24 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
         return $"{from} to {to}";
     }
 
+    private static IEnumerable<ReportTable> ExportSections(ReportModel model)
+    {
+        foreach (var table in model.Tables)
+            yield return table;
+
+        foreach (var chart in model.Charts)
+        {
+            yield return new ReportTable(
+                chart.Title + " (chart data)",
+                ["Label", "Value"],
+                chart.Points.Select(point => new[]
+                {
+                    point.Label,
+                    point.Value.ToString("0.##############", CultureInfo.InvariantCulture)
+                }).ToList());
+        }
+    }
+
     public byte[] ToXlsx(ReportModel model)
     {
         var sheets = new List<(string Name, string Xml)>();
@@ -101,13 +120,27 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
             var style = (r - firstKpiRow) % 2 == 0 ? AlternateRowStyle : BodyStyle;
             summary.Append($"<row r=\"{r}\">{Cell(r, 0, k.Label, style)}{Cell(r, 1, k.Value, style)}</row>"); r++;
         }
+        foreach (var table in ExportSections(model))
+        {
+            summary.Append($"<row r=\"{r}\" ht=\"20\" customHeight=\"1\">{Cell(r, 0, table.Title.ToUpperInvariant(), SectionStyle)}</row>");
+            summaryMerges.Add(Merge(r, r, 0, Math.Max(4, table.Columns.Length - 1))); r++;
+            summary.Append($"<row r=\"{r}\" ht=\"22\" customHeight=\"1\">{string.Concat(table.Columns.Select((column, index) => Cell(r, index, column, HeaderStyle)))}</row>");
+            r++;
+            for (var rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+            {
+                var style = rowIndex % 2 == 1 ? AlternateRowStyle : BodyStyle;
+                summary.Append($"<row r=\"{r}\">{string.Concat(table.Rows[rowIndex].Select((value, index) => Cell(r, index, value, style, index < table.Columns.Length && IsDateColumn(table.Columns[index]))))}</row>");
+                r++;
+            }
+        }
         summary.Append($"<row r=\"{r + 1}\" ht=\"18\" customHeight=\"1\">{Cell(r + 1, 0, "Sourcing & Tender Management System · " + model.Title + " · Generated " + model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm") + " Jordan time", FooterStyle)}</row>");
         summaryMerges.Add(Merge(r + 1, r + 1, 0, 4));
         summary.Append("</sheetData>");
-        if (model.Kpis.Count > 0) summary.Append($"<autoFilter ref=\"A{firstKpiRow}:B{r - 1}\"/>");
+        if (model.Kpis.Count > 0)
+            summary.Append($"<autoFilter ref=\"A{firstKpiRow}:B{firstKpiRow + model.Kpis.Count}\"/>");
         summary.Append("<mergeCells count=\"" + summaryMerges.Count + "\">" + string.Concat(summaryMerges) + "</mergeCells>" + PageSetupXml() + "<headerFooter><oddFooter>&amp;LSourcing &amp; Tender Management System&amp;C" + Esc(model.Title) + "&amp;RPage &amp;P of &amp;N</oddFooter></headerFooter></worksheet>");
         sheets.Add((SheetName("Summary", used), summary.ToString()));
-        foreach (var t in model.Tables)
+        foreach (var t in ExportSections(model))
         {
             var lastColumn = Math.Max(1, t.Columns.Length) - 1;
             // The branded metadata block needs five columns even when a report table has fewer fields.
@@ -200,7 +233,7 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
             AddTable(section, ["Metric", "Value"], model.Kpis.Select(k => new[] { k.Label, k.Value }).ToArray(), orange, cream, rule);
         }
 
-        foreach (var source in model.Tables)
+        foreach (var source in ExportSections(model))
         {
             AddHeading(section, source.Title, orange);
             if (source.Rows.Count == 0)
