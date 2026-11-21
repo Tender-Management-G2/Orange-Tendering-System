@@ -11,6 +11,7 @@ namespace Orange_Tendering_System.Models.Entities
         public int Id { get; set; }
         [Required, MaxLength(450)] public string UserId { get; set; } = string.Empty;
         public ApplicationUser User { get; set; } = null!;
+        [MaxLength(100)] public string? WorkspaceRole { get; set; }
         [Required, MaxLength(200)] public string Title { get; set; } = "New chat";
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

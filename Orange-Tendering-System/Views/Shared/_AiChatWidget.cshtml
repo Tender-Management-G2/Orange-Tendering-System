@@ -7,13 +7,17 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery AiAntiforgery
 @inject Microsoft.Extensions.Configuration.IConfiguration VoiceConfig
 @{
-    var help = Orange_Tendering_System.Services.OrangeHelpKnowledge.Overview(User, Orange_Tendering_System.ViewModels.WorkspaceNavigation.ForArea(ViewContext.RouteData.Values["area"]?.ToString())?.Role);
+    var area = ViewContext.RouteData.Values["area"]?.ToString();
+    var workspace = Orange_Tendering_System.ViewModels.WorkspaceNavigation.ForArea(area);
+    var activeRole = workspace != null && User.IsInRole(workspace.Role)
+        ? workspace.Role : Orange_Tendering_System.Services.Assistant.AssistantAccess.ActiveRole(User);
+    var help = Orange_Tendering_System.Services.OrangeHelpKnowledge.Overview(User, activeRole);
     var pageContext = "/" + string.Join("/", new[] { ViewContext.RouteData.Values["area"]?.ToString(), ViewContext.RouteData.Values["controller"]?.ToString() }.Where(x => !string.IsNullOrEmpty(x)));
     var arabic = Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
     var dir = arabic ? "rtl" : "ltr";
     string T(string en, string ar) => arabic ? ar : en;
 }
-<div class="ai-chat" data-ai-chat dir="@dir" lang="@(arabic ? "ar" : "en")" data-arabic="@(arabic ? "true" : "false")" data-user="@User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value" data-admin="@(User.IsInRole(Orange_Tendering_System.Models.SystemRoles.Admin) ? "true" : "false")"
+<div class="ai-chat" data-ai-chat dir="@dir" lang="@(arabic ? "ar" : "en")" data-arabic="@(arabic ? "true" : "false")" data-user="@User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value" data-workspace="@activeRole" data-admin="@(activeRole == Orange_Tendering_System.Models.SystemRoles.Admin ? "true" : "false")"
      data-csrf="@AiAntiforgery.GetAndStoreTokens(Context).RequestToken" data-page="@pageContext"
      data-send-url="@Url.Action("Send", "AiChat", new { area = "" })" data-history-url="@Url.Action("Conversations", "AiChat", new { area = "" })"
      data-messages-url="@Url.Action("Messages", "AiChat", new { area = "" })" data-delete-url="@Url.Action("Delete", "AiChat", new { area = "" })"

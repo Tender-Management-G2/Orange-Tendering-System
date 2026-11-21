@@ -311,7 +311,7 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
             var (fin, tech) = ParseWeights(message);
             var req = pending.FirstOrDefault(p => p.TenderId == d.TenderId).Requirements ?? "{}";
             if (fin is null || tech is null) return AskWeights(d, req, ar ? "ما فهمت الرقم." : "I didn't catch a number.");
-            try { WeightedCalculation.Weights(fin.Value, tech.Value); }
+            try { WeightedCalculation.WholeWeightProposal(fin.Value, tech.Value); }
             catch (WorkflowException e) { return AskWeights(d, req, (ar ? "القيم غير صالحة: " : "Invalid weights: ") + e.Message); }
             var c = d with { Financial = fin, Technical = tech, State = "Confirming" };
             return new(ar ? $"### تأكيد مقترح الأوزان\n- **المناقصة:** T-{d.TenderId:0000} – {d.Title}\n- **المالي:** {fin:0.##}%\n- **الفني:** {tech:0.##}%\n\nالمقترح نهائي ولا يمكن تعديله بعد الإرسال. قل **«أكّد»** للإرسال أو **«إلغاء»**."

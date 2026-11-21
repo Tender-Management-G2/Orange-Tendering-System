@@ -68,10 +68,23 @@ public partial class TenderWorkflowService
             }
         }
 
-        // Internal parties: Officer, Evaluation Committee (includes the Manager's seat), Top Committee and the requesting department.
         var winner = bid.TenderInvitation.Supplier.CompanyName;
+        var officerId = (await GlobalOfficer()).Id;
+        if (managerId != null)
+        {
+            Notification AwardNotification(string userId) => new()
+            {
+                UserId = userId, Title = "Tender award report", Link = $"/Workflow/Details/{t.Id}", CreatedAt = Now,
+                Message = $"T-{t.Id:0000} · {t.Title}\nWinning supplier: {winner}\nThe Top Committee approved the award."
+            };
+            db.InternalAwardReports.Add(new InternalAwardReport
+            {
+                FinalDecisionNotice = notice, TenderId = t.Id, TenderTitle = t.Title, SupplierName = winner, AwardedAt = Now,
+                OfficerNotification = AwardNotification(officerId), ManagerNotification = AwardNotification(managerId)
+            });
+        }
         var internalUsers = (await Members(t.Id, CommitteeType.Evaluation)).Select(x => x.UserId).Concat(members.Select(x => x.UserId))
-            .Append((await GlobalOfficer()).Id).Concat(managerId == null ? [] : new[] { managerId }).Distinct().ToList();
+            .Append(officerId).Distinct().Where(userId => managerId == null || userId != officerId && userId != managerId).ToList();
         foreach (var userId in internalUsers)
             Notify(userId, t.Id, "Tender awarded", $"The Top Committee approved the recommendation unanimously (4 of 4). The tender is awarded to {winner} and closed. Suppliers were notified of their own result.");
         var pr = await db.PurchaseRequests.AsNoTracking().SingleAsync(x => x.Id == t.PurchaseRequestId);

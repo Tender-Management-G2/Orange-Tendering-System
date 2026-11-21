@@ -11,7 +11,9 @@
   const greeting = $('.ai-greeting'), dot = $('.ai-fab-dot');
   const csrf = root.dataset.csrf, ar = root.dataset.arabic === 'true', userKey = root.dataset.user || 'anon';
   const T = (en, a) => ar ? a : en;
-  const STATE_KEY = 'orange-ai-state:' + userKey, WELCOME_KEY = 'orange-ai-welcomed:' + userKey;
+  const workspace = root.dataset.workspace || 'default';
+  const STATE_KEY = 'orange-ai-state:' + userKey + ':' + workspace, WELCOME_KEY = 'orange-ai-welcomed:' + userKey;
+  function scoped(url) { const target = new URL(url, location.origin); target.searchParams.set('page', root.dataset.page || ''); return target.pathname + target.search; }
   let conversationId = null, busy = false, welcomeData = null, loaded = false, voiceMode = false, voiceLang = ar ? 'ar' : 'en';
 
   const store = {
@@ -435,6 +437,7 @@
     const wait = typing(T('Reading ', 'جارٍ قراءة ') + file.name + '…');
     const data = new FormData(); data.append('file', file); if (conversationId) data.append('conversationId', conversationId);
     try {
+      data.append("page", root.dataset.page || "");
       const reply = await api(root.dataset.uploadUrl, data, true);
       conversationId = reply.conversationId; saveState(); wait.remove();
       let card = null; try { card = JSON.parse(reply.payload).file; } catch { /* ignore */ }
@@ -449,14 +452,14 @@
     hist.hidden = !hist.hidden; if (hist.hidden) return;
     histList.replaceChildren();
     try {
-      const { items } = await api(root.dataset.historyUrl);
+      const { items } = await api(scoped(root.dataset.historyUrl));
       histEmpty.hidden = items.length > 0;
       items.forEach(c => {
         const li = el('li'); const open = el('button', 'ai-hist-open'); open.type = 'button';
         open.append(el('strong', null, c.title), el('small', null, fmtTime(c.UpdatedAt || c.updatedAt)));
         open.addEventListener('click', () => openConversation(c.id));
         const del = el('button', 'ai-hist-del', '×'); del.type = 'button'; del.setAttribute('aria-label', T('Delete conversation', 'حذف المحادثة'));
-        del.addEventListener('click', async () => { if (!confirm(T('Delete this conversation and its files?', 'حذف هذه المحادثة وملفاتها؟'))) return; try { await api(root.dataset.deleteUrl + '?id=' + c.id, {}); if (conversationId === c.id) reset(); li.remove(); } catch (e) { errorRow(e.message); } });
+        del.addEventListener('click', async () => { if (!confirm(T('Delete this conversation and its files?', 'حذف هذه المحادثة وملفاتها؟'))) return; try { await api(scoped(root.dataset.deleteUrl + '?id=' + c.id), {}); if (conversationId === c.id) reset(); li.remove(); } catch (e) { errorRow(e.message); } });
         li.append(open, del); histList.append(li);
       });
     } catch (e) { errorRow(e.message); }
@@ -464,7 +467,7 @@
   async function openConversation(id, quiet) {
     if (busy) return;
     try {
-      const { items } = await api(root.dataset.messagesUrl + '?id=' + id);
+      const { items } = await api(scoped(root.dataset.messagesUrl + '?id=' + id));
       box.querySelectorAll('.ai-msg,.ai-error').forEach(n => n.remove());
       conversationId = id; hist.hidden = true; loaded = true; saveState();
       if (!items.length) { welcome.hidden = false; return; }
@@ -494,7 +497,7 @@
   function hideGreeting() { greeting.classList.remove('is-in'); greeting.hidden = true; }
   async function loadWelcome() {
     try {
-      const data = await api(root.dataset.welcomeUrl);
+      const data = await api(scoped(root.dataset.welcomeUrl));
       welcomeData = data.welcome; renderActions(welcomeData);
       // The personalized welcome heads the empty chat, with the quick actions and suggestions under it (FAB or greeting card).
       const head = $('.ai-welcome-text'); head.classList.add('ai-welcome-msg'); render(head, welcomeData.message);

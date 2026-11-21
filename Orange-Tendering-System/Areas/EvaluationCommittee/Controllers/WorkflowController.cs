@@ -26,10 +26,10 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         }
         catch (WorkflowException e) { ViewData.Model = e.Message; return View("WorkflowError"); }
     }
-    // Final scores for every supplier, the member's recommendation and signature are submitted together, once.
-    [HttpPost] public async Task<IActionResult> SubmitEvaluation(int id, List<ScoreInput> scores, string? signatureImage, [Bind(Prefix = "recommendation")] MemberRecommendationInput recommendation)
+    // Final scores for every supplier, and the member's signature are submitted together, once.
+    [HttpPost] public async Task<IActionResult> SubmitEvaluation(int id, List<ScoreInput> scores, string? signatureImage)
     {
-        var result = await Execute(id, () => Workflow.SubmitEvaluation(id, scores, User, ReportControllerBase.ReadSignature(signatureImage), recommendation ?? new()));
+        var result = await Execute(id, () => Workflow.SubmitEvaluation(id, scores, User, ReportControllerBase.ReadSignature(signatureImage)));
         // A page post (not the popup) returns to the workspace, where the generated report and signing appear.
         if (IsAjax) return result;
         if (result is ViewResult { ViewData.Model: string error }) TempData["WorkflowMessage"] = "Not submitted: " + error;

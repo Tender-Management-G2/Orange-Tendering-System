@@ -73,7 +73,7 @@ public static class OrangeWorkflowFeedback
             // Report lifecycle (ReportControllerBase)
             (_, "Return") => OrangeFeedback.Popup("Report returned for correction", "The reason is recorded and a correction is requested.", OrangeVariant.Return),
             (_, "ActivateRevision") => OrangeFeedback.Toast("Revision authorized", "The correction can now be prepared."),
-            (_, "Resubmit") => OrangeFeedback.Popup("Corrected report submitted", "A new report version was generated. All required signatures must be collected again."),
+            (_, "Resubmit") => OrangeFeedback.Popup("Corrected report submitted", "The corrected report is available in the workflow."),
             _ => null
         };
     }

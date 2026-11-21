@@ -236,6 +236,8 @@ public partial class TenderWorkflowService
             var manager = await AssignedManagerId(tender.Id, session);
             if (manager != null) Notify(manager, tender.Id, "Revised financial report ready", "Review the corrected narrative and unchanged price comparison.");
         }
-        else foreach (var member in await Members(tender.Id, CommitteeType.Evaluation)) Notify(member.UserId, tender.Id, "New report version requires signatures", $"Version {version} incorporates the recorded narrative correction. Review and sign again; no old signature carries forward.");
+        else if (!await CompleteFromSignedEvaluations(tender, session))
+            foreach (var member in await Members(tender.Id, CommitteeType.Evaluation))
+                Notify(member.UserId, tender.Id, "New report version requires signatures", $"Version {version} incorporates the recorded narrative correction. Review and sign this legacy report version.");
     }
 }

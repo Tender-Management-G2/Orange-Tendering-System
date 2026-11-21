@@ -2,6 +2,13 @@ namespace Orange_Tendering_System.Services;
 
 public static class WeightedCalculation
 {
+    public static void WholeWeightProposal(decimal financial, decimal technical)
+    {
+        if (financial != decimal.Truncate(financial) || technical != decimal.Truncate(technical))
+            throw new WorkflowException("Enter whole-number percentages with no decimals.");
+        Weights(financial, technical);
+    }
+
     public static void Range(decimal value)
     {
         if (value < 0 || value > 100 || decimal.Round(value, 4) != value)

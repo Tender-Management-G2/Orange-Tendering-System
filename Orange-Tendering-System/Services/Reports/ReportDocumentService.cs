@@ -127,12 +127,30 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
             return false; // Same immutable endorsement is idempotent.
         }
         TenderWorkflowService.Require(await db.AuditLogs.AnyAsync(x => x.EntityName == "TenderReport" && x.EntityId == report.Id.ToString() && x.UserId == actor.Id && x.Action == "ProtectedReportViewed" && x.NewValues != null && x.NewValues.Contains(expectedHash)), "Review the generated PDF before signing your assigned section.");
+        RecordReceipt(report, actor, stage, role, slot, decision, now, signatureImage);
+        return true;
+    }
+
+    internal const string SubmittedEvaluation = "SubmittedEvaluation";
+
+    internal void RecordEvaluationSubmission(TenderReport report, CommitteeMember member, EvaluationParticipation participation)
+    {
+        TenderWorkflowService.Require(participation.CommitteeMemberId == member.Id && participation.SubmittedAt != null &&
+            participation.SignedAt != null && participation.SignatureImage != null && report.PdfSha256 != null && report.SnapshotSha256 != null,
+            "A signed final evaluation and generated report are required.");
+        var role = member.Responsibility == CommitteeResponsibility.SourcingManager ? Models.SystemRoles.SourcingManager : Models.SystemRoles.EvaluationCommittee;
+        RecordReceipt(report, member.User, ReportSigningStage.Evaluation, role, member.Responsibility.ToString()!, SubmittedEvaluation,
+            participation.SignedAt!.Value, participation.SignatureImage);
+    }
+
+    private void RecordReceipt(TenderReport report, ApplicationUser actor, ReportSigningStage stage,
+        string role, string slot, string decision, DateTime now, byte[]? signatureImage)
+    {
         var signature = new ReportSignature { TenderReportId = report.Id, UserId = actor.Id, SignerName = Name(actor), Role = role, Stage = stage, Slot = slot,
             Decision = decision, SignedAt = now, DocumentHash = report.PdfSha256!, SnapshotHash = report.SnapshotSha256!, SignatureImage = signatureImage };
         crypto.Sign(signature, report.VersionNumber); db.Add(signature);
         db.AuditLogs.Add(new AuditLog { UserId = actor.Id, EntityName = "TenderReport", EntityId = report.Id.ToString(), Action = "ReportVersionSigned", CreatedAt = now,
             NewValues = JsonSerializer.Serialize(new { report.Id, report.VersionNumber, signature.DocumentHash, signature.SnapshotHash, stage, role, slot, decision, signature.Method, signature.CertificateThumbprint }) });
-        return true;
     }
     public async Task RequireCommitteeSignatures(TenderReport report, EvaluationSession session)
     {
@@ -140,7 +158,8 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
         var allReceipts = await db.Set<ReportSignature>().Where(x => x.TenderReportId == report.Id && x.InvalidatedAt == null).ToListAsync();
         TenderWorkflowService.Require(allReceipts.Where(x => x.Method == SignatureMethod.CertificateCms).All(ReportCryptography.CertificateTrustValid), "Current certificate trust/revocation validation failed. Historical receipts remain viewable, but further approval is blocked.");
         if (session.AiAnalysisId == null) return;
-        var signatures = await db.Set<ReportSignature>().Where(x => x.TenderReportId == report.Id && x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null && x.Decision == "Approve").ToListAsync();
+        var signatures = await db.Set<ReportSignature>().Where(x => x.TenderReportId == report.Id && x.Stage == ReportSigningStage.Evaluation &&
+            x.InvalidatedAt == null && (x.Decision == "Approve" || x.Decision == SubmittedEvaluation)).ToListAsync();
         var members = await db.CommitteeMembers.Where(x => x.TenderId == session.TenderRound.TenderId && x.CommitteeType == CommitteeType.Evaluation).Select(x => x.UserId).ToListAsync();
         TenderWorkflowService.Require(signatures.Count == 4 && members.Count == 4 && signatures.All(x => members.Contains(x.UserId)), "All four current-version committee signatures are required before forwarding or subsequent approval.");
     }

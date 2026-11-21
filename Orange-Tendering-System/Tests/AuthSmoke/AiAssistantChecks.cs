@@ -312,7 +312,7 @@ public static class AiAssistantChecks
         var officerClient = await Login("officer", "/SourcingOfficer");
         var welcome1 = JsonDocument.Parse(await officerClient.Client.GetStringAsync("/AiChat/Welcome")).RootElement;
         var loginId = welcome1.GetProperty("loginId").GetString();
-        Check(!string.IsNullOrEmpty(loginId) && welcome1.GetProperty("welcome").GetProperty("message").GetString()!.Contains("Welcome back, Ahmad") && welcome1.GetProperty("welcome").GetProperty("suggestions").GetArrayLength() > 0, "welcome uses the real display name and role suggestions");
+        Check(!string.IsNullOrEmpty(loginId) && welcome1.GetProperty("welcome").GetProperty("message").GetString()!.StartsWith("Hi Ahmad.") && welcome1.GetProperty("welcome").GetProperty("suggestions").GetArrayLength() > 0, "welcome uses the real display name and role suggestions");
         var welcome2 = JsonDocument.Parse(await officerClient.Client.GetStringAsync("/AiChat/Welcome")).RootElement;
         Check(welcome2.GetProperty("loginId").GetString() == loginId, "login id is stable across page loads (welcome shown once per login)");
         var officerAgain = await Login("officer", "/SourcingOfficer");
@@ -321,7 +321,7 @@ public static class AiAssistantChecks
         {
             var principal = new ClaimsPrincipal(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, ids["officer"]), new(ClaimTypes.Role, SystemRoles.SourcingOfficer)], "fixture"));
             var arabicWelcome = JsonSerializer.SerializeToElement(await scope.ServiceProvider.GetRequiredService<Orange_Tendering_System.Services.AiChatService>().WelcomeAsync(principal, true, default));
-            Check(arabicWelcome.GetProperty("arabic").GetBoolean() && arabicWelcome.GetProperty("message").GetString()!.Contains("أهلًا بعودتك يا Ahmad"), "Arabic welcome when the interface language is Arabic");
+            Check(arabicWelcome.GetProperty("arabic").GetBoolean() && arabicWelcome.GetProperty("message").GetString()!.StartsWith("أهلًا Ahmad."), "Arabic welcome when the interface language is Arabic");
         }
 
         var count1 = await Send(officerClient, "How many tenders are currently open?");

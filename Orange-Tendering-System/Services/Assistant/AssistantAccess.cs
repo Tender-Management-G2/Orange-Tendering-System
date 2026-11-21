@@ -28,7 +28,7 @@ public sealed class AssistantAccess(ApplicationDbContext db)
         return WorkspaceNavigation.Workspaces.FirstOrDefault(w => principal.IsInRole(w.Role) && w.Area != "Supplier")?.Role ?? "";
     }
 
-    public async Task<AssistantUser?> ResolveAsync(ClaimsPrincipal principal, CancellationToken ct = default)
+    public async Task<AssistantUser?> ResolveAsync(ClaimsPrincipal principal, CancellationToken ct = default, string? page = null)
     {
         var id = UserId(principal);
         if (id == null) return null;
@@ -38,7 +38,9 @@ public sealed class AssistantAccess(ApplicationDbContext db)
         if (row == null) return null;
         var name = !string.IsNullOrWhiteSpace(row.FullName) ? row.FullName.Trim() : (row.Email ?? "").Split('@')[0];
         var roles = SystemRoles.All.Where(principal.IsInRole).ToArray();
-        return new AssistantUser(id, name, ActiveRole(principal), roles, row.DepartmentId, row.Department, row.SupplierId);
+        var workspace = WorkspaceNavigation.ForArea(page?.Trim('/').Split('/')[0]);
+        var role = workspace != null && roles.Contains(workspace.Role) ? workspace.Role : ActiveRole(principal);
+        return new AssistantUser(id, name, role, roles, row.DepartmentId, row.Department, row.SupplierId);
     }
 
     // Row-level scope for tenders. Mirrors InternalDashboardService.SearchAsync: committee roles see only tenders they are seated on,
@@ -51,7 +53,7 @@ public sealed class AssistantAccess(ApplicationDbContext db)
             SystemRoles.SourcingOfficer => q,
             SystemRoles.RequestingDepartment => user.DepartmentId == null ? q.Where(_ => false) : q.Where(t => t.PurchaseRequest.DepartmentId == user.DepartmentId),
             SystemRoles.EvaluationCommittee => q.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Evaluation)),
-            SystemRoles.SourcingManager => q.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Evaluation && m.Responsibility == CommitteeResponsibility.SourcingManager)),
+            SystemRoles.SourcingManager => q.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.Responsibility == CommitteeResponsibility.SourcingManager)),
             SystemRoles.TopCommittee => q.Where(t => db.CommitteeMembers.Any(m => m.TenderId == t.Id && m.UserId == user.Id && m.CommitteeType == CommitteeType.Top)),
             _ => q.Where(_ => false)
         };

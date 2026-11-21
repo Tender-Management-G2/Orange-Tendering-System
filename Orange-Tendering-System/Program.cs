@@ -81,6 +81,7 @@ builder.Services.AddScoped<TenderWorkflowService>();
 builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<InternalDashboardService>();
 builder.Services.AddScoped<FinalDecisionService>();
+builder.Services.AddScoped<InternalAwardReportDispatcher>();
 builder.Services.AddScoped<AiChatService>();
 // Orange AI assistant: server-authorized data tools, report generators and private file storage (Services/Assistant).
 builder.Services.AddScoped<Orange_Tendering_System.Services.Assistant.AssistantAccess>();

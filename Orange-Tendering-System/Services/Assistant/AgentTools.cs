@@ -34,6 +34,8 @@ public sealed record AgentPlan
     public List<string> KnowledgeSources { get; init; } = [];
     public string State { get; init; } = "Collecting";   // Collecting | Confirming | Done | Partial | Failed | Cancelled
     public DateTime ExpiresAt { get; init; }
+    public int? ConversationId { get; init; }
+    public string? WorkspaceRole { get; init; }
 }
 
 public sealed record ToolSlot(string Key, string En, string Ar, bool Optional = false);
@@ -41,8 +43,9 @@ public sealed record ToolSlot(string Key, string En, string Ar, bool Optional = 
 // Registry of the business tools the agent may execute. Each tool: permission rule, typed slots with validation, a summary for
 // confirmation, execution through the EXISTING application service, and verification by reading the database afterwards.
 // High-impact operations (delete, approve, publish, security policy, Admin role grants) are intentionally not registered.
-public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationUser> users, AdminService admin, EmployeeProvisioning provisioning,
-    IHttpContextAccessor http, IWebHostEnvironment environment, ILogger<AgentTools> logger, ProcurementCategoryService categories)
+public sealed partial class AgentTools(ApplicationDbContext db, UserManager<ApplicationUser> users, AdminService admin, EmployeeProvisioning provisioning,
+    IHttpContextAccessor http, IWebHostEnvironment environment, ILogger<AgentTools> logger, ProcurementCategoryService categories, PurchaseRequestService requests,
+    TenderWorkflowService workflow, EvaluationSchedulingService scheduling, SupplierOfferService supplierOffers, AiChatFileStore chatFiles)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public static readonly TimeSpan PlanLifetime = TimeSpan.FromMinutes(30);
@@ -51,6 +54,7 @@ public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationU
     // The capability registry (also rendered in docs/AI_AGENT_TOOL_MATRIX.md).
     public static readonly ToolInfo[] Registry =
     [
+        .. ProcurementRegistry,
         new("create_department", "Create department", "إنشاء قسم", "create", "Admin", "AdminService.CreateDepartmentAsync", true, true),
         new("create_category", "Create procurement category", "إنشاء تصنيف مشتريات", "create", "Admin", "ProcurementCategoryService.SaveAsync", true, true),
         new("rename_department", "Rename department", "تعديل اسم قسم", "update", "Admin", "AdminService.UpdateDepartmentAsync", true, true),
@@ -83,20 +87,21 @@ public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationU
         "create_purchase_request" => [new("item", "What item do you need?", "شو الصنف المطلوب؟"), new("category", "Which active procurement category?", "شو تصنيف المشتريات للصنف؟"), new("quantity", "How many?", "كم الكمية؟"), new("unit", "What unit? (e.g. Piece, Box, License)", "شو الوحدة؟ (مثلًا: قطعة، علبة، رخصة)"),
             new("specifications", "What specifications are required?", "شو المواصفات المطلوبة؟"),
             new("justification", "Why is it needed? (justification)", "ليش محتاجينه؟ (المبرر)"), new("neededBy", "When is it needed? (e.g. 2026-12-31, or \"in 30 days\")", "إمتى بدكم ياه؟ (مثلًا 2026-12-31 أو «بعد 30 يوم»)")],
-        _ => []
+        _ => ProcurementSlots(tool)
     };
 
     // ---------------- permissions (decided from the authenticated user, re-checked right before execution) ----------------
 
     public async Task<string?> Denial(string tool, AssistantUser user, bool ar)
     {
+        if (ProcurementRole(tool) is { } role) return user.Is(role) ? null : ar ? "هذا الإجراء غير متاح في مساحة عملك." : "This action is unavailable in your workspace.";
         switch (tool)
         {
             case "create_category" or "create_department" or "rename_department" or "list_departments" or "list_users" or "find_user" or "get_user_details" or "prepare_user_role_change"
                 or "update_user_name" or "update_user_phone" or "change_user_department" or "deactivate_user" or "reactivate_user" or "create_user":
-                return user.Roles.Contains(SystemRoles.Admin) ? null : ar ? "هذا الإجراء متاح لمدير النظام فقط." : "This action is available to the Admin only.";
+                return user.Is(SystemRoles.Admin) ? null : ar ? "هذا الإجراء متاح لمدير النظام فقط." : "This action is available to the Admin only.";
             case "create_purchase_request":
-                if (!user.Roles.Contains(SystemRoles.RequestingDepartment)) return ar ? "إنشاء طلبات الشراء متاح لموظفي القسم الطالب فقط." : "Only Requesting Department users can create purchase requests.";
+                if (!user.Is(SystemRoles.RequestingDepartment)) return ar ? "إنشاء طلبات الشراء متاح لموظفي القسم الطالب فقط." : "Only Requesting Department users can create purchase requests.";
                 var ok = user.DepartmentId != null && await db.Departments.AnyAsync(d => d.Id == user.DepartmentId && d.IsActive);
                 return ok ? null : ar ? "حسابك غير مرتبط بقسم نشط." : "Your account is not linked to an active department.";
             default: return ar ? "هذا الإجراء غير مسجّل." : "This action is not registered.";
@@ -171,6 +176,7 @@ public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationU
     {
         var t = N(message);
         if (Question.IsMatch(t)) return null;
+        if (DetectProcurement(t) is { } procurement) return [procurement];
         var create = CreateVerb.IsMatch(t);
         var employee = EmployeeCreation.Match(t);
         if (employee.Success && !Regex.IsMatch(t[..employee.Index], @"\b(?:then)\b|ثم|وبعدين|وبعدها", RegexOptions.IgnoreCase))
@@ -207,6 +213,7 @@ public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationU
     {
         var v = new Dictionary<string, string>();
         var raw = AssistantIntentParser.Strip(message);
+        if (ProcurementRole(tool) != null) return await ExtractProcurement(tool, raw, user);
         switch (tool)
         {
             case "create_category":
@@ -331,9 +338,10 @@ public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationU
 
     // ---------------- slot validation ----------------
 
-    public async Task<(string? Value, string? Problem)> Validate(string tool, string key, string answer, AgentPlan plan, bool ar)
+    public async Task<(string? Value, string? Problem)> Validate(string tool, string key, string answer, AgentPlan plan, AssistantUser user, bool ar)
     {
         answer = answer.Trim();
+        if (ProcurementRole(tool) != null) return await ValidateProcurement(tool, key, answer, plan, user, ar);
         var skip = Regex.IsMatch(N(answer), @"\s(skip|none|no|تخطي|تخطى|لا|بدون|ما في|مافي)\s");
         string? Len(int min, int max) => answer.Length < min || answer.Length > max ? (ar ? $"الطول المسموح {min}–{max} حرفًا." : $"Use {min}–{max} characters.") : null;
         switch (tool, key)
@@ -456,6 +464,7 @@ public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationU
 
     public async Task<string> Describe(AgentStep step, int index, AgentPlan plan, bool ar)
     {
+        if (ProcurementRole(step.Tool) != null) return await DescribeProcurement(step, plan, ar);
         var v = step.Values; string Val(string k) => v.TryGetValue(k, out var x) && x.Length > 0 ? x : "—";
         async Task<string> Dept(string k)
         {
@@ -509,6 +518,7 @@ public sealed class AgentTools(ApplicationDbContext db, UserManager<ApplicationU
 
     public async Task<(bool Ok, string Text, string? Ref, string? Url)> Execute(AgentStep step, AgentPlan plan, AssistantUser user, ClaimsPrincipal principal, bool ar, CancellationToken ct)
     {
+        if (ProcurementRole(step.Tool) != null) return await ExecuteProcurement(step, plan, user, principal, ar, ct);
         var v = new Dictionary<string, string>(step.Values);
         if (v.TryGetValue("department", out var dRef) && dRef.StartsWith('@'))
         {

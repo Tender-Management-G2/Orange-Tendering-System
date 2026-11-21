@@ -54,6 +54,7 @@ namespace Orange_Tendering_System.Data
 
         // Final decision relay (Top Committee -> Manager -> Officer -> Suppliers)
         public DbSet<FinalDecisionNotice> FinalDecisionNotices => Set<FinalDecisionNotice>();
+        public DbSet<InternalAwardReport> InternalAwardReports => Set<InternalAwardReport>();
         public DbSet<SupplierResultDelivery> SupplierResultDeliveries => Set<SupplierResultDelivery>();
 
         // AI Chat Assistant (per-user history)

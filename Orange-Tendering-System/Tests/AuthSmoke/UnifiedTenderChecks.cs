@@ -346,7 +346,7 @@ public static class UnifiedTenderChecks
             Check(afterMeeting.Contains("Open the evaluation workspace") && afterMeeting.Contains("AI analysis for this meeting"), "the popup leads the member to the evaluation workspace");
             var workspace = await lateClient.GetStringAsync("/EvaluationCommittee/Workflow/Meeting/" + id);
             Check(workspace.Contains("data-evaluation-form") && workspace.Contains("step=\"0.1\"") && workspace.Contains("Approved evaluation model"), "financial and technical score inputs (one decimal) remain available after the meeting ends");
-            Check(workspace.Contains("Sign and submit my evaluation") && workspace.Contains("data-report-signature") && workspace.Contains("recommendation.RecommendedBidId"), "one submission carries scores, recommendation and signature");
+            Check(workspace.Contains("Sign and submit my evaluation") && workspace.Contains("data-report-signature") && !workspace.Contains("recommendation.RecommendedBidId"), "one submission carries scores and signature");
             Check(workspace.Contains("Download the AI analysis (PDF)") && workspace.Contains("advisory"), "AI analysis travels with the meeting and is marked advisory");
             var aiPdf = await lateClient.GetAsync("/EvaluationCommittee/Workflow/AiAnalysisPdf/" + id);
             var aiBytes = await aiPdf.Content.ReadAsByteArrayAsync();
@@ -397,37 +397,15 @@ public static class UnifiedTenderChecks
             Check(scoreRepeatRejected, scorer.FullName + " cannot overwrite submitted scores");
         }
         await flow.CloseDueSessions(CancellationToken.None);
-        Check(session.State == SessionState.ReportDraft && session.ReportId != null, "complete post-meeting evaluations automatically generate the report");
+        Check(session.State == SessionState.Finalized && session.ReportId != null, "four signed submissions automatically finalize the report");
         var reportId = session.ReportId!.Value;
         var hash = session.Report!.PdfSha256!;
-        Check((await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee && session.ReportSentAt != null,
-            "committee signing opens as soon as the report is generated (no Officer send step)");
+        Check(!(await flow.ReviewReport(reportId, Principal(technical))).CanSignCommittee && session.ReportSentAt != null,
+            "the generated report requires no second committee signature");
         var officerDraftPopup = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
         Check(!officerDraftPopup.Contains("/SendReport/") && !officerDraftPopup.Contains("RegenerateReport"), "the Officer has no send-for-signing or regenerate action");
-        var sendToken = await Token(officerClient, "/SourcingOfficer/Workflow");
-        var oldSend = await officerClient.PostAsync("/SourcingOfficer/Workflow/SendReport/" + id, new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = sendToken }));
-        Check(oldSend.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed, "the retired send-for-signing endpoint no longer exists (HTTP " + (int)oldSend.StatusCode + ")");
-        var earlyForward = false; try { await flow.Forward(id, Principal(officer)); } catch (WorkflowException) { earlyForward = true; }
-        Check(earlyForward, "an unsigned report cannot be forwarded to the Manager");
-        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=").Concat(new byte[250]).ToArray();
-        foreach (var signer in new[] { technical, financial, evaluator, manager })
-        {
-            using var client = await Login(signer);
-            var area = signer.Id == manager.Id ? "SourcingManager" : "EvaluationCommittee";
-            var reviewUrl = $"/{area}/Reports/Review/{reportId}";
-            var reviewHtml = await client.GetStringAsync(reviewUrl);
-            Check(reviewHtml.Contains("data-report-signature") && reviewHtml.Contains("report-signature.js"), signer.FullName + " has a signature pad and persistent initializer");
-            Check(reviewHtml.Contains("I have opened and reviewed this report version"), signer.FullName + " can sign own committee section");
-            var token = await Token(client, reviewUrl);
-            var pdf = await client.GetAsync($"/{area}/Reports/Pdf/{reportId}");
-            Check(pdf.StatusCode == HttpStatusCode.OK, signer.FullName + " can review the protected PDF");
-            var fields = new Dictionary<string, string> { ["documentHash"] = hash, ["confirmed"] = "true", ["signatureImage"] = "data:image/png;base64," + Convert.ToBase64String(png), ["__RequestVerificationToken"] = token };
-            var signed = await client.PostAsync($"/EvaluationCommittee/Reports/Sign/{reportId}", new FormUrlEncodedContent(fields));
-            Check(signed.StatusCode == HttpStatusCode.Redirect, signer.FullName + " signature HTTP save: " + await signed.Content.ReadAsStringAsync());
-            Check(await db.Set<ReportSignature>().AsNoTracking().AnyAsync(x => x.TenderReportId == reportId && x.UserId == signer.Id && x.SignatureImage != null), signer.FullName + " PNG persisted for own account");
-            var repeat = await client.PostAsync($"/EvaluationCommittee/Reports/Sign/{reportId}", new FormUrlEncodedContent(fields));
-            Check(repeat.StatusCode == HttpStatusCode.Redirect && await db.Set<ReportSignature>().CountAsync(x => x.TenderReportId == reportId && x.UserId == signer.Id) == 1, signer.FullName + " retry does not duplicate signature");
-        }
+        Check(await db.Set<ReportSignature>().CountAsync(s => s.TenderReportId == reportId && s.Decision == "SubmittedEvaluation" && s.SignatureImage != null) == 4,
+            "all four signature images are associated with the final report");
         var finalReport = await db.TenderReports.AsNoTracking().SingleAsync(x => x.Id == reportId);
         Check(finalReport.Status == ReportStatus.Submitted && finalReport.PdfSha256 == hash, "four signatures finalize the report without changing canonical PDF hash");
         Check(await db.Notifications.CountAsync(n => n.UserId == officer.Id && n.Title == "Signed evaluation report received") == 1, "the completed, signed report reaches the Officer");

@@ -4,16 +4,6 @@ using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.ViewModels;
 
-// A member's own recommendation, submitted once together with the scores.
-public class MemberRecommendationInput
-{
-    public int? RecommendedBidId { get; set; }
-    [MaxLength(2000)] public string? Reason { get; set; }
-    [MaxLength(2000)] public string? Concerns { get; set; }
-    // Required by the server only when the recommended offer is not the member's own top-scored offer.
-    [MaxLength(2000)] public string? DeviationJustification { get; set; }
-}
-
 // Verified facts from the database about a supplier (never AI output, never invented performance scores).
 public record SupplierRecord(int SupplierId, string Name, string Category, SupplierStatus Status, int VerifiedDocuments, int PendingDocuments,
     int PastSubmittedOffers, int PastAwards);

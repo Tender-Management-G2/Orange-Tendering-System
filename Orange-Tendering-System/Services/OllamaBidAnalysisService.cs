@@ -95,14 +95,20 @@ public sealed class OllamaChatClient(HttpClient http, IOptions<OllamaSettings> s
     public Task<string> ChatAsync(IEnumerable<object> messages, bool json, double temperature, CancellationToken ct) => ChatAsync(messages, json, temperature, null, ct);
 
     /// <summary>Same as above with a per-request context window (e.g. document analysis); null uses Ollama:ContextLength.</summary>
-    public async Task<string> ChatAsync(IEnumerable<object> messages, bool json, double temperature, int? contextLength, CancellationToken ct)
+    public async Task<string> ChatAsync(IEnumerable<object> messages, bool json, double temperature, int? contextLength, CancellationToken ct, int? maxOutputTokens = null)
     {
         var config = settings.Value;
         if (!IsConfigured) throw new InvalidOperationException("Configure Ollama:BaseUrl and Ollama:Model. No service address or model is assumed.");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         linked.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(config.TimeoutSeconds, 5, 300)));
         // Request all model layers on the GPU; bound the context's VRAM allocation.
-        var options = new { temperature, num_gpu = config.NumGpu, num_ctx = contextLength ?? config.ContextLength };
+        var options = new Dictionary<string, object>
+        {
+            ["temperature"] = temperature,
+            ["num_gpu"] = config.NumGpu,
+            ["num_ctx"] = contextLength ?? config.ContextLength
+        };
+        if (maxOutputTokens.HasValue) options["num_predict"] = maxOutputTokens.Value;
         object body = json
             ? new { model = config.Model, stream = false, format = "json", messages, options }
             : new { model = config.Model, stream = false, messages, options };

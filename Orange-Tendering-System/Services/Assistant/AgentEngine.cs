@@ -25,7 +25,7 @@ public sealed class AgentEngine(ApplicationDbContext db, AgentTools tools, AiKno
 
     private ActionOutcome Out(AgentPlan plan, string text, string speech, string kind) => new(text, speech, kind, JsonSerializer.Serialize(plan, Json));
 
-    public async Task<ActionOutcome> StartAsync(AssistantUser user, List<string> toolIds, string message, bool ar, CancellationToken ct)
+    public async Task<ActionOutcome> StartAsync(AssistantUser user, List<string> toolIds, string message, bool ar, CancellationToken ct, int? conversationId = null)
     {
         foreach (var id in toolIds.Distinct())
             if (await tools.Denial(id, user, ar) is { } denial)
@@ -49,10 +49,10 @@ public sealed class AgentEngine(ApplicationDbContext db, AgentTools tools, AiKno
             await db.SaveChangesAsync(ct);
             return new(output, ar ? "تم البحث في حسابات الموظفين المصرح بعرضها." : "I searched the employee accounts you are authorized to view.", "data");
         }
-        var references = await knowledge.RetrieveAsync(user.Id, message, ct);
+        var references = toolIds.Any(id => AgentTools.ProcurementRole(id) != null) ? [] : await knowledge.RetrieveAsync(user.Id, message, ct);
         var plan = new AgentPlan
         {
-            Arabic = ar, ExpiresAt = Now + AgentTools.PlanLifetime,
+            Arabic = ar, ExpiresAt = Now + AgentTools.PlanLifetime, ConversationId = conversationId, WorkspaceRole = user.Role,
             KnowledgeSources = references.Select(x => $"{SafeReference(x.Title)} v{x.Version}, chunk {x.Chunk}").Distinct().Take(5).ToList()
         };
         for (var i = 0; i < toolIds.Count; i++)
@@ -60,15 +60,15 @@ public sealed class AgentEngine(ApplicationDbContext db, AgentTools tools, AiKno
             var values = await tools.ExtractAsync(toolIds[i], message, user, firstOfPlan: i == 0);
             // "Create a department, then a user in it": the user's department is the one created by the earlier step.
             if (toolIds[i] == "create_user" && toolIds.Take(i).Contains("create_department")) values["department"] = "@" + toolIds.IndexOf("create_department");
+            plan.Steps.Add(new AgentStep { Tool = toolIds[i], Values = values });
             // Values found in the sentence are validated exactly like typed answers; invalid ones are asked again.
             foreach (var key in values.Keys.ToList())
             {
                 if (key == "department" && values[key].StartsWith('@') && toolIds[i] == "create_user" &&
                     toolIds.Take(i).Contains("create_department")) continue;
-                var (ok, _) = await tools.Validate(toolIds[i], key, values[key], plan, ar);
+                var (ok, _) = await tools.Validate(toolIds[i], key, values[key], plan with { Current = i }, user, ar);
                 if (ok == null) values.Remove(key); else values[key] = ok;
             }
-            plan.Steps.Add(new AgentStep { Tool = toolIds[i], Values = values });
         }
         Audit(user, "AiPlanStarted", plan.ActionId, new { Tools = toolIds });
         await db.SaveChangesAsync(ct);
@@ -85,7 +85,7 @@ public sealed class AgentEngine(ApplicationDbContext db, AgentTools tools, AiKno
             foreach (var slot in AgentTools.Slots(plan.Steps[i].Tool).Where(s => !s.Optional))
                 if (!plan.Steps[i].Values.ContainsKey(slot.Key))
                 {
-                    var q = ar ? slot.Ar : slot.En;
+                    var q = await tools.ProcurementQuestion(plan.Steps[i], plan, slot, user, ar);
                     var label = plan.Steps.Count > 1 ? $"({(ar ? "الخطوة" : "Step")} {i + 1}) " : "";
                     var p = plan with { Current = i, Asking = slot.Key, State = "Collecting", ExpiresAt = Now + AgentTools.PlanLifetime };
                     return Out(p, intro + (problem != null ? problem + "\n\n" : "") + label + q, (problem != null ? problem + " " : "") + q, "agent-plan");
@@ -101,7 +101,11 @@ public sealed class AgentEngine(ApplicationDbContext db, AgentTools tools, AiKno
         }
         sb.Append(ar ? "لن يُنفَّذ أي شيء قبل تأكيدك. قل **«أكّد»** أو اضغط زر التأكيد، أو قل **«إلغاء»**." : "Nothing runs before you confirm. Say **\"confirm\"** or press Confirm, or say **\"cancel\"**.");
         // Spoken summary: what will be done and the main value of each step, then the explicit question.
-        string Main(AgentStep s) => s.Values.GetValueOrDefault("name") ?? s.Values.GetValueOrDefault("fullName") ?? s.Values.GetValueOrDefault("title") ?? "";
+        string Main(AgentStep s) => string.Join(". ", new[]
+        {
+            s.Values.GetValueOrDefault("name") ?? s.Values.GetValueOrDefault("fullName") ?? s.Values.GetValueOrDefault("title"),
+            s.Values.GetValueOrDefault("spokenDetails")
+        }.Where(value => !string.IsNullOrWhiteSpace(value)));
         var spoken = string.Join(ar ? "، ثم " : ", then ", confirming.Steps.Select(s => $"{(ar ? AgentTools.Registry.First(r => r.Id == s.Tool).Ar : AgentTools.Registry.First(r => r.Id == s.Tool).En)} {Main(s)}".Trim()));
         var speech = ar ? $"رح {spoken}. بتأكد؟ قول أكّد أو إلغاء." : $"I will {spoken}. Do you confirm? Say confirm or cancel.";
         return Out(confirming, sb.ToString(), speech, "agent-confirm");
@@ -114,6 +118,9 @@ public sealed class AgentEngine(ApplicationDbContext db, AgentTools tools, AiKno
     {
         var ar = plan.Arabic;
         var t = AssistantIntentParser.Normalize(AssistantIntentParser.Strip(message)).TrimEnd('.', '!', '?', '؟').Trim();
+        if (plan.WorkspaceRole != null && plan.WorkspaceRole != user.Role)
+            return new(ar ? "ارجع لمساحة العمل اللي بدأت فيها الإجراء." : "Return to the workspace where you started this action.",
+                ar ? "ارجع لمساحة العمل الأصلية." : "Return to the original workspace.");
         if (plan.State is "Done" or "Partial" or "Failed" or "Cancelled")
             return Out(plan, ar ? "هذه العملية انتهت ولن تُنفَّذ مرة ثانية. اطلب أمرًا جديدًا." : "That operation is finished and will not run again. Ask for a new command.", ar ? "العملية انتهت." : "That operation is finished.", "agent-done");
         if (Now > plan.ExpiresAt)
@@ -138,7 +145,7 @@ public sealed class AgentEngine(ApplicationDbContext db, AgentTools tools, AiKno
             foreach (var (key, input) in inputs)
             {
                 if (values.ContainsKey(key)) continue;
-                var (value, error) = await tools.Validate(step.Tool, key, input, plan, ar);
+                var (value, error) = await tools.Validate(step.Tool, key, input, plan, user, ar);
                 if (value != null) values[key] = value;
                 else if (key == plan.Asking) problem = error;
             }

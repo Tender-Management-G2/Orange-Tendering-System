@@ -129,6 +129,17 @@ public sealed class AiChatFileStore(IWebHostEnvironment environment, Application
         return file;
     }
 
+    internal async Task<(string Name, byte[] Content)> ReadConversationUploadAsync(string userId, int conversationId, Guid id, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow().UtcDateTime;
+        var upload = await db.AiChatFiles.AsNoTracking().SingleOrDefaultAsync(f => f.Id == id && f.UserId == userId
+            && f.ConversationId == conversationId && f.Kind == "upload" && f.DeletedAt == null && f.ExpiresAt > now, ct)
+            ?? throw new AiFileException("The upload is no longer available in this chat.", 404);
+        var path = PathFor(upload.StorageKey);
+        if (!File.Exists(path)) throw new AiFileException("The upload is no longer available in this chat.", 404);
+        return (upload.FileName, await File.ReadAllBytesAsync(path, ct));
+    }
+
     // Reuses the same safe PDF/Office/text parser for persistent knowledge previews without writing the file to disk.
     public async Task<AiKnowledgeSourceText> ExtractForKnowledgeAsync(IFormFile upload, CancellationToken ct)
     {

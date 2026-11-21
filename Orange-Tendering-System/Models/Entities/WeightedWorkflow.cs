@@ -111,8 +111,7 @@ public class EvaluationParticipation
     // Hand-drawn signature (PNG) given in the meeting together with the final scores for every supplier.
     public byte[]? SignatureImage { get; set; }
     public DateTime? SignedAt { get; set; }
-    // The member's own recommendation, submitted once with the scores. It is an opinion recorded in the report; the
-    // recommended offer of the report is still the calculated rank 1.
+    // Historical recommendations are retained for earlier evaluations. New submissions record scores and signatures.
     public int? RecommendedBidId { get; set; }
     public Bid? RecommendedBid { get; set; }
     [MaxLength(2000)] public string? RecommendationReason { get; set; }

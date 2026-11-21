@@ -19,22 +19,22 @@ namespace Orange_Tendering_System.Controllers
         private bool UiArabic => UiLanguage.IsArabic(HttpContext);
 
         [HttpGet] public IActionResult Help() => Json(OrangeHelpKnowledge.Overview(User));
-        [HttpGet] public async Task<IActionResult> Conversations() => Json(new { items = await chat.ListAsync(User) });
+        [HttpGet] public async Task<IActionResult> Conversations(string? page = null) => Json(new { items = await chat.ListAsync(User, page) });
 
         // Welcome card data. loginId changes only with a new sign-in (see Program.cs OnSigningIn), so the browser greets once per login.
         [HttpGet]
-        public async Task<IActionResult> Welcome(CancellationToken ct)
+        public async Task<IActionResult> Welcome(CancellationToken ct, string? page = null)
         {
             var auth = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
             var loginId = auth.Properties?.Items.TryGetValue(OrangeLogin.ItemKey, out var value) == true ? value : null;
-            try { return Json(new { loginId, welcome = await chat.WelcomeAsync(User, UiArabic, ct) }); }
+            try { return Json(new { loginId, welcome = await chat.WelcomeAsync(User, UiArabic, ct, page) }); }
             catch (ChatException e) { return StatusCode(e.Status, new { error = e.Message }); }
         }
 
         [HttpGet]
-        public async Task<IActionResult> Messages(int id)
+        public async Task<IActionResult> Messages(int id, string? page = null)
         {
-            var items = await chat.MessagesAsync(User, id);
+            var items = await chat.MessagesAsync(User, id, page);
             return items == null ? NotFound(new { error = "Conversation not found." }) : Json(new { items });
         }
 
@@ -47,10 +47,10 @@ namespace Orange_Tendering_System.Controllers
         }
 
         [HttpPost, RequestSizeLimit(AiChatFileStore.MaxUploadBytes + 64 * 1024), RequestFormLimits(MultipartBodyLengthLimit = AiChatFileStore.MaxUploadBytes + 64 * 1024)]
-        public async Task<IActionResult> Upload([FromForm] int? conversationId, IFormFile? file, CancellationToken ct)
+        public async Task<IActionResult> Upload([FromForm] int? conversationId, IFormFile? file, CancellationToken ct, [FromForm] string? page = null)
         {
             if (file == null) return BadRequest(new { error = "Choose a file to upload." });
-            try { return Json(await chat.UploadAsync(User, conversationId, file, UiArabic, ct)); }
+            try { return Json(await chat.UploadAsync(User, conversationId, file, UiArabic, ct, page)); }
             catch (ChatException e) { return StatusCode(e.Status, new { error = e.Message, conversationId = e.ConversationId }); }
         }
 
@@ -70,9 +70,9 @@ namespace Orange_Tendering_System.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int id, string? page = null)
         {
-            try { return await chat.DeleteAsync(User, id) ? Json(new { ok = true }) : NotFound(new { error = "Conversation not found." }); }
+            try { return await chat.DeleteAsync(User, id, page) ? Json(new { ok = true }) : NotFound(new { error = "Conversation not found." }); }
             catch (ChatException e) { return StatusCode(e.Status, new { error = e.Message }); }
         }
 

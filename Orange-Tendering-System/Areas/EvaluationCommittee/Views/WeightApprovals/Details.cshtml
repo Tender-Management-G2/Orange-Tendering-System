@@ -46,10 +46,10 @@ else {
 }
 @if (w.State == WeightState.Approved) { <p><strong>Approved and locked:</strong> Financial @w.ApprovedFinancial!.Value.ToString("0.######")% / Technical @w.ApprovedTechnical!.Value.ToString("0.######")%.</p><p>Requirements version @w.Version · Approved @w.ApprovedAt?.ToJordan("yyyy-MM-dd HH:mm") by @w.ApprovedByUserId.</p> }
 @if (Model.IsEvaluator && w.State == WeightState.Proposals && w.Proposals.All(x => x.MemberUserId != Model.UserId)) {
-<form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post"><p>One final independent proposal per member. Submission cannot be edited.</p><label>Financial weight %<input id="financial-weight" name="financial" type="number" min="0" max="100" step="0.0001" required /></label><label>Technical weight %<input id="technical-weight" name="technical" type="number" min="0" max="100" step="0.0001" required /></label><button>Submit final proposal</button></form>
+<form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post"><p>One final independent proposal per member. Submission cannot be edited.</p><label>Financial weight %<input id="financial-weight" name="financial" type="number" min="0" max="100" step="1" required /></label><label>Technical weight %<input id="technical-weight" name="technical" type="number" min="0" max="100" step="1" required /></label><button>Submit final proposal</button></form>
 }
 @if (Model.CanApproveWeights && w.State == WeightState.AwaitingApproval) {
-<partial name="_ApproveTechnicalWeights" model="w" />
+<partial name="_ApproveTechnicalWeights" model='(w!, Model.Tender.Items.AsEnumerable())' />
 <script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
 <script>OrangeTechnicalEvaluation.wire(document);</script>
 }

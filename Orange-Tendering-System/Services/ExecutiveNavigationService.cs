@@ -22,7 +22,7 @@ public sealed class ExecutiveNavigationService(TenderWorkflowService workflow, U
     ApplicationDbContext db, IActionDescriptorCollectionProvider descriptors, LinkGenerator links,
     IAuthorizationPolicyProvider policies, IAuthorizationService authorization)
 {
-    public async Task<ExecutivePage[]> Catalog(ClaimsPrincipal principal)
+    public async Task<ExecutivePage[]> Catalog(ClaimsPrincipal principal, string? workspaceRole = null)
     {
         var actor = await workflow.Actor(principal);
         if (!actor.EmailConfirmed || actor.MustChangePassword || await users.IsLockedOutAsync(actor)) throw new AgentException("Complete account verification first.", 403);
@@ -30,7 +30,7 @@ public sealed class ExecutiveNavigationService(TenderWorkflowService workflow, U
         var current = new ClaimsPrincipal(new ClaimsIdentity(principal.Claims.Where(c => c.Type != ClaimTypes.Role)
             .Concat(roles.Select(r => new Claim(ClaimTypes.Role, r))), principal.Identity?.AuthenticationType ?? "Identity.Application"));
         var pages = new List<ExecutivePage>();
-        var available = WorkspaceNavigation.Workspaces.Where(w => roles.Contains(w.Role)).ToArray();
+        var available = WorkspaceNavigation.Workspaces.Where(w => roles.Contains(w.Role) && (workspaceRole == null || workspaceRole == w.Role)).ToArray();
         foreach (var workspace in available)
             foreach (var item in workspace.Items) await Add(workspace.Area, item);
         foreach (var item in WorkspaceNavigation.SharedItems) await Add("", item);

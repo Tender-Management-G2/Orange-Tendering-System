@@ -164,7 +164,7 @@
                     : Model.IsOfficer ? ("The committee is signing the report", "The report was generated automatically. You receive the completed, signed report when all four members have signed it.", "wait")
                     : ("Report ready", "The committee is reviewing and signing the report.", "wait");
             if (Model.IsEvaluator && !submitted && (s.State == SessionState.Scheduled || TenderWorkflowService.EvaluationOpen(s, Model.UtcNow)))
-                return TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? ("Evaluate the offers", "Open the evaluation workspace: compare the offers, score each one (whole numbers from 0 to 99), recommend a supplier and sign. You submit once.", "action") : ("Prepare for the meeting", "The evaluation workspace already shows the offers, criteria, documents and AI analysis. Scoring opens at the meeting start.", "wait");
+                return TenderWorkflowService.EvaluationOpen(s, Model.UtcNow) ? ("Evaluate the offers", "Open the evaluation workspace: compare the offers, score each one (whole numbers from 0 to 99) and sign. You submit once.", "action") : ("Prepare for the meeting", "The evaluation workspace already shows the offers, criteria, documents and AI analysis. Scoring opens at the meeting start.", "wait");
             if (s.State == SessionState.Scheduled && Model.UtcNow < s.StartsAt) return ("Waiting for the meeting to start", "Scoring opens by itself at the start time shown below. Then the four members score the offers.", "wait");
             return ($"Committee evaluation: {s.Submissions.Count} of 4 submitted", submitted ? "Your evaluation is recorded and cannot be edited." : "Scoring is in progress.", "wait");
         }
@@ -277,11 +277,11 @@
         }
         @if (Model.IsEvaluator && w != null && w.State == WeightState.Proposals && w.Proposals.All(x => x.MemberUserId != Model.UserId))
         {
-            var priorFinancial = revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true && revision.PriorFinancial.TryGetValue(mySeat!.Id, out var prior) ? prior : 50m;
+            var priorFinancial = revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true && revision.PriorFinancial.TryGetValue(mySeat!.Id, out var prior) ? decimal.Round(prior, 0, MidpointRounding.AwayFromZero) : 50m;
             <div class="wp-actions">
                 <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post" class="wp-form wp-weights">
                     @if (revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true) { <p class="wp-hint wp-warn"><strong>Officer's revision note:</strong> @revision.Note</p> }
-                    <div class="wp-split"><div><small>Financial</small><b id="wp-fin-label">@priorFinancial.ToString("0.##")%</b></div><input id="wp-fin" name="financial" type="range" min="0" max="100" step="0.01" value="@priorFinancial.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" aria-label="Financial weight percent" /><div><small>Technical</small><b id="wp-tech-label">@((100m-priorFinancial).ToString("0.##"))%</b></div></div>
+                    <div class="wp-split"><div><small>Financial</small><b id="wp-fin-label">@priorFinancial.ToString("0.##")%</b></div><input id="wp-fin" name="financial" type="range" min="0" max="100" step="1" value="@priorFinancial.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" aria-label="Financial weight percent" /><div><small>Technical</small><b id="wp-tech-label">@((100m-priorFinancial).ToString("0.##"))%</b></div></div>
                     <input id="wp-tech" name="technical" type="hidden" value="@((100m-priorFinancial).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" />
                     <button class="wp-primary">@(revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true ? "Send revised proposal" : "Submit my proposal")</button>
                 </form>
@@ -289,7 +289,7 @@
         }
         @if (Model.CanApproveWeights && w != null && w.State == WeightState.AwaitingApproval)
         {
-            <div class="wp-actions"><partial name="_ApproveTechnicalWeights" model="w" />
+            <div class="wp-actions"><partial name="_ApproveTechnicalWeights" model='(w!, Model.Tender.Items.AsEnumerable())' />
                 <details class="wp-opt"><summary>Return weights to selected members for revision</summary>
                     <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ReturnWeights" asp-route-id="@id" method="post" class="wp-form">
                         <p class="wp-hint">Select one or more members. Their previous proposals are kept in the audit history; their forms reopen with the earlier values.</p>
@@ -406,7 +406,7 @@
         {
             var scoreIndex = 0;
             <div class="wp-actions">
-                <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post" class="wp-form wp-scores" data-evaluator-scores data-financial-weight="@w?.ApprovedFinancial?.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-technical-weight="@w?.ApprovedTechnical?.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post" class="wp-form wp-scores" data-evaluator-scores>
                     @foreach (var eligible in s.EligibleBids)
                     {
                         <fieldset data-score-row data-bid="@eligible.BidId"><legend>@BidSupplier(eligible.BidId)</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" />
@@ -418,13 +418,9 @@
                             <label>Score justification<select class="wp-quick" aria-label="Quick text"><option value="">Use a suggested justification (optional)</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label></fieldset>
                         scoreIndex++;
                     }
-                    <label>Recommended supplier<select name="recommendation.RecommendedBidId" required><option value="">Choose an eligible offer</option>@foreach (var eligible in s.EligibleBids) { <option value="@eligible.BidId">@BidSupplier(eligible.BidId)</option> }</select></label>
-                    <label>Reason for your recommendation<textarea name="recommendation.Reason" maxlength="2000" required rows="2"></textarea></label>
-                    <label data-rank-deviation>Why does your recommendation differ from your own highest score?<textarea name="recommendation.DeviationJustification" maxlength="2000" minlength="20" rows="2"></textarea></label>
-                    <label>Concerns or observations (optional)<textarea name="recommendation.Concerns" maxlength="2000" rows="2"></textarea></label>
                     <h5 class="wp-sub">Your signature <small>required after scoring every supplier</small></h5>
                     <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
-                    <button class="wp-primary">Sign and submit my final evaluation</button><small>You submit once for all suppliers together. Scores, recommendation and signature cannot be changed afterwards.</small>
+                    <button class="wp-primary">Sign and submit my final evaluation</button><small>Sign once for all suppliers. Your signature is recorded with your scores and included in the generated report.</small>
                 </form>
                 <a class="wp-ghost wp-link" data-no-modal asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Meeting" asp-route-id="@id">Open the detailed evaluation workspace</a>
             </div>
@@ -717,7 +713,7 @@
                                     <div><strong>@Who(m.UserId)</strong> <small>@Role(m.Responsibility)</small>@foreach (var g in notes) { <p><b>@BidSupplier(g.Key):</b> @g.First().Comment</p> }</div> }
                             </div></details>
                         }
-                    @if (s?.Report != null) { <p class="wp-auto"><b>&#9889;</b> The system generated the evaluation report automatically (version @s.Report.VersionNumber, @Words(s.Report.Status.ToString())). Members sign it, then it goes to the Manager and the Top Committee.</p> }
+                    @if (s?.Report != null) { <p class="wp-auto"><b>&#9889;</b> The system generated the evaluation report automatically (version @s.Report.VersionNumber, @Words(s.Report.Status.ToString())). After four signed submissions, the Officer receives the report and forwards it to the Manager.</p> }
                 </div>
             </article>
 

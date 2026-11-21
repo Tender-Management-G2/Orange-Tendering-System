@@ -307,6 +307,10 @@ namespace Orange_Tendering_System.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("WorkspaceRole")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("UserId", "UpdatedAt");
@@ -1795,6 +1799,69 @@ namespace Orange_Tendering_System.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("FinalTenderContracts");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.InternalAwardReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AiWritten")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("AwardedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmailAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FinalDecisionNoticeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ManagerEmailSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ManagerNotificationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OfficerEmailSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OfficerNotificationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SupplierName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TenderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TenderTitle")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinalDecisionNoticeId")
+                        .IsUnique();
+
+                    b.HasIndex("ManagerNotificationId");
+
+                    b.HasIndex("OfficerNotificationId");
+
+                    b.ToTable("InternalAwardReports");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Notification", b =>
@@ -3614,6 +3681,33 @@ namespace Orange_Tendering_System.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tender");
+                });
+
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.InternalAwardReport", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.FinalDecisionNotice", "FinalDecisionNotice")
+                        .WithMany()
+                        .HasForeignKey("FinalDecisionNoticeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Orange_Tendering_System.Models.Entities.Notification", "ManagerNotification")
+                        .WithMany()
+                        .HasForeignKey("ManagerNotificationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Orange_Tendering_System.Models.Entities.Notification", "OfficerNotification")
+                        .WithMany()
+                        .HasForeignKey("OfficerNotificationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FinalDecisionNotice");
+
+                    b.Navigation("ManagerNotification");
+
+                    b.Navigation("OfficerNotification");
                 });
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Notification", b =>
