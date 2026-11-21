@@ -1,46 +1,61 @@
 {
-  "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
     "http": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:7182;http://localhost:5254",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "TeamDev__Database": "OrangeTenderingTeamDev"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7182;http://localhost:5254"
     },
     "https": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:7182;http://localhost:5254",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "TeamDev__Database": "OrangeTenderingTeamDev"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7182;http://localhost:5254"
     },
     "https (Orange Radar demo database)": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:7182;http://localhost:5254",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "TeamDev__Database": "OrangeTenderingTeamDev_RadarDemo",
         "OrangeRadar__DemoDataset__Enabled": "true"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7182;http://localhost:5254"
     },
     "https (hosted shared database)": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:7182;http://localhost:5254",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "HostedDatabase__Enabled": "true"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7182;http://localhost:5254"
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:53681/",
+      "sslPort": 44312
     }
   }
 }
