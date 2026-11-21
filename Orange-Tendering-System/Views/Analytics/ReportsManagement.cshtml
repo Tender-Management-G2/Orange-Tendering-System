@@ -22,6 +22,8 @@
 }
 <partial name="_PageHeader" />
 
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Reports Management</h2></div><partial name="_ReportKpiCards" model="@(Model.Kpis)" /></section>
+
 <section class="ws-panel pg-panel rm-filters">
     <div class="pg-panel-head"><div><h2>Filters</h2><span class="pg-hint">Filter management reports by date range, department, supplier, tender, report type, status, version, or creator.</span></div><partial name="_ReportExportLinks" model="@(new Orange_Tendering_System.ViewModels.ReportExportLinksViewModel("reports-management", Model.Filters))" /></div>
     <form method="get" asp-action="ReportsManagement" class="rm-filter-grid">
@@ -38,8 +40,6 @@
         <div class="rm-filter-actions"><button class="pg-btn pg-btn-primary" type="submit">Apply Filters</button><a class="pg-btn" asp-action="ReportsManagement">Reset</a></div>
     </form>
 </section>
-
-<section class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Reports Management</h2></div><div class="rm-kpis">@foreach (var item in Model.Kpis) { <div><span>◌</span><small>@item.Label</small><strong>@item.Value</strong></div> }</div></section>
 
 <section class="rm-charts">
     <article class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Reports by Status</h2></div><div class="rm-pie" style="background:conic-gradient(@Pie(status.Points))"><span><strong>@status.Points.Sum(x => x.Value).ToString("0")</strong><small>Reports</small></span></div><ul class="rm-legend">@foreach (var p in status.Points) { <li>@p.Label <strong>@p.Value.ToString("0")</strong></li> }</ul></article>

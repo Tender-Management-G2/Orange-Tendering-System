@@ -1,0 +1,21 @@
+@model IEnumerable<Orange_Tendering_System.Services.ReportKpi>
+@{
+    var accents = new[] { "orange", "blue", "green", "purple", "orange", "blue" };
+    var icons = new[] { "request", "check", "layers", "history", "shield", "chart" };
+    var index = 0;
+}
+<div class="dash-metrics admin-report-kpis">
+    @foreach (var item in Model)
+    {
+        var style = index++ % accents.Length;
+        <article class="dash-metric dash-@accents[style]">
+            <span class="dash-metric-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon(icons[style]))</svg>
+            </span>
+            <div class="dash-metric-copy">
+                <strong>@item.Value</strong>
+                <span>@item.Label</span>
+            </div>
+        </article>
+    }
+</div>

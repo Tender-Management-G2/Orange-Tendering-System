@@ -339,3 +339,49 @@ body.so-shell.ws-shell[data-workspace-role="Admin"] .dash-metric-copy > span {
   overflow-wrap: anywhere;
   white-space: normal;
 }
+
+/* Report KPIs share the dashboard card layout and palette. */
+body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis .dash-metric::after { display: none; }
+body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis .dash-metric-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis .dash-metric {
+  min-height: 100px;
+  gap: 10px;
+  padding: 12px;
+}
+body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis .dash-metric-icon {
+  width: clamp(34px, 3vw, 53px);
+  height: clamp(34px, 3vw, 53px);
+}
+body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis .dash-metric-icon svg {
+  width: 60%;
+  height: 60%;
+}
+body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis .dash-metric-copy > span {
+  overflow-wrap: anywhere;
+}
+@media (min-width: 1280px) {
+  body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+@media (max-width: 420px) {
+  body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (min-width: 1420px) {
+  body.so-shell.ws-shell[data-workspace-role] .admin-report-kpis:has(> :nth-child(6)) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.admin-report-kpis .dash-metric-copy strong em {
+  font-size: var(--fs-micro);
+  font-style: normal;
+  font-weight: 600;
+}

@@ -20,6 +20,47 @@
 }
 <partial name="_PageHeader" />
 
+<section class="ws-panel pg-panel sr-kpi-panel">
+    <div class="pg-panel-head"><h2>Supplier Reports</h2></div>
+    <div class="dash-metrics admin-report-kpis">
+        <article class="dash-metric dash-orange">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Registered suppliers")</strong>
+                <span>Registered Suppliers</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-blue">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Approved suppliers")</strong>
+                <span>Approved Suppliers</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-green">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("shield"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Suspended suppliers")</strong>
+                <span>Suspended Suppliers</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-purple">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("layers"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Verified documents") <em>Verified</em></strong>
+                <span>Document Verification Status</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-orange">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("history"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Documents expired or expiring soon")</strong>
+                <span>Documents Expired or Expiring Soon</span>
+            </div>
+        </article>
+    </div>
+</section>
+
 <section class="ws-panel pg-panel sr-filters">
     <div class="pg-panel-head"><div><h2>Filters</h2><span class="pg-hint">Filter supplier reports by date range, supplier, or document verification status.</span></div><partial name="_ReportExportLinks" model="@(new Orange_Tendering_System.ViewModels.ReportExportLinksViewModel("suppliers", Model.Filters))" /></div>
     <form method="get" asp-action="Suppliers" class="sr-filter-grid">
@@ -29,17 +70,6 @@
         <label>Document verification status<select name="VerificationStatus"><option value="">All statuses</option>@foreach (var status in Html.GetEnumSelectList<DocumentVerificationStatus>()) { <option value="@status.Value" selected="@(status.Value == ((int?)Model.Filters.VerificationStatus)?.ToString())">@status.Text</option> }</select></label>
         <div class="sr-filter-actions"><button class="pg-btn pg-btn-primary" type="submit">Apply Filters</button><a class="pg-btn" asp-action="Suppliers">Reset</a></div>
     </form>
-</section>
-
-<section class="ws-panel pg-panel sr-kpi-panel">
-    <div class="pg-panel-head"><h2>Supplier Reports</h2></div>
-    <div class="sr-kpis">
-        <div><span>♟</span><small>Registered Suppliers</small><strong>@Kpi("Registered suppliers")</strong></div>
-        <div><span>✓</span><small>Approved Suppliers</small><strong>@Kpi("Approved suppliers")</strong></div>
-        <div><span>⊘</span><small>Suspended Suppliers</small><strong>@Kpi("Suspended suppliers")</strong></div>
-        <div><span>▧</span><small>Document Verification Status</small><strong>@Kpi("Verified documents") <em>Verified</em></strong></div>
-        <div><span>□</span><small>Documents Expired or Expiring Soon</small><strong>@Kpi("Documents expired or expiring soon")</strong></div>
-    </div>
 </section>
 
 <section class="sr-chart-grid">
