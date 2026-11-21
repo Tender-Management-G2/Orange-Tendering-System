@@ -169,7 +169,7 @@ body {
 .eyebrow {
   display: inline-block;
   line-height: 1.6;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 700;
   letter-spacing: 2.2px;
 }
@@ -186,7 +186,7 @@ body {
 .section-heading p,
 .contact-section > div > p {
   color: var(--muted);
-  font-size: 16px;
+  font-size: var(--fs-body);
   line-height: 1.8;
   margin: 0;
   max-width: 440px;
@@ -254,7 +254,7 @@ body {
   text-shadow: 0 0 45px #ff790020;
 }
 .orbit-label {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   letter-spacing: 2px;
   color: #ff9e43;
   margin-top: 15px;
@@ -336,7 +336,7 @@ body {
 }
 .step-number {
   color: #ff7900;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   letter-spacing: 1px;
 }
 .story-step svg {
@@ -351,7 +351,7 @@ body {
   margin: 18px 0 12px;
 }
 .story-step p {
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   color: #aaa;
   line-height: 1.8;
   margin: 0;
@@ -360,7 +360,7 @@ body {
 .story-step .step-tag {
   display: inline-block;
   color: #bbb;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-top: 19px;
@@ -388,7 +388,7 @@ body {
   min-height: 64px;
   padding: 18px 25px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: #ddd;
 }
 .console-bar > div {
@@ -412,7 +412,7 @@ body {
 .pending-badge {
   display: inline-block;
   padding: 6px 9px;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   letter-spacing: 1px;
   line-height: 1.6;
   color: #bd9b7e;
@@ -439,12 +439,12 @@ body {
   gap: 15px;
 }
 .panel-title h3 {
-  font-size: 16px;
+  font-size: var(--fs-body);
   font-weight: 500;
   margin: 0;
 }
 .panel-title > span {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: #888;
 }
 .weight-control {
@@ -457,7 +457,7 @@ body {
   display: flex;
   justify-content: space-between;
   grid-column: 1/-1;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   color: #bbb;
 }
 .weight-control strong {
@@ -473,11 +473,11 @@ body {
   cursor: pointer;
 }
 .weight-control > span {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: #aaa;
 }
 .formula {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   line-height: 1.6;
   color: #888;
   margin: 12px 0 26px;
@@ -489,11 +489,11 @@ table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   white-space: nowrap;
 }
 th {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #818186;
   font-weight: 500;
   padding: 10px 9px;
@@ -510,12 +510,12 @@ td:first-child {
 }
 td:first-child strong {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   font-weight: 500;
   margin-bottom: 4px;
 }
 td:first-child span {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #777;
 }
 td.weighted {
@@ -529,7 +529,7 @@ td.weighted {
   height: 24px;
   border: 1px solid #ffffff14;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--fs-micro);
 }
 .rank.first {
   color: #ff9b40;
@@ -539,7 +539,7 @@ td.weighted {
 .chart-legend {
   display: flex;
   gap: 16px;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: #888;
   margin: 25px 0 17px;
 }
@@ -563,7 +563,7 @@ td.weighted {
   gap: 12px;
   align-items: center;
   margin: 13px 0;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #aaa;
 }
 .score-bars {
@@ -607,17 +607,17 @@ td.weighted {
   stroke-width: 2;
 }
 .ai-mark > span {
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 .ai-mark small {
   display: block;
-  font-size: 8px;
+  font-size: var(--fs-micro);
   color: #999;
   letter-spacing: 1px;
   margin-top: 5px;
 }
 .small-label {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: #888;
   letter-spacing: 1.2px;
 }
@@ -629,7 +629,7 @@ td.weighted {
   margin: 14px 0;
 }
 .insights-panel > p {
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: #aaa;
   line-height: 1.8;
 }
@@ -648,11 +648,11 @@ td.weighted {
   flex-shrink: 0;
 }
 .human-decision strong {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 500;
 }
 .human-decision p {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: #888;
   line-height: 1.7;
   margin: 8px 0 0;
@@ -661,7 +661,7 @@ td.weighted {
   border: 0;
   background: none;
   color: #ff9b42;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   text-align: left;
   line-height: 1.5;
   padding: 18px 0 5px;
@@ -674,7 +674,7 @@ td.weighted {
 }
 .fineprint,
 .insights-panel > .fineprint {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   line-height: 1.7;
   color: #777;
 }
@@ -701,14 +701,14 @@ td.weighted {
   background: none;
   border-radius: 9px;
   color: #8f8f94;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   transition:
     background 0.3s,
     color 0.3s,
     border-color 0.3s;
 }
 .role-tabs button span {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #666;
 }
 .role-tabs button[aria-selected="true"] {
@@ -756,7 +756,7 @@ td.weighted {
 }
 .role-panel > p {
   color: #aaa;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   line-height: 1.8;
   max-width: 540px;
 }
@@ -770,7 +770,7 @@ td.weighted {
   padding-left: 18px;
   margin: 12px 0;
   color: #bbb;
-  font-size: 13px;
+  font-size: var(--fs-caption);
 }
 .role-panel li:before {
   content: "";
@@ -785,7 +785,7 @@ td.weighted {
   border-top: 1px solid var(--border);
   padding-top: 20px;
   color: #999;
-  font-size: 11px;
+  font-size: var(--fs-micro);
 }
 .role-stage strong {
   display: block;
@@ -807,12 +807,12 @@ td.weighted {
   color: #ff7900;
 }
 .security-strip h3 {
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   font-weight: 500;
   margin: 0 0 9px;
 }
 .security-strip p {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.8;
   color: #888;
   margin: 0 0 30px;
@@ -843,7 +843,7 @@ td.weighted {
   background: none;
   padding: 18px 14px;
   color: #888;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.6;
   margin-bottom: 4px;
   transition:
@@ -853,7 +853,7 @@ td.weighted {
 }
 .relationship-list button small {
   display: block;
-  font-size: 8px;
+  font-size: var(--fs-micro);
   letter-spacing: 1px;
   color: #666;
   margin-bottom: 5px;
@@ -887,7 +887,7 @@ td.weighted {
   margin: 9px 0 0;
 }
 .status-badge {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   border: 1px solid #ff79003b;
   background: #ff79000e;
   color: #ffaf67;
@@ -920,7 +920,7 @@ td.weighted {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: #ffa34f;
   border: 1px solid #ff790030;
   background: #ff790009;
@@ -935,15 +935,15 @@ td.weighted {
   justify-content: space-between;
   gap: 15px;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: #bbb;
 }
 .message-title small {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: #666;
 }
 .message p {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.8;
   color: #aaa;
   margin: 10px 0;
@@ -954,13 +954,13 @@ td.weighted {
   background: #ffffff03;
   border-radius: 6px;
   padding: 8px 10px;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #bbb;
 }
 .thread-awaiting {
   margin-left: 43px;
   color: #666;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   line-height: 1.7;
 }
 .thread-foot {
@@ -970,7 +970,7 @@ td.weighted {
   padding: 15px 0;
   border-top: 1px solid var(--border);
   color: #777;
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 .status-switch {
   display: flex;
@@ -980,7 +980,7 @@ td.weighted {
   margin-top: 15px;
 }
 .status-switch > span {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: #777;
   margin-right: auto;
 }
@@ -989,7 +989,7 @@ td.weighted {
   background: transparent;
   padding: 7px 10px;
   border-radius: 6px;
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: #888;
 }
 .status-switch button[aria-pressed="true"] {
@@ -1007,7 +1007,7 @@ td.weighted {
 }
 .metric > span {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: #aaa;
 }
 .metric strong {
@@ -1019,7 +1019,7 @@ td.weighted {
 }
 .metric small {
   color: #707077;
-  font-size: 10px;
+  font-size: var(--fs-micro);
 }
 .analytics-grid {
   display: grid;
@@ -1047,14 +1047,14 @@ td.weighted {
   flex-shrink: 0;
 }
 .empty-chart h4 {
-  font-size: 13px;
+  font-size: var(--fs-caption);
   font-weight: 400;
   color: #999;
   margin: 0 0 10px;
 }
 .empty-chart p {
   color: #666;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   line-height: 1.7;
 }
 .empty-line {
@@ -1152,15 +1152,15 @@ td.weighted {
 }
 .about-values span {
   color: #ff7900;
-  font-size: 10px;
+  font-size: var(--fs-micro);
 }
 .about-values h3 {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   margin: 13px 0 9px;
 }
 .about-values p {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   line-height: 1.8;
   color: #888;
   margin: 0;
@@ -1185,12 +1185,12 @@ td.weighted {
   margin-top: 5px;
 }
 .contact-note strong {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   font-weight: 400;
   color: #ccc;
 }
 .contact-note p {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.8;
   color: #888;
   max-width: 340px;
@@ -1201,7 +1201,7 @@ td.weighted {
 }
 #contact-form label {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: #bbb;
   margin: 0 0 10px;
 }
@@ -1214,7 +1214,7 @@ td.weighted {
   background: #101010aa;
   color: #eee;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   border-radius: 8px;
   padding: 13px 12px;
   transition: border-color 0.2s;
@@ -1245,12 +1245,12 @@ td.weighted {
   display: block;
   min-height: 24px;
   padding-top: 5px;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #ffac83;
 }
 #contact-form .primary {
   height: 46px;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   min-height: 46px;
   padding: 0 22px;
   border-radius: 10px;
@@ -1258,7 +1258,7 @@ td.weighted {
   margin-top: 3px;
 }
 .form-status {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #888;
   line-height: 1.7;
   margin-bottom: 0;
@@ -1290,7 +1290,7 @@ td.weighted {
 }
 .final-cta p {
   color: #96969b;
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
 }
 .final-actions {
   display: flex;
@@ -1300,12 +1300,12 @@ td.weighted {
 }
 .final-actions button {
   height: 50px;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   padding: 0 25px;
   border-radius: 14px;
 }
 .cta-note {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: #777;
 }
 .cta-orbit {
@@ -1347,11 +1347,11 @@ td.weighted {
   gap: 18px;
 }
 .enterprise-footer .brand-title {
-  font-size: 13px;
+  font-size: var(--fs-caption);
   padding-left: 18px;
 }
 .footer-top p {
-  font-size: 12px;
+  font-size: var(--fs-micro);
   line-height: 1.8;
   color: #68686e;
   margin: 0 auto 0 0;
@@ -1367,7 +1367,7 @@ td.weighted {
   border: 0;
 }
 .footer-top nav a {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   color: #8a8a90;
   padding: 0;
   white-space: nowrap;
@@ -1383,7 +1383,7 @@ td.weighted {
   gap: 20px;
   padding-top: 25px;
   color: #626268;
-  font-size: 9px;
+  font-size: var(--fs-micro);
 }
 .footer-bottom a {
   color: #aaa;
@@ -1404,7 +1404,7 @@ td.weighted {
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
   padding: 12px 0;
-  font-size: 13px;
+  font-size: var(--fs-caption);
 }
 .dialog-content .report-row strong {
   color: #ffa251;
@@ -1490,7 +1490,7 @@ dialog {
     gap: 18px;
   }
   .brand-title {
-    font-size: 15px;
+    font-size: var(--fs-body-sm);
   }
   .menu {
     display: block;
@@ -1506,7 +1506,7 @@ dialog {
     gap: 10px;
   }
   .account button {
-    font-size: 12px;
+    font-size: var(--fs-micro);
     padding: 0 15px;
   }
   header nav {
@@ -1526,7 +1526,7 @@ dialog {
     gap: 25px;
   }
   header nav a {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     padding: 12px 0;
   }
   header nav .selected:after {
@@ -1542,10 +1542,10 @@ dialog {
     gap: 50px;
   }
   .feature h2 {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .feature p {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .feature {
     height: 80px;
@@ -1614,7 +1614,7 @@ dialog {
     max-width: 150px;
   }
   .section-heading p {
-    font-size: 14px;
+    font-size: var(--fs-sm);
   }
 }
 @media (min-width: 761px) and (max-width: 900px) {
@@ -1643,7 +1643,7 @@ dialog {
     font-size: 48px;
   }
   .hero p {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     line-height: 1.6;
     margin: 23px 0 25px 25px;
     max-width: 440px;
@@ -1659,7 +1659,7 @@ dialog {
   .overview {
     height: 49px;
     padding: 0 23px;
-    font-size: 14px;
+    font-size: var(--fs-sm);
   }
   .desktop {
     display: none;
@@ -1693,10 +1693,10 @@ dialog {
     display: none;
   }
   .stage h3 {
-    font-size: 16px;
+    font-size: var(--fs-body);
   }
   .stage small {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .stage svg {
     height: 39px;
@@ -1720,10 +1720,10 @@ dialog {
     margin: 0 25px 15px;
   }
   .feature h2 {
-    font-size: 14px;
+    font-size: var(--fs-sm);
   }
   .feature p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .back-wave {
     top: 270px;
@@ -1782,14 +1782,14 @@ dialog {
     font-size: 80px;
   }
   .orbit-label {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .role-layout {
     grid-template-columns: 235px 1fr;
     gap: 18px;
   }
   .role-tabs button {
-    font-size: 12px;
+    font-size: var(--fs-micro);
     padding: 14px;
   }
   .role-panel {
@@ -1806,13 +1806,13 @@ dialog {
   }
   .relationship-list button {
     padding: 14px 10px;
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .thread-panel {
     padding: 24px;
   }
   .thread-heading h3 {
-    font-size: 16px;
+    font-size: var(--fs-body);
   }
   .analytics-grid {
     grid-template-columns: 1fr;
@@ -1853,7 +1853,7 @@ dialog {
     padding: 12px 18px;
   }
   .brand-title {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .account {
     display: none;
@@ -1875,10 +1875,10 @@ dialog {
     gap: 18px;
   }
   .feature h2 {
-    font-size: 16px;
+    font-size: var(--fs-body);
   }
   .feature p {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .feature svg {
     width: 40px;
@@ -1902,11 +1902,11 @@ dialog {
     margin-bottom: 32px;
   }
   .eyebrow {
-    font-size: 9px;
+    font-size: var(--fs-micro);
     letter-spacing: 1.7px;
   }
   .section-heading p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .story-grid {
     grid-template-columns: 1fr;
@@ -1937,7 +1937,7 @@ dialog {
     font-size: 20px;
   }
   .story-step p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .story-step.is-active {
     transform: translateX(2px);
@@ -1950,30 +1950,30 @@ dialog {
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .demo-badge {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .panel-title h3 {
-    font-size: 14px;
+    font-size: var(--fs-sm);
   }
   th,
   td {
     padding: 13px 6px;
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   th {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .weight-control {
     gap: 15px;
   }
   .weight-control > span {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .formula {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .score-row {
     grid-template-columns: 65px 1fr 29px;
@@ -1993,7 +1993,7 @@ dialog {
   }
   .chart-legend {
     gap: 12px;
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .role-layout {
     display: block;
@@ -2007,23 +2007,23 @@ dialog {
   }
   .role-tabs button {
     padding: 10px;
-    font-size: 10px;
+    font-size: var(--fs-micro);
     border: 1px solid #ffffff14;
     gap: 7px;
   }
   .role-tabs button span {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .role-panel {
     padding: 27px;
     min-height: 410px;
   }
   .role-panel li {
-    font-size: 12px;
+    font-size: var(--fs-micro);
     line-height: 1.7;
   }
   .role-panel > p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .security-strip {
     gap: 15px;
@@ -2034,10 +2034,10 @@ dialog {
     flex: 1;
   }
   .security-strip h3 {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .security-strip p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
     margin-bottom: 0;
   }
   .security-strip .pending-badge {
@@ -2062,40 +2062,40 @@ dialog {
     border: 1px solid var(--border);
     margin: 0;
     padding: 13px;
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .thread-panel {
     padding: 22px 17px;
   }
   .thread-heading h3 {
-    font-size: 16px;
+    font-size: var(--fs-body);
   }
   .message-title {
-    font-size: 10px;
+    font-size: var(--fs-micro);
     align-items: start;
   }
   .message-title small {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     white-space: nowrap;
   }
   .message p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .thread-messages {
     min-height: 290px;
   }
   .thread-foot {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     gap: 9px;
   }
   .status-switch {
     gap: 5px;
   }
   .status-switch > span {
-    font-size: 8px;
+    font-size: var(--fs-micro);
   }
   .status-switch button {
-    font-size: 8px;
+    font-size: var(--fs-micro);
     padding: 7px;
   }
   .metric-grid {
@@ -2114,17 +2114,17 @@ dialog {
     font-size: 33px;
   }
   .metric > span {
-    font-size: 13px;
+    font-size: var(--fs-caption);
     margin-bottom: 9px;
   }
   .metric small {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .analytics-panel {
     padding: 22px;
   }
   .analytics-panel .small-label {
-    font-size: 7px;
+    font-size: var(--fs-micro);
   }
   .empty-chart {
     gap: 22px;
@@ -2136,13 +2136,13 @@ dialog {
     border-width: 11px;
   }
   .empty-chart h4 {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .empty-chart p {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .about-lead {
-    font-size: 15px;
+    font-size: var(--fs-body-sm);
   }
   .about-values {
     grid-template-columns: 1fr;
@@ -2158,19 +2158,19 @@ dialog {
   }
   .about-values p {
     grid-column: 2;
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .about-values span {
     padding-top: 2px;
   }
   .contact-section > div > p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .contact-note strong {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .contact-note p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   #contact-form {
     padding: 22px;
@@ -2188,13 +2188,13 @@ dialog {
     letter-spacing: -1px;
   }
   .final-cta p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .final-actions {
     gap: 10px;
   }
   .final-actions button {
-    font-size: 11px;
+    font-size: var(--fs-micro);
     padding: 0 14px;
     min-width: 0;
     height: 46px;
@@ -2206,7 +2206,7 @@ dialog {
     padding: 35px 23px;
   }
   .enterprise-footer .brand-title {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .footer-top nav {
     display: grid;
@@ -2214,7 +2214,7 @@ dialog {
     gap: 20px;
   }
   .footer-top nav a {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .footer-bottom {
     display: grid;
@@ -2224,7 +2224,7 @@ dialog {
     padding-bottom: 30px;
   }
   .fineprint {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .dialog-content h2 {
     font-size: 24px;
@@ -2283,17 +2283,17 @@ main#home {
 }
 td,
 td:first-child strong {
-  font-size: 13px;
+  font-size: var(--fs-caption);
 }
 .insights-panel > p {
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 .human-decision p {
-  font-size: 12px;
+  font-size: var(--fs-micro);
 }
 .fineprint,
 .insights-panel > .fineprint {
-  font-size: 11px;
+  font-size: var(--fs-micro);
 }
 .feature p {
   font-size: 0.82vw;
@@ -2314,7 +2314,7 @@ td:first-child strong {
 }
 @media (max-width: 1200px) {
   .feature p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
 }
 @media (max-width: 900px) {
@@ -2330,7 +2330,7 @@ td:first-child strong {
   .hero-actions .play {
     width: 26px;
     height: 26px;
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .hero-actions .primary span {
     font-size: 22px;
@@ -2338,33 +2338,33 @@ td:first-child strong {
 }
 @media (max-width: 600px) {
   .hero-actions button {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .hero-actions {
     gap: 10px;
   }
   .feature p {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   td,
   td:first-child strong {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .insights-panel > p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .human-decision p {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .fineprint,
   .insights-panel > .fineprint {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
 }
 @media (max-width: 360px) {
   .hero-actions button {
     padding: 0 10px;
-    font-size: 11px;
+    font-size: var(--fs-micro);
     gap: 6px;
   }
   .hero-actions .play {

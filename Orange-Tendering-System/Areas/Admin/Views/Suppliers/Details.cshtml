@@ -41,7 +41,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 <partial name="_PageHeader" />
 
 <!-- Company Information -->
-<section class="ws-panel pg-panel">
+<section class="ws-panel pg-panel admin-supplier-details">
 
     <div class="pg-panel-head">
         <h2>Company Information</h2>
@@ -88,8 +88,8 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
         </div>
 
         <div>
-            <dt>Registration Date (UTC)</dt>
-            <dd>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+            <dt>Registration Date (Jordan time)</dt>
+            <dd>@Model.CreatedAt.ToJordan("yyyy-MM-dd HH:mm")</dd>
         </div>
 
         <div>
@@ -107,9 +107,9 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
         </div>
 
         <div>
-            <dt>Reviewed At (UTC)</dt>
+            <dt>Reviewed At (Jordan time)</dt>
             <dd>
-                @(Model.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")
+                @(Model.ReviewedAt?.ToJordan("yyyy-MM-dd HH:mm")
                     ?? "—")
             </dd>
         </div>
@@ -259,7 +259,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                 <tr>
                     <th>Tender</th>
                     <th>Round</th>
-                    <th>Invited (UTC)</th>
+                    <th>Invited (Jordan time)</th>
                     <th>Response</th>
                     <th>Offer Submitted</th>
                 </tr>

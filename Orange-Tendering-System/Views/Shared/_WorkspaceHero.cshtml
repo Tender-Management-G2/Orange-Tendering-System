@@ -1,0 +1,56 @@
+@*
+  Workspace page banner (orange architectural banner) for every role: same design as the approved Sourcing Officer pages. Reads ViewData["Title"] and ViewData["Description"];
+  a page may set ViewData["HeroTitle"] when its browser title (e.g. "T-12 — Committee Decision") is not a good banner title.
+  Arabic: the top-bar language selector (ViewModels/UiLanguage.cs); unknown titles fall back to English.
+*@
+@{
+    var arabic = UiLanguage.IsArabic(Context);
+    var title = ViewData["HeroTitle"]?.ToString() ?? ViewData["Title"]?.ToString() ?? "Workspace";
+    var description = ViewData["Description"]?.ToString();
+    var arTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Request"] = "الطلبات", ["Request details"] = "تفاصيل الطلب", ["Received offers"] = "العروض المستلمة",
+        ["Committee reports"] = "تقارير اللجنة", ["Final decisions"] = "القرارات النهائية", ["Clarifications"] = "الاستيضاحات",
+        ["Clarification Thread"] = "محادثة الاستيضاح", ["New clarification"] = "استيضاح جديد", ["Offer details"] = "تفاصيل العرض",
+        ["Check offer requirements"] = "التحقق من متطلبات العرض", ["Choose offers for evaluation"] = "اختيار العروض للتقييم",
+        ["Committee forwarding"] = "الإحالة إلى اللجنة", ["Bid Comparison"] = "مقارنة العروض", ["Bid & Clarification History"] = "سجل العروض والاستيضاحات",
+        ["Report details"] = "تفاصيل التقرير", ["Report Versions"] = "إصدارات التقرير", ["Tender rounds"] = "جولات العطاء",
+        ["Supplier Invitations"] = "دعوات الموردين", ["Tender details"] = "تفاصيل العطاء", ["My Tasks"] = "مهامي", ["Notifications"] = "الإشعارات",
+        // Top Committee
+        ["Committee Voting & Decision History"] = "سجل التصويت والقرارات", ["Voting"] = "التصويت", ["Evaluation Summary"] = "ملخص التقييم",
+        ["Management Statistics"] = "إحصاءات الإدارة", ["Reports & Analytics – Top Committee"] = "التقارير والتحليلات – اللجنة العليا",
+        ["Full System Statistics"] = "إحصاءات النظام الكاملة", ["Private Tender Conversations"] = "محادثات العطاءات الخاصة",
+        ["Private Conversation"] = "محادثة خاصة", ["Committee Decision"] = "قرار اللجنة", ["Review Tender Evaluation"] = "مراجعة تقييم العطاء",
+        ["Evaluation Report"] = "تقرير التقييم"
+    };
+    var arDescriptions = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["Review department requests here. Create and manage tenders from the Tender page."] = "راجع طلبات الإدارات هنا. أنشئ العطاءات وأدرها من صفحة العطاءات.",
+        ["Check each supplier offer and record whether it meets the tender requirements."] = "افحص كل عرض مورد وسجّل ما إذا كان يستوفي متطلبات العطاء.",
+        ["Read the evaluation committee's report. Forward submitted reports to the Sourcing Manager, and check returned or decided reports here."] = "اقرأ تقرير لجنة التقييم. أحِل التقارير المقدمة إلى مدير التوريد، وتابع التقارير المعادة أو المحسومة هنا.",
+        ["Top Committee, then Sourcing Manager, then you. Only you can announce results to suppliers."] = "اللجنة العليا، ثم مدير التوريد، ثم أنت. أنت وحدك من يعلن النتائج للموردين.",
+        ["Messages and questions connected to your work."] = "الرسائل والأسئلة المرتبطة بعملك.",
+        ["Choose who to message. Every conversation is linked to a request, tender or bid you share."] = "اختر من تريد مراسلته. كل محادثة مرتبطة بطلب أو عطاء أو عرض مشترك بينكما.",
+        // Top Committee
+        ["Recorded rounds and votes for tenders assigned to you. Earlier decisions remain preserved."] = "الجولات والأصوات المسجلة للعطاءات المسندة إليك. تبقى القرارات السابقة محفوظة.",
+        ["Choose an assigned round to view the members' votes. Voting is available only when the round is eligible and you have not already voted."] = "اختر جولة مسندة إليك لعرض أصوات الأعضاء. يتاح التصويت فقط عندما تكون الجولة مؤهلة ولم تصوّت بعد.",
+        ["Choose an assigned round to review its evaluation, recommendation and supporting documents."] = "اختر جولة مسندة إليك لمراجعة تقييمها والتوصية والمستندات الداعمة.",
+        ["Site-wide management aggregates and supplier transaction frequency. Monetary values are separated by currency."] = "مؤشرات الإدارة على مستوى النظام وتكرار معاملات الموردين. القيم المالية مفصولة حسب العملة.",
+        ["Reports and analytics for purchase requests, tenders, suppliers, bids, evaluations and committee decisions."] = "تقارير وتحليلات لطلبات الشراء والعطاءات والموردين والعروض والتقييمات وقرارات اللجان.",
+        ["Only conversations between you and the other assigned participant are shown."] = "تظهر فقط المحادثات بينك وبين المشارك الآخر المسند."
+    };
+    if (arabic)
+    {
+        if (arTitles.TryGetValue(title, out var t)) title = t;
+        if (description != null && arDescriptions.TryGetValue(description, out var d)) description = d;
+    }
+    var words = arabic ? new[] { title } : title.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+}
+<header class="dash-welcome officer-page-hero">
+    <div class="dash-welcome-photo" aria-hidden="true"></div>
+    <div class="dash-welcome-waves" aria-hidden="true"></div>
+    <div class="dash-welcome-copy">
+        <h1>@if (words.Length > 1) { @words[0]<text> </text><strong>@words[1]</strong> } else { <strong>@title</strong> }</h1>
+        @if (!string.IsNullOrWhiteSpace(description)) { <p>@description</p> }
+    </div>
+</header>

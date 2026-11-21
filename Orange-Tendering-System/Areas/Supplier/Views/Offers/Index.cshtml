@@ -1,15 +1,82 @@
 @model List<SupplierOfferDetailsViewModel>
-@{ ViewData["Title"] = "My Offers"; ViewData["WorkspaceSection"] = "My Offers"; }
-<partial name="_PageHeader" />
-@if (TempData["OfferSuccess"] is string success) { <p class="pg-note" role="status">@success</p> }
-<p><a asp-action="DownloadSummary" class="pg-btn">Download my summary</a></p>
-<section class="ws-panel pg-panel"><div class="pg-table-wrap"><table class="pg-table">
-<thead><tr><th>Offer</th><th>Tender</th><th>Revision</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>
-@foreach (var offer in Model) {
-<tr><td>#@offer.Id</td><td>@offer.TenderTitle</td><td>@offer.Revision</td><td>@offer.Status</td><td>@offer.Total.ToString("N2") @offer.Terms.CurrencyCode</td><td>
-<a asp-action="Details" asp-route-id="@offer.Id" class="pg-btn">Details</a>
-@if (offer.CanEdit) { <a asp-action="Edit" asp-route-id="@offer.Id" class="pg-btn">Edit draft</a> }
-</td></tr>
+@using Orange_Tendering_System.Models.Entities
+@* My Offers: same dashboard shell as the supplier Invitations page (hero, live tiles, filters, table). Details open in a popup. *@
+@{
+    ViewData["Title"] = "My Offers"; ViewData["WorkspaceSection"] = "My Offers";
+    string Result(SupplierOfferDetailsViewModel o) => o.Outcome switch { "Selected" => "Won", "Not selected" => "Not awarded", _ => o.Status == BidStatus.Draft ? "Not submitted" : "Awaiting result" };
+    string StatusTone(BidStatus s) => s switch { BidStatus.Submitted => "good", BidStatus.Draft => "orange", BidStatus.Superseded => "info", _ => "muted" };
+    string ResultTone(string r) => r switch { "Won" => "won", "Not awarded" => "lost", "Awaiting result" => "warn", _ => "muted" };
+    int won = Model.Count(o => o.Outcome == "Selected");
 }
-@if (Model.Count == 0) { <tr><td colspan="6">No offers yet. Accept an invitation to create your first draft.</td></tr> }
-</tbody></table></div></section>
+@section Styles {
+    <link rel="stylesheet" href="~/css/workspace-dashboard.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/supplier-offers.css" asp-append-version="true" />
+}
+<div class="dash-board dash-supplier wfl so-page">
+    <section class="dash-welcome wfl-hero" aria-labelledby="so-title">
+        <div class="dash-welcome-photo" aria-hidden="true"></div>
+        <div class="dash-welcome-waves" aria-hidden="true"></div>
+        <div class="dash-welcome-copy">
+            <h1 id="so-title">My <strong>Offers</strong></h1>
+            <p>Track every offer your company prepared, its submission status and the approved tender result.</p>
+        </div>
+    </section>
+
+    @if (TempData["OfferSuccess"] is string success) { <p class="pg-note" role="status">@success</p> }
+
+    <section class="dash-metrics wfl-metrics" aria-label="Offer statistics">
+        <article class="dash-metric dash-orange"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></svg></div><div class="dash-metric-copy"><strong>@Model.Count.ToString("N0")</strong><span>All offers</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-blue"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4" /></svg></div><div class="dash-metric-copy"><strong>@Model.Count(o => o.Status == BidStatus.Draft).ToString("N0")</strong><span>Drafts</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-purple"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div><div class="dash-metric-copy"><strong>@Model.Count(o => o.Status == BidStatus.Submitted && o.Outcome == null).ToString("N0")</strong><span>Awaiting result</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+        <article class="dash-metric dash-green"><div class="dash-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10" /></svg></div><div class="dash-metric-copy"><strong>@won.ToString("N0")</strong><span>Tenders won</span></div><div class="dash-metric-wave" aria-hidden="true"></div><span class="dash-metric-source">Live data</span></article>
+    </section>
+
+    <section class="dash-panel wfl-panel" aria-labelledby="so-list-title">
+        <div class="dash-panel-heading wfl-heading"><h2 id="so-list-title">Offers</h2>
+            <div class="wfl-heading-actions">
+                <span class="wfl-count" id="so-count" role="status" aria-live="polite">@Model.Count @(Model.Count == 1 ? "offer" : "offers")</span>
+                <a asp-action="DownloadSummary" class="wfl-new so-download" data-no-modal download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></svg> Download my summary</a>
+            </div>
+        </div>
+        <div class="wfl-filters" role="search" aria-label="Filter offers">
+            <label class="wfl-field wfl-search"><span>Search</span><input id="so-q" type="search" placeholder="Offer number or tender" autocomplete="off" /></label>
+            <label class="wfl-field"><span>Status</span><select id="so-status"><option value="">All statuses</option>@foreach (var s in Model.Select(o => o.Status.ToString()).Distinct().OrderBy(x => x)) { <option>@s</option> }</select></label>
+            <label class="wfl-field"><span>Result</span><select id="so-result"><option value="">All results</option><option>Won</option><option>Not awarded</option><option>Awaiting result</option><option>Not submitted</option></select></label>
+            <button type="button" class="wfl-reset" id="so-reset">Reset</button>
+        </div>
+        <div class="wfl-table-wrap">
+            <table class="wfl-table so-table" data-no-enhance>
+                <thead><tr><th scope="col">Offer</th><th scope="col">Tender</th><th scope="col">Revision</th><th scope="col">Status</th><th scope="col">Result</th><th scope="col" class="so-num">Total</th><th scope="col" class="wfl-actions-col">Actions</th></tr></thead>
+                <tbody id="so-body">
+                @foreach (var offer in Model)
+                {
+                    var result = Result(offer);
+                    <tr class="@(offer.Outcome == "Selected" ? "so-row-won" : null)" data-status="@offer.Status" data-result="@result" data-text="@($"#{offer.Id} {offer.TenderTitle}".ToLowerInvariant())">
+                        <td><span class="wfl-ref">#@offer.Id</span></td>
+                        <td><strong>@offer.TenderTitle</strong></td>
+                        <td>@offer.Revision</td>
+                        <td><span class="wfl-pill wfl-@StatusTone(offer.Status)">@offer.Status</span></td>
+                        <td><span class="so-result so-@ResultTone(result)">@if (result == "Won") { <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10" /></svg> }@result</span></td>
+                        <td class="so-num"><strong>@offer.Total.ToString("N2")</strong> <small>@offer.Terms.CurrencyCode</small></td>
+                        <td class="wfl-actions-col">
+                            <button type="button" class="wfl-open" data-offer-details data-url="@Url.Action("Details", "Offers", new { area = "Supplier", id = offer.Id })">Details <span aria-hidden="true">&rarr;</span></button>
+                            @if (offer.CanEdit) { <a asp-action="Edit" asp-route-id="@offer.Id" class="pg-btn" data-no-modal>Edit draft</a> }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            <div class="wfl-empty" id="so-empty" @(Model.Count == 0 ? null : "hidden")>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM3 7l3-4h12l3 4M9 12h6" /></svg>
+                <p id="so-empty-text">@(Model.Count == 0 ? "No offers yet. Accept an invitation to create your first draft." : "No offers match these filters.")</p>
+            </div>
+        </div>
+    </section>
+</div>
+
+<dialog id="so-dialog" class="wf-dialog so-dialog" aria-labelledby="so-pop-title">
+    <button type="button" class="wf-dialog-x" data-so-close aria-label="Close offer details">&times;</button>
+    <div class="wf-dialog-body" data-so-body></div>
+</dialog>
+<script src="~/js/supplier-offers.js" asp-append-version="true"></script>

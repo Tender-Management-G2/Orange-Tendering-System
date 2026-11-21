@@ -1,0 +1,32 @@
+@model SupplierTenderPortalViewModel
+@using Orange_Tendering_System.Models.Entities
+<div class="wf-pop">
+    <header class="wf-pop-head"><span class="pg-hint">T-@Model.TenderId.ToString("0000")</span><h2 id="wf-dialog-title">@Model.Title</h2><p>@Model.Description</p></header>
+    <div class="wf-error" role="alert" hidden></div>
+    @if (TempData["WorkflowMessage"] is string message) { <div class="wf-flash" role="status">@message</div> }
+    <section>
+        <h3>Your participation</h3>
+        @if (Model.CanRespond)
+        {
+            <form asp-area="Supplier" asp-controller="Workflow" asp-action="Respond" asp-route-id="@Model.TenderId" method="post" class="wp-form wp-inline">
+                <input type="hidden" name="invitationId" value="@Model.InvitationId" />
+                <button name="accept" value="true" class="wp-primary">Accept invitation</button><button name="accept" value="false" class="wp-ghost">Decline</button>
+            </form>
+        }
+        @if (Model.CanCreateOffer)
+        {
+            <a class="pg-btn pg-btn-primary" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Create" asp-route-id="@Model.InvitationId">Prepare my offer</a>
+        }
+        else if (Model.Offers.Count == 0 && Model.InvitationStatus == InvitationStatus.Accepted)
+        {
+            <p>Offers are not available for this invitation right now. Check the submission dates or contact the Sourcing Officer.</p>
+        }
+        @if (Model.InvitationStatus == InvitationStatus.Declined) { <p>You declined this invitation.</p> }
+        @foreach (var offer in Model.Offers)
+        {
+            <a class="pg-btn" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Details" asp-route-id="@offer.Id">My offer: @offer.Status</a>
+            @if (offer.CanEdit) { <a class="pg-btn pg-btn-primary" data-no-modal asp-area="Supplier" asp-controller="Offers" asp-action="Edit" asp-route-id="@offer.Id">Edit draft</a> }
+        }
+    </section>
+    <partial name="_SupplierTenderContent" model="Model" />
+</div>

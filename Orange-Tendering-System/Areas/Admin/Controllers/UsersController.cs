@@ -24,19 +24,36 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             _userManager = userManager;
         }
 
-        // GET: /Admin/Users
+
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            string? search,
+            string? roleFilter,
+            string? departmentFilter,
+            string? statusFilter,
+            int page = 1)
         {
-            var users = await _adminService.GetUsersAsync();
-            return View(users);
+            var model = await _adminService.GetUsersAsync(
+                search,
+                roleFilter,
+                departmentFilter,
+                statusFilter,
+                page);
+
+            return View(model);
         }
 
         // GET: /Admin/Users/Create
         [HttpGet]
-        public async Task<IActionResult> Create()
+        public async Task<IActionResult> Create(string? role, string? returnUrl, string? committeeSeat)
         {
-            var model = new CreateUserViewModel();
+            var seat = CommitteeAccountSeats.Find(committeeSeat);
+            if (committeeSeat != null && seat == null) return BadRequest();
+            var model = new CreateUserViewModel { CommitteeSeat = seat?.Key };
+            if (SystemRoles.PublicRoles.Where(r => r != SystemRoles.Supplier).Contains(role))
+                model.Role = role!;
+            if (seat != null) model.Role = seat.Role;
+            ViewData["ReturnUrl"] = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 
             await _adminService.FillCreateUserOptionsAsync(model);
 
@@ -47,8 +64,9 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-            CreateUserViewModel model)
+            CreateUserViewModel model, string? returnUrl)
         {
+            ViewData["ReturnUrl"] = Url.IsLocalUrl(returnUrl) ? returnUrl : null;
             if (!ModelState.IsValid)
             {
                 await _adminService.FillCreateUserOptionsAsync(model);
@@ -63,7 +81,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             var result = await _adminService.CreateUserAsync(
-                model, adminId);
+                model, adminId, HttpContext);
 
             if (!result.Succeeded)
             {
@@ -78,21 +96,27 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                 return View(model);
             }
 
-            TempData["SuccessMessage"] =
-                "User created successfully. The active account can now sign in.";
+            TempData.Orange(OrangeFeedback.Popup("User created!", "Share the temporary password securely. A setup link was also e-mailed.", OrangeVariant.Save));
+
+            if (Url.IsLocalUrl(returnUrl)) return LocalRedirect(returnUrl!);
 
             return RedirectToAction(nameof(Index));
         }
 
 
+
+        // ==========================================
         // GET: /Admin/Users/Edit/{id}
+        // ==========================================
+
         [HttpGet]
         public async Task<IActionResult> Edit(string? id)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return NotFound();
 
-            var model = await _adminService.GetUserForEditAsync(id);
+            var model = await _adminService
+                .GetUserForEditAsync(id);
 
             if (model == null)
                 return NotFound();
@@ -100,7 +124,11 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             return View(model);
         }
 
+
+        // ==========================================
         // POST: /Admin/Users/Edit/{id}
+        // ==========================================
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(
@@ -110,6 +138,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             if (id != model.Id)
                 return BadRequest();
 
+            // Validate submitted form
             if (!ModelState.IsValid)
             {
                 var original = await _adminService
@@ -119,23 +148,28 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     return NotFound();
 
                 model.Departments = original.Departments;
+                model.AvailableRoles = original.AvailableRoles;
                 model.CurrentRoles = original.CurrentRoles;
                 model.Email = original.Email;
 
                 return View(model);
             }
 
+            // Get current Admin ID
             var adminId = _userManager.GetUserId(User);
 
-            if (string.IsNullOrEmpty(adminId))
+            if (string.IsNullOrWhiteSpace(adminId))
                 return Challenge();
+        
 
+            // Update account and single role
             var result = await _adminService.UpdateUserAsync(
                 model, adminId);
 
             if (result == "NotFound")
                 return NotFound();
 
+            // Handle service validation and save errors
             if (result != "Success")
             {
                 var messages = new Dictionary<string, string>
@@ -147,27 +181,51 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                         "Full name must contain 2 to 150 characters.",
 
                     ["InvalidDepartment"] =
-                        "Please select an active department.",
+                        "Please select a valid active department.",
 
                     ["DepartmentRequired"] =
-                        "A department is required for this role.",
+                        "An assigned department is required for this role.",
+
+                    ["InvalidRole"] =
+                        "Please select a valid user role.",
 
                     ["SelfDeactivate"] =
                         "You cannot deactivate your own account.",
 
+                    ["SelfRoleChange"] =
+                        "You cannot remove your own Admin role.",
+
                     ["LastAdmin"] =
-                        "You cannot deactivate the last active Admin.",
+                        "You cannot remove or deactivate the last active Admin.",
+
+                    ["OfficerAlreadyActive"] =
+                        "Only one active Sourcing Officer is allowed. Deactivate the current officer before activating another.",
+
+                    ["RoleUpdateFailed"] =
+                        "Unable to update the user's role.",
 
                     ["UpdateFailed"] =
                         "Unable to update the account."
                 };
 
-                ModelState.AddModelError(
-                    "",
-                    messages.TryGetValue(result, out var message)
-                        ? message
-                        : "Unable to update the account.");
+                var message = messages.TryGetValue(
+                    result, out var errorMessage)
+                        ? errorMessage
+                        : "Unable to update the account.";
 
+                // Display role errors next to Role dropdown
+                if (result == "InvalidRole")
+                {
+                    ModelState.AddModelError(
+                        nameof(model.SelectedRole),
+                        message);
+                }
+                else
+                {
+                    ModelState.AddModelError("", message);
+                }
+
+                // Reload dropdown data
                 var original = await _adminService
                     .GetUserForEditAsync(id);
 
@@ -175,17 +233,18 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     return NotFound();
 
                 model.Departments = original.Departments;
+                model.AvailableRoles = original.AvailableRoles;
                 model.CurrentRoles = original.CurrentRoles;
                 model.Email = original.Email;
 
                 return View(model);
             }
 
-            TempData["SuccessMessage"] =
-                "User updated successfully.";
+            TempData.Orange(OrangeFeedback.Toast("Changes saved", "User information and role were updated."));
 
             return RedirectToAction(nameof(Index));
         }
+
 
 
 
@@ -205,6 +264,16 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             }
 
             return View(user);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResendSetupLink(string id)
+        {
+            var result = await _adminService.ResendSetupLinkAsync(id, HttpContext);
+            if (result.Succeeded) TempData.Orange(OrangeFeedback.Toast("Setup link sent", "A new password setup link was e-mailed. It expires in one hour.", OrangeVariant.Send));
+            else TempData["ErrorMessage"] = result.Errors.FirstOrDefault()?.Description ?? "The setup link could not be sent.";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
     }

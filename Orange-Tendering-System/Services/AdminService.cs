@@ -1,29 +1,42 @@
-﻿using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Orange_Tendering_System.Models;
 using System.Text.Json;
+using System.Text;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Orange_Tendering_System.Services
 {
-    public class AdminService
+    public partial class AdminService
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IEmailSender _emailSender;
+        private readonly AccountLinkGenerator _links;
+        private readonly IWebHostEnvironment _environment;
 
         public AdminService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
-            RoleManager<IdentityRole> roleManager)
+            RoleManager<IdentityRole> roleManager,
+            IEmailSender emailSender,
+            AccountLinkGenerator links,
+            IWebHostEnvironment environment)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
+            _emailSender = emailSender;
+            _links = links;
+            _environment = environment;
         }
 
         // A supplier application enters Admin review only after its contact verifies the OTP.
@@ -32,7 +45,37 @@ namespace Orange_Tendering_System.Services
             !_context.Users.Any(u => u.SupplierId == s.Id) ||
             _context.Users.Any(u => u.SupplierId == s.Id && u.EmailConfirmed));
 
+        public async Task<string> ResolveVoiceSearchTermAsync(string term, string? scope, CancellationToken cancellationToken)
+        {
+            IQueryable<string?>? labels = scope switch
+            {
+                "global" => _context.Users.Select(user => user.FullName)
+                    .Union(SubmittedSuppliers().Select(supplier => supplier.CompanyName)),
+                "users" => _context.Users.Select(user => user.FullName),
+                "departments" => _context.Departments.Select(department => department.Name),
+                "suppliers" => SubmittedSuppliers().Select(supplier => supplier.CompanyName),
+                "auditlogs" => _context.AuditLogs.Where(log => log.User != null).Select(log => log.User!.UserName)
+                    .Union(_context.AuditLogs.Select(log => log.Action))
+                    .Union(_context.AuditLogs.Select(log => log.EntityName)),
+                "committees" => _context.Tenders.Select(tender => tender.Title),
+                _ => null
+            };
+            if (labels is null) return term;
+
+            var matcher = new AdminVoiceSearchMatcher(term, forDepartments: scope == "departments");
+            await foreach (var label in labels.Distinct().AsAsyncEnumerable().WithCancellation(cancellationToken))
+                matcher.Consider(label);
+            return matcher.Resolve();
+        }
+
         // 1. ADMIN DASHBOARD
+
+        // Full name of the signed-in user for greetings; null when the account has none.
+        public async Task<string?> GetDisplayNameAsync(System.Security.Claims.ClaimsPrincipal principal)
+        {
+            var user = await _userManager.GetUserAsync(principal);
+            return string.IsNullOrWhiteSpace(user?.FullName) ? null : user.FullName;
+        }
 
         public async Task<WorkspaceDashboardViewModel> GetDashboardAsync()
         {
@@ -108,12 +151,54 @@ namespace Orange_Tendering_System.Services
         }
         // 2. MANAGE DEPARTMENTS - INDEX
 
-        public async Task<List<DepartmentListViewModel>> GetDepartmentsAsync()
+
+        public async Task<DepartmentIndexViewModel> GetDepartmentsAsync(
+            string? search = null,
+            string? statusFilter = null)
         {
-            // Get departments from database
-            var departments = await _context.Departments
+            search = search?.Trim();
+            statusFilter = statusFilter?.Trim();
+
+            // KPI cards - all departments
+            var totalDepartments =
+                await _context.Departments.CountAsync();
+
+            var activeDepartments =
+                await _context.Departments.CountAsync(d => d.IsActive);
+
+            var inactiveDepartments =
+                await _context.Departments.CountAsync(d => !d.IsActive);
+
+            var assignedEmployees =
+                await _context.Users.CountAsync(
+                    u => u.DepartmentId != null);
+
+            // Table query
+            var query = _context.Departments
                 .AsNoTracking()
-                .OrderBy(d => d.Name)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(d =>
+                    d.Name.Contains(search));
+            }
+
+            if (statusFilter == "Active")
+            {
+                query = query.Where(d => d.IsActive);
+            }
+            else if (statusFilter == "Inactive")
+            {
+                query = query.Where(d => !d.IsActive);
+            }
+            else
+            {
+                statusFilter = "All";
+            }
+
+            var departments = await query
+                .OrderByDescending(d => d.Id)
                 .Select(d => new DepartmentListViewModel
                 {
                     Id = d.Id,
@@ -121,88 +206,191 @@ namespace Orange_Tendering_System.Services
                     Description = d.Description,
                     IsActive = d.IsActive,
 
-                    // Count employees in each department
                     EmployeeCount = _context.Users
                         .Count(u => u.DepartmentId == d.Id),
 
-                    // Count purchase requests for each department
                     PurchaseRequestCount = _context.PurchaseRequests
                         .Count(p => p.DepartmentId == d.Id)
                 })
                 .ToListAsync();
 
-            return departments;
+            return new DepartmentIndexViewModel
+            {
+                Departments = departments,
+                Search = search,
+                StatusFilter = statusFilter,
+
+                TotalDepartments = totalDepartments,
+                ActiveDepartments = activeDepartments,
+                InactiveDepartments = inactiveDepartments,
+                AssignedEmployees = assignedEmployees
+            };
         }
 
-        // CREATE DEPARTMENT
-        public async Task<bool> CreateDepartmentAsync(
+        public async Task<List<SelectListItem>>
+            GetAvailableDepartmentEmployeesAsync(int? departmentId = null)
+        {
+            // Current department employees and unassigned employee accounts.
+            // Supplier and Admin accounts are excluded from new assignments.
+
+            var users = await _context.Users
+                .AsNoTracking()
+                .Where(u =>
+                    (departmentId.HasValue &&
+                     u.DepartmentId == departmentId.Value)
+                    ||
+                    (u.DepartmentId == null))
+                .Where(u =>
+                    !_context.UserRoles.Any(ur =>
+                        ur.UserId == u.Id &&
+                        _context.Roles.Any(r =>
+                            r.Id == ur.RoleId &&
+                            (r.Name == SystemRoles.Supplier ||
+                             r.Name == SystemRoles.Admin))))
+                .OrderBy(u => u.FullName)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FullName,
+                    u.Email,
+                    u.DepartmentId
+                })
+                .ToListAsync();
+
+            return users.Select(u => new SelectListItem
+            {
+                Value = u.Id,
+                Text = $"{u.FullName} ({u.Email})",
+                Selected = departmentId.HasValue &&
+                           u.DepartmentId == departmentId.Value
+            }).ToList();
+        }
+
+
+
+        public async Task<string> CreateDepartmentAsync(
             CreateDepartmentViewModel model,
             string adminId)
         {
-            var name = model.Name.Trim();
+            var name = model.Name?.Trim() ?? "";
 
-            // Check for duplicate department names
-            var exists = await _context.Departments
-                .AnyAsync(d => d.Name == name);
 
-            if (exists)
+            if (model.Description?.Trim().Length > 160) return "InvalidDescription";
+
+            if (name.Length < 2 || name.Length > 100)
             {
-                return false;
+                return "InvalidName";
             }
 
-            // Create the department
-            var department = new Department
-            {
-                Name = name,
-                Description = model.Description?.Trim(),
-                IsActive = model.IsActive
-            };
+            var selectedIds = (model.SelectedEmployeeIds
+                ?? new List<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+
+            if (!model.IsActive && selectedIds.Count > 0) return "InactiveDepartmentEmployees";
 
             await using var transaction =
-                await _context.Database.BeginTransactionAsync();
+                await _context.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
 
             try
             {
+                var exists = await _context.Departments
+                    .AnyAsync(d => d.Name == name);
+
+                if (exists)
+                {
+                    return "Duplicate";
+                }
+
+                // Validate all selected employees
+                var employees = await _context.Users
+                    .Where(u => selectedIds.Contains(u.Id))
+                    .ToListAsync();
+
+                if (employees.Count != selectedIds.Count)
+                {
+                    return "InvalidEmployees";
+                }
+
+                var restrictedIds = await (
+                    from ur in _context.UserRoles
+                    join r in _context.Roles
+                        on ur.RoleId equals r.Id
+                    where selectedIds.Contains(ur.UserId)
+                       && (r.Name == SystemRoles.Supplier ||
+                           r.Name == SystemRoles.Admin)
+                    select ur.UserId
+                ).Distinct().ToListAsync();
+
+                if (restrictedIds.Count > 0 ||
+                    employees.Any(u => u.DepartmentId != null))
+                {
+                    return "InvalidEmployees";
+                }
+
+                // Create department
+                var department = new Department
+                {
+                    Name = name,
+                    Description = model.Description?.Trim(),
+                    IsActive = model.IsActive
+                };
+
                 _context.Departments.Add(department);
                 await _context.SaveChangesAsync();
 
-                // Record the operation in AuditLogs
-                var auditLog = new AuditLog
+                // Assign employees to the new department
+                foreach (var employee in employees)
+                {
+                    employee.DepartmentId = department.Id;
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Audit the complete creation
+                _context.AuditLogs.Add(new AuditLog
                 {
                     UserId = adminId,
                     Action = "Created",
                     EntityName = "Department",
                     EntityId = department.Id.ToString(),
-                    NewValues = System.Text.Json.JsonSerializer.Serialize(
-                        new
+
+                    NewValues =
+                        System.Text.Json.JsonSerializer.Serialize(new
                         {
                             department.Name,
                             department.Description,
-                            department.IsActive
+                            department.IsActive,
+                            EmployeeIds = selectedIds
                         }),
+
                     CreatedAt = DateTime.UtcNow
-                };
+                });
 
-                _context.AuditLogs.Add(auditLog);
                 await _context.SaveChangesAsync();
-
                 await transaction.CommitAsync();
 
-                return true;
+                return "Success";
             }
             catch (DbUpdateException ex)
-                when (ex.InnerException is SqlException sqlEx &&
-                      (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+                when (ex.InnerException is
+                    Microsoft.Data.SqlClient.SqlException sqlEx &&
+                    (sqlEx.Number == 2601 || sqlEx.Number == 2627))
             {
                 await transaction.RollbackAsync();
-                return false;
+                _context.ChangeTracker.Clear();
+                return "Duplicate";
             }
         }
 
-        // GET DEPARTMENT FOR EDIT
-        public async Task<EditDepartmentViewModel?> GetDepartmentForEditAsync(int id)
+
+
+        public async Task<EditDepartmentViewModel?>
+            GetDepartmentForEditAsync(int id)
         {
-            return await _context.Departments
+            var department = await _context.Departments
                 .AsNoTracking()
                 .Where(d => d.Id == id)
                 .Select(d => new EditDepartmentViewModel
@@ -213,94 +401,235 @@ namespace Orange_Tendering_System.Services
                     IsActive = d.IsActive
                 })
                 .FirstOrDefaultAsync();
+
+            if (department == null)
+            {
+                return null;
+            }
+
+            department.AvailableEmployees =
+                await GetAvailableDepartmentEmployeesAsync(id);
+
+            department.SelectedEmployeeIds =
+                department.AvailableEmployees
+                    .Where(e => e.Selected)
+                    .Select(e => e.Value)
+                    .ToList();
+
+            return department;
         }
 
 
-        // UPDATE DEPARTMENT
+
+
+        public async Task<DepartmentDetailsViewModel?>
+            GetDepartmentDetailsAsync(int id)
+        {
+            // Get department information
+            var department = await _context.Departments
+                .AsNoTracking()
+                .Where(d => d.Id == id)
+                .Select(d => new DepartmentDetailsViewModel
+                {
+                    Id = d.Id,
+                    Name = d.Name,
+                    Description = d.Description,
+                    IsActive = d.IsActive,
+
+                    EmployeeCount = _context.Users
+                        .Count(u => u.DepartmentId == d.Id),
+
+                    PurchaseRequestCount = _context.PurchaseRequests
+                        .Count(p => p.DepartmentId == d.Id)
+                })
+                .FirstOrDefaultAsync();
+
+            if (department == null)
+            {
+                return null;
+            }
+
+            // Load employees assigned to this department
+            department.Employees = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.DepartmentId == id)
+                .OrderBy(u => u.FullName)
+                .Select(u => new DepartmentEmployeeViewModel
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    Email = u.Email ?? "",
+                    IsActive = u.IsActive
+                })
+                .ToListAsync();
+
+            return department;
+        }
+
         public async Task<string> UpdateDepartmentAsync(
             EditDepartmentViewModel model,
             string adminId)
         {
-            var department = await _context.Departments
-                .FirstOrDefaultAsync(d => d.Id == model.Id);
+            var newName = model.Name?.Trim() ?? "";
 
-            if (department == null)
-            {
-                return "NotFound";
-            }
 
-            var newName = model.Name.Trim();
+            if (model.Description?.Trim().Length > 160) return "InvalidDescription";
 
             if (newName.Length < 2 || newName.Length > 100)
             {
                 return "InvalidName";
             }
 
-            // Check duplicate name, excluding current department
-            var exists = await _context.Departments
-                .AnyAsync(d => d.Name == newName && d.Id != model.Id);
+            var selectedIds = (model.SelectedEmployeeIds
+                ?? new List<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
 
-            if (exists)
-            {
-                return "Duplicate";
-            }
+            if (!model.IsActive) selectedIds.Clear();
 
-            // Save old values for audit history
-            var oldValues = System.Text.Json.JsonSerializer.Serialize(
-                new
-                {
-                    department.Name,
-                    department.Description,
-                    department.IsActive
-                });
-
-            // Update department
-            department.Name = newName;
-            department.Description = model.Description?.Trim();
-            department.IsActive = model.IsActive;
-
-            var newValues = System.Text.Json.JsonSerializer.Serialize(
-                new
-                {
-                    department.Name,
-                    department.Description,
-                    department.IsActive
-                });
-
-            // Save department and audit log in one transaction
             await using var transaction =
-                await _context.Database.BeginTransactionAsync();
+                await _context.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
 
             try
             {
+                var department = await _context.Departments
+                    .FirstOrDefaultAsync(d => d.Id == model.Id);
+
+                if (department == null)
+                {
+                    return "NotFound";
+                }
+
+                var exists = await _context.Departments
+                    .AnyAsync(d =>
+                        d.Name == newName &&
+                        d.Id != model.Id);
+
+                if (exists)
+                {
+                    return "Duplicate";
+                }
+
+                // Current employees in this department
+                var currentEmployees = await _context.Users
+                    .Where(u => u.DepartmentId == model.Id)
+                    .ToListAsync();
+
+                var oldEmployeeIds = currentEmployees
+                    .Select(u => u.Id)
+                    .ToList();
+
+                // Employees selected in submitted form
+                var selectedEmployees = await _context.Users
+                    .Where(u => selectedIds.Contains(u.Id))
+                    .ToListAsync();
+
+                if (selectedEmployees.Count != selectedIds.Count)
+                {
+                    return "InvalidEmployees";
+                }
+
+                // Prevent assigning users from another department
+                if (selectedEmployees.Any(u =>
+                    u.DepartmentId != null &&
+                    u.DepartmentId != model.Id))
+                {
+                    return "InvalidEmployees";
+                }
+
+                // Check roles for newly assigned users
+                var newEmployeeIds = selectedIds
+                    .Except(oldEmployeeIds)
+                    .ToList();
+
+                var restrictedIds = await (
+                    from ur in _context.UserRoles
+                    join r in _context.Roles
+                        on ur.RoleId equals r.Id
+                    where newEmployeeIds.Contains(ur.UserId)
+                       && (r.Name == SystemRoles.Supplier ||
+                           r.Name == SystemRoles.Admin)
+                    select ur.UserId
+                ).Distinct().ToListAsync();
+
+                if (restrictedIds.Count > 0)
+                {
+                    return "InvalidEmployees";
+                }
+
+                var oldValues =
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        department.Name,
+                        department.Description,
+                        department.IsActive,
+                        EmployeeIds = oldEmployeeIds
+                    });
+
+                // Update department information
+                department.Name = newName;
+                department.Description = model.Description?.Trim();
+                department.IsActive = model.IsActive;
+
+                // Remove unchecked employees from department
+                foreach (var employee in currentEmployees)
+                {
+                    if (!selectedIds.Contains(employee.Id))
+                    {
+                        employee.DepartmentId = null;
+                    }
+                }
+
+                // Assign newly selected employees
+                foreach (var employee in selectedEmployees)
+                {
+                    if (employee.DepartmentId == null)
+                    {
+                        employee.DepartmentId = department.Id;
+                    }
+                }
+
+                var newValues =
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        department.Name,
+                        department.Description,
+                        department.IsActive,
+                        EmployeeIds = selectedIds
+                    });
+
                 await _context.SaveChangesAsync();
 
-                var auditLog = new AuditLog
+                // Record changes in AuditLogs
+                _context.AuditLogs.Add(new AuditLog
                 {
                     UserId = adminId,
                     Action = "Updated",
                     EntityName = "Department",
                     EntityId = department.Id.ToString(),
-                    OldValues = oldValues,  // لاحظي إنه استخدمنا OldValues وNewValues الموجودين أصلاً في AuditLog.cs، عشان نقدر نعرف شو تغير بالضبط.
+                    OldValues = oldValues,
                     NewValues = newValues,
                     CreatedAt = DateTime.UtcNow
-                };
+                });
 
-                _context.AuditLogs.Add(auditLog);
                 await _context.SaveChangesAsync();
-
                 await transaction.CommitAsync();
 
                 return "Success";
             }
             catch (DbUpdateException ex)
-                when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx &&
-                      (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+                when (ex.InnerException is
+                    Microsoft.Data.SqlClient.SqlException sqlEx &&
+                    (sqlEx.Number == 2601 || sqlEx.Number == 2627))
             {
                 await transaction.RollbackAsync();
+                _context.ChangeTracker.Clear();
                 return "Duplicate";
             }
         }
+
 
         // ADMIN - AUDIT LOGS WITH FILTERS & PAGINATION
         public async Task<AuditLogPageViewModel> GetAuditLogsAsync(
@@ -401,64 +730,248 @@ namespace Orange_Tendering_System.Services
             };
         }
 
-        // ADMIN - MANAGE USERS - INDEX
-        
-        public async Task<List<UserListViewModel>> GetUsersAsync()
+
+
+        public async Task<UserIndexViewModel> GetUsersAsync(
+            string? search,
+            string? roleFilter,
+            string? departmentFilter,
+            string? statusFilter,
+            int page = 1)
         {
-            // Get user accounts with their department/company
-            var users = await _context.Users
+            const int pageSize = 10;
+
+            search = search?.Trim();
+            roleFilter = roleFilter?.Trim();
+            departmentFilter = departmentFilter?.Trim();
+            statusFilter = statusFilter?.Trim();
+
+            // =========================================
+            // KPI CARDS - ALL USERS
+            // =========================================
+
+            var totalUsers = await _context.Users.CountAsync();
+
+            var activeUsers = await _context.Users
+                .CountAsync(u => u.IsActive);
+
+            var inactiveUsers = await _context.Users
+                .CountAsync(u => !u.IsActive);
+
+            var departmentUsers = await _context.Users
+                .CountAsync(u => u.DepartmentId != null);
+
+            // =========================================
+            // DEPARTMENT FILTER OPTIONS
+            // =========================================
+
+            var departments = await _context.Departments
                 .AsNoTracking()
-                .OrderBy(u => u.FullName)
+                .OrderBy(d => d.Name)
+                .Select(d => new SelectListItem
+                {
+                    Value = d.Id.ToString(),
+                    Text = d.Name
+                })
+                .ToListAsync();
+
+            // =========================================
+            // USERS QUERY
+            // =========================================
+
+            var query = _context.Users
+                .AsNoTracking()
+                .AsQueryable();
+
+            // Search by name or email
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(u => u.FullName.Contains(search) ||
+                    (u.Email != null && u.Email.Contains(search)));
+            }
+
+            // =========================================
+            // ROLE FILTER
+            // =========================================
+
+            if (!string.IsNullOrWhiteSpace(roleFilter) &&
+                roleFilter != "All")
+            {
+                if (SystemRoles.PublicRoles.Contains(roleFilter))
+                {
+                    query = query.Where(u =>
+                        _context.UserRoles.Any(ur =>
+                            ur.UserId == u.Id &&
+                            _context.Roles.Any(r =>
+                                r.Id == ur.RoleId &&
+                                r.Name == roleFilter)));
+                }
+                else
+                {
+                    roleFilter = "All";
+                }
+            }
+            else
+            {
+                roleFilter = "All";
+            }
+
+            // =========================================
+            // DEPARTMENT FILTER
+            // =========================================
+
+            if (!string.IsNullOrWhiteSpace(departmentFilter) &&
+                departmentFilter != "All")
+            {
+                if (int.TryParse(departmentFilter, out int departmentId) &&
+                    departments.Any(d => d.Value == departmentId.ToString()))
+                {
+                    query = query.Where(u =>
+                        u.DepartmentId == departmentId);
+                }
+                else
+                {
+                    departmentFilter = "All";
+                }
+            }
+            else
+            {
+                departmentFilter = "All";
+            }
+
+            // =========================================
+            // STATUS FILTER
+            // =========================================
+
+            if (statusFilter == "Active")
+            {
+                query = query.Where(u => u.IsActive);
+            }
+            else if (statusFilter == "Inactive")
+            {
+                query = query.Where(u => !u.IsActive);
+            }
+            else
+            {
+                statusFilter = "All";
+            }
+
+            // =========================================
+            // TOTAL MATCHING RESULTS
+            // =========================================
+
+            var totalRecords = await query.CountAsync();
+
+            var totalPages = (int)Math.Ceiling(
+                (double)totalRecords / pageSize);
+
+            page = Math.Max(1, page);
+
+            if (totalPages > 0)
+            {
+                page = Math.Min(page, totalPages);
+            }
+            else
+            {
+                page = 1;
+            }
+
+            // =========================================
+            // PAGINATION
+            // =========================================
+
+            var users = await query
+                // Creation audit IDs are chronological; keep updates from changing this order.
+                // Legacy accounts without a creation entry follow in a stable alphabetical order.
+                .OrderByDescending(u => _context.AuditLogs
+                    .Where(a => a.EntityName == "ApplicationUser" && a.EntityId == u.Id
+                        && (a.Action == "Created" || a.Action == "EmployeeProvisioned"))
+                    .Select(a => (long?)a.Id).Min())
+                .ThenBy(u => u.FullName)
+                .ThenBy(u => u.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(u => new UserListViewModel
                 {
                     Id = u.Id,
                     FullName = u.FullName,
                     Email = u.Email ?? "",
                     IsActive = u.IsActive,
-                    SupplierStatus = u.Supplier != null ? (SupplierStatus?)u.Supplier.Status : null,
 
-                    DepartmentOrCompany = u.Department != null
-                        ? u.Department.Name
-                        : u.Supplier != null
-                            ? u.Supplier.CompanyName
-                            : "—"
+                    // Keep supplier status from Main
+                    SupplierStatus = u.Supplier != null
+                        ? (SupplierStatus?)u.Supplier.Status
+                        : null,
+
+                    DepartmentOrCompany =
+                        u.Department != null
+                            ? u.Department.Name
+                            : u.Supplier != null
+                                ? u.Supplier.CompanyName
+                                : "—"
                 })
                 .ToListAsync();
 
-            // Get Identity role assignments
+            // =========================================
+            // LOAD IDENTITY ROLES
+            // =========================================
+
+            var userIds = users
+                .Select(u => u.Id)
+                .ToList();
+
             var userRoles = await (
-                from userRole in _context.UserRoles
-                join role in _context.Roles
-                    on userRole.RoleId equals role.Id
+                from ur in _context.UserRoles
+                join r in _context.Roles
+                    on ur.RoleId equals r.Id
+                where userIds.Contains(ur.UserId)
                 select new
                 {
-                    userRole.UserId,
-                    RoleName = role.Name
+                    ur.UserId,
+                    RoleName = r.Name
                 }
-            ).ToListAsync();
+            )
+            .AsNoTracking()
+            .ToListAsync();
 
-            // Group roles by user
-            var rolesByUser = userRoles
-                .GroupBy(r => r.UserId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => string.Join(", ",
-                        g.Select(r => r.RoleName ?? "")
-                         .Where(r => r != "")
-                         .OrderBy(r => r))
-                );
-
-            // Assign role names to users
             foreach (var user in users)
             {
-                user.Roles = rolesByUser.TryGetValue(
-                    user.Id, out var roles)
-                    ? roles
-                    : "No Role";
+                var roles = userRoles
+                    .Where(r => r.UserId == user.Id)
+                    .Select(r => r.RoleName)
+                    .Where(r => !string.IsNullOrEmpty(r))
+                    .OrderBy(r => r)
+                    .ToList();
+
+                user.Roles = SystemRoles.RoleText(roles);
             }
 
-            return users;
+            // =========================================
+            // RETURN VIEW MODEL
+            // =========================================
+
+            return new UserIndexViewModel
+            {
+                Users = users,
+
+                Search = search,
+                RoleFilter = roleFilter,
+                DepartmentFilter = departmentFilter,
+                StatusFilter = statusFilter,
+
+                Departments = departments,
+
+                TotalUsers = totalUsers,
+                ActiveUsers = activeUsers,
+                InactiveUsers = inactiveUsers,
+                DepartmentUsers = departmentUsers,
+
+                CurrentPage = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords
+            };
         }
+
 
         public async Task FillCreateUserOptionsAsync(
             CreateUserViewModel model)
@@ -477,7 +990,7 @@ namespace Orange_Tendering_System.Services
             model.Departments = departments;
 
             // Internal roles only - suppliers register themselves
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier)
                 .ToList();
 
@@ -501,9 +1014,14 @@ namespace Orange_Tendering_System.Services
 
         public async Task<IdentityResult> CreateUserAsync(
             CreateUserViewModel model,
-            string adminId)
+            string adminId,
+            HttpContext httpContext)
         {
-            var allowedRoles = SystemRoles.All
+            var committeeSeat = CommitteeAccountSeats.Find(model.CommitteeSeat);
+            if (model.CommitteeSeat != null && (committeeSeat == null || committeeSeat.Role != model.Role))
+                return IdentityResult.Failed(new IdentityError { Description = "The selected committee category does not match the account role." });
+
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier);
 
             if (!allowedRoles.Contains(model.Role) ||
@@ -512,6 +1030,15 @@ namespace Orange_Tendering_System.Services
                 return IdentityResult.Failed(new IdentityError
                 {
                     Description = "The selected role is invalid."
+                });
+            }
+
+            if (model.Role == SystemRoles.SourcingOfficer && model.IsActive &&
+                (await _userManager.GetUsersInRoleAsync(SystemRoles.SourcingOfficer)).Any(u => u.IsActive))
+            {
+                return IdentityResult.Failed(new IdentityError
+                {
+                    Description = "Only one active Sourcing Officer is allowed. Deactivate the current officer before activating another."
                 });
             }
 
@@ -531,7 +1058,7 @@ namespace Orange_Tendering_System.Services
             }
 
             // Requesting Department accounts need a department
-            if (model.Role == SystemRoles.RequestingDepartment &&
+            if ((model.Role == SystemRoles.RequestingDepartment || model.Role == SystemRoles.DepartmentRepresentative) &&
                 !model.DepartmentId.HasValue)
             {
                 return IdentityResult.Failed(new IdentityError
@@ -561,9 +1088,9 @@ namespace Orange_Tendering_System.Services
                 DepartmentId = model.DepartmentId,
                 SupplierId = null,
                 IsActive = model.IsActive,
-
-                // Admin-created employees receive a password here, with no email
-                // confirmation flow. Identity requires a confirmed account to sign in.
+                MustChangePassword = true,
+                // Admin-provisioned employees may use the temporary password once;
+                // FirstLoginGate requires them to replace it before workspace access.
                 EmailConfirmed = true
             };
 
@@ -571,8 +1098,7 @@ namespace Orange_Tendering_System.Services
                 await _context.Database.BeginTransactionAsync();
 
             // Create the account using Identity
-            var result = await _userManager.CreateAsync(
-                user, model.Password);
+            var result = await _userManager.CreateAsync(user, model.Password);
 
             if (!result.Succeeded)
             {
@@ -581,13 +1107,24 @@ namespace Orange_Tendering_System.Services
             }
 
             // Assign the initial role
-            var roleResult = await _userManager.AddToRoleAsync(
-                user, model.Role);
+            var roleResult = await _userManager.AddToRolesAsync(
+                user, SystemRoles.AccountRoles(model.Role));
 
             if (!roleResult.Succeeded)
             {
                 await transaction.RollbackAsync();
                 return roleResult;
+            }
+
+            if (committeeSeat != null)
+            {
+                var claimResult = await _userManager.AddClaimAsync(user,
+                    new System.Security.Claims.Claim(CommitteeAccountSeats.ClaimType, committeeSeat.Key));
+                if (!claimResult.Succeeded)
+                {
+                    await transaction.RollbackAsync();
+                    return claimResult;
+                }
             }
 
             // Record non-sensitive information in AuditLogs
@@ -604,14 +1141,82 @@ namespace Orange_Tendering_System.Services
                         user.Email,
                         user.DepartmentId,
                         user.IsActive,
-                        Role = model.Role
+                        Role = model.Role,
+                        CommitteeSeat = committeeSeat?.Key
                     }),
                 CreatedAt = DateTime.UtcNow
             });
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            try
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+                var passwordUrl = _links.GetUriByPage(httpContext, "/Account/ActivateEmployee",
+                    values: new { area = "Identity", email = user.Email, code });
+                var loginUrl = _links.GetUriByPage(httpContext, "/Account/Login",
+                    values: new { area = "Identity" });
+                if (passwordUrl == null || loginUrl == null)
+                    throw new InvalidOperationException("Could not generate account links.");
 
+                await _emailSender.SendEmailAsync(email, "Welcome to Orange Tendering",
+                    $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
+                    "<p>Welcome to Orange Tendering. An administrator has created an account for you.</p>" +
+                    $"<p>Use the temporary password provided by your administrator to <a href=\"{HtmlEncoder.Default.Encode(loginUrl)}\">sign in</a>. You must change it before opening your workspace.</p>" +
+                    $"<p>Alternatively, <a href=\"{HtmlEncoder.Default.Encode(passwordUrl)}\">set a private password</a> using this secure link, which expires in one hour.</p>" +
+                    "<p>If you were not expecting this invitation, please contact your administrator.</p>" +
+                    "<p>Kind regards,<br>Orange Tendering Team</p>");
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            // Any delivery or link failure (SMTP, address format, network) rolls the account back and shows a clear message
+            // instead of an error page; nothing is half-created.
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                await transaction.RollbackAsync();
+                return IdentityResult.Failed(new IdentityError
+                {
+                    Description = exception is InvalidOperationException &&
+                        exception.Message == "SMTP email delivery is not configured."
+                        ? "Email delivery is not configured. The account was not created."
+                        : "The welcome email could not be delivered. The account was not created. Please try again."
+                });
+            }
+
+            return IdentityResult.Success;
+        }
+
+        public async Task<IdentityResult> ResendSetupLinkAsync(string id, HttpContext httpContext)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user is not { SupplierId: null, MustChangePassword: true } ||
+                !await _context.AuditLogs.AnyAsync(a => a.EntityName == nameof(ApplicationUser) &&
+                    a.EntityId == id && (a.Action == "Created" || a.Action == "EmployeeProvisioned")))
+                return IdentityResult.Failed(new IdentityError { Description = "This account does not need an employee setup link." });
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+            var url = _links.GetUriByPage(httpContext, "/Account/ActivateEmployee",
+                new { area = "Identity", email = user.Email, code });
+
+            try
+            {
+                await _emailSender.SendEmailAsync(user.Email!, "Set your Orange Tendering password",
+                    $"<p>Dear {HtmlEncoder.Default.Encode(user.FullName)},</p>" +
+                    $"<p><a href=\"{HtmlEncoder.Default.Encode(url)}\">Set your private password</a> using this new link. It expires in one hour.</p>" +
+                    "<p>If you were not expecting this email, please contact your administrator.</p>");
+            }
+            catch (Exception exception) when (exception is System.Net.Mail.SmtpException or InvalidOperationException)
+            {
+                return IdentityResult.Failed(new IdentityError { Description = "The setup email could not be delivered. Please try again." });
+            }
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                UserId = _userManager.GetUserId(httpContext.User),
+                Action = "EmployeeSetupLinkResent", EntityName = nameof(ApplicationUser),
+                EntityId = user.Id, CreatedAt = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
             return IdentityResult.Success;
         }
 
@@ -656,14 +1261,16 @@ namespace Orange_Tendering_System.Services
                 })
                 .ToListAsync();
 
+            var canResendSetupLink = user.SupplierId == null && user.MustChangePassword &&
+                await _context.AuditLogs.AnyAsync(a => a.EntityName == nameof(ApplicationUser) &&
+                    a.EntityId == id && (a.Action == "Created" || a.Action == "EmployeeProvisioned"));
+
             return new UserDetailsViewModel
             {
                 Id = user.Id,
                 FullName = user.FullName,
                 Email = user.Email ?? "",
-                Roles = roles.Count > 0
-                    ? string.Join(", ", roles)
-                    : "No Role",
+                Roles = SystemRoles.RoleText(roles),
 
                 DepartmentName = user.Department?.Name ?? "—",
                 SupplierName = user.Supplier?.CompanyName ?? "—",
@@ -671,11 +1278,13 @@ namespace Orange_Tendering_System.Services
 
                 IsActive = user.IsActive,
                 EmailConfirmed = user.EmailConfirmed,
+                CanResendSetupLink = canResendSetupLink,
                 LockoutEnd = user.LockoutEnd,
 
                 RecentActivities = recentActivities
             };
         }
+
 
         public async Task<EditUserViewModel?> GetUserForEditAsync(
             string id)
@@ -685,8 +1294,10 @@ namespace Orange_Tendering_System.Services
             if (user == null)
                 return null;
 
+            // Get the user's current roles
             var roles = await _userManager.GetRolesAsync(user);
 
+            // Get available departments
             var departments = await _context.Departments
                 .AsNoTracking()
                 .Where(d => d.IsActive || d.Id == user.DepartmentId)
@@ -698,6 +1309,24 @@ namespace Orange_Tendering_System.Services
                 })
                 .ToListAsync();
 
+            // Get internal system roles from Identity database
+            var availableRoles = await _context.Roles
+                .AsNoTracking()
+                .Where(r => r.Name != null &&
+                            r.Name != SystemRoles.Supplier)
+                .OrderBy(r => r.Name)
+                .Select(r => new SelectListItem
+                {
+                    Value = r.Name!,
+                    Text = r.Name!
+                })
+                .ToListAsync();
+
+            availableRoles = availableRoles
+                .Where(r => SystemRoles.PublicRoles.Contains(r.Value))
+                .ToList();
+
+            // Return data to Edit.cshtml
             return new EditUserViewModel
             {
                 Id = user.Id,
@@ -705,15 +1334,24 @@ namespace Orange_Tendering_System.Services
                 Email = user.Email ?? "",
                 DepartmentId = user.DepartmentId,
                 IsActive = user.IsActive,
-                CurrentRoles = string.Join(", ", roles),
-                Departments = departments
+
+                CurrentRoles = SystemRoles.RoleText(roles),
+                SelectedRole = SystemRoles.DisplayRoles(roles).FirstOrDefault() ?? "",
+
+                Departments = departments,
+                AvailableRoles = availableRoles
             };
-            // الميثود بتجيب معلومات المستخدم والـRoles الحالية والأقسام المتاحة. وبتسمح بظهور القسم القديم حتى لو أصبح غير نشط، عشان ما نفقد العلاقة الموجودة.
         }
 
-        public async Task<string> UpdateUserAsync(
-            EditUserViewModel model,
-            string adminId)
+
+           
+            // الميثود بتجيب معلومات المستخدم والـRoles الحالية والأقسام المتاحة. وبتسمح بظهور القسم القديم حتى لو أصبح غير نشط، عشان ما نفقد العلاقة الموجودة.
+        
+
+      
+public async Task<string> UpdateUserAsync(
+    EditUserViewModel model,
+    string adminId)
         {
             if (string.IsNullOrWhiteSpace(model.Id))
                 return "NotFound";
@@ -723,42 +1361,74 @@ namespace Orange_Tendering_System.Services
             if (user == null)
                 return "NotFound";
 
-            // Supplier accounts are reviewed in Supplier Verification.
+            // Supplier accounts are managed separately.
             if (user.SupplierId.HasValue)
                 return "SupplierAccount";
 
-            var newName = model.FullName.Trim();
+            var newName = model.FullName?.Trim() ?? "";
+            var newRole = model.SelectedRole?.Trim() ?? "";
 
+            // Validate name
             if (newName.Length < 2 || newName.Length > 150)
                 return "InvalidName";
 
-            if (model.DepartmentId.HasValue &&
-                model.DepartmentId != user.DepartmentId)
+            // Validate selected role
+            if (string.IsNullOrWhiteSpace(newRole) ||
+                newRole == SystemRoles.Supplier ||
+                !SystemRoles.PublicRoles.Contains(newRole) ||
+                !await _roleManager.RoleExistsAsync(newRole))
             {
-                var departmentExists = await _context.Departments
-                    .AnyAsync(d =>
-                        d.Id == model.DepartmentId.Value &&
-                        d.IsActive);
-
-                if (!departmentExists)
-                    return "InvalidDepartment";
+                return "InvalidRole";
             }
 
-            var roles = await _userManager.GetRolesAsync(user);
+            // Current roles assigned to user
+            var currentRoles = await _userManager.GetRolesAsync(user);
 
-            if (roles.Contains(SystemRoles.RequestingDepartment) &&
+            // Requesting Department requires a department
+            if ((newRole == SystemRoles.RequestingDepartment || newRole == SystemRoles.DepartmentRepresentative) &&
                 !model.DepartmentId.HasValue)
             {
                 return "DepartmentRequired";
             }
 
-            // Prevent an Admin from deactivating their own account.
-            if (!model.IsActive && user.Id == adminId)
+            if (newRole == SystemRoles.SourcingOfficer && model.IsActive &&
+                (await _userManager.GetUsersInRoleAsync(SystemRoles.SourcingOfficer))
+                    .Any(officer => officer.IsActive && officer.Id != user.Id))
+            {
+                return "OfficerAlreadyActive";
+            }
+
+            // Validate department
+            if (model.DepartmentId.HasValue)
+            {
+                var departmentExists = await _context.Departments
+                    .AnyAsync(d =>
+                        d.Id == model.DepartmentId.Value &&
+                        (d.IsActive ||
+                         d.Id == user.DepartmentId));
+
+                if (!departmentExists)
+                    return "InvalidDepartment";
+            }
+
+            // Prevent self-deactivation
+            if (user.Id == adminId && !model.IsActive)
                 return "SelfDeactivate";
 
-            // Protect the last active Admin.
-            if (user.IsActive && !model.IsActive &&
-                roles.Contains(SystemRoles.Admin))
+            // Prevent Admin from removing own role
+            if (user.Id == adminId &&
+                currentRoles.Contains(SystemRoles.Admin) &&
+                newRole != SystemRoles.Admin)
+            {
+                return "SelfRoleChange";
+            }
+
+            bool removingAdmin =
+                currentRoles.Contains(SystemRoles.Admin) &&
+                (newRole != SystemRoles.Admin || !model.IsActive);
+
+            // Protect last active Admin
+            if (user.IsActive && removingAdmin)
             {
                 var adminRole = await _roleManager.FindByNameAsync(
                     SystemRoles.Admin);
@@ -778,42 +1448,101 @@ namespace Orange_Tendering_System.Services
                     return "LastAdmin";
             }
 
-            // Save original values for Audit Log
+            // Save old values for AuditLogs
+            var oldIsActive = user.IsActive;
+
             var oldValues = System.Text.Json.JsonSerializer.Serialize(
                 new
                 {
                     user.FullName,
                     user.DepartmentId,
-                    user.IsActive
+                    user.IsActive,
+                    Roles = currentRoles.ToArray()
                 });
-
-            user.FullName = newName;
-            user.DepartmentId = model.DepartmentId;
-            user.IsActive = model.IsActive;
 
             var newValues = System.Text.Json.JsonSerializer.Serialize(
                 new
                 {
-                    user.FullName,
-                    user.DepartmentId,
-                    user.IsActive
+                    FullName = newName,
+                    DepartmentId = model.DepartmentId,
+                    IsActive = model.IsActive,
+                    Role = newRole
                 });
 
+            var desiredRoles = SystemRoles.AccountRoles(newRole);
+            bool roleChanged = !currentRoles.ToHashSet(StringComparer.Ordinal).SetEquals(desiredRoles);
+
+            bool accountChanged =
+                user.FullName != newName ||
+                user.DepartmentId != model.DepartmentId ||
+                user.IsActive != model.IsActive;
+
+            if (!roleChanged && !accountChanged)
+                return "Success";
+
+            // Use transaction for account + role + audit
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
-            var result = await _userManager.UpdateAsync(user);
+            // Update account information
+            user.FullName = newName;
+            user.DepartmentId = model.DepartmentId;
+            user.IsActive = model.IsActive;
 
-            if (!result.Succeeded)
+            var updateResult =
+                await _userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
             {
                 await transaction.RollbackAsync();
                 return "UpdateFailed";
             }
 
+            // Replace all previous roles with one role
+            if (roleChanged)
+            {
+                if (currentRoles.Count > 0)
+                {
+                    var removeResult =
+                        await _userManager.RemoveFromRolesAsync(
+                            user, currentRoles);
+
+                    if (!removeResult.Succeeded)
+                    {
+                        await transaction.RollbackAsync();
+                        return "RoleUpdateFailed";
+                    }
+                }
+
+                var addResult =
+                    await _userManager.AddToRolesAsync(
+                        user, desiredRoles);
+
+                if (!addResult.Succeeded)
+                {
+                    await transaction.RollbackAsync();
+                    return "RoleUpdateFailed";
+                }
+            }
+
+            // Invalidate old login sessions when access changes
+            if (roleChanged || oldIsActive != model.IsActive)
+            {
+                var stampResult =
+                    await _userManager.UpdateSecurityStampAsync(user);
+
+                if (!stampResult.Succeeded)
+                {
+                    await transaction.RollbackAsync();
+                    return "UpdateFailed";
+                }
+            }
+
+            // Record the change
             _context.AuditLogs.Add(new AuditLog
             {
                 UserId = adminId,
-                Action = "Updated",
+                Action = roleChanged ? "RoleChanged" : "Updated",
                 EntityName = "ApplicationUser",
                 EntityId = user.Id,
                 OldValues = oldValues,
@@ -826,6 +1555,7 @@ namespace Orange_Tendering_System.Services
 
             return "Success";
         }
+
 
         // =============================================
         // ADMIN - ROLES MANAGEMENT - INDEX
@@ -878,7 +1608,7 @@ namespace Orange_Tendering_System.Services
 
             var result = new List<RoleListViewModel>();
 
-            foreach (var roleName in SystemRoles.All)
+            foreach (var roleName in SystemRoles.PublicRoles)
             {
                 var users = memberships
                     .Where(m => m.RoleName == roleName)
@@ -889,7 +1619,7 @@ namespace Orange_Tendering_System.Services
                 result.Add(new RoleListViewModel
                 {
                     RoleName = roleName,
-                    Purpose = descriptions[roleName],
+                    Purpose = descriptions.GetValueOrDefault(roleName, "Committee member job role"),
                     UserCount = users.Count,
                     IsSeeded = dbRoles.Any(r => r.Name == roleName),
                     Users = users
@@ -920,7 +1650,7 @@ namespace Orange_Tendering_System.Services
                 .ToListAsync();
 
             // Only predefined internal roles
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier)
                 .ToList();
 
@@ -955,7 +1685,7 @@ namespace Orange_Tendering_System.Services
             if (user.SupplierId != null)
                 return "SupplierAccount";
 
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier);
 
             if (!allowedRoles.Contains(roleName) ||
@@ -965,15 +1695,16 @@ namespace Orange_Tendering_System.Services
             if (await _userManager.IsInRoleAsync(user, roleName))
                 return "AlreadyAssigned";
 
-            if (roleName == SystemRoles.RequestingDepartment &&
+            if ((roleName == SystemRoles.RequestingDepartment || roleName == SystemRoles.DepartmentRepresentative) &&
                 !user.DepartmentId.HasValue)
                 return "DepartmentRequired";
 
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
-            var result = await _userManager.AddToRoleAsync(
-                user, roleName);
+            var existingRoles = await _userManager.GetRolesAsync(user);
+            var result = await _userManager.AddToRolesAsync(
+                user, SystemRoles.AccountRoles(roleName).Except(existingRoles));
 
             if (!result.Succeeded)
             {
@@ -1018,7 +1749,7 @@ namespace Orange_Tendering_System.Services
             if (user.SupplierId != null)
                 return "SupplierAccount";
 
-            var allowedRoles = SystemRoles.All
+            var allowedRoles = SystemRoles.PublicRoles
                 .Where(r => r != SystemRoles.Supplier);
 
             if (!allowedRoles.Contains(roleName))
@@ -1056,8 +1787,9 @@ namespace Orange_Tendering_System.Services
             await using var transaction =
                 await _context.Database.BeginTransactionAsync();
 
-            var result = await _userManager.RemoveFromRoleAsync(
-                user, roleName);
+            var assignedRoles = await _userManager.GetRolesAsync(user);
+            var result = await _userManager.RemoveFromRolesAsync(
+                user, SystemRoles.RolesToRemove(assignedRoles, roleName));
 
             if (!result.Succeeded)
             {
@@ -1408,41 +2140,74 @@ namespace Orange_Tendering_System.Services
                 (supplier.Status == SupplierStatus.Approved &&
                  model.Decision == SupplierStatus.Suspended)
                 ||
-                (supplier.Status == SupplierStatus.Suspended &&
+                ((supplier.Status == SupplierStatus.Suspended ||
+                  supplier.Status == SupplierStatus.Rejected) &&
                  model.Decision == SupplierStatus.Approved);
 
             if (!allowed)
                 return "InvalidTransition";
 
+            var oldStatus = supplier.Status;
+            var reviewedAt = DateTime.UtcNow;
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
             if (model.Decision == SupplierStatus.Approved)
             {
                 var documents = await _context.Documents
-                    .AsNoTracking()
                     .Where(d => d.SupplierId == supplier.Id)
                     .ToListAsync();
 
                 if (documents.Count == 0)
                     return "DocumentsRequired";
 
-                var allVerified = documents.All(d =>
-                    d.VerificationStatus ==
-                        DocumentVerificationStatus.Verified &&
-                    (!d.ExpiresAt.HasValue ||
-                     d.ExpiresAt.Value.Date >= DateTime.UtcNow.Date));
+                if (!documents.Any(d => d.DocumentType == "CommercialRegistration"))
+                    return "DocumentsRequired";
 
-                if (!allVerified)
+                foreach (var document in documents)
+                {
+                    try
+                    {
+                        if (!File.Exists(PrivateDocumentPaths.Resolve(
+                            _environment.ContentRootPath, document.StoragePath)))
+                            return "DocumentsUnavailable";
+                    }
+                    catch (WorkflowException)
+                    {
+                        return "DocumentsUnavailable";
+                    }
+                }
+
+                if (documents.Any(d => d.VerificationStatus == DocumentVerificationStatus.Rejected))
+                    return "DocumentsRejected";
+
+                if (documents.Any(d => d.ExpiresAt.HasValue &&
+                    d.ExpiresAt.Value.Date < reviewedAt.Date))
                     return "DocumentsNotVerified";
+
+                // The Admin's approval also verifies documents still awaiting a decision.
+                foreach (var document in documents.Where(d =>
+                    d.VerificationStatus != DocumentVerificationStatus.Verified))
+                {
+                    document.VerificationStatus = DocumentVerificationStatus.Verified;
+                    document.VerifiedByUserId = adminId;
+                    document.VerifiedAt = reviewedAt;
+                    document.VerificationNotes = model.ReviewNotes?.Trim();
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        UserId = adminId,
+                        Action = "DocumentVerifiedWithSupplierApproval",
+                        EntityName = "Document",
+                        EntityId = document.Id.ToString(),
+                        CreatedAt = reviewedAt
+                    });
+                }
             }
-
-            var oldStatus = supplier.Status;
-
-            await using var transaction =
-                await _context.Database.BeginTransactionAsync();
 
             supplier.Status = model.Decision;
             supplier.ReviewNotes = model.ReviewNotes?.Trim();
             supplier.ReviewedByUserId = adminId;
-            supplier.ReviewedAt = DateTime.UtcNow;
+            supplier.ReviewedAt = reviewedAt;
 
             // Accounts linked to this supplier
             var accounts = await _context.Users
@@ -1460,9 +2225,14 @@ namespace Orange_Tendering_System.Services
                     account.SecurityStamp = Guid.NewGuid().ToString();
                 }
             }
-
-            // Re-approving does not automatically reactivate
-            // accounts that might have been disabled separately.
+            else if (model.Decision == SupplierStatus.Approved)
+            {
+                foreach (var account in accounts.Where(a => a.EmailConfirmed))
+                {
+                    account.IsActive = true;
+                    account.SecurityStamp = Guid.NewGuid().ToString();
+                }
+            }
 
             foreach (var account in accounts)
             {

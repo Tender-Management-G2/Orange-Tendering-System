@@ -9,28 +9,24 @@ TRELLO TASK: User Management
 TRELLO URL: https://trello.com/c/UYxdWeUv
 
 PURPOSE:
-Form to create an internal employee account with department
-and role(s).
+Form to create an internal employee account with department and role.
+Layout: three sections (identity, role & department, access) and a live summary card.
+Field names, validation and the POST contract are unchanged (AdminService.CreateUserAsync).
 
 BUSINESS ACCESS:
 Admin
 
 ROUTE: /Admin/Users/Create
 
-FUTURE IMPLEMENTATION:
-- Add [HttpPost, ValidateAntiForgeryToken] Create with
-  server-side validation.
-- Create the user with UserManager and set FullName,
-  DepartmentId and IsActive.
-- Assign roles with UserManager.AddToRoleAsync using the
-  SystemRoles names.
-- Write an AuditLog entry without the password.
+IMPLEMENTATION:
+AdminService creates the account with a temporary password, assigns its role, and records an
+audit entry without the password. The user receives an email link to replace the temporary password.
 
 DEPENDENCIES:
 AspNetUsers, AspNetRoles, Departments, AuditLogs.
 
 STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
+INTEGRATED.
 
 IMPORTANT:
 No hardcoded passwords or demo accounts.
@@ -40,138 +36,183 @@ No hardcoded passwords or demo accounts.
 @model CreateUserViewModel
 
 @{
-    ViewData["Title"] = "Create User";
+    var committeeSeat = CommitteeAccountSeats.Find(Model.CommitteeSeat);
+    ViewData["Title"] = committeeSeat == null ? "Create User" : $"Create {committeeSeat.Title}";
     ViewData["WorkspaceSection"] = "Users";
     ViewData["Description"] =
-        "Create an internal employee account.";
+        committeeSeat == null ? "Create an internal employee account." : $"{(committeeSeat.Committee == "Top" ? "Top Committee" : "Evaluation Committee")} · {committeeSeat.Title}";
+
+    // Role cards: grouped and described. Only roles the server offers (Model.Roles) are shown.
+    var groups = new (string Title, string Hint, (string Role, string Icon, string Text)[] Items)[]
+    {
+        ("Workspace roles", "Day-to-day sourcing work.", new[] {
+            (SystemRoles.RequestingDepartment, "building", "Creates purchase requests for one department."),
+            (SystemRoles.SourcingOfficer, "briefcase", "Runs tenders end to end. Only one may be active."),
+            (SystemRoles.SourcingManager, "check", "Reviews recommendations and approves results."),
+            (SystemRoles.Admin, "shield", "Manages users, departments, suppliers and settings.") }),
+        ("Evaluation Committee", "Scores offers on assigned tenders.", new[] {
+            (SystemRoles.Technical, "cpu", "Technical evaluation seat."),
+            (SystemRoles.Finance, "coin", "Financial evaluation seat."),
+            (SystemRoles.DepartmentRepresentative, "users", "Represents the requesting department.") }),
+        ("Top Committee", "Final approval of awards.", new[] {
+            (SystemRoles.ChiefExecutiveOfficer, "star", "CEO member of the Top Committee."),
+            (SystemRoles.ChiefFinancialOfficer, "coin", "CFO member of the Top Committee."),
+            (SystemRoles.ChiefTechnologyOfficer, "cpu", "CTO member of the Top Committee."),
+            (SystemRoles.ChiefOperationsOfficer, "gear", "COO member of the Top Committee.") })
+    };
+    var offered = Model.Roles.Select(r => r.Value).ToHashSet();
+    var deptRoles = new[] { SystemRoles.RequestingDepartment, SystemRoles.DepartmentRepresentative };
+    string Icon(string name) => name switch
+    {
+        "building" => "<path d=\"M4 21V5l8-3 8 3v16M9 21v-4h6v4M8 8h2M14 8h2M8 12h2M14 12h2\"/>",
+        "briefcase" => "<rect x=\"3\" y=\"7\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12h18\"/>",
+        "check" => "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"m8 12 3 3 5-6\"/>",
+        "shield" => "<path d=\"M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z\"/><path d=\"m9 12 2 2 4-4\"/>",
+        "cpu" => "<rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4\"/>",
+        "coin" => "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M15 9a3 3 0 0 0-3-1.5c-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2A3.2 3.2 0 0 1 9 15M12 6v1.5M12 16.5V18\"/>",
+        "users" => "<circle cx=\"9\" cy=\"8\" r=\"3.5\"/><path d=\"M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6\"/>",
+        "star" => "<path d=\"m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z\"/>",
+        _ => "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1\"/>"
+    };
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-user-create.css" asp-append-version="true" />
 }
 
 <partial name="_PageHeader" />
 
-<section class="ws-panel pg-panel">
+<form asp-area="Admin" asp-controller="Users" asp-action="Create" method="post" class="auc" data-user-create novalidate
+      data-dept-roles="@string.Join("|", deptRoles)" data-officer-role="@SystemRoles.SourcingOfficer">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="CommitteeSeat" />
+    <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
 
-    <h2>Create Employee Account</h2>
+    <div class="auc-main">
+        <div asp-validation-summary="ModelOnly" class="auc-alert" role="alert"></div>
 
-    <form asp-area="Admin"
-          asp-controller="Users"
-          asp-action="Create"
-          method="post"
-          class="pg-form">
-
-        @Html.AntiForgeryToken()
-
-        <div asp-validation-summary="All"
-             class="text-danger"></div>
-
-        <div class="pg-form-grid">
-
-            <div class="pg-field">
-                <label asp-for="FullName">Full Name</label>
-
-                <input asp-for="FullName"
-                       class="form-control"
-                       maxlength="150" />
-
-                <span asp-validation-for="FullName"
-                      class="text-danger"></span>
+        <section class="auc-card" aria-labelledby="auc-s1">
+            <header class="auc-card-head"><span class="auc-step">1</span><div><h2 id="auc-s1">Personal details</h2><p>Name and work e-mail used to sign in.</p></div></header>
+            <div class="auc-grid">
+                <div class="auc-field">
+                    <label asp-for="FullName">Full name</label>
+                    <input asp-for="FullName" maxlength="150" autocomplete="off" placeholder="e.g. Sara Haddad" data-sum-src="name" />
+                    <span asp-validation-for="FullName" class="auc-error"></span>
+                </div>
+                <div class="auc-field">
+                    <label asp-for="Email">Work e-mail</label>
+                    <input asp-for="Email" type="email" maxlength="256" autocomplete="off" placeholder="name@company.com" spellcheck="false" data-sum-src="email" />
+                    <span asp-validation-for="Email" class="auc-error"></span>
+                    <small class="auc-hint">A welcome e-mail with a one-hour password setup link is sent here.</small>
+                </div>
             </div>
+        </section>
 
-            <div class="pg-field">
-                <label asp-for="Email">Email</label>
-
-                <input asp-for="Email"
-                       class="form-control"
-                       type="email" />
-
-                <span asp-validation-for="Email"
-                      class="text-danger"></span>
+        <section class="auc-card" aria-labelledby="auc-s2">
+            <header class="auc-card-head"><span class="auc-step">2</span><div><h2 id="auc-s2">Role &amp; department</h2><p>The role decides the workspace this person opens.</p></div></header>
+            @if (committeeSeat != null)
+            {
+                <input type="hidden" asp-for="Role" data-sum-src="role" />
+                <div class="auc-seat">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(Icon("users"))</svg>
+                    <div><strong>@committeeSeat.Role</strong><span>@(committeeSeat.Committee == "Top" ? "Top Committee" : "Evaluation Committee") · @committeeSeat.Title</span></div>
+                </div>
+            }
+            else
+            {
+                <fieldset class="auc-roles">
+                    <legend class="auc-label">Role <span class="fv-req" aria-hidden="true">*</span></legend>
+                    @foreach (var g in groups)
+                    {
+                        var items = g.Items.Where(i => offered.Contains(i.Role)).ToList();
+                        if (items.Count == 0) continue;
+                        <div class="auc-role-group">
+                            <p class="auc-role-group-title">@g.Title <span>@g.Hint</span></p>
+                            <div class="auc-role-grid">
+                                @foreach (var item in items)
+                                {
+                                    <label class="auc-role">
+                                        <input type="radio" name="Role" value="@item.Role" checked="@(Model.Role == item.Role)" data-sum-src="role" required data-val="true" data-val-required="Please select a role." />
+                                        <span class="auc-role-icon"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(Icon(item.Icon))</svg></span>
+                                        <span class="auc-role-text"><strong>@item.Role</strong><small>@item.Text</small></span>
+                                        <span class="auc-role-tick" aria-hidden="true"></span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    }
+                    @* Any server role without a card (future roles) stays selectable. *@
+                    @foreach (var extra in Model.Roles.Where(r => !groups.SelectMany(g => g.Items).Any(i => i.Role == r.Value)))
+                    {
+                        <label class="auc-role"><input type="radio" name="Role" value="@extra.Value" checked="@(Model.Role == extra.Value)" data-sum-src="role" /><span class="auc-role-text"><strong>@extra.Text</strong></span><span class="auc-role-tick" aria-hidden="true"></span></label>
+                    }
+                </fieldset>
+                <span asp-validation-for="Role" class="auc-error"></span>
+                <p class="auc-note" data-officer-note hidden>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.5" /></svg>
+                    Only one Sourcing Officer can be active. If one is already active, create this account as inactive or deactivate the current officer first.
+                </p>
+            }
+            <div class="auc-grid">
+                <div class="auc-field">
+                    <label asp-for="DepartmentId">Department <span class="fv-req" aria-hidden="true" data-dept-star hidden>*</span><em data-dept-optional>(optional)</em></label>
+                    <select asp-for="DepartmentId" asp-items="Model.Departments" data-sum-src="dept">
+                        <option value="">No department</option>
+                    </select>
+                    <span asp-validation-for="DepartmentId" class="auc-error" data-dept-error></span>
+                    <small class="auc-hint" data-dept-hint>Required for Requesting Department and Department Representative accounts.</small>
+                </div>
             </div>
+        </section>
 
-            <div class="pg-field">
-                <label asp-for="DepartmentId">Department</label>
-
-                <select asp-for="DepartmentId"
-                        asp-items="Model.Departments"
-                        class="form-control">
-                    <option value="">Select Department</option>
-                </select>
-
-                <span asp-validation-for="DepartmentId"
-                      class="text-danger"></span>
+        <section class="auc-card" aria-labelledby="auc-s3">
+            <header class="auc-card-head"><span class="auc-step">3</span><div><h2 id="auc-s3">Access</h2><p>A temporary password for the first sign-in. It must be changed on first use.</p></div></header>
+            <div class="auc-field">
+                <label asp-for="Password">Temporary password</label>
+                <div class="admin-temp-password auc-password" data-temp-password>
+                    <input asp-for="Password" type="password" autocomplete="new-password" minlength="8" maxlength="100" spellcheck="false" placeholder="At least 8 characters" />
+                    <button type="button" class="pg-btn pg-btn-primary" data-password-generate aria-label="Generate temporary password">Generate</button>
+                    <button type="button" class="pg-btn" data-password-toggle aria-label="Show temporary password" aria-pressed="false">Show</button>
+                    <button type="button" class="pg-btn" data-password-copy aria-label="Copy temporary password">Copy</button>
+                </div>
+                <div class="auc-meter" aria-hidden="true"><i data-meter></i></div>
+                <ul class="auc-rules" data-rules>
+                    <li data-rule="len">8+ characters</li><li data-rule="upper">Uppercase letter</li><li data-rule="lower">Lowercase letter</li><li data-rule="digit">Number</li><li data-rule="symbol">Symbol</li>
+                </ul>
+                <span asp-validation-for="Password" class="auc-error"></span>
+                <span class="auc-hint" data-password-status role="status" aria-live="polite"></span>
             </div>
+            <label class="auc-switch">
+                <input asp-for="IsActive" data-sum-src="active" />
+                <span class="auc-switch-ui" aria-hidden="true"></span>
+                <span><strong>Active account</strong><small>Inactive accounts cannot sign in until an Admin activates them.</small></span>
+            </label>
+        </section>
+    </div>
 
-            <div class="pg-field">
-                <label asp-for="Role">Role</label>
-
-                <select asp-for="Role"
-                        asp-items="Model.Roles"
-                        class="form-control">
-                    <option value="">Select Role</option>
-                </select>
-
-                <span asp-validation-for="Role"
-                      class="text-danger"></span>
-            </div>
-
-            <div class="pg-field">
-                <label asp-for="Password">
-                    Temporary Password
-                </label>
-
-                <input asp-for="Password"
-                       type="password"
-                       class="form-control"
-                       autocomplete="new-password" />
-
-                <span asp-validation-for="Password"
-                      class="text-danger"></span>
-
-                <small class="pg-hint">
-                    Password must follow Identity security requirements.
-                    The account must be confirmed before sign-in.
-                </small>
-            </div>
-
-            <div class="pg-field">
-                <label class="pg-check">
-                    <input asp-for="IsActive" />
-                    Active Account
-                </label>
-            </div>
-
-        </div>
-
-        <div class="pg-actions">
-
-            <button type="submit"
-                    class="pg-btn pg-btn-primary">
-                Create Account
+    <aside class="auc-side" aria-label="Account summary">
+        <div class="auc-summary">
+            <p class="auc-summary-kicker">New account</p>
+            <div class="auc-avatar" data-sum="initials">?</div>
+            <h3 data-sum="name">Full name</h3>
+            <p class="auc-summary-email" data-sum="email">e-mail address</p>
+            <dl>
+                <div><dt>Role</dt><dd data-sum="role">Not selected</dd></div>
+                <div><dt>Department</dt><dd data-sum="dept">No department</dd></div>
+                <div><dt>Status</dt><dd><span class="auc-status" data-sum="active">Active</span></dd></div>
+                <div><dt>First sign-in</dt><dd>Password change required</dd></div>
+            </dl>
+            <button type="submit" class="pg-btn pg-btn-primary auc-submit" data-submit>
+                <span data-submit-label>Create account</span>
             </button>
-
-            <a asp-area="Admin"
-               asp-controller="Users"
-               asp-action="Index"
-               class="pg-btn">
-                Cancel
-            </a>
-
+            <a asp-area="Admin" asp-controller="Users" asp-action="Index" class="pg-btn auc-cancel">Cancel</a>
+            <p class="auc-audit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" /></svg>Recorded in the audit log without the password.</p>
         </div>
-
-    </form>
-</section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li>
-            <a asp-area="Admin"
-               asp-controller="Users"
-               asp-action="Index">
-                Back to Users
-            </a>
-        </li>
-    </ul>
-</nav>
+    </aside>
+</form>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/admin-temp-password.js" asp-append-version="true"></script>
+    <script src="~/js/admin-user-create.js" asp-append-version="true"></script>
 }

@@ -15,7 +15,9 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         TenderWorkflowService.Require(financial.HasValue && technical.HasValue, "Both weight percentages must be supplied.");
         return Workflow.Propose(id, financial.Value, technical.Value, User);
     });
-    [HttpPost] public Task<IActionResult> SubmitEvaluation(int id, List<ScoreInput> scores) => Execute(id, () => Workflow.SubmitEvaluation(id, scores, User));
+    // Final scores for every supplier are submitted together with the member's signature drawn in the meeting.
+    [HttpPost] public Task<IActionResult> SubmitEvaluation(int id, List<ScoreInput> scores, string? signatureImage) =>
+        Execute(id, () => Workflow.SubmitEvaluation(id, scores, User, ReportControllerBase.ReadSignature(signatureImage)));
     [HttpPost] public Task<IActionResult> GenerateReport(int id, string justification) => Execute(id, () => Workflow.GenerateReport(id, justification, User));
     [HttpPost] public Task<IActionResult> FinalizeReport(int id, string comment = "", string? documentHash = null, bool confirmed = false) => Execute(id, () => Workflow.FinalizeReport(id, comment, User, documentHash, confirmed));
 }

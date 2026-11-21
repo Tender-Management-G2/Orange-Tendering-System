@@ -1,0 +1,111 @@
+@page
+@model EmployeeIdentityModel
+@{
+    var faceDone = Model.FaceTemplateCount > 0;
+    var passkeyDone = Model.PasskeyCount > 0;
+    // Optional: one method is enough, and the employee may also skip and keep using the password.
+    var done = faceDone || passkeyDone;
+    ViewData["Title"] = done ? "Identity ready" : "Set up Face ID or Fingerprint";
+}
+<section class="as-shell" id="authStudio" data-chapter="identity" data-face-done="@(faceDone ? "true" : "false")" data-passkey-done="@(passkeyDone ? "true" : "false")" data-approved="true" data-done-say="Identity enrolled. You can sign in with it from the next visit.">
+    @* LEFT: the Identity Station. Decorative: every real status is repeated as text in the form. *@
+    <div class="as-stage" id="asStage" data-shot="wide" data-caption="1">
+        <div class="as-stage-ui" aria-hidden="true">
+            <p class="as-chapter"><span class="as-sq"></span>Employee Access</p>
+            <p class="as-tagline">Your workspace, opened by you alone.</p>
+        </div>
+        @* The live camera, seen through the Paper Iris. It opens only after Start face enrollment. *@
+        <div class="as-camera bio-hidden" id="facePanel">
+            <video id="faceVideo" playsinline muted autoplay aria-label="Live camera preview"></video>
+        </div>
+        <p class="sr-only" data-scene-status></p>
+    </div>
+
+    @* RIGHT: a normal form. *@
+    <div class="as-panel">
+        <div class="as-panel-inner" id="bio-root" data-return-url="" data-face-complete="@(faceDone ? "true" : "false")" data-enrolled-url="/Identity/Account/EmployeeIdentity">
+            @Html.AntiForgeryToken()
+            <p class="as-brand"><span class="as-brand-mark" aria-hidden="true"></span><span class="as-brand-name">Sourcing &amp; Tender Management</span></p>
+            <p class="as-kicker">Employee access · Identity</p>
+            <h1 class="as-title">@(done ? "Your identity is ready." : Model.JustActivated ? "Your password is set." : "Set up Face ID or Fingerprint")</h1>
+            <p class="as-lede">@(done
+                ? "Next time, choose Other User on the sign-in page, then Face ID or Fingerprint. Email & Password keeps working too."
+                : "Optional: choose one faster way to sign in, Face ID with your camera or Fingerprint with this computer or your phone. One is enough, and you can skip this and add it later from your account menu.")</p>
+
+            <ol class="as-steps" aria-label="Activation progress">
+                <li class="is-done"><span class="as-n">1</span><span class="as-t">Password</span></li>
+                <li class="@(done ? "is-done" : "is-current")" aria-current="@(done ? null : "step")"><span class="as-n">2</span><span class="as-t">Identity (optional)</span></li>
+                <li class="@(done ? "is-current" : "")" aria-current="@(done ? "step" : null)"><span class="as-n">3</span><span class="as-t">Workspace</span></li>
+            </ol>
+
+            @if (faceDone)
+            {
+                <p class="as-status is-success" role="status">Face ID is set up for this account.</p>
+            }
+            @if (passkeyDone)
+            {
+                <p class="as-status is-success" role="status">Fingerprint sign-in is set up for this account (@Model.PasskeyCount device(s) registered).</p>
+            }
+            <div id="bio-status" class="as-status bio-status" role="status" aria-live="polite"></div>
+
+            <div class="as-actions">
+                <a id="employeeContinue" class="@(done ? "as-primary" : "as-secondary")" href="@Model.WorkspaceUrl">@(done ? "Continue to my workspace" : "Skip for now")</a>
+            </div>
+
+            <div class="as-field">
+                <label for="bioPassword">Your password</label>
+                <input id="bioPassword" type="password" autocomplete="current-password" />
+                <p class="as-fine">Type the password you chose. It is checked before the camera opens or a QR code is shown.</p>
+            </div>
+
+            @* Choose a method; the other card stays hidden (wwwroot/js/phone-passkey.js). The method already enrolled
+               is preselected, otherwise Face ID. *@
+            <div class="as-methods" role="group" aria-label="Choose an identity method">
+                <button type="button" class="as-method" data-method-choice="faceCard" aria-pressed="@(passkeyDone && !faceDone ? "false" : "true")">
+                    <span class="as-method-icon" aria-hidden="true">
+                        <svg class="as-icon" viewBox="0 0 48 48"><path d="M8 16V11a3 3 0 0 1 3-3h5M32 8h5a3 3 0 0 1 3 3v5M40 32v5a3 3 0 0 1-3 3h-5M16 40h-5a3 3 0 0 1-3-3v-5" /><path d="M18 19v3M30 19v3M24 20v8h-2M18.5 32c3.200 2.600 7.800 2.600 11 0" /></svg>
+                    </span>
+                    <span class="as-method-text"><strong>Face ID</strong><small>Use this device's camera</small></span>
+                </button>
+                <button type="button" class="as-method" data-method-choice="passkeyCard" aria-pressed="@(passkeyDone && !faceDone ? "true" : "false")">
+                    <span class="as-method-icon" aria-hidden="true">
+                        <svg class="as-icon" viewBox="0 0 48 48"><path d="M14 40c2.6-5 3.6-10.4 3.6-16a6.4 6.4 0 0 1 12.8 0c0 6.8-1.2 12.8-3.8 18M24 24c0 6.4-1.2 12-4 17M11 33c1.2-3 1.6-5.8 1.6-9a11.4 11.4 0 0 1 22.8 0c0 4.6-.5 8.8-1.6 12.8M9.5 19.5A15.5 15.5 0 0 1 24 8.5c4 0 7.7 1.5 10.5 4M38.5 18c.6 1.9 1 3.9 1 6" /></svg>
+                    </span>
+                    <span class="as-method-text"><strong>Fingerprint</strong><small>This computer's reader, or your smartphone</small></span>
+                </button>
+            </div>
+
+            <div class="as-cards">
+                <section class="as-card" id="faceCard" aria-labelledby="faceCardTitle" hidden="@(passkeyDone && !faceDone)">
+                    <h2 class="as-card-title" id="faceCardTitle">Face ID</h2>
+                    <p class="as-fine">The Paper Iris opens on your live camera. Hold still for 7 seconds in good light.</p>
+                    <div class="as-actions">
+                        <button id="btnFaceEnroll" type="button" class="@(faceDone ? "as-secondary" : "as-primary")">@(faceDone ? "Replace face samples" : "Start face enrollment")</button>
+                    </div>
+                    <div class="as-actions" id="faceActions" hidden>
+                        <button type="button" id="btnFaceCancel" class="as-secondary" data-bio-keep>Cancel and close the camera</button>
+                    </div>
+                    <p id="faceHint" class="as-hint" role="status" aria-live="polite">Use a well-lit place and keep only one person in view.</p>
+                </section>
+                <section class="as-card" id="passkeyCard" aria-labelledby="passkeyCardTitle" hidden="@(!(passkeyDone && !faceDone))">
+                    <h2 class="as-card-title" id="passkeyCardTitle">Fingerprint</h2>
+                    <partial name="_PhonePasskeySetup" />
+                    <p class="as-fine">@(passkeyDone ? Model.PasskeyCount + " device(s) registered. You can add another one." : "No device registered yet.") Your fingerprint never leaves your device: it may use its fingerprint, face unlock or screen lock, and this application cannot tell which.</p>
+                </section>
+            </div>
+
+            <p class="as-fine">Your camera image stays on this device. Face measurements are sent to this application and stored encrypted. This academic face check has no liveness or spoof protection, so it is not production-grade biometric proof.</p>
+
+            <form asp-page="./Logout" method="post"><button type="submit" class="as-quiet">Sign out</button></form>
+        </div>
+    </div>
+</section>
+@section Styles {
+    <partial name="_AuthStudioHead" />
+    <link rel="stylesheet" href="~/css/phone-passkey.css" asp-append-version="true" />
+}
+@section Scripts {
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
+    <script src="~/js/phone-passkey.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/auth-studio/station-page.js" asp-append-version="true"></script>
+}

@@ -28,6 +28,8 @@ namespace Orange_Tendering_System.ViewModels
 
         public bool EmailConfirmed { get; set; }
 
+        public bool CanResendSetupLink { get; set; }
+
         public DateTimeOffset? LockoutEnd { get; set; }
 
         public List<UserAuditEntryViewModel> RecentActivities

@@ -1,0 +1,62 @@
+{
+  "time": "2026-11-14T15:56:33.614Z",
+  "browser": "157.0.4341.60",
+  "url": "http://127.0.0.1:4173",
+  "clips": [
+    {
+      "name": "registration-normal",
+      "mode": "paper",
+      "from": 0,
+      "to": 1,
+      "rate": 1,
+      "file": "registration-normal.webm",
+      "durationMs": 16489
+    },
+    {
+      "name": "login-normal",
+      "mode": "signal",
+      "from": 0,
+      "to": 1,
+      "rate": 1,
+      "file": "login-normal.webm",
+      "durationMs": 7810
+    },
+    {
+      "name": "registration-fold-slow",
+      "mode": "paper",
+      "from": 0.24,
+      "to": 0.39,
+      "rate": 0.4,
+      "file": "registration-fold-slow.webm",
+      "durationMs": 6522
+    },
+    {
+      "name": "registration-architecture-slow",
+      "mode": "paper",
+      "from": 0.5,
+      "to": 0.83,
+      "rate": 0.4,
+      "file": "registration-architecture-slow.webm",
+      "durationMs": 13699
+    },
+    {
+      "name": "login-optical-slow",
+      "mode": "signal",
+      "from": 0.53,
+      "to": 0.94,
+      "rate": 0.4,
+      "file": "login-optical-slow.webm",
+      "durationMs": 7975
+    },
+    {
+      "name": "login-fiber-slow",
+      "mode": "signal",
+      "from": 0.94,
+      "to": 1,
+      "rate": 0.4,
+      "file": "login-fiber-slow.webm",
+      "durationMs": 1606
+    }
+  ],
+  "errors": []
+}

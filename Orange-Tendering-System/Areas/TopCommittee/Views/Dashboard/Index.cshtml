@@ -1,8 +1,307 @@
-@* Role dashboard: all six internal roles share Views/Shared/_InternalDashboard.cshtml; the numbers come from InternalDashboardService. *@
-@model WorkspaceDashboardViewModel
+@model CommitteeDashboard
+@*
+  Top Committee dashboard in the approved Sourcing Officer dashboard design (sod-* classes, wwwroot/css/officer-theme.css).
+  Data: Areas/TopCommittee/Controllers/DashboardController.cs (unchanged). Vote/Review links follow the same rules as before:
+  Vote is offered only when the round allows this member to vote (CanVote) or its signed report is ready (SignedReportRounds).
+*@
 @{
-    ViewData["Title"] = "Top Committee Dashboard";
+    var arabic = UiLanguage.IsArabic(Context);
+    string L(string en, string ar) => arabic ? ar : en;
+    ViewData["Title"] = L("Top Committee Dashboard", "لوحة اللجنة العليا");
     ViewData["WorkspaceSection"] = "Dashboard";
-    ViewData["DashboardRole"] = "TopCommittee";
+    ViewData["BodyClass"] = "so-home";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    string N(int value) => value.ToString("N0", culture);
+    var signedRounds = ViewData["SignedReportRounds"] as HashSet<int>;
+    bool CanOpenVote(RoundDetails item) => item.CanVote || signedRounds?.Contains(item.Round.Id) == true;
+    string StatusText(CommitteeRoundStatus s) => s switch
+    {
+        CommitteeRoundStatus.Approved => L("Approved", "معتمدة"),
+        CommitteeRoundStatus.Rejected => L("Rejected", "مرفوضة"),
+        _ => L("In Progress", "قيد التنفيذ")
+    };
+    string Ago(DateTime at)
+    {
+        var d = DateTime.UtcNow - at;
+        if (d.TotalMinutes < 1) return L("Just now", "الآن");
+        if (d.TotalHours < 1) { var m = (int)d.TotalMinutes; return arabic ? $"قبل {m} دقيقة" : $"{m} min ago"; }
+        if (d.TotalDays < 1) { var h = (int)d.TotalHours; return arabic ? $"قبل {h} ساعة" : $"{h} {(h == 1 ? "hour" : "hours")} ago"; }
+        if (d.TotalDays < 2) return L("Yesterday", "أمس");
+        if (d.TotalDays < 30) { var days = (int)d.TotalDays; return arabic ? $"قبل {days} يوم" : $"{days} days ago"; }
+        return at.ToString("yyyy-MM-dd", culture);
+    }
+    (string Label, string Tone) VotePill(RoundDetails item) => item.MyVote?.Decision switch
+    {
+        VoteDecision.Approve => (L("Approved", "موافقة"), "green"),
+        null => CanOpenVote(item) ? (L("Vote pending", "بانتظار تصويتك"), "orange") : (L("Not eligible yet", "غير مؤهل بعد"), "gray"),
+        var d => (d.ToString()!, "purple")
+    };
+
+    var waiting = Model.Pending.FirstOrDefault(CanOpenVote);
+    var focus = waiting ?? Model.Pending.FirstOrDefault();
+    var focusVotes = focus?.ValidVotes.Count ?? 0;
+    var focusProgress = focus == null ? 0 : Math.Min(100, focusVotes * 25);
+    // Committee path: Review Evaluation → Review Recommendation → Committee Voting → Final Decision.
+    var stage = focus == null ? -1 : focusVotes >= 4 ? 3 : 2;
+    var stages = new (string En, string Ar, string Icon)[]
+    {
+        ("Review Evaluation", "مراجعة التقييم", "<path d=\"M6 2.5h8l4 4v15H6z\"/><path d=\"M14 2.5V7h4M9 11.5h6M9 15h6M9 18.5h4\"/>"),
+        ("Recommendation", "التوصية", "<path d=\"M7 3.5h10v6a5 5 0 0 1-10 0zM12 14.5v3.5M8 21h8M9.5 18h5\"/>"),
+        ("Committee Voting", "تصويت اللجنة", "<circle cx=\"12\" cy=\"7.5\" r=\"3\"/><circle cx=\"5.5\" cy=\"10\" r=\"2.3\"/><circle cx=\"18.5\" cy=\"10\" r=\"2.3\"/><path d=\"M7 20c0-3.8 2.2-6 5-6s5 2.2 5 6M1.8 19c0-2.8 1.5-4.4 3.7-4.4M22.2 19c0-2.8-1.5-4.4-3.7-4.4\"/>"),
+        ("Final Decision", "القرار النهائي", "<rect x=\"5\" y=\"4\" width=\"14\" height=\"17\" rx=\"2.2\"/><path d=\"M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5\"/>")
+    };
+
+    var total = Model.Active + Model.Approved + Model.Rejected;
+    var slices = new (string En, string Ar, int Count, string Color)[]
+    {
+        ("Active", "نشطة", Model.Active, "#2196f3"),
+        ("Approved", "معتمدة", Model.Approved, "#22b85f"),
+        ("Rejected", "مرفوضة", Model.Rejected, "#e5604f")
+    };
+    var segments = new List<string>();
+    decimal angle = 0;
+    foreach (var s in slices)
+    {
+        if (s.Count == 0 || total == 0) continue;
+        var end = angle + s.Count * 360m / total;
+        segments.Add($"{s.Color} {angle.ToString("0.##", culture)}deg {end.ToString("0.##", culture)}deg");
+        angle = end;
+    }
+    var ring = segments.Count > 0 ? $"conic-gradient(from 0deg,{string.Join(",", segments)})" : "conic-gradient(var(--sod-ring-empty) 0deg 360deg)";
+    var analyzed = Model.Pending.FirstOrDefault(item => item.AiAnalysis is not null);
+    var arrow = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4.5 12h15M13.5 6l6 6-6 6\" /></svg>";
 }
-<partial name="_InternalDashboard" model="Model" />
+
+<div class="sod tcd" data-officer-dashboard data-dashboard-role="Top Committee">
+    <h1 class="ws-sr-only">@L("Top Committee dashboard", "لوحة اللجنة العليا")</h1>
+    <partial name="_Messages" />
+
+    @* Welcome banner *@
+    <section class="sod-hero" aria-labelledby="tcd-hero-title">
+        <div class="sod-hero-photo" aria-hidden="true"></div>
+        <div class="sod-hero-waves" aria-hidden="true"></div>
+        <div class="sod-hero-copy">
+            <h2 id="tcd-hero-title">@L("Welcome back,", "مرحباً بعودتك،")<strong><bdi>@Model.DisplayName</bdi></strong></h2>
+            <p>@L("Review tenders, track committee votes and manage final procurement decisions.", "راجع العطاءات وتابع تصويت اللجنة وأدر القرارات النهائية للمشتريات.")</p>
+        </div>
+    </section>
+
+    @* KPI cards *@
+    <section class="sod-kpis" aria-label="@L("Key figures", "الأرقام الرئيسية")">
+        <a class="sod-kpi is-orange" asp-controller="Decisions" asp-action="Decision">
+            <span class="sod-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H5v17h14V4h-3M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.AwaitingVote)</strong><span>@L("Awaiting My Vote", "بانتظار تصويتي")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+        <a class="sod-kpi is-blue" asp-controller="Decisions" asp-action="History" asp-route-status="@CommitteeRoundStatus.InProgress">
+            <span class="sod-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 4.6-9 4.6-9-4.6z" /><path d="m3 12 9 4.6 9-4.6M3 16.4 12 21l9-4.6" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.Active)</strong><span>@L("Active Rounds", "الجولات النشطة")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+        <a class="sod-kpi is-green" asp-controller="Decisions" asp-action="History" asp-route-status="@CommitteeRoundStatus.Approved">
+            <span class="sod-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.2" /><path d="M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.Approved)</strong><span>@L("Approved Rounds", "الجولات المعتمدة")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+        <a class="sod-kpi is-purple" asp-controller="Decisions" asp-action="History" asp-route-status="@CommitteeRoundStatus.Rejected">
+            <span class="sod-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.2" /><path d="M9 2.5h6v3.4H9zM9.5 11l5 5M14.5 11l-5 5" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.Rejected)</strong><span>@L("Rejected Rounds", "الجولات المرفوضة")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+    </section>
+
+    <div class="sod-main-row">
+        @* Awaiting your vote: the first assigned round this member may vote on *@
+        <section class="sod-card sod-assigned" aria-labelledby="tcd-assigned-title">
+            <header class="sod-card-head">
+                <h2 id="tcd-assigned-title"><svg class="sod-head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H5v17h14V4h-3M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5" /></svg>@L("Awaiting Your Vote", "بانتظار تصويتك")</h2>
+                @if (Model.AwaitingVote > 0)
+                {
+                    <span class="sod-badge">@(arabic ? $"{Model.AwaitingVote} بانتظارك" : Model.AwaitingVote == 1 ? "1 Round" : $"{Model.AwaitingVote} Rounds")</span>
+                }
+            </header>
+            @if (waiting != null)
+            {
+                <div class="sod-assigned-body">
+                    <span class="sod-assigned-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4H5v17h14V4h-3M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5" /></svg></span>
+                    <div class="sod-assigned-copy">
+                        <h3>@L("Committee vote required", "مطلوب تصويت اللجنة")</h3>
+                        <p class="sod-assigned-tender">@L("Tender:", "العطاء:") <bdi>T-@waiting.Tender.Id.ToString("0000", culture) · @waiting.Tender.Title</bdi></p>
+                        <p class="sod-assigned-reason"><span>@L("Recommended:", "المورد الموصى به:")</span> <mark>@(waiting.Round.TenderReport?.RecommendedBid?.TenderInvitation.Supplier.CompanyName ?? "—")</mark></p>
+                    </div>
+                    <div class="sod-assigned-meta">
+                        <span class="sod-round">@(arabic ? $"الجولة {waiting.Round.RoundNumber} · {waiting.ValidVotes.Count} من 4 صوّتوا" : $"Round {waiting.Round.RoundNumber} · {waiting.ValidVotes.Count} of 4 voted")</span>
+                        <span class="sod-required"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2" /><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3" /></svg>@L("Action Required", "إجراء مطلوب")</span>
+                    </div>
+                </div>
+                <a class="sod-primary" asp-controller="Decisions" asp-action="Decision" asp-route-id="@waiting.Round.Id">@L("Open voting", "افتح التصويت")@Html.Raw(arrow)</a>
+            }
+            else
+            {
+                <div class="sod-assigned-body is-empty">
+                    <span class="sod-assigned-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4H5v17h14V4h-3M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5" /></svg></span>
+                    <div class="sod-assigned-copy">
+                        <h3>@L("No votes waiting", "لا توجد أصوات بانتظارك")</h3>
+                        <p class="sod-assigned-tender">@L("Committee rounds that are ready for your vote appear here.", "تظهر هنا جولات اللجنة الجاهزة لتصويتك.")</p>
+                    </div>
+                </div>
+                <a class="sod-primary is-quiet" asp-controller="Decisions" asp-action="History">@L("View Decision History", "عرض سجل القرارات")@Html.Raw(arrow)</a>
+            }
+        </section>
+
+        @* Committee workflow: four stages; position of the round shown on the right *@
+        <section class="sod-card sod-workflow" aria-labelledby="tcd-workflow-title">
+            <header class="sod-card-head">
+                <h2 id="tcd-workflow-title">@L("Committee Workflow", "مسار اللجنة")</h2>
+                @if (focus != null)
+                {
+                    <a class="sod-link" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@focus.Round.Id">@L("View Details", "عرض التفاصيل")@Html.Raw(arrow)</a>
+                }
+                else
+                {
+                    <a class="sod-link" asp-area="" asp-controller="Home" asp-action="HowItWorks">@L("View Details", "عرض التفاصيل")@Html.Raw(arrow)</a>
+                }
+            </header>
+            <ol class="sod-stages tcd-stages">
+                @for (var i = 0; i < stages.Length; i++)
+                {
+                    var state = stage < 0 ? "is-upcoming" : i < stage ? "is-complete" : i == stage ? "is-current" : "is-upcoming";
+                    var stateText = state switch { "is-complete" => L("completed", "مكتملة"), "is-current" => L("current stage", "المرحلة الحالية"), _ => L("not started", "لم تبدأ") };
+                    <li class="@state" aria-current="@(state == "is-current" ? "step" : null)">
+                        <span class="sod-stage-dot">
+                            @if (state == "is-complete")
+                            {
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4.2 4.2 8.8-9.4" /></svg>
+                            }
+                            else
+                            {
+                                <svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(stages[i].Icon)</svg>
+                            }
+                        </span>
+                        <span class="sod-stage-label">@(arabic ? stages[i].Ar : stages[i].En)</span>
+                        <span class="ws-sr-only">(@stateText)</span>
+                    </li>
+                }
+            </ol>
+            <p class="sod-caption">@if (focus != null) { <text>T-@focus.Tender.Id.ToString("0000", culture) · <bdi>@focus.Tender.Title</bdi> · @(arabic ? $"{focusVotes} من 4 صوّتوا" : $"{focusVotes} of 4 voted")</text> } else { @L("All four members vote before a final result is recorded.", "يصوّت الأعضاء الأربعة قبل تسجيل النتيجة النهائية.") }</p>
+        </section>
+    </div>
+
+    <div class="sod-bottom-row">
+        @* Rounds awaiting committee action *@
+        <section class="sod-card sod-tenders" aria-labelledby="tcd-rounds-title">
+            <header class="sod-card-head">
+                <h2 id="tcd-rounds-title">@L("Active Rounds", "الجولات النشطة")</h2>
+                <a class="sod-link" asp-controller="Decisions" asp-action="History">@L("View All", "عرض الكل")@Html.Raw(arrow)</a>
+            </header>
+            @if (Model.Pending.Count > 0)
+            {
+                <ul class="sod-tender-list">
+                    @foreach (var item in Model.Pending.Take(6))
+                    {
+                        var pill = VotePill(item);
+                        <li>
+                            <a asp-controller="Decisions" asp-action="@(CanOpenVote(item) ? "Decision" : "ReviewEvaluation")" asp-route-id="@item.Round.Id">
+                                <svg class="sod-doc" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8l4 4v15H6z" /><path d="M14 2.5V7h4M9 11.5h6M9 15h6M9 18.5h4" /></svg>
+                                <span class="sod-tender-copy"><strong><bdi>@item.Tender.Title</bdi></strong><small>@(arabic ? $"T-{item.Tender.Id:0000} · الجولة {item.Round.RoundNumber} · {item.ValidVotes.Count} من 4" : $"T-{item.Tender.Id:0000} · Round {item.Round.RoundNumber} · {item.ValidVotes.Count}/4 voted")</small></span>
+                                <span class="sod-pill is-@pill.Tone">@pill.Label</span>
+                                <svg class="sod-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p class="sod-empty">@L("No tenders awaiting committee action.", "لا توجد عطاءات بانتظار إجراء اللجنة.")</p>
+            }
+        </section>
+
+        @* Committee outcomes *@
+        <section class="sod-card sod-status" aria-labelledby="tcd-status-title">
+            <header class="sod-card-head"><h2 id="tcd-status-title">@L("Committee Outcomes", "نتائج اللجنة")</h2></header>
+            <div class="sod-status-body">
+                <div class="sod-donut" style="--sod-ring:@ring" role="img" aria-label="@(arabic ? $"{total} جولات" : $"{total} rounds")">
+                    <span><strong>@N(total)</strong><small>@L("Rounds", "جولات")</small></span>
+                </div>
+                <ul class="sod-legend">
+                    @foreach (var s in slices)
+                    {
+                        <li><i style="--dot:@s.Color" aria-hidden="true"></i><span>@(arabic ? s.Ar : s.En)</span><b>@N(s.Count)</b></li>
+                    }
+                </ul>
+            </div>
+        </section>
+
+        @* Recent decisions *@
+        <section class="sod-card sod-activity" aria-labelledby="tcd-recent-title">
+            <header class="sod-card-head">
+                <h2 id="tcd-recent-title">@L("Recent Decisions", "القرارات الأخيرة")</h2>
+                <a class="sod-link" asp-controller="Decisions" asp-action="History">@L("View All", "عرض الكل")@Html.Raw(arrow)</a>
+            </header>
+            @if (Model.Recent.Count > 0)
+            {
+                <ol class="sod-timeline">
+                    @foreach (var r in Model.Recent)
+                    {
+                        var icon = r.Status == CommitteeRoundStatus.Approved
+                            ? "<rect x=\"5\" y=\"4\" width=\"14\" height=\"17\" rx=\"2.2\"/><path d=\"M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5\"/>"
+                            : "<rect x=\"5\" y=\"4\" width=\"14\" height=\"17\" rx=\"2.2\"/><path d=\"M9 2.5h6v3.4H9zM9.5 11l5 5M14.5 11l-5 5\"/>";
+                        <li>
+                            <i class="sod-timeline-dot" aria-hidden="true"></i>
+                            <span class="sod-activity-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(icon)</svg></span>
+                            <span class="sod-activity-copy">
+                                <a asp-controller="Decisions" asp-action="History" asp-route-id="@r.Id"><strong><bdi>@r.TenderRound.Tender.Title</bdi></strong></a>
+                                <small>@StatusText(r.Status) · @L("Decision details", "تفاصيل القرار")</small>
+                            </span>
+                            @if (r.CompletedAt is { } done) { <time datetime="@done.ToString("o", culture)">@Ago(done)</time> }
+                        </li>
+                    }
+                </ol>
+            }
+            else
+            {
+                <p class="sod-empty">@L("No completed decisions available.", "لا توجد قرارات مكتملة.")</p>
+            }
+        </section>
+
+        <div class="sod-side-stack">
+            @* Current round: voting progress of the round shown in the workflow *@
+            <section class="sod-card sod-ongoing" aria-labelledby="tcd-ongoing-title">
+                <h2 id="tcd-ongoing-title">@L("Current Round", "الجولة الحالية")</h2>
+                <svg class="sod-tower" viewBox="0 0 160 190" aria-hidden="true"><path d="m80 45-40 140h80L80 45M80 45v140M65 95l40 30-55 35 70 25M95 95l-40 30 55 35-70 25M65 52c-22-17-22-45 0-62M95 52c22-17 22-45 0-62M55 65c-35-24-35-61 0-85M105 65c35-24 35-61 0-85" /><circle cx="80" cy="20" r="7" /></svg>
+                <div class="sod-ongoing-copy">
+                    @if (focus != null)
+                    {
+                        <strong>T-@focus.Tender.Id.ToString("0000", culture)</strong>
+                        <p><bdi>@focus.Tender.Title</bdi></p>
+                        <div class="sod-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@focusProgress" aria-label="@L("Voting progress", "تقدم التصويت")"><i style="width:@(focusProgress)%"></i></div>
+                        <span class="sod-progress-caption"><span>@(arabic ? $"{focusVotes} من 4 صوّتوا" : $"{focusVotes} of 4 voted")</span><b>@(focusProgress)%</b></span>
+                        @if (analyzed != null)
+                        {
+                            <a class="tcd-ai-link" asp-controller="Decisions" asp-action="ReviewEvaluation" asp-route-id="@analyzed.Round.Id" asp-fragment="report-ai">@L("View AI report analysis", "عرض تحليل التقرير بالذكاء الاصطناعي")</a>
+                        }
+                    }
+                    else
+                    {
+                        <strong aria-hidden="true">—</strong>
+                        <p>@L("No active committee round", "لا توجد جولة لجنة نشطة")</p>
+                        <div class="sod-progress is-empty" aria-hidden="true"></div>
+                        <span class="sod-progress-caption"><span>@L("Waiting for a committee round", "بانتظار جولة لجنة")</span></span>
+                    }
+                </div>
+            </section>
+
+            @* AI Assistant: opens the existing chat (_AiChatWidget + ai-chat.js) *@
+            <button type="button" class="sod-card sod-ai" data-open-ai-chat aria-haspopup="dialog">
+                <span class="sod-ai-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4.5" y="8" width="15" height="11" rx="3.2" /><path d="M12 4.6V8M9.2 13h.01M14.8 13h.01M9.8 16.2h4.4M2.6 12.2v3.4M21.4 12.2v3.4" /><circle cx="12" cy="3.6" r="1.1" /></svg></span>
+                <span class="sod-ai-copy"><strong>@L("AI Assistant", "المساعد الذكي")<svg class="sod-spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9zM19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z" /></svg></strong><small>@L("Ask about committee rounds, reports or votes.", "اسأل عن جولات اللجنة أو التقارير أو التصويت.")</small></span>
+                <span class="sod-ai-go" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/officer-dashboard.js" asp-append-version="true"></script>
+}

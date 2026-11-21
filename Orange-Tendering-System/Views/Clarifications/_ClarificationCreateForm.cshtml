@@ -1,0 +1,53 @@
+@model Orange_Tendering_System.ViewModels.ClarificationCreateModel
+@*
+  The Create clarification form: pick people (table with tick boxes), write the message, press Create.
+  Used in the Create window on the Clarifications list and on /Clarifications/New. Posts to ClarificationsController.New.
+  Ticked "Available" people each get their own conversation; ticked "Not linked yet" people are refused by name.
+*@
+@{
+    string Initials(string name) => string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+    var index = 0;
+}
+<form method="post" asp-controller="Clarifications" asp-action="New" asp-area="" class="cc-create-form">
+    <div class="pg-table-wrap" data-fv-group-required data-fv-label="people" data-fv-msg="Please select at least one person to ask." data-fv-msg-ar="يرجى اختيار شخص واحد على الأقل لمراسلته.">
+        <table class="pg-table cc-table" data-no-enhance>
+            <thead>
+                <tr><th scope="col" class="cc-col-pick"><span class="ws-sr-only">Select</span></th><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Linked to</th><th scope="col">Status</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var o in Model.Options)
+                {
+                    var id = "cc-option-" + index++;
+                    <tr>
+                        <td class="cc-col-pick"><input type="checkbox" id="@id" name="options" value="@o.Value" /></td>
+                        <td><label for="@id" class="cc-name"><span class="cc-initials" aria-hidden="true">@Initials(o.Recipient)</span><strong>@o.Recipient</strong></label></td>
+                        <td>@o.Role</td>
+                        <td><bdi>@o.Context</bdi></td>
+                        <td><span class="cc-state is-ok">Available</span></td>
+                    </tr>
+                }
+                @foreach (var p in Model.Pending)
+                {
+                    var id = "cc-pending-" + index++;
+                    <tr class="is-unlinked">
+                        <td class="cc-col-pick"><input type="checkbox" id="@id" name="pending" value="@p.Id" aria-describedby="@id-why" /></td>
+                        <td><label for="@id" class="cc-name"><span class="cc-initials" aria-hidden="true">@Initials(p.Name)</span><strong>@p.Name</strong></label></td>
+                        <td>@p.Role</td>
+                        <td class="cc-muted">—</td>
+                        <td><span class="cc-state">Not linked yet</span><small id="@id-why" class="cc-why">@p.Reason</small></td>
+                    </tr>
+                }
+                @if (Model.Options.Count == 0 && Model.Pending.Count == 0)
+                {
+                    <tr><td colspan="5">There are no active accounts in the roles you can contact.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="cc-compose-grid">
+        <label class="cc-field"><span>Subject <small>(optional)</small></span><input name="subject" maxlength="200" /></label>
+        <label class="cc-field"><span>Message</span><textarea name="message" rows="4" maxlength="10000" required placeholder="Type a message..." data-fv-label="Message"></textarea></label>
+    </div>
+    <p class="cc-hint">Each ticked person gets their own conversation. A conversation is created only with people who share a request, tender or bid with you.</p>
+    <div class="pg-actions cc-actions"><button type="submit" class="pg-btn pg-btn-primary">Create</button><button type="button" class="pg-btn" data-cc-close>Cancel</button></div>
+</form>

@@ -1,0 +1,12 @@
+@using Orange_Tendering_System.Services
+@*
+Orange Motion host (docs/ORANGE_MOTION.md). Every layout renders this once, before its Scripts section, so any page can use
+window.OrangeMotion. A controller's TempData.Orange(...) signal is consumed here and played once; a refresh never replays it.
+*@
+@{ var orangeFeedback = TempData.TakeOrange(); }
+<link rel="stylesheet" href="~/css/orange-motion.css" asp-append-version="true" />
+<script src="~/js/orange-motion.js" asp-append-version="true"></script>
+@if (orangeFeedback is not null)
+{
+    <script type="application/json" id="om-feedback">@Html.Raw(orangeFeedback.ToJson())</script>
+}

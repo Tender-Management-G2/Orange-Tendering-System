@@ -16,6 +16,7 @@ public class ReportReviewModel
 {
     public TenderReport Report { get; set; } = null!;
     public Tender Tender { get; set; } = null!;
+    public Dictionary<string, string> TopExecutiveTitles { get; set; } = [];
     public List<ReportSignature> Signatures { get; set; } = [];
     public List<ReportRevision> Revisions { get; set; } = [];
     public List<TenderReport> Versions { get; set; } = [];

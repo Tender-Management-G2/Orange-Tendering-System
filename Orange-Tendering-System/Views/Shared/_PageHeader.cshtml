@@ -9,6 +9,13 @@
     var sectionLabel = ViewData["WorkspaceSection"] as string;
     var description = ViewData["Description"] as string;
 }
+@* Every role workspace (and the Supplier portal) uses the same banner as the approved Sourcing Officer pages. *@
+@if (workspace is not null || User.IsInRole(SystemRoles.Supplier))
+{
+    <partial name="~/Views/Shared/_WorkspaceHero.cshtml" />
+}
+else
+{
 <header class="pg-header">
     <nav class="pg-breadcrumb" aria-label="Breadcrumb">
         <ol>
@@ -33,3 +40,4 @@
         <p class="pg-description">@description</p>
     }
 </header>
+}

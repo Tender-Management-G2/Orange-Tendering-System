@@ -48,8 +48,8 @@ else
                             <tr>
                                 <td>@invitation.TenderTitle</td>
                                 <td>@invitation.RoundNumber</td>
-                                <td>@invitation.InvitedAt.ToString("yyyy-MM-dd HH:mm")</td>
-                                <td>@(invitation.Deadline?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                                <td>@invitation.InvitedAt.ToJordan("yyyy-MM-dd HH:mm")</td>
+                                <td>@(invitation.Deadline?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</td>
                                 <td>@invitation.DisplayStatus</td>
                                 <td>
                                     <a asp-area="Supplier" asp-controller="Invitations" asp-action="Details"

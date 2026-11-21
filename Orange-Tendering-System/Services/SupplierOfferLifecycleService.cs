@@ -19,7 +19,29 @@ public sealed partial class SupplierOfferService
             .Include(b => b.TenderInvitation).ThenInclude(i => i.TenderRound).ThenInclude(r => r.Tender)
             .Include(b => b.Items).ThenInclude(i => i.TenderItem)
             .OrderByDescending(b => b.CreatedAt).ToListAsync();
-        return bids.Select(ToDetails).ToList();
+        var list = bids.Select(ToDetails).ToList();
+        // Same rule as GetOfferAsync: an outcome is shown only after the Officer's "Tender result" notice for this offer
+        // exists and the tender is awarded. Only the supplier's own offers and notices are read.
+        var links = list.ToDictionary(o => $"/Supplier/Offers/Details/{o.Id}", o => o);
+        var notices = await context.Notifications.AsNoTracking()
+            .Where(n => n.UserId == userId && n.Title == "Tender result" && links.Keys.Contains(n.Link!))
+            .Select(n => new { n.Link, n.Message, n.CreatedAt }).ToListAsync();
+        var awardedIds = bids.Select(b => b.TenderInvitation.TenderRound.Tender)
+            .Where(t => t.Status == TenderStatus.Awarded && t.AwardedAt.HasValue && t.AwardedBidId.HasValue)
+            .Select(t => t.AwardedBidId!.Value).Distinct().ToList();
+        var awardedInvitation = await context.Bids.AsNoTracking().Where(b => awardedIds.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.TenderInvitationId);
+        foreach (var notice in notices.OrderByDescending(n => n.CreatedAt).GroupBy(n => n.Link).Select(g => g.First()))
+        {
+            var model = links[notice.Link!];
+            var bid = bids.First(b => b.Id == model.Id);
+            var tender = bid.TenderInvitation.TenderRound.Tender;
+            if (tender.Status != TenderStatus.Awarded || !tender.AwardedAt.HasValue || !tender.AwardedBidId.HasValue) continue;
+            model.Outcome = awardedInvitation.TryGetValue(tender.AwardedBidId.Value, out var inv) && inv == bid.TenderInvitationId ? "Selected" : "Not selected";
+            model.ResultMessage = notice.Message;
+            model.NotifiedAt = notice.CreatedAt;
+        }
+        return list;
     }
 
     public async Task<SupplierOfferDetailsViewModel?> GetOfferAsync(string userId, int id)
@@ -86,13 +108,20 @@ public sealed partial class SupplierOfferService
 
     public async Task<string?> SubmitAsync(string userId, int id)
     {
+        // Supplier portal rule: an offer is submitted only with at least one supporting attachment.
+        if (!await context.Documents.AnyAsync(d => d.BidId == id && OwnOffers(userId).Any(b => b.Id == id)))
+            return "Add at least one attachment (PDF, PNG or JPEG) before submitting the offer.";
         try
         {
             await workflow.SubmitDraft(id, new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
                 [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId)], "SupplierPortal")));
             return null;
         }
-        catch (WorkflowException e) { return e.Message; }
+        catch (WorkflowException e)
+        {
+            return new[] { "weight", "evaluation", "committee", "approval" }.Any(word => e.Message.Contains(word, StringComparison.OrdinalIgnoreCase))
+                ? "This offer cannot be submitted right now. Check the tender dates or contact the Sourcing Officer." : e.Message;
+        }
     }
 
     public async Task<List<SupplierHistoryRow>?> GetHistoryAsync(string userId, int id)
@@ -133,7 +162,8 @@ public sealed partial class SupplierOfferService
             CanEdit = bid.Status == BidStatus.Draft && bid.TenderInvitation.Status == InvitationStatus.Accepted
                 && round.Status == TenderRoundStatus.Open && round.Tender.Status == TenderStatus.Bidding
                 && round.Deadline.HasValue && round.Deadline > now && (!round.OpensAt.HasValue || round.OpensAt <= now),
-            MissingRequirements = bid.MissingRequirements, ComplianceStatus = bid.ComplianceStatus.ToString(),
+            // Internal screening is communicated through explicit clarification requests, not an inferred outcome.
+            MissingRequirements = null, ComplianceStatus = string.Empty,
             Terms = new SupplierDraftOfferInputModel
             {
                 CurrencyCode = bid.CurrencyCode, TechnicalProposal = bid.TechnicalProposal, PaymentTerms = bid.PaymentTerms,

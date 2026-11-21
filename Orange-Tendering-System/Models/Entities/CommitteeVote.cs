@@ -17,10 +17,22 @@ namespace Orange_Tendering_System.Models.Entities
         public CommitteeMember CommitteeMember { get; set; } = null!;
 
         public VoteDecision Decision { get; set; }
+        public TopRejectionReason? RejectionReason { get; set; }
 
         [MaxLength(2000)]
         public string? Comment { get; set; }
 
         public DateTime VotedAt { get; set; }
+
+        // Populated for electronic approvals of an Executive Summary. VotedAt is the
+        // signature timestamp; these fields bind that approval to one immutable report PDF.
+        public int? SignatureReportId { get; set; }
+        public TenderReport? SignatureReport { get; set; }
+
+        [MaxLength(64)]
+        public string? SignatureDocumentHash { get; set; }
+
+        // Sanitized vector ink captured from the authenticated member's signing pad.
+        public string? ElectronicSignatureSvg { get; set; }
     }
 }

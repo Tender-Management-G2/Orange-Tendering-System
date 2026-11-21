@@ -7,9 +7,9 @@
 }
 <div class="so-page"><partial name="_PageHeader" />
 <section class="pg-cards" aria-label="Offer summary">
-    <article class="pg-card"><span>Submitted offers</span><strong>@rows.Count</strong></article>
-    <article class="pg-card"><span>Need a compliance check</span><strong>@rows.Count(b => b.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.NotChecked)</strong></article>
-    <article class="pg-card"><span>Compliant offers</span><strong>@rows.Count(b => b.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant)</strong></article>
+    <article class="pg-card" data-icon="layers"><span>Submitted offers</span><strong>@rows.Count</strong></article>
+    <article class="pg-card" data-icon="clipboard"><span>Need a compliance check</span><strong>@rows.Count(b => b.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.NotChecked)</strong></article>
+    <article class="pg-card" data-icon="check"><span>Compliant offers</span><strong>@rows.Count(b => b.ComplianceStatus == Orange_Tendering_System.Models.Entities.ComplianceStatus.Compliant)</strong></article>
 </section>
 <section class="so-forward-shortcut" aria-label="Committee forwarding">
     <div><span class="so-eyebrow">NEXT STEP AFTER COMPLIANCE</span><strong>Send offers to the evaluation committee</strong><span class="pg-hint">Review ready rounds and select which compliant offers to forward.</span></div>

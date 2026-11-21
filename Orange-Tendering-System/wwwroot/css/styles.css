@@ -9,8 +9,8 @@ body {
   margin: 0;
   background: #101010;
   color: #f8f8f8;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 16px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
 }
 button,
 a {
@@ -163,7 +163,7 @@ nav .selected:after {
   top: 0;
   width: 64%;
   height: 27vw;
-  background: url("../assets/building.png") right top/100% 100% no-repeat;
+  background: url("../assets/building.webp") right top/100% 100% no-repeat;
   mask-image: linear-gradient(to bottom, #000 75%, transparent);
   opacity: 0.98;
   transform: translate3d(0, var(--parallax, 0px), 0) scale(1.015);
@@ -270,7 +270,7 @@ h1 strong {
   height: 29px;
   border: 1px solid white;
   border-radius: 50%;
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   padding-left: 2px;
 }
 .primary:hover,
@@ -513,7 +513,7 @@ h1 strong {
 }
 .eyebrow {
   color: #ff7900;
-  font-size: 12px;
+  font-size: var(--fs-micro);
   letter-spacing: 2px;
 }
 h2 {
@@ -526,14 +526,14 @@ h2 {
 }
 .lower .primary {
   white-space: nowrap;
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
 }
 footer {
   padding: 30px 5vw;
   display: flex;
   justify-content: space-between;
   color: #888;
-  font-size: 13px;
+  font-size: var(--fs-caption);
 }
 footer button {
   background: none;
@@ -618,12 +618,12 @@ dialog::backdrop {
   font: inherit;
 }
 .dialog-content .primary {
-  font-size: 15px;
+  font-size: var(--fs-body-sm);
   width: 100%;
   margin-top: 24px;
 }
 .dialog-content .note {
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: #aaa;
 }
 .status {
@@ -642,7 +642,7 @@ dialog::backdrop {
     gap: 20px;
   }
   .brand-title {
-    font-size: 16px;
+    font-size: var(--fs-body);
   }
   .logo {
     font-size: 20px;
@@ -652,7 +652,7 @@ dialog::backdrop {
     gap: 10px;
   }
   .account button {
-    font-size: 13px;
+    font-size: var(--fs-caption);
     padding: 0 15px;
   }
   nav {
@@ -660,29 +660,29 @@ dialog::backdrop {
     gap: 10px;
   }
   nav a {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .feature {
     padding: 12px;
     gap: 10px;
   }
   .feature h2 {
-    font-size: 12px;
+    font-size: var(--fs-micro);
   }
   .feature p {
-    font-size: 10px;
+    font-size: var(--fs-micro);
   }
   .hero p {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .hero-actions button {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .stage h3 {
-    font-size: 13px;
+    font-size: var(--fs-caption);
   }
   .stage small {
-    font-size: 9px;
+    font-size: var(--fs-micro);
   }
   .showcase {
     min-height: 58vw;
@@ -706,7 +706,7 @@ dialog::backdrop {
     gap: 12px;
   }
   .brand-title {
-    font-size: 13px;
+    font-size: var(--fs-caption);
     padding-left: 12px;
   }
   .logo {
@@ -773,7 +773,7 @@ dialog::backdrop {
     white-space: normal;
   }
   .hero p {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     white-space: normal;
     line-height: 1.6;
     margin: 23px 0 25px 25px;
@@ -819,10 +819,10 @@ dialog::backdrop {
     border-radius: 16px;
   }
   .stage h3 {
-    font-size: 16px;
+    font-size: var(--fs-body);
   }
   .stage small {
-    font-size: 11px;
+    font-size: var(--fs-micro);
   }
   .stage svg {
     height: 39px;
@@ -865,7 +865,7 @@ dialog::backdrop {
     margin-bottom: 8px;
   }
   .feature p {
-    font-size: 12px;
+    font-size: var(--fs-micro);
     white-space: normal;
   }
   .footer-wave {

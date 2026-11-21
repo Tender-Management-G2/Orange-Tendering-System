@@ -16,7 +16,7 @@
     <button type="submit" class="pg-btn pg-btn-primary">Search</button><a asp-action="Index" class="pg-btn">Clear</a>
 </form>
 <section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><h2>Purchase requests (@Model.Total)</h2><a class="pg-btn pg-btn-primary" asp-action="Create">New request</a></div>
+    <div class="pg-panel-head"><h2>Purchase requests (@Model.Total)</h2><a class="pg-btn pg-btn-primary" asp-action="Create" data-no-modal>New request</a></div>
     <partial name="_RequestTable" model='new RequestTable(Model.Requests, Model.UserId)' />
     <nav class="pg-actions" aria-label="Request pages">
     @if (Model.Page > 1) { <a class="pg-btn" asp-route-page="@(Model.Page - 1)" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-priority="@Model.Priority">Previous</a> }

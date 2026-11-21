@@ -1,0 +1,186 @@
+@model Orange_Tendering_System.ViewModels.TenderPassportViewModel
+@using Orange_Tendering_System.ViewModels
+@{
+    // The Tender Passport package. Every sticker is one real AuditLogs event (latest of its kind); hover, focus or tap
+    // shows its details, the package itself shows the passport summary. Behaviour: wwwroot/js/tender-passport.js,
+    // look: wwwroot/css/tender-passport.css. Times are stored in UTC and shown in Jordan time.
+    var uid = "tp" + Model.EntityId;
+    string When(DateTime? utc) => utc == null ? "" : utc.Value.ToJordan("d MMM yyyy · HH:mm");
+    string Kind(StickerKind k) => k.ToString().ToLowerInvariant();
+    // Face slots in placement order (most recent sticker gets the most visible slot); the last slot holds "+N".
+    var slots = new[] { "f1", "r1", "t1", "r2", "f2", "t2" };
+    var stateHint = Model.State switch
+    {
+        PackageState.Open => "Open package: the tender is still being prepared.",
+        PackageState.Sealed => "Sealed package: published and travelling to suppliers.",
+        PackageState.Inspection => "Package under inspection: evaluation and approvals are in progress.",
+        PackageState.Returned => "Returned package: sent back for an authorized correction.",
+        PackageState.Approved => "Approved package: the decision is approved and awaiting the final award.",
+        PackageState.Awarded => "Awarded package: carries the final award seal.",
+        _ => "Archived package: the tender is closed."
+    };
+}
+@functions {
+    // 24×24 stroke icons, one per sticker kind.
+    static string IconPath(StickerKind k) => k switch
+    {
+        StickerKind.Created => "M12 5v14M5 12h14",
+        StickerKind.Viewed => "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+        StickerKind.Modified => "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
+        StickerKind.Reviewed => "M9 4h6v3H9zM7 5H5v16h14V5h-2M8.5 14l2.5 2.5 5-5",
+        StickerKind.Returned => "M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11",
+        StickerKind.Corrected => "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z",
+        StickerKind.Submitted => "M22 2 11 13M22 2l-7 20-4-9-9-4z",
+        StickerKind.Approved => "m4.5 12.5 5 5 10-11",
+        StickerKind.Rejected => "M6 6l12 12M18 6 6 18",
+        StickerKind.Downloaded => "M12 3v12m0 0-5-5m5 5 5-5M4 20h16",
+        _ => "m12 2.8 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.6l-5.8 3.1 1.1-6.5L2.6 9.6l6.5-.9z"
+    };
+    static string Icon(StickerKind k, string cls = "tp-ico") => $"<svg class=\"{cls}\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"{IconPath(k)}\"/></svg>";
+}
+<div class="tp" id="@uid" data-tp data-state="@Model.State.ToString().ToLowerInvariant()" data-trail="@Model.TrailUrl">
+    <div class="tp-stage">
+        <div class="tp-box">
+            <button type="button" class="tp-hit" data-tp-tip="@(uid)-sum" aria-haspopup="dialog" aria-expanded="false"
+                    aria-label="Tender Passport @Model.Reference: @Model.StateLabel package, @Model.TotalEvents recorded event(s). Open the passport summary."></button>
+            <svg class="tp-pkg" viewBox="0 0 196 186" aria-hidden="true" focusable="false">
+                <defs>
+                    <linearGradient id="@(uid)-l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9a56b" /><stop offset="1" stop-color="#c38a4f" /></linearGradient>
+                    <linearGradient id="@(uid)-r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9783f" /><stop offset="1" stop-color="#9d6331" /></linearGradient>
+                    <linearGradient id="@(uid)-t" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8bd88" /><stop offset="1" stop-color="#d9a66d" /></linearGradient>
+                    <pattern id="@(uid)-p" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6 6 0" stroke="#7a4a1e" stroke-opacity=".07" stroke-width="1" /></pattern>
+                </defs>
+                <ellipse class="tp-shadow" cx="100" cy="172" rx="88" ry="12" />
+                <polygon class="tp-face-l" points="14,64 98,98 98,176 14,142" fill="url(#@(uid)-l)" />
+                <polygon points="14,64 98,98 98,176 14,142" fill="url(#@(uid)-p)" />
+                <polygon class="tp-face-r" points="98,98 178,66 178,144 98,176" fill="url(#@(uid)-r)" />
+                <polygon points="98,98 178,66 178,144 98,176" fill="url(#@(uid)-p)" />
+                <g class="tp-closed">
+                    <polygon class="tp-face-t" points="14,64 94,32 178,66 98,98" fill="url(#@(uid)-t)" />
+                    <path d="M56 48 140 82" stroke="#8c5a2b" stroke-opacity=".35" stroke-width="1" />
+                    <g class="tp-tape">
+                        <polygon points="47.6,50.6 131.6,84.6 144.4,79.4 60.4,45.4" fill="#ff7900" />
+                        <polygon points="131.6,84.6 144.4,79.4 144.4,119.4 131.6,124.6" fill="#e86e00" />
+                        <polygon points="47.6,50.6 60.4,45.4 60.4,47.4 47.6,52.6" fill="#ffffff" fill-opacity=".35" />
+                    </g>
+                </g>
+                <g class="tp-open">
+                    <polygon points="14,64 94,32 178,66 98,98" fill="#5b3a1d" />
+                    <polygon points="22,66 94,37 168,67 98,94" fill="#3f2712" />
+                    <polygon class="tp-flap" points="14,64 94,32 80,16 0,48" fill="#e2b47e" />
+                    <polygon class="tp-flap" points="94,32 178,66 184,46 100,12" fill="#d6a46a" />
+                    <polygon class="tp-flap" points="98,98 178,66 192,60 112,92" fill="#c58d52" />
+                </g>
+                <path d="M14 64 98 98 178 66M98 98v78" stroke="#7a4a1e" stroke-opacity=".28" stroke-width="1" fill="none" />
+                <g class="tp-mark tp-mark-inspection"><circle cx="164" cy="128" r="11" fill="#fff" stroke="#0f8a8a" stroke-width="2" /><circle cx="162" cy="126" r="5" fill="none" stroke="#0f8a8a" stroke-width="2" /><path d="m166 130 4 4" stroke="#0f8a8a" stroke-width="2.4" stroke-linecap="round" /></g>
+                <g class="tp-mark tp-mark-returned"><polygon points="14,96 98,130 98,140 14,106" fill="#b94a12" fill-opacity=".85" /><polygon points="98,130 178,98 178,108 98,140" fill="#9c3d0e" fill-opacity=".85" /></g>
+                <g class="tp-mark tp-mark-approved"><circle cx="160" cy="132" r="12" fill="#1f9d5c" /><path d="m154 132 4.5 4.5 8-9" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></g>
+                <g class="tp-mark tp-mark-awarded"><circle cx="160" cy="130" r="15" fill="#c9480b" /><circle cx="160" cy="130" r="11.5" fill="#ff7900" stroke="#ffd7a8" stroke-width="1.2" /><path d="m160 122.6 2.2 4.5 5 .7-3.6 3.5.9 4.9-4.5-2.4-4.5 2.4.9-4.9-3.6-3.5 5-.7z" fill="#fff" /><path d="m152 143-3 9 5-2 3 4 2-9M168 143l3 9-5-2-3 4-2-9" fill="#c9480b" /></g>
+                <g class="tp-mark tp-mark-archived"><polygon points="14,92 98,126 98,134 14,100" fill="#55595f" fill-opacity=".8" /><polygon points="98,126 178,94 178,102 98,134" fill="#45484d" fill-opacity=".8" /></g>
+            </svg>
+
+            <span class="tp-label" aria-hidden="true">
+                <small>ORANGE · TRACKED</small>
+                <b>@Model.Reference</b>
+                <em>@(Model.Version?.Split(' ')[0] ?? "—") · R@(Model.Round?.ToString() ?? "–")</em>
+                <i class="tp-barcode"></i>
+            </span>
+
+            @for (var i = 0; i < Model.Stickers.Count; i++)
+            {
+                var st = Model.Stickers[i];
+                <button type="button" class="tp-st tp-k-@Kind(st.Kind) tp-slot-@slots[i]" data-tp-tip="@(uid)-s@(i)" data-fresh="@(st.AuditId == Model.FreshAuditId && st.AuditId != 0 ? st.AuditId.ToString() : null)"
+                        aria-label="@st.Kind sticker: @st.Label by @(st.Actor?.Name ?? "Orange system"), @When(st.AtUtc) Jordan time">
+                    <span class="tp-st-face">@Html.Raw(Icon(st.Kind))@if (st.Count > 1) { <span class="tp-st-n">@(st.Count > 99 ? "99+" : st.Count.ToString())</span> }</span>
+                </button>
+            }
+            @if (Model.Overflow > 0 && Model.TrailUrl != null)
+            {
+                <button type="button" class="tp-st tp-k-more tp-slot-r3" data-tp-trail aria-label="@Model.Overflow more recorded event(s): open the full activity trail">
+                    <span class="tp-st-face">+@(Model.Overflow > 99 ? "99" : Model.Overflow.ToString())</span>
+                </button>
+            }
+        </div>
+        <div class="tp-caption">
+            <strong>Tender Passport <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" /><path d="M12 11v6M12 7.5v.5" /></svg></strong>
+            <span>Tracked · @Model.Classification</span>
+        </div>
+    </div>
+
+    <div class="tp-pop" role="dialog" aria-modal="false" aria-label="Tender Passport details" hidden><i class="tp-pop-arrow" aria-hidden="true"></i><div class="tp-pop-body"></div></div>
+
+    @* ---------- Popover templates (copied into .tp-pop by the script, so only one popover is ever open) ---------- *@
+    <template data-tp-tpl="@(uid)-sum">
+        <div class="tp-sum">
+            <header class="tp-sum-head">
+                <span class="tp-sum-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2 3 6.5v11L12 22l9-4.5v-11zM3 6.5l9 4.5 9-4.5M12 11v11M7.5 4.3l9 4.5" /></svg></span>
+                <div><h4>Tender Passport</h4><p>@Model.Reference · Round @(Model.Round?.ToString() ?? "—") · Version @(Model.Version ?? "—")</p></div>
+                <span class="tp-chip tp-chip-state tp-state-@Model.State.ToString().ToLowerInvariant()">@Model.StateLabel</span>
+            </header>
+            <p class="tp-sum-state">@stateHint</p>
+            <dl class="tp-rows">
+                @{
+                    void Row(string icon, string label, PassportPerson? who, DateTime? at, string empty)
+                    {
+                        <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@icon" /></svg>@label</dt>
+                            @if (who != null || at != null) { <dd><b>@(who?.Name ?? "Orange system")</b>@if (at != null) { <time datetime="@DateTime.SpecifyKind(at.Value, DateTimeKind.Utc).ToString("O")" title="Jordan time">@When(at)</time> }</dd> }
+                            else { <dd class="tp-empty">@empty</dd> }
+                        </div>
+                    }
+                }
+                @{ Row("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6", "Created by", Model.CreatedBy, Model.CreatedAtUtc, "No creation record"); }
+                @{ Row(IconPath(StickerKind.Modified), "Last modified by", Model.LastModified?.Actor, Model.LastModified?.AtUtc, "No modification recorded"); }
+                @{ Row(IconPath(StickerKind.Viewed), "Previously viewed by", Model.PreviousView?.Actor, Model.PreviousView?.AtUtc, "No earlier viewer recorded"); }
+                @{ Row(IconPath(StickerKind.Reviewed), "Last reviewed by", Model.LastReviewed?.Actor, Model.LastReviewed?.AtUtc, "Not reviewed yet"); }
+                @{ Row(IconPath(StickerKind.Corrected), "Last corrected by", Model.LastCorrected?.Actor, Model.LastCorrected?.AtUtc, "No correction recorded"); }
+                <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>Latest action</dt>
+                    <dd>@if (Model.LatestAction != null) { <span class="tp-chip tp-k-@Kind(Model.LatestAction.Kind)">@Model.LatestAction.Label</span> } else { <span class="tp-empty">No business action yet</span> }</dd></div>
+            </dl>
+            <dl class="tp-rows tp-rows-now">
+                <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /></svg>Current holder</dt>
+                    <dd>@if (Model.CurrentHolder != null) { <span class="tp-chip tp-chip-holder">@Model.CurrentHolder</span> } else { <span class="tp-empty">Closed: no open action</span> }</dd></div>
+                <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" /></svg>Current viewer (you)</dt>
+                    <dd><span class="tp-chip tp-chip-you">@(Model.CurrentViewer?.Name ?? "You")</span>@if (Model.CurrentViewer?.Role != null) { <small>@Model.CurrentViewer.Role</small> }</dd></div>
+                <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10" /></svg>Workflow stage</dt><dd><b>@Model.Stage</b></dd></div>
+            </dl>
+            <div class="tp-tiles">
+                <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2 7 10-5 10 5-10 5zM2 12l10 5 10-5M2 17l10 5 10-5" /></svg><small>Round</small><b>@(Model.Round?.ToString() ?? "—")@(Model.MaxRounds != null && Model.Round != null ? " of " + Model.MaxRounds : "")</b></div>
+                <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5" /></svg><small>Version</small><b>@(Model.Version ?? "—")</b></div>
+                <div class="tp-tile-class"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg><small>Classification</small><b>@Model.Classification</b></div>
+            </div>
+            @if (Model.TrailUrl != null)
+            {
+                <button type="button" class="tp-trail-btn" data-tp-trail><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2" /></svg>View Full Activity Trail <span>@Model.TotalEvents</span><b aria-hidden="true">&rarr;</b></button>
+            }
+        </div>
+    </template>
+    @for (var i = 0; i < Model.Stickers.Count; i++)
+    {
+        var st = Model.Stickers[i];
+        <template data-tp-tpl="@(uid)-s@(i)">
+            <div class="tp-tip tp-k-@Kind(st.Kind)">
+                <header><span class="tp-tip-ico">@Html.Raw(Icon(st.Kind))</span><div><small>@st.Kind</small><h4>@st.Label</h4></div></header>
+                <dl class="tp-facts">
+                    <div><dt>By</dt><dd><b>@(st.Actor?.Name ?? "Orange system")</b></dd></div>
+                    <div><dt>Role</dt><dd>@(st.Actor?.Role ?? (st.Actor == null ? "Automatic workflow" : "Not recorded"))</dd></div>
+                    <div><dt>Unit</dt><dd>@(st.Actor?.Unit ?? "Not recorded")</dd></div>
+                    <div><dt>When</dt><dd><time datetime="@DateTime.SpecifyKind(st.AtUtc, DateTimeKind.Utc).ToString("O")">@st.AtUtc.ToJordan("d MMM yyyy · HH:mm:ss")</time> <small>Jordan time</small></dd></div>
+                    <div><dt>Tender</dt><dd>@st.Reference@(st.Round != null ? " · Round " + st.Round : "")</dd></div>
+                    @if (st.Version != null) { <div><dt>Version</dt><dd>@st.Version</dd></div> }
+                    @if (st.Document != null) { <div><dt>Document</dt><dd class="tp-break">@st.Document</dd></div> }
+                    @if (st.NewStatus != null) { <div><dt>Status</dt><dd><span class="tp-chip">@(st.PreviousStatus ?? "—")</span> &rarr; <span class="tp-chip tp-chip-strong">@st.NewStatus</span></dd></div> }
+                    @if (st.Comment != null) { <div class="tp-fact-wide"><dt>Comment</dt><dd class="tp-break">@st.Comment</dd></div> }
+                </dl>
+                @if (st.Count > 1) { <p class="tp-tip-more">Latest of @st.Count @st.Kind.ToString().ToLowerInvariant() events. <button type="button" data-tp-trail>See all in the trail</button></p> }
+            </div>
+        </template>
+    }
+
+    <dialog class="tp-trail" aria-labelledby="@(uid)-trail-title">
+        <div class="tp-trail-head">
+            <div><small>Package journey · @Model.Reference</small><h3 id="@(uid)-trail-title">Full Activity Trail</h3></div>
+            <button type="button" class="tp-trail-x" data-tp-trail-close aria-label="Close the activity trail">&times;</button>
+        </div>
+        <div class="tp-trail-body" data-tp-trail-body><p class="tp-trail-loading">Loading the recorded activity…</p></div>
+    </dialog>
+</div>

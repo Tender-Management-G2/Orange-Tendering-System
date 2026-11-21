@@ -6,7 +6,7 @@
     min-height: 124px;
     padding: 17px 10px;
     color: var(--ws-ink);
-    font-size: 14px;
+    font-size: var(--fs-sm);
     display: flex;
     flex-direction: column;
     align-items: center;

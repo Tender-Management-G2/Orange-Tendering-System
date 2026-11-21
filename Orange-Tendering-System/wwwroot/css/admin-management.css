@@ -1,0 +1,131 @@
+/* Shared header and list layout for the two Admin management indexes. */
+body.so-shell.admin-management-page[data-workspace-role] .pg-page { gap: 16px; }
+
+body.so-shell.admin-management-page[data-workspace-role] .officer-page-hero {
+  min-height: 228px;
+  height: auto;
+  padding-inline: clamp(22px, 3vw, 46px);
+}
+
+body.so-shell.admin-management-page[data-workspace-role] .admin-management-stats .dash-metric {
+  min-height: 104px;
+  padding: 14px 15px;
+  gap: 13px;
+}
+
+
+body.so-shell.admin-management-page[data-workspace-role] .admin-management-stats .dash-metric-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+:root[data-theme="dark"] body.so-shell.admin-management-page[data-workspace-role] .admin-management-stats .dash-metric {
+  background: linear-gradient(115deg, var(--tint), #171719 70%, #222125);
+}
+
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-filters {
+  align-items: flex-end;
+  gap: 12px;
+  margin: 0;
+  padding: 20px 13px 13px;
+  background: var(--sod-card);
+  border: 1px solid var(--sod-border);
+  border-radius: 15px;
+}
+
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-filters .admin-filter-field { gap: 10px; }
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-filters .admin-filter-search { max-width: 390px; }
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-filters :is(input, select, .admin-clear) { height: 42px; }
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-filters :is(input, select) { background: var(--sod-card); }
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-status { min-height: 0; margin: -10px 0 0; }
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-status:empty { margin: -8px 0 0; }
+
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-records .pg-panel-head { align-items: center; margin-block-end: 22px; }
+body.so-shell.admin-management-page[data-workspace-role] .admin-list-records .pg-table-wrap { max-width: 100%; overflow-x: auto; }
+
+@media (min-width: 1181px) {
+  body.so-shell.admin-management-page[data-workspace-role] .ws-main { padding-inline: 26px; }
+}
+@media (max-width: 767px) {
+  body.so-shell.admin-management-page[data-workspace-role] .officer-page-hero { min-height: 180px; }
+  body.so-shell.admin-management-page[data-workspace-role] .admin-management-stats .dash-metric { min-height: 86px; gap: 8px; padding: 10px; }
+  body.so-shell.admin-management-page[data-workspace-role] .admin-management-stats .dash-metric-copy > span { font-size: 12px; }
+  body.so-shell.admin-management-page[data-workspace-role] .admin-list-filters .admin-filter-search { flex: 1 1 100%; max-width: none; }
+}
+
+.admin-supplier-search-input { position: relative; }
+body.so-shell.admin-management-page[data-workspace-role] .admin-supplier-search-input > input { padding-inline-end: 56px; }
+body.so-shell.admin-management-page[data-workspace-role] .admin-supplier-search-input > button {
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-end: 4px;
+  min-height: 0;
+  width: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ws-muted);
+}
+.admin-supplier-search-input > button svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.admin-management-page .pg-table details { overflow-wrap: anywhere; }
+
+/* Keep supplier descriptions flexible and reserve room for both row actions. */
+body.so-shell.ws-shell[data-workspace-role="Admin"] .admin-suppliers-table {
+  width: 100%;
+  min-width: 800px;
+  table-layout: fixed;
+}
+body.so-shell.ws-shell[data-workspace-role="Admin"] .admin-suppliers-table :is(th, td) {
+  padding: 10px 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.admin-suppliers-table th:nth-child(1) { width: 14%; }
+.admin-suppliers-table th:nth-child(2) { width: 11%; }
+.admin-suppliers-table th:nth-child(3) { width: 19%; }
+.admin-suppliers-table th:nth-child(4) { width: 8%; }
+.admin-suppliers-table th:nth-child(5) { width: 10%; }
+.admin-suppliers-table th:nth-child(6) { width: 10%; }
+.admin-suppliers-table th:nth-child(7) { width: 10%; }
+.admin-suppliers-table th:nth-child(8) { width: 18%; }
+body.so-shell.ws-shell[data-workspace-role="Admin"] .admin-suppliers-table .admin-row-actions .pg-btn {
+  min-height: 32px;
+  height: auto;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+@media (max-width: 720px) {
+  body.so-shell.ws-shell[data-workspace-role="Admin"] .admin-suppliers-table { min-width: 0; }
+}
+
+body.reports-analytics-home .ra-kpi-link { color: inherit; text-decoration: none; }
+body.reports-analytics-home .ra-kpi-link .dash-metric-copy small {
+  display: block;
+  margin-top: 4px;
+  color: var(--ws-muted);
+  font-size: var(--fs-micro);
+  line-height: 1.35;
+}
+body.reports-analytics-home :is(.ra-kpi-link, .reports-center-card):focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+body.reports-analytics-home :is(.ra-overview-chart, .reports-center-heading, .reports-center-card) {
+  background: linear-gradient(130deg, var(--dash-panel-top), var(--dash-panel-bottom));
+}
+body.reports-analytics-home .reports-center-heading h2 {
+  font-size: 22px;
+  color: var(--dash-title);
+}
+body.reports-analytics-home .reports-center-card > .ra-report-icon {
+  border-radius: 50%;
+}

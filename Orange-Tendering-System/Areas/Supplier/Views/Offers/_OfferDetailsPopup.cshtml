@@ -1,0 +1,112 @@
+@model SupplierOfferDetailsViewModel
+@using Orange_Tendering_System.Models.Entities
+@* Offer details shown inside the My Offers popup. Same data and permissions as Details.cshtml (only the supplier's own offer). *@
+@{
+    var state = Model.Outcome switch { "Selected" => "won", "Not selected" => "lost", _ => Model.Status == BidStatus.Draft ? "draft" : "pending" };
+    var extras = new (string Label, decimal Value)[] { ("Shipping", Model.Terms.ShippingCost), ("Installation", Model.Terms.InstallationCost), ("Maintenance", Model.Terms.MaintenanceCost), ("Tax", Model.Terms.TaxAmount), ("Other", Model.Terms.OtherCost) };
+    var itemsTotal = Model.Terms.Items.Sum(i => i.Quantity * i.UnitPrice);
+    var cur = Model.Terms.CurrencyCode;
+}
+<div class="so-pop so-state-@state" data-so-state="@state">
+    <header class="so-pop-hero">
+        <div class="so-pop-hero-bg" aria-hidden="true"></div>
+        @if (state == "won")
+        {
+            <div class="so-badge-icon so-trophy" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v7a5 5 0 0 1-10 0zM7 5H3v4c0 4 4 4 4 4M17 5h4v4c0 4-4 4-4 4M12 15v6M7 22h10" /></svg></div>
+            <p class="so-kicker">Congratulations · مبروك</p>
+            <h2 id="so-pop-title">Your offer won this tender!</h2>
+            <p class="so-sub">@Model.TenderTitle: your company was selected after all mandatory approvals.</p>
+        }
+        else if (state == "lost")
+        {
+            <div class="so-badge-icon so-heart" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" /></svg></div>
+            <p class="so-kicker">Better luck next time · حظاً أوفر</p>
+            <h2 id="so-pop-title">Thank you for taking part</h2>
+            <p class="so-sub">Another offer was selected for @Model.TenderTitle. Your participation is valued, and new invitations may be waiting for you.</p>
+        }
+        else if (state == "draft")
+        {
+            <div class="so-badge-icon so-pen" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4" /></svg></div>
+            <p class="so-kicker">Draft · not submitted</p>
+            <h2 id="so-pop-title">@Model.TenderTitle</h2>
+            <p class="so-sub">Complete and submit this offer before the deadline. Submitted offers can no longer be edited.</p>
+        }
+        else
+        {
+            <div class="so-badge-icon so-clock" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
+            <p class="so-kicker">Submitted · awaiting the approved result</p>
+            <h2 id="so-pop-title">@Model.TenderTitle</h2>
+            <p class="so-sub">Your offer is recorded. The Sourcing Officer will notify you once the final decision is approved.</p>
+        }
+        <div class="so-hero-chips">
+            <span>Offer #@Model.Id</span><span>Revision @Model.Revision</span><span>@Model.Status</span>
+            <span class="so-hero-total">@Model.Total.ToString("N2") @cur</span>
+        </div>
+    </header>
+
+    <div class="so-pop-body">
+        @if (TempData["OfferError"] is string error) { <p class="pg-note" role="alert">@error</p> }
+        @if (Model.ResultMessage != null)
+        {
+            <section class="so-card so-result-card">
+                <h3>Approved result message</h3>
+                <p class="so-message so-pre">@System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(Model.ResultMessage.Replace("</p>", "\n"), "<[^>]+>", "")).Trim()</p>
+                <p class="so-muted">Notified @Model.NotifiedAt?.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</p>
+            </section>
+        }
+
+        <section class="so-facts" aria-label="Offer summary">
+            <div><span>Deadline (Jordan time)</span><strong>@(Model.Deadline?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</strong></div>
+            <div><span>Submitted (Jordan time)</span><strong>@(Model.SubmittedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "Not submitted")</strong></div>
+            <div><span>Delivery</span><strong>@Model.Terms.DeliveryDays days</strong></div>
+            <div><span>Payment terms</span><strong>@(string.IsNullOrWhiteSpace(Model.Terms.PaymentTerms) ? "—" : Model.Terms.PaymentTerms)</strong></div>
+            <div><span>Valid until</span><strong>@(Model.Terms.ValidUntil?.ToString("yyyy-MM-dd") ?? "—")</strong></div>
+            <div><span>Missing requirements</span><strong>@(Model.MissingRequirements ?? "None recorded")</strong></div>
+        </section>
+
+        <section class="so-card">
+            <h3>Offered items</h3>
+            <div class="so-table-wrap"><table class="so-items" data-no-enhance>
+                <thead><tr><th>Item</th><th class="so-num">Qty</th><th class="so-num">Unit price</th><th>Specifications</th><th class="so-num">Line total</th></tr></thead>
+                <tbody>
+                @foreach (var item in Model.Terms.Items)
+                {
+                    <tr><td><strong>@item.Name</strong></td><td class="so-num">@item.Quantity</td><td class="so-num">@item.UnitPrice.ToString("N2")</td><td>@item.OfferedSpecifications</td><td class="so-num">@((item.Quantity * item.UnitPrice).ToString("N2"))</td></tr>
+                }
+                @if (Model.Terms.Items.Count == 0) { <tr><td colspan="5" class="so-muted">No items recorded.</td></tr> }
+                </tbody>
+            </table></div>
+            <div class="so-costs">
+                <div><span>Items</span><strong>@itemsTotal.ToString("N2")</strong></div>
+                @foreach (var x in extras.Where(e => e.Value != 0)) { <div><span>@x.Label</span><strong>@x.Value.ToString("N2")</strong></div> }
+                <div class="so-cost-total"><span>Total</span><strong>@Model.Total.ToString("N2") @cur</strong></div>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Terms.TechnicalProposal))
+        {
+            <section class="so-card"><h3>Technical proposal</h3><p class="so-pre">@Model.Terms.TechnicalProposal</p></section>
+        }
+
+        <section class="so-card">
+            <h3>Attachments</h3>
+            @if (Model.Documents.Count == 0) { <p class="so-muted">No attachments uploaded.</p> }
+            else
+            {
+                <ul class="so-docs">@foreach (var doc in Model.Documents) { <li><a asp-controller="Documents" asp-action="Download" asp-route-id="@doc.Id" data-no-modal><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /></svg>@doc.FileName</a></li> }</ul>
+            }
+        </section>
+
+        <footer class="so-actions">
+            @if (Model.CanEdit)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="pg-btn" data-no-modal>Edit draft</a>
+                <a asp-action="Details" asp-route-id="@Model.Id" class="pg-btn pg-btn-primary" data-no-modal>Upload &amp; submit…</a>
+            }
+            <a asp-action="History" asp-route-id="@Model.Id" class="pg-btn" data-no-modal>History</a>
+            @if (Model.CanContactOfficer) { <a asp-controller="Clarifications" asp-action="Create" asp-route-bidId="@Model.Id" class="pg-btn" data-no-modal>Contact Sourcing Officer</a> }
+            @if (state == "lost") { <a asp-controller="Workflow" asp-action="Index" class="pg-btn pg-btn-primary" data-no-modal>See open invitations</a> }
+            <a asp-action="Details" asp-route-id="@Model.Id" class="pg-btn so-full" data-no-modal>Open full page</a>
+        </footer>
+    </div>
+</div>

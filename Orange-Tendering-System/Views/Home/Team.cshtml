@@ -1,7 +1,7 @@
 @*
 ===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Team Page
+PAGE: Team Page — "The Minds Behind Orange"
 
 DEVELOPER OWNER: Tariq
 MODULE: Public Site
@@ -9,66 +9,129 @@ TRELLO TASK: Team Page
 TRELLO URL: https://trello.com/c/P1gL4sPq
 
 PURPOSE:
-Team presentation driven by wwwroot/data/team.json (Trello
-status: Doing).
+Pinned, scroll-driven innovation room (wwwroot/js/team-scene.js):
+a miniature Orange HQ in the centre, the seven team cards above it.
+Each scroll stage focuses one member, draws an Orange connection
+line to their section of the building and shows their details in
+the right-hand panel; the finale connects all seven.
 
 BUSINESS ACCESS:
 Anonymous
 
 ROUTE: /team
 
-FUTURE IMPLEMENTATION:
-- Replace the four placeholder entries in team.json with the
-  seven verified team members (names, roles, photos, links).
-- Set placeholder = false for verified profiles.
-
-DEPENDENCIES:
-wwwroot/data/team.json, TeamMemberViewModel.
+DATA:
+wwwroot/data/team.json; photos in wwwroot/images/team/ (names
+from the supplied photo filenames). Roles and contributions stay
+marked as pending until the team confirms them.
 
 STATUS:
-PAGE FROM THE SUPPLIED LAYOUT ZIP — STATIC CONTENT, NO BUSINESS LOGIC.
+STATIC PUBLIC CONTENT, NO BUSINESS LOGIC.
 ===========================================================
 *@
 @using Orange_Tendering_System.ViewModels
 @model IReadOnlyList<TeamMemberViewModel>
-@{ ViewData["Title"] = "Our Team | Orange Sourcing"; }
-<main class="public-page team-page">
-  <section class="page-shell editorial-hero team-page-intro"><div class="page-overline"><span>OUR TEAM</span><span>THE PEOPLE BEHIND THE SYSTEM</span></div><div class="team-title-layout"><h1>Different minds.<br /><em>One vision.</em></h1><div><p class="editorial-lead">A shared direction is built by people. Meet the contributors behind the Sourcing &amp; Tender Management System.</p><p class="public-caption">Team profiles await verified information. The entries below are clearly marked placeholders and do not establish the actual team size.</p></div></div><a href="#team-showcase" class="editorial-link">Meet the minds <span aria-hidden="true">↓</span></a></section>
-  @if (Model.Count > 0) {
-  <section id="team-showcase" class="editorial-team" aria-label="Editorial team showcase" data-member-count="@Model.Count">
-    <div class="editorial-team-stage">
-      <div class="team-stage-heading"><span class="public-eyebrow">BEHIND THE SYSTEM</span><span class="team-reading-hint">SCROLL TO EXPLORE · OR CHOOSE A PROFILE</span></div>
-      <div class="editorial-viewport" tabindex="0" aria-label="Team profiles; use the profile navigation below">
-        <div class="editorial-track">
-        @for (var i = 0; i < Model.Count; i++) { var member = Model[i]; var photo = !string.IsNullOrWhiteSpace(member.Image) && Url.IsLocalUrl(member.Image) ? member.Image : null;
-          <article class="editorial-member" id="member-@(i + 1)" aria-labelledby="member-title-@(i + 1)">
-            <div class="editorial-portrait">
-              <div class="portrait-placeholder" hidden="@(photo != null)"><span class="portrait-watermark" aria-hidden="true">@((i + 1).ToString("00"))</span><svg viewBox="0 0 200 250" aria-hidden="true"><circle cx="100" cy="75" r="33"/><path d="M35 245v-47c0-74 130-74 130 0v47"/></svg><span class="portrait-placeholder-label">PORTRAIT TO BE PROVIDED</span></div>
-              @if (photo != null) { <img src="@photo" alt="@member.FullName" loading="lazy" width="800" height="1000" /> }
-              <span class="portrait-caption">THE HUMAN SIDE OF THE SYSTEM</span>
-            </div>
-            <div class="editorial-member-copy"><div class="member-meta"><span class="editorial-member-number">@((i + 1).ToString("00"))</span><span>@(member.Placeholder ? "PROFILE AWAITING VERIFICATION" : "PROJECT CONTRIBUTOR")</span></div><h2 id="member-title-@(i + 1)">@member.FullName</h2><p class="editorial-member-role">@member.Role</p><div class="member-responsibility"><span class="public-eyebrow">RESPONSIBILITIES &amp; CONTRIBUTIONS</span><p>@member.Contributions</p></div>
-              <div class="editorial-socials">
-                @if (TeamMemberViewModel.ProfileUrl(member.GitHub) is string github) { <a href="@github" target="_blank" rel="noopener noreferrer" aria-label="@member.FullName on GitHub (opens a new tab)">GitHub ↗</a> }
-                @if (TeamMemberViewModel.ProfileUrl(member.LinkedIn) is string linkedin) { <a href="@linkedin" target="_blank" rel="noopener noreferrer" aria-label="@member.FullName on LinkedIn (opens a new tab)">LinkedIn ↗</a> }
-              </div>
-            </div>
-          </article>
-        }
-        </div>
+@{ ViewData["Title"] = "Our Team | Orange Sourcing"; ViewData["HideFooter"] = true; }
+@section Styles {<link rel="stylesheet" href="~/css/team-scene.css" asp-append-version="true" />}
+<main class="public-page team-page tx-page">
+  <section class="tx" id="tx" style="--tx-n:@Model.Count" aria-labelledby="tx-title">
+    <div class="tx-sticky">
+      <canvas class="tx-canvas" aria-hidden="true"></canvas>
+      <div class="tx-vignette" aria-hidden="true"></div>
+      <svg class="tx-links" aria-hidden="true">
+        <defs>
+          <linearGradient id="tx-line-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb066" /><stop offset="1" stop-color="#ff7900" /></linearGradient>
+        </defs>
+        @for (var i = 0; i < Model.Count; i++) { <path class="tx-link-glow" /> <path class="tx-link" /> <circle class="tx-link-dot" r="5" /> }
+      </svg>
+
+      <div class="tx-head">
+        <span class="tx-eyebrow">OUR TEAM</span>
+        <h1 id="tx-title">The Minds Behind <em>Orange</em></h1>
+        <p>Seven Minds. One Connected Vision.</p>
       </div>
-      <div class="editorial-team-controls"><div class="team-direction-controls"><button type="button" data-team-prev aria-label="Previous team member">←</button><button type="button" data-team-next aria-label="Next team member">→</button></div><div class="editorial-member-nav" role="group" aria-label="Choose a team member">@for(var i = 0; i < Model.Count; i++){<button type="button" data-team-index="@i" aria-controls="member-@(i + 1)" aria-label="View @Model[i].FullName">@((i + 1).ToString("00"))</button>}</div><span class="editorial-team-count" aria-hidden="true">01 / @Model.Count.ToString("00")</span><span class="sr-only" id="team-announcement" role="status"></span></div>
+
+      <aside class="tx-journey" aria-label="Team journey">
+        <h2>Team Journey</h2>
+        <ol>
+          <li><b>Welcome</b><span>Enter the Orange experience</span></li>
+          <li><b>Meet the Team</b><span>Discover the seven minds behind the system</span></li>
+          <li><b>Their Contributions</b><span>See how each member connects to Orange</span></li>
+          <li><b>One Connected Team</b><span>A unified vision in action</span></li>
+        </ol>
+      </aside>
+
+      @if (Model.Count > 0)
+      {
+        <div class="tx-row-wrap">
+          <ul class="tx-row" aria-label="Team members">
+            @for (var i = 0; i < Model.Count; i++)
+            {
+              var m = Model[i];
+              var photo = !string.IsNullOrWhiteSpace(m.Image) && Url.IsLocalUrl(m.Image) ? Url.Content(m.Image) : "";
+              <li>
+                <button type="button" class="tx-card" aria-haspopup="dialog" aria-controls="tx-dialog"
+                        data-index="@((i + 1).ToString("00"))" data-name="@m.FullName" data-role="@m.Role" data-contrib="@m.Contributions"
+                        data-photo="@photo" data-placeholder="@(m.Placeholder ? "true" : "false")"
+                        data-github="@(TeamMemberViewModel.ProfileUrl(m.GitHub) ?? "")" data-linkedin="@(TeamMemberViewModel.ProfileUrl(m.LinkedIn) ?? "")">
+                  <span class="tx-card-photo">
+                    @if (photo != "") { <img src="@photo" alt="" width="320" height="400" decoding="async" /> }
+                    else { <span class="tx-ph" aria-hidden="true"><b>@((i + 1).ToString("00"))</b></span> }
+                  </span>
+                  <span class="tx-card-body"><strong>@m.FullName</strong><span>@m.Role</span></span>
+                  <span class="sr-only">, view profile</span>
+                </button>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
+      <aside class="tx-info" aria-live="polite" aria-label="Selected team member">
+        <div class="tx-info-head">
+          <span class="tx-info-photo"><img alt="" hidden /></span>
+          <div><h3></h3><p class="tx-info-role"></p></div>
+        </div>
+        <span class="tx-info-label">Contribution</span>
+        <ul class="tx-info-list"></ul>
+        <p class="tx-info-section"></p>
+        <button type="button" class="tx-info-open" aria-haspopup="dialog" aria-controls="tx-dialog">View profile <span aria-hidden="true">&rarr;</span></button>
+      </aside>
+
+      <div class="tx-steps" role="group" aria-label="Go to a team member">
+        @for (var i = 0; i < Model.Count; i++)
+        {
+          var first = Model[i].FullName.Split(' ')[0];
+          <button type="button" data-step="@i" aria-label="Go to @Model[i].FullName"><span aria-hidden="true">@((i + 1).ToString("00"))</span><em>@first</em></button>
+        }
+      </div>
+
+      <div class="tx-finale" aria-hidden="true"><span>Seven Minds.</span> <em>One Connected Vision.</em></div>
+      <span class="tx-live sr-only" role="status" aria-live="polite"></span>
+      <div class="tx-progress" aria-hidden="true"><i></i></div>
     </div>
   </section>
-  }
-  <section class="page-shell team-collective" aria-labelledby="collective-title"><div class="collective-heading public-reveal"><span class="public-eyebrow">THE COLLECTIVE</span><h2 id="collective-title">Individual perspectives.<br /><em>A shared ambition.</em></h2><p>One connected project, brought together through different responsibilities.</p></div>
-    <div class="collective-lineup">
-    @for(var i = 0; i < Model.Count; i++){var member=Model[i]; var photo=!string.IsNullOrWhiteSpace(member.Image)&&Url.IsLocalUrl(member.Image)?member.Image:null;
-      <a class="collective-person public-reveal" href="#member-@(i + 1)" data-team-jump="@i"><div class="collective-portrait">@if(photo != null){<img src="@photo" alt="" loading="lazy" width="400" height="500"/>}else{<span aria-hidden="true">@((i + 1).ToString("00"))</span><small>PORTRAIT PENDING</small>}</div><span class="collective-name">@member.FullName</span><span class="collective-role">@member.Role</span></a>
-    }
+
+  <dialog class="tx-dialog" id="tx-dialog" aria-labelledby="tx-dlg-name">
+    <div class="tx-dlg">
+      <button type="button" class="tx-dlg-close" data-tx-close aria-label="Close profile">&times;</button>
+      <div class="tx-dlg-photo"><img alt="" hidden /><span class="tx-ph" aria-hidden="true"><b></b></span></div>
+      <div class="tx-dlg-copy">
+        <span class="tx-dlg-status tx-eyebrow"></span>
+        <h2 class="tx-dlg-name" id="tx-dlg-name"></h2>
+        <p class="tx-dlg-role"></p>
+        <span class="tx-eyebrow tx-dlg-label">Contribution</span>
+        <p class="tx-dlg-text"></p>
+        <div class="tx-dlg-links"></div>
+      </div>
     </div>
-    <p class="collective-signoff public-reveal">Different Minds. One Vision.<br /><em>One Powerful System.</em></p>
-  </section>
-  <section class="page-shell public-next public-reveal"><span class="public-eyebrow">START A CONVERSATION</span><a asp-action="Contact">A question.<br /><em>A new connection.</em><span aria-hidden="true">↗</span></a></section>
+  </dialog>
 </main>
-@section Scripts {<script type="module" src="~/js/editorial-team.js" asp-append-version="true"></script>}
+@section Scripts {
+  @* GSAP 3.12.5 served locally (same pinned version): no wait on an external CDN. *@
+  <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
+  <script src="~/js/vendor/ScrollTrigger.min.js" asp-append-version="true"></script>
+  @* Emitted raw: the .NET importmap tag helper would replace this map with its own. *@
+  @Html.Raw("<script type=\"importmap\">{ \"imports\": { \"three\": \"" + Url.Content("~/js/vendor/three/build/three.module.min.js") + "\" } }</script>")
+  <script type="module" src="~/js/team-scene.js" asp-append-version="true"></script>
+}

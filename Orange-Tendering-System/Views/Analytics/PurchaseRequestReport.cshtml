@@ -1,0 +1,70 @@
+@model Orange_Tendering_System.Services.ReportModel
+@using Orange_Tendering_System.Models.Entities
+@using System.Globalization
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Purchase Request Reports";
+    ViewData["WorkspaceSection"] = "Reports & Analytics";
+    ViewData["Description"] = "All requests, status and department breakdown, and average approval duration.";
+    ViewData["BodyClass"] = "purchase-reports-page";
+    string Kpi(string label) => Model.Kpis.FirstOrDefault(x => x.Label == label)?.Value ?? "0";
+    var status = Model.Tables.First(x => x.Title == "Status breakdown");
+    var latest = Model.Tables.First(x => x.Title == "Latest requests");
+    var statusChart = Model.Charts.FirstOrDefault(x => x.Title == "Purchase requests by status");
+    var trend = Model.Charts.FirstOrDefault(x => x.Title == "Monthly request trend");
+    var total = statusChart?.Points.Sum(x => x.Value) ?? 0;
+    var max = trend?.Points.Count > 0 ? trend.Points.Max(x => x.Value) : 0;
+    string ColorFor(string label) => label.ToLowerInvariant() switch { var x when x.Contains("draft") => "#a8afb9", var x when x.Contains("submitted") => "#1e88e5", var x when x.Contains("review") => "#ffb127", var x when x.Contains("accepted") || x.Contains("approved") => "#17b26a", var x when x.Contains("rejected") => "#e54444", var x when x.Contains("returned") => "#8d36e8", _ => "#737373" }; var cursor = 0m; var slices = new List<string>();
+    if (statusChart != null && total > 0) { for (var i = 0; i < statusChart.Points.Count; i++) { var end = cursor + statusChart.Points[i].Value * 100 / total; slices.Add($"{ColorFor(statusChart.Points[i].Label)} {cursor.ToString("0.##", CultureInfo.InvariantCulture)}% {end.ToString("0.##", CultureInfo.InvariantCulture)}%"); cursor = end; } }
+}
+<partial name="_PageHeader" />
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Purchase Request Reports</h2></div><div class="dash-metrics admin-report-kpis">
+    <article class="dash-metric dash-orange">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6zM15 3v4h3M9 11h6M9 15h6" /></svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Total requests")</strong>
+            <span>Total Requests</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-blue">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4 10-10" /></svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Submitted / under review")</strong>
+            <span>Submitted Requests</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-green">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14l-3 14H8zM9 5l1-2h4l1 2" /></svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Accepted")</strong>
+            <span>Accepted Requests</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-purple">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v7l4 2" /><circle cx="12" cy="12" r="8" /></svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Returned / rejected")</strong>
+            <span>Returned / Rejected</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-orange">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 6v7M12 17h.01" /><circle cx="12" cy="12" r="9" /></svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Kpi("Average approval duration")</strong>
+            <span>Avg. Approval Duration</span>
+        </div>
+    </article>
+</div>
+</section>
+<section class="ws-panel pg-panel pr-filters"><div class="pg-panel-head"><div><h2>Filters</h2><span class="pg-hint">Filter purchase requests by date range, department, status, or priority.</span></div><partial name="_ReportExportLinks" model='@(new Orange_Tendering_System.ViewModels.ReportExportLinksViewModel("purchase-requests", Model.Filters))' /></div>
+    <form method="get" asp-action="PurchaseRequests" class="pr-filter-grid">
+        <label>From<input type="date" name="From" value="@Model.Filters.From?.ToString("yyyy-MM-dd")" /></label><label>To<input type="date" name="To" value="@Model.Filters.To?.ToString("yyyy-MM-dd")" /></label>
+        <label>Department<select name="DepartmentId"><option value="">All departments</option>@foreach (var x in Model.Departments) { <option value="@x.Id" selected="@(Model.Filters.DepartmentId == x.Id)">@x.Label</option> }</select></label>
+        <label>Request status<select name="RequestStatus"><option value="">All statuses</option>@foreach (var x in Html.GetEnumSelectList<PurchaseRequestStatus>()) { <option value="@x.Value" selected="@(x.Value == ((int?)Model.Filters.RequestStatus)?.ToString())">@x.Text</option> }</select></label>
+        <label>Priority<select name="Priority"><option value="">All priorities</option>@foreach (var x in Html.GetEnumSelectList<RequestPriority>()) { <option value="@x.Value" selected="@(x.Value == ((int?)Model.Filters.Priority)?.ToString())">@x.Text</option> }</select></label>
+        <div><button class="pg-btn pg-btn-primary" type="submit">Apply Filters</button><a class="pg-btn" asp-action="PurchaseRequests">Reset</a></div>
+    </form>
+</section>
+<section class="pr-chart-grid"><article class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Requests by Status</h2></div>@if (total == 0) { <partial name="_EmptyState" model='"No requests match the selected filters."' /> } else { <div class="pr-donut" style="background:conic-gradient(@string.Join(",", slices))"><span><strong>@total.ToString("0")</strong><small>Requests</small></span></div><div class="pg-table-wrap"><table class="pg-table pr-mini"><thead><tr><th>Status</th><th>Requests</th><th>Rate</th></tr></thead><tbody>@foreach (var row in status.Rows) { <tr><td>@row[0]</td><td>@row[1]</td><td>@row[2]</td></tr> }</tbody></table></div> }</article>
+<article class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Monthly Request Trend</h2></div>@if (trend == null || trend.Points.Count == 0) { <partial name="_EmptyState" model='"No monthly data matches the selected filters."' /> } else { <div class="pr-bars">@foreach (var point in trend.Points) { var height = max == 0 ? 0 : point.Value * 100 / max; <div><strong>@point.Value.ToString("0")</strong><i style="height:@height.ToString("0.##", CultureInfo.InvariantCulture)%"></i><span>@point.Label</span></div> }</div> }</article></section>
+<section class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Latest Requests</h2></div><div class="pg-table-wrap"><table class="pg-table"><thead><tr>@foreach (var column in latest.Columns) { <th>@column</th> }</tr></thead><tbody>@foreach (var row in latest.Rows) { <tr>@foreach (var cell in row) { <td>@cell</td> }</tr> }@if (latest.Rows.Count == 0) { <tr><td colspan="6"><partial name="_EmptyState" model='"No purchase requests found."' /></td></tr> }</tbody></table></div></section>

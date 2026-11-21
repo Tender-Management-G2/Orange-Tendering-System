@@ -1,0 +1,63 @@
+@model Orange_Tendering_System.ViewModels.RetenderPlan
+@{
+    ViewData["Title"] = "Prepare the new round";
+    ViewData["WorkspaceSection"] = "Final Decisions";
+    ViewData["Description"] = $"The Top Committee requested a Re-Tender. Round {Model.RoundNumber + 1} of {Model.MaxRounds} reuses the same tender; every supplier submits a new offer.";
+    var selected = ViewBag.Selected as List<int>;
+    bool Checked(Orange_Tendering_System.ViewModels.RetenderSupplier s) => selected != null ? selected.Contains(s.Id) : s.Previous;
+    var deadlineIso = DateTime.SpecifyKind(Model.Deadline, DateTimeKind.Utc).ToString("O");
+}
+<div class="so-page"><partial name="_PageHeader" />
+<partial name="_Flash" />
+<section class="ws-panel pg-panel" aria-labelledby="rt-request">
+    <div class="pg-panel-head"><div><h2 id="rt-request">Re-Tender request</h2><span class="pg-hint">Tender T-@Model.TenderId.ToString("0000") · current round @Model.RoundNumber of @Model.MaxRounds</span></div>
+        <a class="pg-btn" asp-action="Index">← Final decisions</a></div>
+    <dl class="ui-facts">
+        <div><dt>Reason from the Top Committee</dt><dd>@(Model.Reason ?? "—")</dd></div>
+        <div><dt>Requested</dt><dd>@(Model.RequestedAt?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+    </dl>
+    @if (Model.Blocked != null) { <p class="pg-hint" role="alert"><strong>@Model.Blocked</strong></p> }
+</section>
+@if (Model.Blocked == null)
+{
+<form method="post" asp-action="Retender" asp-route-id="@Model.TenderId" class="pg-form" data-retender>
+    <div asp-validation-summary="ModelOnly" class="pg-hint" role="alert"></div>
+    <section class="ws-panel pg-panel" aria-labelledby="rt-details">
+        <div class="pg-panel-head"><h2 id="rt-details">1. Tender details</h2><span class="pg-hint">Permitted edits for the new round. Approved weights and items stay locked.</span></div>
+        <div class="pg-field pg-field-wide"><label for="Title">Tender title *</label><input id="Title" name="Title" value="@Model.Title" maxlength="200" required /></div>
+        <div class="pg-field pg-field-wide"><label for="Description">Description *</label><textarea id="Description" name="Description" maxlength="10000" rows="5" required>@Model.Description</textarea></div>
+        <div class="pg-field"><label for="rt-deadline">New bidding deadline *</label><input id="rt-deadline" type="datetime-local" data-local-from="@deadlineIso" required /><input type="hidden" name="Deadline" value="@deadlineIso" data-deadline /></div>
+    </section>
+    <section class="ws-panel pg-panel" aria-labelledby="rt-suppliers">
+        <div class="pg-panel-head"><div><h2 id="rt-suppliers">2. Invitation list</h2><span class="pg-hint">Previous participants are selected automatically. Add new suppliers or remove any before publishing. At least 3 distinct suppliers.</span></div><span class="ui-pill ui-pill--info" data-rt-count>0 selected</span></div>
+        <p class="pg-hint" role="alert" data-rt-error hidden style="color:#d92d20;font-weight:600">Invite at least 3 distinct suppliers.</p>
+        <div class="pg-table-wrap"><table class="pg-table">
+            <thead><tr><th scope="col">Invite</th><th scope="col">Supplier</th><th scope="col">Category</th><th scope="col">Earlier rounds</th></tr></thead>
+            <tbody>
+            @foreach (var s in Model.Suppliers)
+            {
+                <tr><td><input type="checkbox" name="SupplierIds" value="@s.Id" aria-label="Invite @s.Name" @(Checked(s) ? "checked" : null) /></td><td><strong>@s.Name</strong></td><td>@(s.Category ?? "—")</td><td>@(s.Previous ? "Previous participant" : "New supplier")</td></tr>
+            }
+            @if (Model.Suppliers.Count == 0) { <tr><td colspan="4"><partial name="_EmptyState" model='"No approved supplier with an active verified account is available."' /></td></tr> }
+            </tbody></table></div>
+    </section>
+    <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary" data-confirm="Publish round @(Model.RoundNumber + 1) and notify the previous and newly invited suppliers?">Publish round @(Model.RoundNumber + 1) and notify suppliers</button>
+        <span class="pg-hint">Earlier offers, evaluations and decisions stay on record; none of their approvals carry into the new round.</span></div>
+</form>
+<script>
+(function () {
+    var form = document.querySelector('[data-retender]'); if (!form) return;
+    var local = form.querySelector('#rt-deadline'), hidden = form.querySelector('[data-deadline]'), count = document.querySelector('[data-rt-count]');
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var d = new Date(local.dataset.localFrom);
+    if (!isNaN(d)) local.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    var sync = function () { var v = new Date(local.value); if (!isNaN(v)) hidden.value = v.toISOString(); };
+    var recount = function () { var n = form.querySelectorAll('input[name=SupplierIds]:checked').length; count.textContent = n + ' selected'; count.className = 'ui-pill ui-pill--' + (n >= 3 ? 'good' : 'warn'); };
+    local.addEventListener('change', sync); form.addEventListener('change', recount); recount();
+    var error = form.querySelector('[data-rt-error]');
+    form.addEventListener('change', function () { if (form.querySelectorAll('input[name=SupplierIds]:checked').length >= 3) error.hidden = true; });
+    form.addEventListener('submit', function (e) { sync(); if (form.querySelectorAll('input[name=SupplierIds]:checked').length < 3) { e.preventDefault(); error.hidden = false; error.scrollIntoView({ block: 'center' }); } });
+})();
+</script>
+}
+</div>

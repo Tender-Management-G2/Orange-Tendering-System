@@ -7,16 +7,18 @@
     var isSupplier = User.IsInRole(SystemRoles.Supplier);
     var allUrl = isSupplier ? Url.Action("Index", "Notifications", new { area = "Supplier" }) : Url.Action("Index", "Notifications", new { area = "" });
 }
-<div class="ws-bell" data-notification-bell data-csrf="@Antiforgery.GetAndStoreTokens(Context).RequestToken" data-all-url="@allUrl">
+<div class="ws-bell" data-notification-bell data-csrf="@Antiforgery.GetAndStoreTokens(Context).RequestToken" data-all-url="@allUrl" data-feed-url="@Url.Action("Feed", "Notifications", new { area = "" })" data-read-url="@Url.Action("Read", "Notifications", new { area = "" })" data-read-all-url="@Url.Action("ReadAll", "Notifications", new { area = "" })" data-hub-url="@Url.Content("~/hubs/notifications")">
     <button type="button" class="ws-icon-button ws-bell-button" aria-haspopup="dialog" aria-expanded="false" aria-label="Notifications" title="Notifications">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zM10 20h4M12 2v2" /></svg>
         <span class="ws-bell-badge" hidden aria-live="polite">0</span>
     </button>
     <div class="ws-bell-panel" role="dialog" aria-label="Notifications" hidden>
         <header><strong>Notifications</strong><button type="button" class="ws-link-button" data-bell-readall>Mark all as read</button></header>
+        <p data-bell-error role="status" hidden>Notifications could not be refreshed. Reopen the bell to retry.</p>
         <ul class="ws-bell-list" aria-live="polite"></ul>
         <p class="ws-bell-empty" hidden>You are all caught up. No notifications yet.</p>
         <footer><a href="@allUrl">View all notifications</a></footer>
     </div>
     <div class="ws-toast-region" aria-live="polite"></div>
 </div>
+<partial name="_EventSpotlight" />

@@ -40,7 +40,13 @@ public partial class TenderWorkflowService
         Require(await Role(a, SystemRoles.SourcingManager) && notice!.ManagerUserId == a.Id, "Only the Sourcing Manager assigned to this tender may acknowledge the final decision.");
         Require(notice.Status == FinalDecisionStatus.AwaitingManager, "This final decision was already acknowledged and forwarded.");
         notice.Status = FinalDecisionStatus.ForwardedToOfficer; notice.ManagerAcknowledgedAt = Now; notice.ManagerComment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim()[..Math.Min(comment.Trim().Length, 1000)];
-        await NotifyOfficer(tenderId, "Final decision forwarded by the Sourcing Manager", "Review the decision, award the tender if required and use Notify Suppliers to announce the results.");
+        if (notice.Outcome == FinalDecisionOutcome.Award)
+            await NotifyOfficer(tenderId, "Final decision forwarded by the Sourcing Manager", "Review the decision, award the tender if required and use Notify Suppliers to announce the results.");
+        else
+            await NotifyOfficer(tenderId, notice.Outcome == FinalDecisionOutcome.Cancel ? "Top Committee rejection forwarded by the Sourcing Manager" : "Re-Tender request forwarded by the Sourcing Manager",
+                notice.Outcome == FinalDecisionOutcome.Cancel
+                ? $"The company no longer needs this tender. Reason: {notice.DecisionReason}. Notify the suppliers and the requesting department; the tender is cancelled."
+                : $"Reason: {notice.DecisionReason}. Open Final Decisions → Prepare the new round: edit the tender details, set the deadline, review the invitation list (at least 3 suppliers) and publish the next round (maximum {MaxRounds}).");
     });
 
     // Only the Officer, only after the tender is awarded and the Manager forwarded the decision, and only once.
@@ -51,6 +57,7 @@ public partial class TenderWorkflowService
         Require(notice != null, "There is no final decision to announce yet.");
         Require(notice!.Status != FinalDecisionStatus.SuppliersNotified, "Suppliers were already notified about this decision. Use delivery retry for failed e-mails.");
         Require(notice.Status == FinalDecisionStatus.ForwardedToOfficer, "The assigned Sourcing Manager must acknowledge and forward the final decision first.");
+        if (notice.Outcome != FinalDecisionOutcome.Award) { await ExecuteRejectionOutcome(t, a, notice); return; }
         Require(t.Status == TenderStatus.Awarded && t.AwardedBidId != null, "Award the tender before notifying suppliers.");
         var winnerSupplierId = await db.Bids.Where(b => b.Id == t.AwardedBidId).Select(b => b.TenderInvitation.SupplierId).SingleAsync();
         var offers = await db.Bids.Where(b => b.TenderInvitation.TenderRound.TenderId == tenderId && b.Status == BidStatus.Submitted)

@@ -6,7 +6,7 @@ using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Services.Reports;
 
-public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer renderer, ReportCryptography crypto)
+public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer renderer, ReportCryptography crypto, DocumentWatermarkService watermarks)
 {
     private static string Utc(DateTime date) => DateTime.SpecifyKind(date, DateTimeKind.Utc).ToString("O");
     private static string N(decimal number) => number.ToString("0.##############", CultureInfo.InvariantCulture);
@@ -153,6 +153,9 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
             topRequired = policy.TopCommitteeRequirement == "None" ? false : policy.TopCommitteeRequirement == "All" ? true :
                 tender.Currency == policy.ThresholdCurrency ? tender.IsCritical || tender.EstimatedValue >= policy.HighValueThreshold : null;
         }
-        return renderer.AccessCopy(report, signatures, identity + " | " + login + " | User " + ReportCryptography.Hash(actor.Id)[..16], now, topRequired);
+        var copy = renderer.AccessCopy(report, signatures, identity + " | " + login + " | User " + ReportCryptography.Hash(actor.Id)[..16], now, topRequired);
+        // "Orange Restricted" stamp under the page content of this personal copy; the canonical signed bytes are untouched.
+        return watermarks.Apply(copy, new WatermarkStamp(await watermarks.IdentityAsync(actor.Id), now, TenderPassportService.Reference(session.TenderRound.TenderId),
+            $"Report v{report.VersionNumber:00}", "Accessed"), underlay: true).Bytes;
     }
 }

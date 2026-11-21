@@ -62,6 +62,8 @@ public class EvaluationSession
     public DateTime StartsAt { get; set; }
     public DateTime EndsAt { get; set; }
     [MaxLength(1000)] public string MeetingUrl { get; set; } = "";
+    // Set when the Officer sends the generated report to the four committee members for signing; null until then.
+    public DateTime? ReportSentAt { get; set; }
     // Set only when the meeting was created through the Zoom API; null for an officer-supplied link.
     [MaxLength(40)] public string? ZoomMeetingId { get; set; }
     // When the system announced that scoring opened. The StartsAt/EndsAt window stays authoritative.
@@ -101,6 +103,9 @@ public class EvaluationParticipation
     public CommitteeMember CommitteeMember { get; set; } = null!;
     public DateTime SentAt { get; set; }
     public DateTime? SubmittedAt { get; set; }
+    // Hand-drawn signature (PNG) given in the meeting together with the final scores for every supplier.
+    public byte[]? SignatureImage { get; set; }
+    public DateTime? SignedAt { get; set; }
 }
 
 public class AiAnalysis

@@ -66,6 +66,25 @@ public class ChallengeStore(IMemoryCache cache, IOptions<BiometricOptions> optio
         }
     }
 
+    /// <summary>Reads a live entry without burning it (a step that spans several requests); null when unknown, expired, or issued for another purpose.</summary>
+    public ChallengeEntry? Peek(string? token, string purpose) =>
+        !string.IsNullOrEmpty(token) && cache.TryGetValue(Key(token), out ChallengeEntry? entry) && entry is not null &&
+        entry.Purpose == purpose && entry.ExpiresAt > DateTime.UtcNow
+            ? entry
+            : null;
+
+    /// <summary>Ends an entry of the given purpose early; entries issued for another purpose are left alone.</summary>
+    public void Remove(string? token, string purpose)
+    {
+        lock (consumeLock)
+        {
+        if (Peek(token, purpose) is not null)
+        {
+            cache.Remove(Key(token!));
+        }
+        }
+    }
+
     private static string Key(string token) => "bio:challenge:" + token;
 }
 
@@ -75,6 +94,18 @@ public class BiometricThrottle(IMemoryCache cache, IOptions<BiometricOptions> op
     private readonly object countLock = new();
     public bool IsBlocked(params string[] keys) =>
         keys.Any(k => cache.TryGetValue(Key(k), out int count) && count >= options.Value.MaxFailuresPerWindow);
+
+    /// <summary>Counts one use of a limited action (a new QR code, a setup email); false once the limit is reached in the window.</summary>
+    public bool TryUse(string key, int limit)
+    {
+        lock (countLock)
+        {
+            var count = cache.TryGetValue(Key(key), out int current) ? current : 0;
+            if (count >= limit) return false;
+            cache.Set(Key(key), count + 1, TimeSpan.FromMinutes(options.Value.FailureWindowMinutes));
+            return true;
+        }
+    }
 
     public void Failure(params string[] keys)
     {

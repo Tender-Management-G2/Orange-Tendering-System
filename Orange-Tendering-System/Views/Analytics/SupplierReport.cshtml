@@ -1,0 +1,97 @@
+@model Orange_Tendering_System.Services.ReportModel
+@using Orange_Tendering_System.Models.Entities
+@using System.Globalization
+@{
+    Layout = WorkspaceNavigation.LayoutFor(User);
+    ViewData["Title"] = "Supplier Reports";
+    ViewData["WorkspaceSection"] = "Reports & Analytics";
+    ViewData["Description"] = "Registered, approved and suspended suppliers, legal verification, document expiry and performance.";
+    ViewData["BodyClass"] = "supplier-reports-page";
+    string Kpi(string label) => Model.Kpis.FirstOrDefault(x => x.Label == label)?.Value ?? "0";
+    var verificationTable = Model.Tables.First(x => x.Title == "Document verification status");
+    var performanceTable = Model.Tables.First(x => x.Title == "Supplier performance");
+    var expiryTable = Model.Tables.First(x => x.Title == "Document expiry tracking");
+    decimal VerificationValue(string label) => decimal.TryParse(verificationTable.Rows.FirstOrDefault(x => x[0] == label)?[1], out var value) ? value : 0;
+    var verified = VerificationValue("Verified"); var pending = VerificationValue("Pending Verification"); var rejected = VerificationValue("Rejected");
+    var verificationTotal = verified + pending + rejected;
+    var verifiedEnd = verificationTotal == 0 ? 0 : verified * 100 / verificationTotal;
+    var pendingEnd = verificationTotal == 0 ? 0 : verifiedEnd + pending * 100 / verificationTotal;
+    string Keep(string name) => name switch { "From" => Model.Filters.From?.ToString("yyyy-MM-dd") ?? "", "To" => Model.Filters.To?.ToString("yyyy-MM-dd") ?? "", "SupplierId" => Model.Filters.SupplierId?.ToString() ?? "", "VerificationStatus" => Model.Filters.VerificationStatus?.ToString() ?? "", _ => "" };
+}
+<partial name="_PageHeader" />
+
+<section class="ws-panel pg-panel sr-kpi-panel">
+    <div class="pg-panel-head"><h2>Supplier Reports</h2></div>
+    <div class="dash-metrics admin-report-kpis">
+        <article class="dash-metric dash-orange">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Registered suppliers")</strong>
+                <span>Registered Suppliers</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-blue">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Approved suppliers")</strong>
+                <span>Approved Suppliers</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-green">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("shield"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Suspended suppliers")</strong>
+                <span>Suspended Suppliers</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-purple">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("layers"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Verified documents") <em>Verified</em></strong>
+                <span>Document Verification Status</span>
+            </div>
+        </article>
+        <article class="dash-metric dash-orange">
+            <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("history"))</svg></span>
+            <div class="dash-metric-copy">
+                <strong>@Kpi("Documents expired or expiring soon")</strong>
+                <span>Documents Expired or Expiring Soon</span>
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel sr-filters">
+    <div class="pg-panel-head"><div><h2>Filters</h2><span class="pg-hint">Filter supplier reports by date range, supplier, or document verification status.</span></div><partial name="_ReportExportLinks" model="@(new Orange_Tendering_System.ViewModels.ReportExportLinksViewModel("suppliers", Model.Filters))" /></div>
+    <form method="get" asp-action="Suppliers" class="sr-filter-grid">
+        <label>From<input type="date" name="From" value="@Keep("From")" /></label>
+        <label>To<input type="date" name="To" value="@Keep("To")" /></label>
+        <label>Supplier<select name="SupplierId"><option value="">All suppliers</option>@foreach (var supplier in Model.Suppliers) { <option value="@supplier.Id" selected="@(Model.Filters.SupplierId == supplier.Id)">@supplier.Label</option> }</select></label>
+        <label>Document verification status<select name="VerificationStatus"><option value="">All statuses</option>@foreach (var status in Html.GetEnumSelectList<DocumentVerificationStatus>()) { <option value="@status.Value" selected="@(status.Value == ((int?)Model.Filters.VerificationStatus)?.ToString())">@status.Text</option> }</select></label>
+        <div class="sr-filter-actions"><button class="pg-btn pg-btn-primary" type="submit">Apply Filters</button><a class="pg-btn" asp-action="Suppliers">Reset</a></div>
+    </form>
+</section>
+
+<section class="sr-chart-grid">
+    <article class="ws-panel pg-panel sr-chart-card"><div class="pg-panel-head"><h2>Document Verification Status</h2></div>
+        @if (verificationTotal == 0) { <partial name="_EmptyState" model='"No supplier documents match the selected filters."' /> }
+        else {
+            <div class="sr-donut" style="background:conic-gradient(#17b26a 0 @verifiedEnd.ToString("0.##", CultureInfo.InvariantCulture)%,#ffb127 @verifiedEnd.ToString("0.##", CultureInfo.InvariantCulture)% @pendingEnd.ToString("0.##", CultureInfo.InvariantCulture)%,#e54444 @pendingEnd.ToString("0.##", CultureInfo.InvariantCulture)% 100%)"><span><strong>@verificationTotal.ToString("0")</strong><small>Suppliers</small></span></div>
+            <div class="pg-table-wrap"><table class="pg-table sr-compact-table"><thead><tr><th>Status</th><th>Suppliers</th><th>Rate</th></tr></thead><tbody>@foreach (var row in verificationTable.Rows) { <tr><td><i class="sr-dot sr-dot-@row[0].Replace(" ", "").ToLowerInvariant()"></i>@row[0]</td><td>@row[1]</td><td>@row[2]</td></tr> }</tbody></table></div>
+        }
+    </article>
+    <article class="ws-panel pg-panel sr-chart-card"><div class="pg-panel-head"><div><h2>Supplier Performance</h2><span class="pg-hint">Participation & Award Rate</span></div></div>
+        @if (performanceTable.TotalRows == 0) { <partial name="_EmptyState" model='"No supplier participation data matches the selected filters."' /> }
+        else { <div class="sr-chart-legend"><span><i></i>Participation Rate</span><span><i></i>Award Rate</span></div><div class="sr-performance-chart">@foreach (var row in performanceTable.Rows.Take(8)) { var participation = decimal.TryParse(row[4].TrimEnd('%'), NumberStyles.Any, CultureInfo.InvariantCulture, out var p) ? p : 0; var offers = int.TryParse(row[3], out var o) ? o : 0; var awards = int.TryParse(row[5], out var a) ? a : 0; var awardRate = offers == 0 ? 0 : awards * 100m / offers; <div class="sr-performance-item"><div><i style="height:@participation.ToString("0.##", CultureInfo.InvariantCulture)%"></i><i style="height:@awardRate.ToString("0.##", CultureInfo.InvariantCulture)%"></i></div><span title="@row[0]">@row[0]</span></div> }</div> }
+    </article>
+</section>
+
+<section class="ws-panel pg-panel sr-table-panel"><div class="pg-panel-head"><div><h2>Document Expiry Tracking</h2><span class="pg-hint">Expired or near-expiry supplier documents (within 30 days).</span></div></div>
+    <div class="pg-table-wrap"><table class="pg-table"><thead><tr>@foreach (var column in expiryTable.Columns) { <th>@column</th> }</tr></thead><tbody>@foreach (var row in expiryTable.Rows) { <tr>@for (var i = 0; i < row.Length; i++) { <td>@if (i == 4) { <span class="sr-status @(row[i] == "Expired" ? "is-expired" : "is-soon")">@row[i]</span> } else { @row[i] }</td> }</tr> }@if (expiryTable.Rows.Count == 0) { <tr><td colspan="5"><partial name="_EmptyState" model='"No expired or near-expiry documents."' /></td></tr> }</tbody></table></div>
+    <partial name="_SupplierReportPager" model="@(new Orange_Tendering_System.ViewModels.SupplierReportPagerViewModel(expiryTable.Page, expiryTable.TotalRows, expiryTable.PageSize, "ExpiryPage", Model.Filters))" />
+</section>
+
+<section class="ws-panel pg-panel sr-table-panel"><div class="pg-panel-head"><h2>Supplier Performance</h2></div>
+    <div class="pg-table-wrap"><table class="pg-table"><thead><tr>@foreach (var column in performanceTable.Columns) { <th>@column</th> }</tr></thead><tbody>@foreach (var row in performanceTable.Rows) { <tr>@for (var i = 0; i < row.Length; i++) { <td>@if (i == 1) { <span class="sr-status">@row[i]</span> } else { @row[i] }</td> }</tr> }@if (performanceTable.Rows.Count == 0) { <tr><td colspan="6"><partial name="_EmptyState" model='"No suppliers match the selected filters."' /></td></tr> }</tbody></table></div>
+    <partial name="_SupplierReportPager" model="@(new Orange_Tendering_System.ViewModels.SupplierReportPagerViewModel(performanceTable.Page, performanceTable.TotalRows, performanceTable.PageSize, "PerformancePage", Model.Filters))" />
+</section>

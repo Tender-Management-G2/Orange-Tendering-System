@@ -1,0 +1,6 @@
+@model ReportingPage
+@{ ViewData["Title"] = Model.Title; ViewData["Description"] = "Reports and analytics for purchase requests, tenders, suppliers, bids, evaluations and committee decisions."; ViewData["WorkspaceSection"] = "Analytics & Exports"; }
+@* Same workspace banner as every role page; the report header below keeps its PDF/Excel export buttons. *@
+<partial name="_PageHeader" />
+<partial name="_ReportingContent" model="Model" />
+@section Styles { <partial name="_TopStyles" /><partial name="_ReportStyles" /> }

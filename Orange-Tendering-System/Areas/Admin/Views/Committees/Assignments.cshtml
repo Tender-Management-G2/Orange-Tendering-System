@@ -1,0 +1,39 @@
+@model AdminCommitteeIndexViewModel
+@{
+    ViewData["Title"] = "Tender Committee Assignments";
+    ViewData["WorkspaceSection"] = "Committees";
+    ViewData["Description"] = "Choose a tender, then manage its Evaluation and Top Committee members separately.";
+}
+<partial name="_PageHeader" />
+<section class="pg-cards" aria-label="Committee structure">
+    <article class="pg-card"><span>Evaluation Committee</span><h2>4 members</h2><p>2 Technical · 1 Sourcing Manager · 1 Financial</p></article>
+    <article class="pg-card"><span>Top Committee</span><h2>4 members</h2><p>1 CEO · 3 Committee Members</p></article>
+</section>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><div><h2>Select a tender</h2><p>Each tender has its own two committees. Accounts can be created from each member's seat.</p></div></div>
+    <form method="get" asp-area="Admin" asp-controller="Committees" asp-action="Assignments" class="pg-toolbar" data-admin-voice-filter>
+        <input type="text" name="search" value="@Model.Search" placeholder="Tender title or number" aria-label="Find tender" />
+        <button type="submit" class="pg-btn pg-btn-primary">Search</button>
+        <a asp-area="Admin" asp-controller="Committees" asp-action="Index" class="pg-btn pg-btn-primary">Clear</a>
+    </form>
+    <div class="pg-table-wrap">
+        <table class="pg-table" data-no-enhance>
+            <thead><tr><th>Tender</th><th>Status</th><th>Evaluation Committee</th><th>Top Committee</th><th>Manage</th></tr></thead>
+            <tbody>
+                @if (Model.Tenders.Count == 0)
+                {
+                    <tr><td colspan="5">No tenders found. A tender must exist before assigning its committees.</td></tr>
+                }
+                @foreach (var tender in Model.Tenders)
+                {
+                    <tr data-search-item>
+                        <td><strong>#@tender.Id · @tender.Title</strong></td><td>@tender.Status</td>
+                        <td>@tender.EvaluationCount / 4 assigned</td>
+                        <td>@tender.TopCount / 4 assigned · @(tender.HasCeo ? "CEO selected" : "CEO not selected")</td>
+                        <td><a class="pg-btn pg-btn-primary" asp-area="Admin" asp-controller="Committees" asp-action="Manage" asp-route-id="@tender.Id">Manage Committees</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

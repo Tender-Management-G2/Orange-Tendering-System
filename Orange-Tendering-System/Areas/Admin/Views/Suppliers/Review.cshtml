@@ -104,8 +104,8 @@ offers.
         </div>
 
         <div>
-            <dt>Registered At (UTC)</dt>
-            <dd>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+            <dt>Registered At (Jordan time)</dt>
+            <dd>@Model.CreatedAt.ToJordan("yyyy-MM-dd HH:mm")</dd>
         </div>
 
         <div>
@@ -153,7 +153,15 @@ offers.
                     @foreach (var document in Model.Documents)
                     {
                         <tr>
-                            <td>@document.FileName</td>
+                            <td>
+                                <a asp-area="Admin"
+                                   asp-controller="Suppliers"
+                                   asp-action="Document"
+                                   asp-route-id="@document.Id"
+                                   data-no-modal
+                                   target="_blank"
+                                   rel="noopener noreferrer">@document.FileName</a>
+                            </td>
 
                             <td>@(document.DocumentType ?? "—")</td>
 
@@ -195,13 +203,13 @@ offers.
                                             <select name="Status"
                                                     class="form-control"
                                                     required>
-                                                <option value="Pending">
+                                                <option value="Pending" selected="@(document.VerificationStatus == "Pending")">
                                                     Pending
                                                 </option>
-                                                <option value="Verified">
+                                                <option value="Verified" selected="@(document.VerificationStatus == "Verified")">
                                                     Verified
                                                 </option>
-                                                <option value="Rejected">
+                                                <option value="Rejected" selected="@(document.VerificationStatus == "Rejected")">
                                                     Rejected
                                                 </option>
                                             </select>
@@ -211,6 +219,10 @@ offers.
                                             <label>Verification Notes</label>
 
                                             <textarea name="Notes"
+                                                      data-fv-required-when="Status=Rejected"
+                                                      data-fv-label="Verification notes"
+                                                      data-fv-msg="Please give the reason for rejecting this document."
+                                                      data-fv-msg-ar="يرجى ذكر سبب رفض هذا المستند."
                                                       class="form-control"
                                                       maxlength="1000"
                                                       rows="2"
@@ -243,8 +255,8 @@ offers.
     <div class="pg-panel-head">
         <h2>Supplier Decision</h2>
         <p>
-            Approval and rejection decisions are recorded
-            in the audit history.
+            Open the documents before making a decision. Approving also verifies
+            pending, unexpired documents and records the decision in the audit history.
         </p>
     </div>
 
@@ -285,6 +297,10 @@ offers.
                             Restore Approval
                         </option>
                     }
+                    else if (Model.Status == "Rejected")
+                    {
+                        <option value="Approved">Approve</option>
+                    }
                     else
                     {
                         <option value="">
@@ -301,6 +317,9 @@ offers.
 
                 <textarea id="reviewNotes"
                           name="ReviewNotes"
+                          data-fv-required-when="Decision=Rejected|Suspended"
+                          data-fv-msg="Please give the reason for this rejection or suspension."
+                          data-fv-msg-ar="يرجى ذكر سبب الرفض أو الإيقاف."
                           class="form-control"
                           rows="4"
                           maxlength="1000"
@@ -315,7 +334,8 @@ offers.
 
         @if (Model.Status == "Pending" ||
              Model.Status == "Approved" ||
-             Model.Status == "Suspended")
+             Model.Status == "Suspended" ||
+             Model.Status == "Rejected")
         {
             <div class="pg-actions">
                 <button type="submit"
@@ -323,13 +343,6 @@ offers.
                     Submit Decision
                 </button>
             </div>
-        }
-        else
-        {
-            <p>
-                This registration was rejected.
-                A new review requires a resubmission workflow.
-            </p>
         }
     </form>
 </section>

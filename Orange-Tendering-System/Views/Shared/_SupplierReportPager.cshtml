@@ -1,0 +1,12 @@
+@model Orange_Tendering_System.ViewModels.SupplierReportPagerViewModel
+@{ var pages = Model.PageSize == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(Model.Total / (double)Model.PageSize)); }
+@if (pages > 1)
+{
+    <nav class="sr-pager" aria-label="Table pages">
+        @for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
+        {
+            var route = new Dictionary<string, string?> { ["From"] = Model.Filters.From?.ToString("yyyy-MM-dd"), ["To"] = Model.Filters.To?.ToString("yyyy-MM-dd"), ["SupplierId"] = Model.Filters.SupplierId?.ToString(), ["VerificationStatus"] = Model.Filters.VerificationStatus?.ToString(), ["ExpiryPage"] = Model.Filters.ExpiryPage.ToString(), ["PerformancePage"] = Model.Filters.PerformancePage.ToString(), [Model.Parameter] = pageNumber.ToString() };
+            <a class="@(pageNumber == Model.Page ? "is-current" : "")" asp-controller="Analytics" asp-action="Suppliers" asp-all-route-data="route">@pageNumber</a>
+        }
+    </nav>
+}

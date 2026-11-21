@@ -1,24 +1,355 @@
 @model Orange_Tendering_System.ViewModels.SourcingOfficerDashboardViewModel
-@{ ViewData["Title"] = "Sourcing Officer Home"; ViewData["WorkspaceSection"] = "Dashboard"; ViewData["Description"] = "Your work, in order. Start with a request or use the ready-made demo tender to try the full officer flow."; }
-<div class="so-page"><partial name="_PageHeader" />
-<section class="so-welcome ws-panel" aria-labelledby="so-welcome-title">
-    <div><span class="so-eyebrow">WELCOME TO YOUR WORKSPACE</span><h2 id="so-welcome-title">What would you like to do?</h2><p>Follow the numbered steps below. The demo data is already in the database, so you can try each screen right away.</p></div>
-    <a class="pg-btn pg-btn-primary" asp-controller="PurchaseRequests" asp-action="Index">Start with requests <span aria-hidden="true">→</span></a>
-</section>
-<section class="pg-cards so-metrics" aria-label="Current work counts">
-    <a class="pg-card" asp-controller="PurchaseRequests" asp-action="Index"><span>Requests waiting for review</span><strong>@Model.SubmittedRequests</strong><small>Open the request inbox</small></a>
-    <a class="pg-card" asp-controller="PurchaseRequests" asp-action="Index"><span>Accepted, ready for a tender</span><strong>@Model.AcceptedRequestsWithoutTender</strong><small>Create a tender from a request</small></a>
-    <a class="pg-card" asp-controller="Tenders" asp-action="Index"><span>Open tenders</span><strong>@Model.ActiveTenders</strong><small>View tenders and offers</small></a>
-    <a class="pg-card" asp-controller="Reports" asp-action="Index"><span>Committee reports to forward</span><strong>@Model.ReportsToForward</strong><small>Read and send reports to the manager</small></a>
-</section>
-<section class="ws-panel pg-panel so-guide" aria-labelledby="so-guide-title">
-    <div class="pg-panel-head"><div><span class="so-eyebrow">A SIMPLE WALKTHROUGH</span><h2 id="so-guide-title">Try the demo in four steps</h2></div><span class="pg-badge is-ok">Demo data loaded</span></div>
-    <ol class="so-steps">
-        <li><span class="so-step-number">1</span><div><h3>Review a department request</h3><p>Open the request inbox. Choose <strong>DEMO - Monitors awaiting review</strong> and mark it accepted, returned, or rejected.</p></div><a class="pg-btn" asp-controller="PurchaseRequests" asp-action="Index">Open requests</a></li>
-        <li><span class="so-step-number">2</span><div><h3>Create a tender</h3><p>Use <strong>DEMO - Laptops ready for tender</strong>, or the request you just accepted. Its item is copied into the new tender automatically.</p></div><a class="pg-btn" asp-controller="PurchaseRequests" asp-action="Index">Choose an accepted request</a></li>
-        <li><span class="so-step-number">3</span><div><h3>Send offers to the evaluation committee</h3><p>For the quickest test, open <strong>DEMO Tender - Laptops ready for committee</strong>. It has four submitted offers: three compliant and one non-compliant. Select the three compliant offers and send them.</p>@if(Model.TenderReadyForCommittee != null){<a class="so-inline-link" asp-controller="Tenders" asp-action="Details" asp-route-id="@Model.TenderReadyForCommittee.Id">Open the demo tender →</a>}</div><a class="pg-btn" asp-controller="Tenders" asp-action="Index">Open tenders</a></li>
-        <li><span class="so-step-number">4</span><div><h3>Read committee reports and answer suppliers</h3><p>Reports contains submitted, accepted, returned, and rejected examples. All supplier conversations arrive in the same Clarifications inbox.</p></div><div class="so-step-actions"><a class="pg-btn" asp-controller="Reports" asp-action="Index">Open reports</a><a class="pg-btn" asp-area="" asp-controller="Clarifications" asp-action="Index">Open clarifications</a></div></li>
-    </ol>
-</section>
-<aside class="so-help"><strong>Want to see it as a supplier?</strong><span>Sign out and log in as <code>supplier1@orange-demo.local</code>. Password for every demo account: <code>OrangeDemo2026!</code>. The supplier account can see its own invitation and offer only.</span><a class="so-inline-link" asp-area="" asp-controller="Home" asp-action="HowItWorks">Read how the workflow works →</a></aside>
+@using Orange_Tendering_System.Models.Entities
+@*
+  Sourcing Officer dashboard (approved design). Data: Areas/SourcingOfficer/Controllers/DashboardController.cs (SQL Server only).
+  Styles: wwwroot/css/officer-theme.css. Arabic/RTL via the top-bar language selector (ViewModels/UiLanguage.cs).
+*@
+@{
+    var arabic = UiLanguage.IsArabic(Context);
+    string L(string en, string ar) => arabic ? ar : en;
+    ViewData["Title"] = L("Sourcing Officer Dashboard", "لوحة مسؤول التوريد");
+    ViewData["WorkspaceSection"] = "Dashboard";
+    ViewData["BodyClass"] = "so-home";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    string N(int value) => value.ToString("N0", culture);
+
+    string Ago(DateTime at)
+    {
+        var d = DateTime.UtcNow - at;
+        if (d.TotalMinutes < 1) return L("Just now", "الآن");
+        if (d.TotalHours < 1) { var m = (int)d.TotalMinutes; return arabic ? $"قبل {m} دقيقة" : $"{m} min ago"; }
+        if (d.TotalDays < 1) { var h = (int)d.TotalHours; return arabic ? $"قبل {h} ساعة" : $"{h} {(h == 1 ? "hour" : "hours")} ago"; }
+        if (d.TotalDays < 2) return L("Yesterday", "أمس");
+        if (d.TotalDays < 30) { var days = (int)d.TotalDays; return arabic ? $"قبل {days} يوم" : $"{days} days ago"; }
+        return at.ToString("yyyy-MM-dd", culture);
+    }
+
+    (string Label, string Tone) Pill(OfficerTenderSummary t) => t.Retendering ? (L("Re-Tendering", "إعادة الطرح"), "purple") : t.Status switch
+    {
+        TenderStatus.Bidding => (L("Bidding", "تقديم العروض"), "orange"),
+        TenderStatus.Evaluation => (L("Evaluation", "التقييم"), "blue"),
+        TenderStatus.OfficerReview => (L("Officer Review", "مراجعة المسؤول"), "blue"),
+        TenderStatus.ManagerReview => (L("Manager Review", "مراجعة المدير"), "blue"),
+        TenderStatus.TopCommitteeReview => (L("Top Committee", "اللجنة العليا"), "blue"),
+        TenderStatus.Awarded => (L("Awarded", "تمت الترسية"), "green"),
+        _ => (L("Draft", "مسودة"), "gray")
+    };
+
+    string Detail(OfficerTenderSummary t)
+    {
+        if (t.Retendering) return arabic ? $"الجولة {t.RoundNumber} من 4 · بانتظار إعادة الفتح" : $"Round {t.RoundNumber} of 4 · awaiting reopening";
+        if (t.Status == TenderStatus.Bidding && t.Deadline is { } deadline)
+        {
+            var days = (int)Math.Ceiling((deadline - DateTime.UtcNow).TotalDays);
+            if (days <= 0) return L("Closing today", "يغلق اليوم");
+            return arabic ? $"يغلق خلال {days} {(days == 1 ? "يوم" : "أيام")}" : $"Closes in {days} {(days == 1 ? "day" : "days")}";
+        }
+        if (t.Status == TenderStatus.Bidding) return L("Bidding closed", "انتهى تقديم العروض");
+        return L("In Progress", "قيد التنفيذ");
+    }
+
+    var focus = Model.FocusTender;
+    var stage = focus == null ? -1 : focus.Retendering ? 1 : focus.Status switch
+    {
+        TenderStatus.Bidding => 2,
+        TenderStatus.Evaluation or TenderStatus.OfficerReview => 3,
+        TenderStatus.ManagerReview => 4,
+        TenderStatus.TopCommitteeReview => 5,
+        TenderStatus.Awarded => 7,
+        _ => 1
+    };
+    int? progress = focus == null ? null : focus.Retendering ? 15 : focus.Status switch
+    {
+        TenderStatus.Bidding => 30, TenderStatus.Evaluation => 50, TenderStatus.OfficerReview => 62,
+        TenderStatus.ManagerReview => 75, TenderStatus.TopCommitteeReview => 90, TenderStatus.Awarded => 100, _ => 10
+    };
+
+    var stages = new (string En, string Ar, string Icon)[]
+    {
+        ("PR", "طلب الشراء", "<path d=\"M6 2.5h8l4 4v15H6z\"/><path d=\"M14 2.5V7h4M9 11.5h6M9 15h6M9 18.5h4\"/>"),
+        ("Tender", "العطاء", "<path d=\"M6 2.5h8l4 4v15H6z\"/><path d=\"M14 2.5V7h4M9 11.5h6M9 15h6\"/>"),
+        ("Bidding", "تقديم العروض", "<path d=\"m12 3 9 4.6-9 4.6-9-4.6z\"/><path d=\"m3 12 9 4.6 9-4.6M3 16.4 12 21l9-4.6\"/>"),
+        ("Evaluation", "التقييم", "<path d=\"M12 3.5v17M7.5 20.5h9M4.5 7h15M12 5.5a1.3 1.3 0 1 0 0-.1\"/><path d=\"M6.5 7 3.5 13.5a3 2 0 0 0 6 0zM17.5 7l-3 6.5a3 2 0 0 0 6 0z\"/>"),
+        ("Manager", "المدير", "<circle cx=\"12\" cy=\"8\" r=\"4.2\"/><path d=\"M4.5 21c.4-4.4 3.5-7 7.5-7s7.1 2.6 7.5 7\"/>"),
+        ("Top Committee", "اللجنة العليا", "<circle cx=\"12\" cy=\"7.5\" r=\"3\"/><circle cx=\"5.5\" cy=\"10\" r=\"2.3\"/><circle cx=\"18.5\" cy=\"10\" r=\"2.3\"/><path d=\"M7 20c0-3.8 2.2-6 5-6s5 2.2 5 6M1.8 19c0-2.8 1.5-4.4 3.7-4.4M22.2 19c0-2.8-1.5-4.4-3.7-4.4\"/>"),
+        ("Award", "الترسية", "<path d=\"M7 3.5h10v6a5 5 0 0 1-10 0zM7 5.5H3.5v1.8c0 2.7 1.8 4.2 3.9 4.2M17 5.5h3.5v1.8c0 2.7-1.8 4.2-3.9 4.2M12 14.5v3.5M8 21h8M9.5 18h5\"/>")
+    };
+
+    var slices = new (string Key, string En, string Ar, string Color)[]
+    {
+        ("bidding", "Bidding", "تقديم العروض", "#ff7a00"),
+        ("evaluation", "Evaluation", "التقييم", "#2196f3"),
+        ("awarded", "Awarded", "تمت الترسية", "#22b85f"),
+        ("retendering", "Re-Tendering", "إعادة الطرح", "#9b2cf5")
+    };
+    int SliceCount(string key) => Model.StatusSlices.FirstOrDefault(s => s.Key == key)?.Count ?? 0;
+    var sliceTotal = slices.Sum(s => SliceCount(s.Key));
+    var segments = new List<string>();
+    decimal angle = 0;
+    foreach (var s in slices)
+    {
+        var count = SliceCount(s.Key);
+        if (count == 0 || sliceTotal == 0) continue;
+        var end = angle + count * 360m / sliceTotal;
+        segments.Add($"{s.Color} {angle.ToString("0.##", culture)}deg {end.ToString("0.##", culture)}deg");
+        angle = end;
+    }
+    var ring = segments.Count > 0 ? $"conic-gradient(from 0deg,{string.Join(",", segments)})" : "conic-gradient(var(--sod-ring-empty) 0deg 360deg)";
+
+    var handoff = Model.Handoffs.FirstOrDefault();
+    var welcomeName = L("Sourcing Officer", "مسؤول التوريد");
+}
+
+<div class="sod" data-officer-dashboard>
+    <h1 class="ws-sr-only">@L("Sourcing Officer dashboard", "لوحة مسؤول التوريد")</h1>
+
+    @* Welcome banner *@
+    <section class="sod-hero" aria-labelledby="sod-hero-title">
+        <div class="sod-hero-photo" aria-hidden="true"></div>
+        <div class="sod-hero-waves" aria-hidden="true"></div>
+        <div class="sod-hero-copy">
+            <h2 id="sod-hero-title">@L("Welcome back,", "مرحباً بعودتك،")<strong>@welcomeName</strong></h2>
+            <p>@L("Manage your requests, tenders, bids and sourcing activities.", "أدر طلباتك وعطاءاتك وعروضك وأنشطة التوريد.")</p>
+        </div>
+    </section>
+
+    @* KPI cards *@
+    <section class="sod-kpis" aria-label="@L("Key figures", "الأرقام الرئيسية")">
+        <a class="sod-kpi is-orange" asp-area="" asp-controller="Tasks" asp-action="Index">
+            <span class="sod-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.2" /><path d="M9 2.5h6v3.4H9zM8.6 11h6.8M8.6 14.4h6.8M8.6 17.8h4" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.ActionItems)</strong><span>@L("My Action Items", "مهامي")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+        <a class="sod-kpi is-blue" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Index">
+            <span class="sod-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 4.6-9 4.6-9-4.6z" /><path d="m3 12 9 4.6 9-4.6M3 16.4 12 21l9-4.6" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.ActiveTenders)</strong><span>@L("Active Tenders", "العطاءات النشطة")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+        <a class="sod-kpi is-green" asp-area="SourcingOfficer" asp-controller="Invitations" asp-action="Index">
+            <span class="sod-kpi-icon"><svg class="is-filled" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.4" r="3.3" /><path d="M5.8 19.6c0-3.9 2.8-6.3 6.2-6.3s6.2 2.4 6.2 6.3z" /><circle cx="5" cy="9.4" r="2.5" /><circle cx="19" cy="9.4" r="2.5" /><path d="M1.2 18.4c0-2.7 1.6-4.5 4-4.5.9 0 1.7.3 2.3.7-1.3 1.2-2 2.7-2.2 3.8zM22.8 18.4c0-2.7-1.6-4.5-4-4.5-.9 0-1.7.3-2.3.7 1.3 1.2 2 2.7 2.2 3.8z" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.InvitedSuppliers)</strong><span>@L("Invited Suppliers", "الموردون المدعوون")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+        <a class="sod-kpi is-purple" asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Index">
+            <span class="sod-kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.2" /><path d="M9 2.5h6v3.4H9zM8.6 13.2l2.5 2.5 4.5-5" /></svg></span>
+            <span class="sod-kpi-copy"><strong>@N(Model.OngoingEvaluations)</strong><span>@L("Ongoing Evaluations", "التقييمات الجارية")</span></span>
+            <svg class="sod-kpi-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg>
+        </a>
+    </section>
+
+    <div class="sod-main-row">
+        @* Assigned by Sourcing Manager: real Manager -> Officer handoffs only *@
+        <section class="sod-card sod-assigned" aria-labelledby="sod-assigned-title">
+            <header class="sod-card-head">
+                <h2 id="sod-assigned-title"><svg class="sod-head-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="13" r="8.2" /><circle cx="11" cy="13" r="4.2" /><circle cx="11" cy="13" r=".6" /><path d="m11 13 8.5-8.5M15.6 4.5h3.9v3.9" /></svg>@L("Assigned by Sourcing Manager", "مُسند من مدير التوريد")</h2>
+                @if (handoff != null)
+                {
+                    <span class="sod-badge">@(Model.Handoffs.Count > 1 ? (arabic ? $"{Model.Handoffs.Count} طلبات جديدة" : $"{Model.Handoffs.Count} New Requests") : L("New Request", "طلب جديد"))</span>
+                }
+            </header>
+            @if (handoff != null)
+            {
+                var title = handoff.Kind switch
+                {
+                    OfficerHandoffKind.Retender => L("Re-Tendering Request", "طلب إعادة الطرح"),
+                    OfficerHandoffKind.ProceedApproved => L("Proceed Approved", "تمت الموافقة على المتابعة"),
+                    _ => L("Final Decision Forwarded", "قرار نهائي مُحال")
+                };
+                var defaultReason = handoff.Kind switch
+                {
+                    OfficerHandoffKind.Retender => L("Proceed request rejected", "رُفض طلب المتابعة"),
+                    OfficerHandoffKind.ProceedApproved => L("Fewer suppliers approved", "تمت الموافقة على عدد أقل من الموردين"),
+                    _ => L("Final decision acknowledged", "تم اعتماد القرار النهائي")
+                };
+                var reason = string.IsNullOrWhiteSpace(handoff.Reason) ? defaultReason : handoff.Reason!;
+                <div class="sod-assigned-body">
+                    <span class="sod-assigned-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.8 12a7.8 7.8 0 0 1-14 4.7M4.2 12a7.8 7.8 0 0 1 14-4.7" /><path d="M18.6 3.3v4.4h-4.4M5.4 20.7v-4.4h4.4" /></svg></span>
+                    <div class="sod-assigned-copy">
+                        <h3>@title</h3>
+                        <p class="sod-assigned-tender">@L("Tender:", "العطاء:") <bdi>@handoff.TenderTitle</bdi></p>
+                        <p class="sod-assigned-reason"><span>@L("Reason:", "السبب:")</span> <mark title="@reason">@reason</mark></p>
+                    </div>
+                    <div class="sod-assigned-meta">
+                        <span class="sod-round">@(arabic ? $"الجولة: {handoff.RoundNumber} من {handoff.MaxRounds}" : $"Round: {handoff.RoundNumber} of {handoff.MaxRounds}")</span>
+                        <span class="sod-required"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2" /><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3" /></svg>@L("Action Required", "إجراء مطلوب")</span>
+                    </div>
+                </div>
+                @switch (handoff.Kind)
+                {
+                    case OfficerHandoffKind.Retender:
+                        <a class="sod-primary" asp-area="SourcingOfficer" asp-controller="Tenders" asp-action="Rounds" asp-route-id="@handoff.TenderId">@L("Start Re-Tendering", "ابدأ إعادة الطرح")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+                        break;
+                    case OfficerHandoffKind.ProceedApproved:
+                        <a class="sod-primary" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Index" asp-route-open="@handoff.TenderId">@L("Schedule Evaluation", "جدولة التقييم")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+                        break;
+                    default:
+                        <a class="sod-primary" asp-area="SourcingOfficer" asp-controller="FinalDecisions" asp-action="Index">@L("Open Final Decision", "افتح القرار النهائي")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+                        break;
+                }
+            }
+            else
+            {
+                <div class="sod-assigned-body is-empty">
+                    <span class="sod-assigned-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.8 12a7.8 7.8 0 0 1-14 4.7M4.2 12a7.8 7.8 0 0 1 14-4.7" /><path d="M18.6 3.3v4.4h-4.4M5.4 20.7v-4.4h4.4" /></svg></span>
+                    <div class="sod-assigned-copy">
+                        <h3>@L("No forwarded requests", "لا توجد طلبات مُحالة")</h3>
+                        <p class="sod-assigned-tender">@L("Re-tendering requests and final decisions forwarded to you by the Sourcing Manager appear here.", "تظهر هنا طلبات إعادة الطرح والقرارات النهائية التي يحيلها إليك مدير التوريد.")</p>
+                    </div>
+                </div>
+                <a class="sod-primary is-quiet" asp-area="SourcingOfficer" asp-controller="FinalDecisions" asp-action="Index">@L("View Final Decisions", "عرض القرارات النهائية")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+            }
+        </section>
+
+        @* Tender workflow: seven stages; position of the most recent active tender *@
+        <section class="sod-card sod-workflow" aria-labelledby="sod-workflow-title">
+            <header class="sod-card-head">
+                <h2 id="sod-workflow-title">@L("Tender Workflow", "مسار العطاء")</h2>
+                @if (focus != null)
+                {
+                    <a class="sod-link" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Index" asp-route-open="@focus.Id">@L("View Details", "عرض التفاصيل")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+                }
+                else
+                {
+                    <a class="sod-link" asp-area="" asp-controller="Home" asp-action="HowItWorks">@L("View Details", "عرض التفاصيل")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+                }
+            </header>
+            <ol class="sod-stages">
+                @for (var i = 0; i < stages.Length; i++)
+                {
+                    var state = stage < 0 ? "is-upcoming" : i < stage ? "is-complete" : i == stage ? "is-current" : "is-upcoming";
+                    var stateText = state switch { "is-complete" => L("completed", "مكتملة"), "is-current" => L("current stage", "المرحلة الحالية"), _ => L("not started", "لم تبدأ") };
+                    <li class="@state" aria-current="@(state == "is-current" ? "step" : null)">
+                        <span class="sod-stage-dot">
+                            @if (state == "is-complete")
+                            {
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.5 12.5 4.2 4.2 8.8-9.4" /></svg>
+                            }
+                            else
+                            {
+                                <svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(stages[i].Icon)</svg>
+                            }
+                        </span>
+                        <span class="sod-stage-label">@(arabic ? stages[i].Ar : stages[i].En)</span>
+                        <span class="ws-sr-only">(@stateText)</span>
+                    </li>
+                }
+            </ol>
+            <p class="sod-caption">@if (focus != null) { <text>T-@focus.Id.ToString("0000", culture) · <bdi>@focus.Title</bdi></text> } else { @L("Process overview · no active tender", "نظرة عامة على المسار · لا يوجد عطاء نشط") }</p>
+        </section>
+    </div>
+
+    <div class="sod-bottom-row">
+        @* Active tenders *@
+        <section class="sod-card sod-tenders" aria-labelledby="sod-tenders-title">
+            <header class="sod-card-head">
+                <h2 id="sod-tenders-title">@L("Active Tenders", "العطاءات النشطة")</h2>
+                <a class="sod-link" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Index">@L("View All", "عرض الكل")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+            </header>
+            @if (Model.ActiveTenderList.Count > 0)
+            {
+                <ul class="sod-tender-list">
+                    @foreach (var t in Model.ActiveTenderList)
+                    {
+                        var pill = Pill(t);
+                        <li>
+                            <a asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Index" asp-route-open="@t.Id">
+                                <svg class="sod-doc" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8l4 4v15H6z" /><path d="M14 2.5V7h4M9 11.5h6M9 15h6M9 18.5h4" /></svg>
+                                <span class="sod-tender-copy"><strong><bdi>@t.Title</bdi></strong><small>@Detail(t)</small></span>
+                                <span class="sod-pill is-@pill.Tone">@pill.Label</span>
+                                <svg class="sod-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p class="sod-empty">@L("No active tenders.", "لا توجد عطاءات نشطة.")</p>
+            }
+        </section>
+
+        @* Tender status overview *@
+        <section class="sod-card sod-status" aria-labelledby="sod-status-title">
+            <header class="sod-card-head"><h2 id="sod-status-title">@L("Tender Status Overview", "نظرة على حالة العطاءات")</h2></header>
+            <div class="sod-status-body">
+                <div class="sod-donut" style="--sod-ring:@ring" role="img" aria-label="@(arabic ? $"{sliceTotal} عطاءات" : $"{sliceTotal} tenders")">
+                    <span><strong>@N(sliceTotal)</strong><small>@L("Tenders", "عطاءات")</small></span>
+                </div>
+                <ul class="sod-legend">
+                    @foreach (var s in slices)
+                    {
+                        <li><i style="--dot:@s.Color" aria-hidden="true"></i><span>@(arabic ? s.Ar : s.En)</span><b>@N(SliceCount(s.Key))</b></li>
+                    }
+                </ul>
+            </div>
+        </section>
+
+        @* Recent activities: the officer's own notifications *@
+        <section class="sod-card sod-activity" aria-labelledby="sod-activity-title">
+            <header class="sod-card-head">
+                <h2 id="sod-activity-title">@L("Recent Activities", "الأنشطة الأخيرة")</h2>
+                <a class="sod-link" asp-area="" asp-controller="Notifications" asp-action="Index">@L("View All", "عرض الكل")<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></a>
+            </header>
+            @if (Model.Activities.Count > 0)
+            {
+                <ol class="sod-timeline">
+                    @foreach (var a in Model.Activities)
+                    {
+                        var text = (a.Title + " " + a.Message).ToLowerInvariant();
+                        var icon = text.Contains("re-tender") || text.Contains("round") ? "<rect x=\"3\" y=\"7\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M9 7V4.5h6V7M3 12.5h18M10.5 12.5v2h3v-2\"/>"
+                            : text.Contains("supplier") || text.Contains("invit") ? "<circle cx=\"12\" cy=\"7.5\" r=\"3\"/><circle cx=\"5.5\" cy=\"10\" r=\"2.3\"/><circle cx=\"18.5\" cy=\"10\" r=\"2.3\"/><path d=\"M7 20c0-3.8 2.2-6 5-6s5 2.2 5 6M1.8 19c0-2.8 1.5-4.4 3.7-4.4M22.2 19c0-2.8-1.5-4.4-3.7-4.4\"/>"
+                            : "<path d=\"m12 3 9 4.6-9 4.6-9-4.6z\"/><path d=\"m3 12 9 4.6 9-4.6M3 16.4 12 21l9-4.6\"/>";
+                        <li>
+                            <i class="sod-timeline-dot" aria-hidden="true"></i>
+                            <span class="sod-activity-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(icon)</svg></span>
+                            <span class="sod-activity-copy">
+                                @if (!string.IsNullOrEmpty(a.Link) && a.Link.StartsWith('/') && !a.Link.StartsWith("//")) { <a href="@a.Link"><strong>@a.Title</strong></a> } else { <strong>@a.Title</strong> }
+                                <small title="@a.Message">@a.Message</small>
+                            </span>
+                            <time datetime="@a.At.ToString("o", culture)">@Ago(a.At)</time>
+                        </li>
+                    }
+                </ol>
+            }
+            else
+            {
+                <p class="sod-empty">@L("No recent activities.", "لا توجد أنشطة حديثة.")</p>
+            }
+        </section>
+
+        <div class="sod-side-stack">
+            @* Ongoing tender (original broadcast-tower illustration and data-driven empty state) *@
+            <section class="sod-card sod-ongoing" aria-labelledby="sod-ongoing-title">
+                <h2 id="sod-ongoing-title">@L("Ongoing Tender", "العطاء الجاري")</h2>
+                <svg class="sod-tower" viewBox="0 0 160 190" aria-hidden="true"><path d="m80 45-40 140h80L80 45M80 45v140M65 95l40 30-55 35 70 25M95 95l-40 30 55 35-70 25M65 52c-22-17-22-45 0-62M95 52c22-17 22-45 0-62M55 65c-35-24-35-61 0-85M105 65c35-24 35-61 0-85" /><circle cx="80" cy="20" r="7" /></svg>
+                <div class="sod-ongoing-copy">
+                    @if (focus != null)
+                    {
+                        <strong>T-@focus.Id.ToString("0000", culture)</strong>
+                        <p><bdi>@focus.Title</bdi></p>
+                        <div class="sod-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@progress" aria-label="@L("Tender progress", "تقدم العطاء")"><i style="width:@(progress)%"></i></div>
+                        <span class="sod-progress-caption"><span>@Pill(focus).Label</span><b>@(progress)%</b></span>
+                    }
+                    else
+                    {
+                        <strong aria-hidden="true">—</strong>
+                        <p>@L("No verified tender selected", "لم يتم اختيار عطاء موثّق")</p>
+                        <div class="sod-progress is-empty" aria-hidden="true"></div>
+                        <span class="sod-progress-caption"><span>@L("Waiting for tender data", "بانتظار بيانات العطاء")</span></span>
+                    }
+                </div>
+            </section>
+
+            @* AI Assistant: opens the existing chat (_AiChatWidget + ai-chat.js); no separate service *@
+            <button type="button" class="sod-card sod-ai" data-open-ai-chat aria-haspopup="dialog">
+                <span class="sod-ai-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4.5" y="8" width="15" height="11" rx="3.2" /><path d="M12 4.6V8M9.2 13h.01M14.8 13h.01M9.8 16.2h4.4M2.6 12.2v3.4M21.4 12.2v3.4" /><circle cx="12" cy="3.6" r="1.1" /></svg></span>
+                <span class="sod-ai-copy"><strong>@L("AI Assistant", "المساعد الذكي")<svg class="sod-spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9zM19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z" /></svg></strong><small>@L("Ask about requests, tenders, bids, or workflows.", "اسأل عن الطلبات أو العطاءات أو العروض أو مسار العمل.")</small></span>
+                <span class="sod-ai-go" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 12h15M13.5 6l6 6-6 6" /></svg></span>
+            </button>
+        </div>
+    </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/officer-dashboard.js" asp-append-version="true"></script>
+}

@@ -8,6 +8,12 @@ namespace Orange_Tendering_System.ViewModels
 {
     public class EditUserViewModel
     {
+
+        [Required(ErrorMessage = "Please select a user role.")]
+        public string SelectedRole { get; set; } = "";
+
+        public List<SelectListItem> AvailableRoles { get; set; } = new();
+
         [Required]
         public string Id { get; set; } = "";
 

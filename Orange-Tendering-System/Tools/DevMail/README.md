@@ -1,5 +1,13 @@
 # Email delivery modes for local development
 
+Employee setup, sign-in, and password-reset emails use `AccountLinks:PublicBaseUrl`.
+Development defaults to `http://localhost:5254`, which works only while the app is
+running on the recipient's own computer. For recipients on other devices, set
+`AccountLinks__PublicBaseUrl` to the HTTPS origin of the deployed site or an
+active tunnel before sending invitations. The URL must be reachable from the
+recipient's browser, and the application must remain running. Restart the app
+after changing configuration; already-sent links keep their original address.
+
 The web project defaults to `Smtp:Mode=LocalInbox` in `appsettings.Development.json`. This sends verification messages to a local test inbox, not to Gmail. To test actual Gmail delivery, select `Smtp` mode in Visual Studio User Secrets and provide a Gmail sender account with an app password. Do not put credentials in `appsettings*.json`, source control, screenshots, or issue reports.
 
 ## Configure real Gmail SMTP in Visual Studio

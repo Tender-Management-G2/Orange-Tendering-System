@@ -1,0 +1,21 @@
+@*
+  OWNER: Ahmad — Authentication.
+  Head content shared by the Orange Auth Studio pages (Register, Login, Verify Email, Pending Approval):
+  the stylesheet and the import map for the scene modules in wwwroot/js/auth-studio.
+  The map is written with Html.Raw on purpose: a literal <script type="importmap"> element would be
+  replaced by the framework's own generated map, which does not know the bare "three"/"gsap" names.
+*@
+@{
+    var importMap = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        imports = new Dictionary<string, string>
+        {
+            // Minified Three.js r187 (same code as three.module.js / three.core.js, minified by jsDelivr/Terser): ~0.8 MB instead of ~2.2 MB.
+            ["three"] = Url.Content("~/lib/three/three.module.min.js"),
+            ["gsap"] = Url.Content("~/lib/gsap/index.js"),
+            ["gsap/CustomEase"] = Url.Content("~/lib/gsap/CustomEase.js")
+        }
+    });
+}
+<link rel="stylesheet" href="~/css/auth-studio.css" asp-append-version="true" />
+@Html.Raw($"<script type=\"importmap\">{importMap}</script>")

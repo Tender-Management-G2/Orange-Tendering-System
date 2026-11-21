@@ -68,7 +68,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
                 return View(model);
             }
 
-            TempData["OfferSuccess"] = "Your draft offer was saved. It has not been submitted.";
+            TempData.Orange(OrangeFeedback.Toast("Draft saved!", "Your offer is saved as a draft. It has not been submitted."));
             return RedirectToAction("Index");
         }
 
@@ -94,7 +94,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
                 ModelState.AddModelError("", "Draft not saved. Check the items and submission deadline.");
                 return View("Edit", model);
             }
-            TempData["OfferSuccess"] = "Draft updated.";
+            TempData.Orange(OrangeFeedback.Toast("Draft updated", "Your changes are saved. The offer has not been submitted."));
             return RedirectToAction("Details", new { id });
         }
 
@@ -103,7 +103,14 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         public async Task<IActionResult> Details(int id)
         {
             var model = await offerService.GetOfferAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!, id);
-            return model == null ? NotFound() : View(model);
+            if (model == null) return NotFound();
+            // The My Offers page opens details in a popup; direct links (notifications, bookmarks) keep the full page.
+            if (string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                Response.Headers.CacheControl = "no-store";
+                return PartialView("_OfferDetailsPopup", model);
+            }
+            return View(model);
         }
 
         // Supplier Offer History — Owner: Saja · No Trello card
@@ -120,7 +127,8 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
             if (await offerService.GetOfferAsync(userId, id) == null) return NotFound();
             var error = await offerService.SubmitAsync(userId, id);
-            TempData[error == null ? "OfferSuccess" : "OfferError"] = error ?? "Offer submitted successfully. It can no longer be edited.";
+            if (error == null) TempData.Orange(OrangeFeedback.Popup("Offer submitted!", "Your offer is recorded and can no longer be edited."));
+            else TempData["OfferError"] = error;
             return RedirectToAction("Details", new { id });
         }
 
@@ -128,7 +136,7 @@ namespace Orange_Tendering_System.Areas.Supplier.Controllers
         {
             var offers = await offerService.GetOffersAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var lines = offers.Select(o => $"Offer #{o.Id} | {o.TenderTitle} | Revision {o.Revision} | {o.Status} | {o.Total:0.00} {o.Terms.CurrencyCode}");
-            var summary = "My offer summary (UTC)\n" + string.Join("\n", lines);
+            var summary = "My offer summary (Jordan time)\n" + string.Join("\n", lines);
             return File(System.Text.Encoding.UTF8.GetBytes(summary), "text/plain; charset=utf-8", "my-offers-summary.txt");
         }
     }

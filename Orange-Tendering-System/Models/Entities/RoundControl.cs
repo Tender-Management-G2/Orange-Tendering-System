@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orange_Tendering_System.Models.Entities;
 
-public enum RoundDecisionKind { Retender, ProceedException, Proceed }
+public enum RoundDecisionKind { Retender, ProceedException, Proceed, TopRetender }
 // Recorded: an officer decision that needs no second approval (re-tender).
 // Withdrawn: a pending proceed request closed because the officer re-tendered the round instead.
 public enum RoundDecisionStatus { Pending, Approved, Rejected, Recorded, Withdrawn }

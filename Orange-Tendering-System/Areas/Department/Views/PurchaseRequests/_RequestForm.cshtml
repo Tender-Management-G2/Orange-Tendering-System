@@ -42,11 +42,11 @@
         <ul>@foreach (var document in Model.ExistingDocuments) { <li>@document.FileName</li> }</ul>
         <p class="pg-hint">Existing attachments are preserved.</p>
     }
-    <div class="pg-field"><label asp-for="Attachments">Add files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" /><span asp-validation-for="Attachments"></span>
+    <div class="pg-field"><label asp-for="Attachments">Add files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" data-fv-max-mb="5" /><span asp-validation-for="Attachments"></span>
     <small class="pg-hint">PDF, PNG, JPEG, DOCX or XLSX. Up to five files per save, 5 MB each and 10 MB combined. Reselect new files if validation fails.</small></div>
     <div class="pg-actions">
-        <button type="submit" name="intent" value="save" class="pg-btn">@(Model.Id == 0 ? "Save draft" : "Save changes")</button>
-        <button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary">@(Model.Id == 0 ? "Submit to Sourcing Officer" : "Submit / resubmit to Sourcing Officer")</button>
+        <button type="submit" name="intent" value="save" class="pg-btn" data-om="toast" data-om-working="Saving your draft">@(Model.Id == 0 ? "Save draft" : "Save changes")</button>
+        <button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary" data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">@(Model.Id == 0 ? "Submit to Sourcing Officer" : "Submit / resubmit to Sourcing Officer")</button>
         <a class="pg-btn" asp-action="Index">Cancel</a>
     </div>
     <p class="pg-hint">Submission goes directly to the Sourcing Officer. Submitted requests are read-only until returned for corrections.</p>

@@ -1,13 +1,56 @@
 @model Orange_Tendering_System.Services.ReportModel
 @* Shared report renderer: the page, the Excel file and the PDF all use the same ReportModel computed from live SQL data. *@
+@{
+    var exportRoute = new Dictionary<string, string?> {
+        ["key"] = Model.Key, ["From"] = Model.Filters.From?.ToString("yyyy-MM-dd"), ["To"] = Model.Filters.To?.ToString("yyyy-MM-dd"),
+        ["DepartmentId"] = Model.Filters.DepartmentId?.ToString(), ["SupplierId"] = Model.Filters.SupplierId?.ToString(), ["TenderId"] = Model.Filters.TenderId?.ToString(),
+        ["RequestStatus"] = Model.Filters.RequestStatus?.ToString(), ["TenderStatus"] = Model.Filters.TenderStatus?.ToString(), ["ReportType"] = Model.Filters.ReportType?.ToString(),
+        ["ReportStatus"] = Model.Filters.ReportStatus?.ToString(), ["Search"] = Model.Filters.Search, ["ExpiryDays"] = Model.Filters.ExpiryDays.ToString()
+    };
+}
 <section class="ws-panel pg-panel">
-    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">@Model.Description · generated @Model.GeneratedAt.ToString("yyyy-MM-dd HH:mm") UTC</span></div>
-        <div class="pg-actions"><a class="pg-btn pg-btn-primary" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "pdf" })">Download PDF</a>
-            <a class="pg-btn" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "xlsx" })">Download Excel</a></div></div>
+    <div class="pg-panel-head"><div><h2>Filters</h2><span class="pg-hint">Filters are applied on the server and are also applied to downloaded files.</span></div></div>
+    <form method="get" asp-controller="Analytics" asp-action="Filter" class="pg-toolbar report-filters">
+        <input type="hidden" name="key" value="@Model.Key" />
+        <input type="search" name="Search" value="@Model.Filters.Search" placeholder="Search identifier or title" aria-label="Search report records" />
+        <label>From<input type="date" name="From" value="@Model.Filters.From?.ToString("yyyy-MM-dd")" /></label>
+        <label>To<input type="date" name="To" value="@Model.Filters.To?.ToString("yyyy-MM-dd")" /></label>
+        @if (Model.Departments.Count > 0) { <label>Department<select name="DepartmentId"><option value="">All departments</option>@foreach (var x in Model.Departments) { <option value="@x.Id" selected="@(Model.Filters.DepartmentId == x.Id)">@x.Label</option> }</select></label> }
+        @if (Model.Suppliers.Count > 0) { <label>Supplier<select name="SupplierId"><option value="">All suppliers</option>@foreach (var x in Model.Suppliers) { <option value="@x.Id" selected="@(Model.Filters.SupplierId == x.Id)">@x.Label</option> }</select></label> }
+        @if (Model.Tenders.Count > 0) { <label>Tender<select name="TenderId"><option value="">All tenders</option>@foreach (var x in Model.Tenders) { <option value="@x.Id" selected="@(Model.Filters.TenderId == x.Id)">@x.Label</option> }</select></label> }
+        @if (Model.Key is "purchase-requests" or "reports-management") { <label>Request status<select name="RequestStatus"><option value="">All statuses</option>@foreach (var x in Html.GetEnumSelectList<Orange_Tendering_System.Models.Entities.PurchaseRequestStatus>()) { <option value="@x.Value" selected="@(x.Value == ((int?)Model.Filters.RequestStatus)?.ToString())">@x.Text</option> }</select></label> }
+        @if (Model.Key == "purchase-requests") { <label>Priority<select name="Priority"><option value="">All priorities</option>@foreach (var x in Html.GetEnumSelectList<Orange_Tendering_System.Models.Entities.RequestPriority>()) { <option value="@x.Value" selected="@(x.Value == ((int?)Model.Filters.Priority)?.ToString())">@x.Text</option> }</select></label> }
+        @if (Model.Key is "tenders" or "reports-management") { <label>Tender status<select name="TenderStatus"><option value="">All statuses</option>@foreach (var x in Html.GetEnumSelectList<Orange_Tendering_System.Models.Entities.TenderStatus>()) { <option value="@x.Value" selected="@(x.Value == ((int?)Model.Filters.TenderStatus)?.ToString())">@x.Text</option> }</select></label> }
+        @if (Model.Key == "reports-management") {
+            <label>Report type<select name="ReportType"><option value="">All types</option>@foreach (var x in Html.GetEnumSelectList<Orange_Tendering_System.Models.Entities.ReportType>()) { <option value="@x.Value" selected="@(x.Value == ((int?)Model.Filters.ReportType)?.ToString())">@x.Text</option> }</select></label>
+            <label>Report status<select name="ReportStatus"><option value="">All statuses</option>@foreach (var x in Html.GetEnumSelectList<Orange_Tendering_System.Models.Entities.ReportStatus>()) { <option value="@x.Value" selected="@(x.Value == ((int?)Model.Filters.ReportStatus)?.ToString())">@x.Text</option> }</select></label>
+        }
+        @if (Model.Key == "suppliers") { <label>Expiry threshold (days)<input type="number" min="1" max="365" name="ExpiryDays" value="@Model.Filters.ExpiryDays" /></label> }
+        <button class="pg-btn pg-btn-primary" type="submit">Apply filters</button>
+        <a class="pg-btn" asp-controller="Analytics" asp-action="Filter" asp-route-key="@Model.Key">Reset</a>
+    </form>
+</section>
+<section class="ws-panel pg-panel">
+    <div class="pg-panel-head"><div><h2>@Model.Title</h2><span class="pg-hint">@Model.Description · generated @Model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm") (Jordan time)</span></div>
+        <div class="pg-actions"><a class="pg-btn pg-btn-primary" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "pdf", From = Model.Filters.From?.ToString("yyyy-MM-dd"), To = Model.Filters.To?.ToString("yyyy-MM-dd"), DepartmentId = Model.Filters.DepartmentId, SupplierId = Model.Filters.SupplierId, TenderId = Model.Filters.TenderId, RequestStatus = Model.Filters.RequestStatus, TenderStatus = Model.Filters.TenderStatus, ReportType = Model.Filters.ReportType, ReportStatus = Model.Filters.ReportStatus, Search = Model.Filters.Search, ExpiryDays = Model.Filters.ExpiryDays })">Download PDF</a>
+            <a class="pg-btn" data-no-modal href="@Url.Action("Export", "Analytics", new { area = "", key = Model.Key, format = "xlsx", From = Model.Filters.From?.ToString("yyyy-MM-dd"), To = Model.Filters.To?.ToString("yyyy-MM-dd"), DepartmentId = Model.Filters.DepartmentId, SupplierId = Model.Filters.SupplierId, TenderId = Model.Filters.TenderId, RequestStatus = Model.Filters.RequestStatus, TenderStatus = Model.Filters.TenderStatus, ReportType = Model.Filters.ReportType, ReportStatus = Model.Filters.ReportStatus, Search = Model.Filters.Search, ExpiryDays = Model.Filters.ExpiryDays })">Download Excel</a></div></div>
     <dl class="ui-facts">
         @foreach (var k in Model.Kpis) { <div><dt>@k.Label</dt><dd><strong style="font-size:22px">@k.Value</strong></dd></div> }
     </dl>
 </section>
+@if (Model.Charts.Count > 0)
+{
+    <section class="ws-panel pg-panel"><div class="pg-panel-head"><h2>Analytics</h2></div><div class="report-chart-grid">
+    @foreach (var chart in Model.Charts)
+    {
+        var max = chart.Points.Count == 0 ? 0 : chart.Points.Max(x => x.Value);
+        <article class="report-chart"><h3>@chart.Title</h3>
+            @if (chart.Points.Count == 0) { <partial name="_EmptyState" model='"No data for the selected filters."' /> }
+            else { @foreach (var point in chart.Points) { var width = max == 0 ? 0 : point.Value * 100 / max; <div class="report-chart-row"><span>@point.Label</span><div><i style="width:@width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></i></div><strong>@point.Value.ToString("0.##")</strong></div> } }
+        </article>
+    }
+    </div></section>
+}
 @foreach (var t in Model.Tables)
 {
     <section class="ws-panel pg-panel">
@@ -15,7 +58,7 @@
         <div class="pg-table-wrap"><table class="pg-table">
             <thead><tr>@foreach (var c in t.Columns) { <th scope="col">@c</th> }</tr></thead>
             <tbody>
-            @foreach (var row in t.Rows) { <tr>@foreach (var cell in row) { <td>@cell</td> }</tr> }
+            @foreach (var row in t.Rows) { <tr>@for (var i = 0; i < row.Length; i++) { <td>@if (Model.Key == "reports-management" && t.Title == "Stored report versions" && i == 0) { <a asp-controller="Analytics" asp-action="ReportDetails" asp-route-id="@row[i]">@row[i]</a> } else { @row[i] }</td> }</tr> }
             @if (t.Rows.Count == 0) { <tr><td colspan="@t.Columns.Length"><partial name="_EmptyState" model='"No records yet."' /></td></tr> }
             </tbody>
         </table></div>

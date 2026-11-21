@@ -1,49 +1,100 @@
+
 @*
-===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Rjoub
 PAGE: Department Management
-
-DEVELOPER OWNER: Rjoub
-MODULE: Administration
-TRELLO TASK: Department Management
-TRELLO URL: https://trello.com/c/KHRsEmzE
-
-PURPOSE:
-List departments with their employees and purchase-request
-activity.
-
-BUSINESS ACCESS:
-Admin
-
-ROUTE: /Admin/Departments
-
-FUTURE IMPLEMENTATION:
-- Query Departments with counts of users and
-  PurchaseRequests.
-- Links to Edit for each row.
-
-DEPENDENCIES:
-Departments, AspNetUsers (DepartmentId), PurchaseRequests.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
 *@
 
-@model List<DepartmentListViewModel>
+@model DepartmentIndexViewModel
 
 @{
     ViewData["Title"] = "Department Management";
     ViewData["WorkspaceSection"] = "Departments";
-    ViewData["Description"] = "Manage organization departments and their activity.";
+    ViewData["Description"] =
+        "Manage organization departments and their activity.";
 }
 
 <partial name="_PageHeader" />
 
-<section class="ws-panel pg-panel">
+<section class="dash-metrics admin-management-stats" aria-label="Departments statistics">
+    <article class="dash-metric dash-orange">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("building"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.TotalDepartments</strong>
+            <span>Total Departments</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-blue">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.ActiveDepartments</strong>
+            <span>Active Departments</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-purple">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("shield"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.InactiveDepartments</strong>
+            <span>Inactive Departments</span>
+        </div>
+    </article>
+    <article class="dash-metric dash-green">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("users"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.AssignedEmployees</strong>
+            <span>Assigned Employees</span>
+        </div>
+    </article>
+</section>
+
+<form asp-area="Admin" asp-controller="Departments" asp-action="Index" method="get" class="admin-list-filters" data-admin-list-filters>
+<div class="admin-filter-field admin-filter-search">
+    <label for="admin-list-search">Search</label>
+    <input id="admin-list-search" type="text" name="search" value="@Model.Search" placeholder="Department name" aria-label="Search Departments" maxlength="100" /></div>
+<div class="admin-filter-field">
+    <label for="statusFilter">Status</label>
+    <select id="statusFilter" name="statusFilter"
+            aria-label="Filter department status">
+
+        <option value="All"
+                selected="@(string.IsNullOrEmpty(Model.StatusFilter)
+                    || Model.StatusFilter == "All")">
+            All Statuses
+        </option>
+
+        <option value="Active"
+                selected="@(Model.StatusFilter == "Active")">
+            Active
+        </option>
+
+        <option value="Inactive"
+                selected="@(Model.StatusFilter == "Inactive")">
+            Inactive
+        </option>
+
+    </select></div>
+<a asp-area="Admin" asp-controller="Departments" asp-action="Index" class="pg-btn pg-btn-primary admin-clear">Clear</a>
+</form>
+<p class="pg-hint admin-list-status" data-admin-list-status role="status" aria-live="polite"></p>
+
+
+<!-- ==================================
+     DEPARTMENTS TABLE
+=================================== -->
+
+<div data-admin-list-results>
+<section class="ws-panel pg-panel admin-list-records admin-department-records">
 
     <div class="pg-panel-head">
-        <h2>Departments</h2>
+
+        <div>
+            <h2>Departments</h2>
+
+            <p class="pg-hint">
+                Matching Departments:
+                @Model.Departments.Count
+            </p>
+        </div>
 
         <a class="pg-btn pg-btn-primary"
            asp-area="Admin"
@@ -51,11 +102,13 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
            asp-action="Create">
             Add Department
         </a>
+
     </div>
 
     <div class="pg-table-wrap">
 
         <table class="pg-table">
+
             <thead>
                 <tr>
                     <th>Name</th>
@@ -69,7 +122,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
             <tbody>
 
-                @if (Model == null || !Model.Any())
+                @if (!Model.Departments.Any())
                 {
                     <tr>
                         <td colspan="6">
@@ -79,48 +132,75 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                 }
                 else
                 {
-                    @foreach (var department in Model)
+                    @foreach (var department
+                        in Model.Departments)
                     {
                         <tr>
-                            <td>@department.Name</td>
-
-                            <td>@department.Description</td>
-
-                            <td>@department.EmployeeCount</td>
-
-                            <td>@department.PurchaseRequestCount</td>
 
                             <td>
-                                @if (department.IsActive)
-                                {
-                                    <span class="pg-status">
-                                        Active
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="pg-status">
-                                        Inactive
-                                    </span>
-                                }
+                                @department.Name
                             </td>
 
                             <td>
-                                <a class="pg-btn"
-                                   asp-area="Admin"
-                                   asp-controller="Departments"
-                                   asp-action="Edit"
-                                   asp-route-id="@department.Id">
-                                    Edit
-                                </a>
+                                @(string.IsNullOrWhiteSpace(
+                                    department.Description)
+                                    ? "—"
+                                    : department.Description.Length > 90
+                                        ? department.Description[..90] + "…"
+                                        : department.Description)
                             </td>
+
+                            <td>
+                                @department.EmployeeCount
+                            </td>
+
+                            <td>
+                                @department.PurchaseRequestCount
+                            </td>
+
+                            <td>
+                                <span class="pg-status">
+                                    @(department.IsActive
+                                        ? "Active"
+                                        : "Inactive")
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="pg-actions">
+
+                                    <a class="pg-btn"
+                                       asp-area="Admin"
+                                       asp-controller="Departments"
+                                       asp-action="Details" data-modal="center"
+                                       asp-route-id="@department.Id">
+                                        Details
+                                    </a>
+
+                                    <a class="pg-btn pg-btn-primary"
+                                       asp-area="Admin"
+                                       asp-controller="Departments"
+                                       asp-action="Edit"
+                                       asp-route-id="@department.Id">
+                                        Edit
+                                    </a>
+
+                                </div>
+                            </td>
+
                         </tr>
                     }
                 }
 
             </tbody>
+
         </table>
 
     </div>
 
 </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin-list-live.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,131 @@
+.admin-dashboard-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .35fr) minmax(0, .65fr) minmax(0, 1fr);
+  grid-template-areas:
+    "tasks tasks workflow workflow"
+    "distribution activity activity ongoing";
+  gap: 16px 12px;
+}
+.admin-dashboard-panels .dash-tasks { grid-area: tasks; }
+.admin-dashboard-panels .dash-workflow { grid-area: workflow; }
+.admin-dashboard-panels .dash-distribution { grid-area: distribution; }
+.admin-dashboard-panels .dash-activity { grid-area: activity; }
+.admin-dashboard-panels .dash-ongoing { grid-area: ongoing; }
+.admin-dashboard-panels .dash-panel { min-height: 193px; }
+
+.admin-dashboard-page .admin-metric-link { color: inherit; text-decoration: none; }
+.admin-dashboard-page .admin-metric-link:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 3px;
+}
+.admin-dashboard-page .dash-metric[hidden] { display: none !important; }
+
+:root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] { --admin-dash-bg: #0c0e0f; background: var(--admin-dash-bg); }
+:root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .ws-stage { background: var(--admin-dash-bg); }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .admin-page-search { display: none; }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .ws-search { max-width: 580px; }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-board { gap: 17px; }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-welcome { min-height: 151px; height: auto; }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-welcome-copy { padding: 16px 27px 24px; }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-welcome h1 { font-size: 28px; }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-welcome h1 strong { font-size: clamp(36px, 3vw, 47px); }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-welcome-waves { mask-image: none; }
+
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-secondary-metric { display: none; }
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link {
+  min-height: 98px;
+  padding: 14px 15px;
+  gap: 12px;
+  border-radius: 14px;
+}
+:root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link {
+  background: linear-gradient(115deg, var(--tint), #171719 70%, #222125);
+}
+:root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(3) {
+  --tone: #ff8a00; --tint: #392004; --edge: #a35a17; --icon-bg: #6d390a;
+}
+:root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(4) {
+  --tone: #48b7ff; --tint: #0b2940; --edge: #12669c; --icon-bg: #0b416a;
+}
+:root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(5) {
+  --tone: #6ae4b8; --tint: #082f24; --edge: #14755a; --icon-bg: #0a4735;
+}
+:root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(6) {
+  --tone: #b887ed; --tint: #292038; --edge: #745396; --icon-bg: #4d365f;
+}
+body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .dash-metric-copy > span { font-size: 14px; }
+
+.admin-dashboard-panels .dash-panel { padding: 15px 16px; border-radius: 15px; }
+.admin-dashboard-panels .dash-panel-heading { margin-bottom: 14px; }
+.admin-dashboard-panels .dash-panel-heading h2 { font-size: 20px; }
+.admin-dashboard-panels :is(.dash-distribution, .dash-activity, .dash-ongoing) { min-height: 400px; }
+[data-theme="dark"] .admin-dashboard-panels .dash-ongoing::before {
+  opacity: .19;
+  background-size: auto 500%;
+}
+.admin-dashboard-panels .dash-ongoing .dash-tower { inset-inline-end: 4px; right: auto; }
+.admin-dashboard-panels .dash-tasks:has(.admin-task-empty) .dash-panel-heading .dash-text-action,
+.admin-dashboard-panels .admin-task-empty ~ :is(.dash-empty-rows, .dash-empty-state) { display: none; }
+.admin-dashboard-panels .admin-task-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-block: 17px;
+  border-top: 1px solid var(--ws-rule);
+}
+.admin-task-empty .dash-task-icon { width: 64px; height: 64px; flex: 0 0 64px; }
+.admin-task-empty strong { display: block; margin-block-end: 7px; }
+.admin-task-empty .dash-text-action { width: fit-content; }
+
+@media (min-width: 1181px) {
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .ws-main { padding-inline: 26px; padding-top: 8px; }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .ws-topbar { padding-inline: 42px 24px; }
+  :root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .ws-sidebar {
+    background: linear-gradient(155deg, #151718 32%, #211a13);
+    border-inline-end: 1px solid #343539;
+  }
+  :root[data-theme="dark"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .ws-primary-nav .ws-nav-item.is-active {
+    background: linear-gradient(100deg, #ffac23, #ff7900 42%, #8f3800);
+    border-color: #ffab496e;
+  }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-workflow-icon { width: 39px; height: 39px; border-width: 1px; }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-workflow-icon svg { width: 23px; height: 23px; }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-workflow-stages li + li::before { inset-inline: auto calc(50% + 18px); top: 19px; width: calc(100% - 36px); }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-workflow-stages li.is-current .dash-workflow-icon { width: 45px; height: 45px; margin-top: -3px; margin-bottom: 6px; }
+}
+
+@media (max-width: 1180px) {
+  .admin-dashboard-panels,
+  .admin-dashboard-panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "tasks ongoing"
+      "workflow workflow"
+      "distribution activity";
+  }
+  .admin-dashboard-panels :is(.dash-distribution, .dash-activity, .dash-ongoing) { min-height: 245px; }
+}
+@media (max-width: 767px) {
+  .admin-dashboard-panels,
+  .admin-dashboard-panels {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "tasks" "workflow" "distribution" "activity" "ongoing";
+  }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-welcome-copy { padding: 20px; }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link { padding: 10px; gap: 8px; }
+  body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .dash-metric-copy > span { font-size: 12px; }
+}
+
+/* Keep the same card accents in the light and dark palettes. */
+:root[data-theme="light"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(3) {
+  --tone: #b45100; --tint: #fff5ec; --tint-2: #ffe6d1; --edge: #ffc99a; --icon-bg: #ffd9b5;
+}
+:root[data-theme="light"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(4) {
+  --tone: #1169ab; --tint: #eef7ff; --tint-2: #d6ebfd; --edge: #98cbf3; --icon-bg: #b9dcfa;
+}
+:root[data-theme="light"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(5) {
+  --tone: #087a45; --tint: #edfcf4; --tint-2: #d4f6e5; --edge: #9be4c0; --icon-bg: #b5efd2;
+}
+:root[data-theme="light"] body.so-shell.admin-dashboard-page[data-workspace-role="Admin"] .dash-metrics .admin-metric-link:nth-child(6) {
+  --tone: #7431b6; --tint: #f7f1ff; --tint-2: #ece2fd; --edge: #d2b6f6; --icon-bg: #e0cdfb;
+}

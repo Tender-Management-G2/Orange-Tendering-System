@@ -1,0 +1,282 @@
+@model Orange_Tendering_System.Models.Entities.TenderReport
+
+@{
+    ViewData["Title"] = "Forward to Top Committee";
+    ViewData["WorkspaceSection"] = "Forwarding";
+    ViewData["Description"] = "Write the short executive summary and forward it to the four-member Top Committee.";
+}
+
+<partial name="_PageHeader" />
+
+
+<section class="forward-steps" aria-label="Forwarding progress">
+    <div class="forward-step is-complete">
+        <span>1</span>
+        <div><strong>Review evaluation</strong><small>Supplier recommendation and report</small></div>
+    </div>
+    <div class="forward-step is-current">
+        <span>2</span>
+        <div><strong>Write executive summary</strong><small>Prepare the Top Committee brief</small></div>
+    </div>
+    <div class="forward-step">
+        <span>3</span>
+        <div><strong>Forward for decision</strong><small>Send the saved brief to the committee</small></div>
+    </div>
+</section>
+
+<section class="ws-panel pg-panel forward-overview">
+    <div class="pg-panel-head">
+        <div>
+            <p class="forward-eyebrow">Tender at a glance</p>
+            <h2>Tender Information</h2>
+        </div>
+        <span class="pg-badge is-ok">Ready for forwarding</span>
+    </div>
+
+    <dl class="pg-dl">
+        <div>
+            <dt>Tender</dt>
+            <dd>@Model.TenderRound.Tender.Title</dd>
+        </div>
+
+        <div>
+            <dt>Deadline</dt>
+            <dd>
+                @(Model.TenderRound.Deadline?.ToString("yyyy-MM-dd")
+                    ?? "Not available")
+            </dd>
+        </div>
+
+        <div>
+            <dt>Recommended Supplier</dt>
+            <dd>
+                @(Model.RecommendedBid?.TenderInvitation?
+                    .Supplier?.CompanyName ?? "Not available")
+            </dd>
+        </div>
+
+        <div>
+            <dt>Recommended Offer Total Cost</dt>
+            <dd>
+                @if (ViewBag.TotalCost != null)
+                {
+                    <span>
+                        @(((decimal)ViewBag.TotalCost).ToString("N2"))
+                        @Model.RecommendedBid?.CurrencyCode
+                    </span>
+                }
+                else
+                {
+                    <span>Not available</span>
+                }
+            </dd>
+        </div>
+
+        <div>
+            <dt>Report Version</dt>
+            <dd>Version @Model.VersionNumber</dd>
+        </div>
+    </dl>
+
+    <div class="forward-section-heading">
+        <h3>Products and quantities</h3>
+        <span>@Model.TenderRound.Tender.Items.Count item@(Model.TenderRound.Tender.Items.Count == 1 ? "" : "s")</span>
+    </div>
+
+    <div class="pg-table-wrap forward-items-table">
+        <table class="pg-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.TenderRound.Tender.Items)
+                {
+                    <tr>
+                        <td>@item.Name</td>
+                        <td>@item.Quantity</td>
+                        <td>@item.Unit</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <details class="forward-evaluation" open>
+        <summary>
+            <span>
+                <strong>Evaluation result</strong>
+                <small>Submitted by the Sourcing Officer</small>
+            </span>
+            <span class="forward-toggle">Show details</span>
+        </summary>
+        <div class="forward-report-body">@Model.Content</div>
+    </details>
+</section>
+
+
+<section class="ws-panel pg-panel forward-summary-panel">
+    <div class="pg-panel-head">
+        <div>
+            <p class="forward-eyebrow">Step 2 of 3</p>
+            <h2>Executive summary for the Top Committee</h2>
+        </div>
+        <span class="forward-audience">Visible to Top Committee</span>
+    </div>
+    <p class="forward-intro">Turn the evaluation into a concise, decision-ready brief. The Top Committee receives this summary, not the full working report.</p>
+
+    <form asp-area="SourcingManager"
+          asp-controller="ManagerReports"
+          asp-action="SaveSummaryDraft"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" name="id" value="@Model.Id" />
+
+        <div class="pg-form-grid">
+            <div class="pg-field pg-field-wide">
+                <label for="summary">Summary</label>
+
+                <textarea id="summary"
+                          name="summary"
+                          rows="4"
+                          required>@ViewBag.Summary</textarea>
+
+                <small class="pg-hint">Focus on the decision, supplier recommendation, and key reason.</small>
+            </div>
+
+            <div class="pg-field pg-field-wide">
+                <label for="keyComparisonPoints">
+                    Key comparison points
+                </label>
+
+                <textarea id="keyComparisonPoints"
+                          name="keyComparisonPoints"
+                          rows="4"
+                          required>@ViewBag.KeyComparisonPoints</textarea>
+
+            </div>
+        </div>
+
+        <div class="pg-actions">
+            <button type="submit" class="pg-btn pg-btn-primary">
+                Save summary draft
+            </button>
+        </div>
+    </form>
+</section>
+
+
+<section class="ws-panel pg-panel forward-preview-panel">
+    <div class="pg-panel-head">
+        <div>
+            <p class="forward-eyebrow">Saved draft</p>
+            <h2>Executive summary preview</h2>
+        </div>
+        @if (!string.IsNullOrWhiteSpace((string)ViewBag.Summary))
+        {
+            <span class="pg-badge is-ok">Draft saved</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace((string)ViewBag.Summary))
+    {
+        <div class="forward-preview-block">
+            <h3>Summary</h3>
+            <p>@ViewBag.Summary</p>
+        </div>
+
+        <div class="forward-preview-block">
+            <h3>Key comparison points</h3>
+            <p>@ViewBag.KeyComparisonPoints</p>
+        </div>
+    }
+    else
+    {
+        <partial name="_EmptyState"
+                 model='"No executive summary draft saved yet."' />
+    }
+</section>
+
+
+<section class="ws-panel pg-panel forward-submit-panel">
+    <div class="pg-panel-head">
+        <div>
+            <p class="forward-eyebrow">Final step</p>
+            <h2>Forward to Top Committee</h2>
+        </div>
+        <span class="forward-member-count">4 committee members</span>
+    </div>
+
+    <p>
+        Review the forwarding requirements before sending
+        the saved executive summary to the Top Committee.
+    </p>
+
+    @{
+        bool hasSavedDraft =
+            !string.IsNullOrWhiteSpace(
+                ViewBag.Summary as string) &&
+            !string.IsNullOrWhiteSpace(
+                ViewBag.KeyComparisonPoints as string);
+    }
+
+    @if (!hasSavedDraft)
+    {
+        <p class="pg-hint">
+            Please save your executive summary draft first.
+        </p>
+    }
+
+    <form asp-area="SourcingManager"
+          asp-controller="ManagerReports"
+          asp-action="SubmitToTopCommittee"
+          method="post"
+          class="pg-form">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" name="id" value="@Model.Id" />
+
+        <fieldset class="forward-checklist">
+            <legend>Forwarding review checklist</legend>
+            <label class="pg-check">
+                <input type="checkbox"
+                       name="costAndItemsReviewed"
+                       value="true"
+                       required />
+                <span>I have reviewed the total cost, deadline, product type, and quantity.</span>
+            </label>
+
+            <label class="pg-check">
+                <input type="checkbox"
+                       name="supplierReviewed"
+                       value="true"
+                       required />
+                <span>I have reviewed the recommended supplier and evaluation results.</span>
+            </label>
+
+            <label class="pg-check">
+                <input type="checkbox"
+                       name="readyForCommittee"
+                       value="true"
+                       required />
+                <span>I confirm this tender is ready for Top Committee review.</span>
+            </label>
+        </fieldset>
+
+        <div class="pg-actions forward-submit-actions">
+            <button type="submit"
+                    class="pg-btn pg-btn-primary"
+                    disabled="@(!hasSavedDraft)">
+                Forward to Top Committee
+            </button>
+            <small>Once forwarded, the committee receives the saved executive summary.</small>
+        </div>
+    </form>
+</section>

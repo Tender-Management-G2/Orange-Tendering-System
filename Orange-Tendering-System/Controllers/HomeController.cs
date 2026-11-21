@@ -54,6 +54,10 @@ namespace Orange_Tendering_System.Controllers
             return View(members);
         }
 
+        // Project presentation as a web slide deck (same four slides as the team's PowerPoint).
+        [HttpGet("/presentation")]
+        public IActionResult Presentation() => View();
+
         // Owner: Tariq — no dedicated Trello card
         [HttpGet("/how-it-works")]
         public IActionResult HowItWorks()

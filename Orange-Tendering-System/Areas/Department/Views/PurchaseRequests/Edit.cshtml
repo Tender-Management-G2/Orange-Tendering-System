@@ -6,7 +6,7 @@
 }
 <partial name="_PageHeader" />
 <nav class="pg-links"><ul><li><a asp-action="Details" asp-route-id="@Model.Id">View earlier submissions & Officer review history</a></li></ul></nav>
-<form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form department-form">
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="pg-form department-form" data-om="popup">
     <partial name="_RequestForm" model="Model" />
 </form>
 @section Styles { <style>.department-form{display:grid;gap:20px}.department-form [role=alert],.department-form .field-validation-error{color:#b43e24}.department-form [role=alert]:empty{display:none}.department-form .pg-table input{min-width:110px}</style> }

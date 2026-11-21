@@ -1,0 +1,111 @@
+@*
+===========================================================
+ORANGE TENDER MANAGEMENT SYSTEM
+PAGE: Phone page for fingerprint / phone sign-in
+
+DEVELOPER OWNER: Ahmad
+MODULE: Authentication & Biometrics
+
+PURPOSE:
+Opened on the supplier's smartphone from the QR code (or the
+emailed link). Registers this phone for the account that made
+the code, or approves that account's pending sign-in on a
+computer (after typing the number shown there).
+
+ROUTE: /Biometrics/Phone#t=<one-time token>
+The token stays in the URL fragment, so it is never sent to
+the server in the address or written to request logs; the
+script posts it to Controllers/PhonePasskeyController.cs.
+
+HOW IT WORKS:
+WebAuthn on the phone, user verification required. The phone
+keeps the private key and decides whether it uses its
+fingerprint, face unlock or screen lock; the server stores
+only the public key and cannot tell which was used.
+===========================================================
+*@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en" class="pp-page-html">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#F6F1E9" />
+    <title>Phone sign-in · Sourcing &amp; Tender Management</title>
+    <link rel="stylesheet" href="~/css/phone-passkey.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/typography.css" asp-append-version="true" />
+</head>
+<body class="pp pp-page">
+    <p class="pp-brand"><span class="pp-brand-mark" aria-hidden="true"></span>Sourcing &amp; Tender Management</p>
+
+    <main class="pp-card" id="phonePage">
+        @Html.AntiForgeryToken()
+
+        <div data-pp-view="loading" class="pp-loading" role="status"><span class="pp-spinner" aria-hidden="true"></span>Checking your link…</div>
+
+        @* Register this phone *@
+        <section data-pp-view="enroll" hidden aria-labelledby="ppEnrollTitle">
+            <p class="pp-kicker">Fingerprint / Phone</p>
+            <h1 class="pp-title" id="ppEnrollTitle">Register this phone</h1>
+            <div class="pp-account"><strong data-pp-name></strong><span data-pp-account></span></div>
+            <p class="pp-lead">Your phone will ask for its fingerprint, face unlock or screen lock. Your fingerprint stays on this phone: the application only receives a security key and cannot tell which method the phone used.</p>
+            <div class="pp-stack">
+                <button type="button" id="btnPhoneEnroll" class="pp-btn pp-btn--primary">Register this phone</button>
+                <button type="button" id="btnPhoneEnrollCancel" class="pp-btn pp-btn--secondary">Cancel</button>
+            </div>
+        </section>
+
+        @* Approve a sign-in: first the number shown on the computer *@
+        <section data-pp-view="signin" hidden aria-labelledby="ppSignInTitle">
+            <p class="pp-kicker">Sign-in request</p>
+            <h1 class="pp-title" id="ppSignInTitle">Is this you signing in?</h1>
+            <div class="pp-account"><strong data-pp-name></strong><span data-pp-account></span></div>
+            <p class="pp-lead">Requested from <strong id="ppRequestedFrom"></strong>.</p>
+            <form id="ppCodeForm" novalidate>
+                <div class="pp-field">
+                    <label for="ppCode">Type the number shown on your computer</label>
+                    <input id="ppCode" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="one-time-code" aria-describedby="ppCodeHelp" />
+                </div>
+                <p class="pp-fine" id="ppCodeHelp">If you did not start a sign-in, choose "This wasn't me".</p>
+                <div class="pp-stack">
+                    <button type="submit" class="pp-btn pp-btn--primary">Continue</button>
+                    <button type="button" class="pp-btn pp-btn--secondary" data-pp-deny>This wasn't me</button>
+                </div>
+            </form>
+        </section>
+
+        @* ...then the phone's own fingerprint / face unlock / screen lock *@
+        <section data-pp-view="approve" hidden aria-labelledby="ppApproveTitle">
+            <p class="pp-kicker">Sign-in request</p>
+            <h1 class="pp-title" id="ppApproveTitle">Confirm it is you</h1>
+            <div class="pp-account"><strong data-pp-name></strong><span data-pp-account></span></div>
+            <p class="pp-lead">Your phone will ask for its fingerprint, face unlock or screen lock.</p>
+            <div class="pp-stack">
+                <button type="button" id="btnPhoneApprove" class="pp-btn pp-btn--primary">Approve sign-in</button>
+                <button type="button" class="pp-btn pp-btn--secondary" data-pp-deny>This wasn't me</button>
+            </div>
+        </section>
+
+        <section data-pp-view="done" hidden aria-live="polite">
+            <h1 class="pp-title pp-result" id="ppDoneTitle"></h1>
+            <p class="pp-lead" id="ppDoneText"></p>
+        </section>
+
+        <section data-pp-view="ended" hidden aria-live="polite">
+            <h1 class="pp-title pp-result pp-result--warn" id="ppEndTitle"></h1>
+            <p class="pp-lead" id="ppEndText"></p>
+        </section>
+
+        <p id="ppMessage" class="pp-message" role="status" aria-live="polite"></p>
+        <p class="pp-expires">This code expires in <span id="ppExpires">–</span>.</p>
+        <noscript><p class="pp-message pp-message--danger">This page needs JavaScript.</p></noscript>
+    </main>
+
+    <script src="~/js/biometric.js" asp-append-version="true"></script>
+    <script src="~/js/phone-passkey.js" asp-append-version="true"></script>
+</body>
+</html>

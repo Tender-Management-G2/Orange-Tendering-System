@@ -23,16 +23,20 @@ namespace Orange_Tendering_System.Models.Entities
 
     public enum ComplianceStatus { NotChecked, Compliant, NonCompliant, PendingClarification }
 
+    public enum TopExecutivePosition { CEO, CFO, CTO, COO }
+
     public enum CommitteeType { Evaluation, Top }
 
-    // The four Evaluation Committee seats (one person each per tender). Top Committee members have none.
-    public enum CommitteeResponsibility { SourcingManager, DepartmentRepresentative, FinancialRepresentative, TechnicalRepresentative }
+    // Keep DepartmentRepresentative for historical tenders. Admin may assign two distinct technical seats.
+    // ChiefExecutiveOfficer marks the Top Committee CEO seat; other Top members have no responsibility.
+    public enum CommitteeResponsibility { SourcingManager, DepartmentRepresentative, FinancialRepresentative, TechnicalRepresentative, TechnicalRepresentative2, ChiefExecutiveOfficer, ChiefFinancialOfficer, ChiefTechnologyOfficer, ChiefOperationsOfficer }
 
     public enum CommitteeRoundStatus { InProgress, Approved, Rejected }
 
     public enum CriterionType { Technical, Financial }
 
-    public enum VoteDecision { Approve, Reject }
+    // Top Committee final decision: Approve, Reject (company no longer needs the tender) or Retender (reissue as a new round).
+    public enum VoteDecision { Approve, Reject, Retender }
 
     public enum ReportType { OfficerComparison, FullEvaluation, ExecutiveSummary }
 

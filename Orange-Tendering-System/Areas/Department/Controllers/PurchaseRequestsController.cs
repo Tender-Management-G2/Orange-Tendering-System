@@ -8,6 +8,7 @@ using Orange_Tendering_System.Areas.Department.ViewModels;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Areas.Department.Controllers;
 
@@ -122,11 +123,13 @@ public class PurchaseRequestsController : Controller
         if (user is null) return Forbid();
         if ((!edit && form.Id != 0) || (edit && (id <= 0 || form.Id != id))) return BadRequest();
         if (intent is not ("save" or "submit")) return BadRequest();
+        var resubmission = false;
         if (edit)
         {
             var request = await service.Load(user.DepartmentId!.Value, id);
             if (request is null) return NotFound();
             if (!RequestDisplay.Editable(request, user.Id)) return Forbid();
+            resubmission = request.SubmittedAt != null;
             form.ExistingDocuments = request.Documents.ToList();
             form.ReturnComment = DepartmentRequestService.Form(request).ReturnComment;
             db.ChangeTracker.Clear();
@@ -145,8 +148,13 @@ public class PurchaseRequestsController : Controller
         try
         {
             var savedId = await service.Save(user, form, intent == "submit", storageRoot);
-            TempData["DepartmentMessage"] = intent == "submit"
-                ? "Request submitted directly to the Sourcing Officer." : "Changes saved.";
+            TempData.Orange((intent, edit) switch
+            {
+                ("submit", true) when resubmission => OrangeFeedback.Popup("Request resubmitted!", $"PR-{savedId} was sent back to the Sourcing Officer with your corrections.", OrangeVariant.Send),
+                ("submit", _) => OrangeFeedback.Popup("Request sent!", $"Your purchase request PR-{savedId} has been successfully sent to the Sourcing Officer.", OrangeVariant.Send),
+                (_, false) => OrangeFeedback.Toast("Draft saved!", $"PR-{savedId} is saved as a draft and can be submitted when ready."),
+                _ => OrangeFeedback.Toast("Changes saved", $"PR-{savedId} is updated.")
+            });
             return RedirectToAction(nameof(Details), new { id = savedId });
         }
         catch (InvalidOperationException ex)

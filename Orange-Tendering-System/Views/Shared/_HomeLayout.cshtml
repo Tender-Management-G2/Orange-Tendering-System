@@ -1,0 +1,89 @@
+@*
+  Layout for the cinematic public homepage only (Home/Index).
+  Real routes only: Identity login/registration, Home pages, and the signed-in workspace.
+  No business logic. Every other public page keeps using _Layout.
+*@
+@{
+    var signedIn = User.Identity?.IsAuthenticated == true;
+}
+<!doctype html>
+<html lang="en" data-theme="dark" class="hc-root">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#090909" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="description" content="Orange Sourcing & Tender Management System: one transparent digital journey from purchase request to final award." />
+    <title>@(ViewData["Title"] ?? "Orange Sourcing & Tender Management System")</title>
+    <link rel="icon" href="~/favicon.ico" />
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+    <script>
+        /* Before first paint: mark JS/animation support. home-hq3d.js and home-cinema.js re-check. */
+        (function (r) {
+            r.classList.add("hc-js");
+            if (!matchMedia("(prefers-reduced-motion: reduce)").matches) r.classList.add("hc-anim");
+        })(document.documentElement);
+    </script>
+    @* Inter served locally (variable font already in the project) instead of Google Fonts: no render-blocking external request. *@
+    <link rel="preload" href="~/assets/auth-studio/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <style>@@font-face{font-family:"Inter";src:url("@Url.Content("~/assets/auth-studio/fonts/inter-latin-wght-normal.woff2")") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}</style>
+    <link rel="stylesheet" href="~/css/home-cinema.css" asp-append-version="true" />
+    @* Emitted raw: the .NET importmap tag helper would replace this map with its own. *@
+    @Html.Raw("<script type=\"importmap\">{ \"imports\": { \"three\": \"" + Url.Content("~/js/vendor/three/build/three.module.min.js") + "\" } }</script>")
+    <link rel="stylesheet" href="~/css/theme-surfaces.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/typography.css" asp-append-version="true" />
+</head>
+<body class="hc">
+    <a class="hc-skip" href="#main-content">Skip to content</a>
+    @{ ViewData["NavHome"] = true; }
+    <partial name="_SiteNav" />
+    <main id="main-content" tabindex="-1">
+        @RenderBody()
+    </main>
+    <footer class="hc-footer" id="footer">
+        <div class="hc-wrap hc-footer-grid">
+            <div>
+                <a class="hc-brand" asp-area="" asp-controller="Home" asp-action="Index"><span class="hc-logo" aria-hidden="true">orange</span><span class="hc-brand-text">Sourcing &amp; Tender</span></a>
+                <p class="hc-muted">A connected procurement journey, from purchase request to award and closure.</p>
+            </div>
+            <nav aria-label="Footer navigation">
+                <h3>Explore</h3>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#roles">Roles &amp; Permissions</a>
+                <a href="#clarifications">Clarifications</a>
+                <a href="#evaluation">Weighted Evaluation</a>
+                <a href="#governance">Security &amp; Governance</a>
+            </nav>
+            <nav aria-label="Footer pages">
+                <h3>Pages</h3>
+                <a asp-area="" asp-controller="Home" asp-action="HowItWorks">How It Works</a>
+                <a asp-area="" asp-controller="Home" asp-action="About">About</a>
+                <a asp-area="" asp-controller="Home" asp-action="Team">Our Team</a>
+                <a asp-area="" asp-controller="Home" asp-action="Contact">Contact</a>
+                <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+            </nav>
+            <nav aria-label="Footer account">
+                <h3>Account</h3>
+                @if (signedIn)
+                {
+                    <a asp-area="" asp-controller="Workspace" asp-action="Index">My Workspace</a>
+                }
+                else
+                {
+                    <a asp-area="Identity" asp-page="/Account/Login">Login</a>
+                    <a asp-area="Identity" asp-page="/Account/Register">Supplier Registration</a>
+                }
+            </nav>
+        </div>
+        <div class="hc-wrap hc-footer-base">
+            <span>&copy; 2026 Sourcing &amp; Tender Management System. Independent project presentation; Orange branding shown for demonstration, no official company affiliation is claimed.</span>
+            <a href="#home">Back to top &uarr;</a>
+        </div>
+    </footer>
+    @* GSAP 3.12.5 served locally (same pinned version): no wait on an external CDN. *@
+    <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
+    <script src="~/js/vendor/ScrollTrigger.min.js" asp-append-version="true"></script>
+    <script src="~/js/home-cinema.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/home-hq3d.js" asp-append-version="true"></script>
+</body>
+</html>

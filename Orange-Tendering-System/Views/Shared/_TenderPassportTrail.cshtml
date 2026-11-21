@@ -1,0 +1,42 @@
+@model Orange_Tendering_System.ViewModels.PassportTrailViewModel
+@using Orange_Tendering_System.ViewModels
+@{
+    // Full Activity Trail of a Tender Passport, loaded into the passport's <dialog> by wwwroot/js/tender-passport.js
+    // (WorkflowControllerBase.Passport). Events are the same authorized AuditLogs rows as the stickers, oldest first.
+    var kinds = Model.Events.Select(e => e.Kind).Distinct().OrderBy(k => k).ToList();
+    var people = Model.Events.Select(e => e.Actor?.Name ?? "Orange system").Distinct().OrderBy(n => n).ToList();
+}
+@if (Model.Events.Count == 0)
+{
+    <div class="tp-trail-empty"><b>No recorded activity yet</b><p>Actions on this tender will appear here as soon as they are recorded.</p></div>
+}
+else
+{
+    <div class="tp-filters" data-tp-filters role="search" aria-label="Filter the activity trail">
+        <label>Action<select data-f="kind"><option value="">All actions (@Model.Events.Count)</option>@foreach (var k in kinds) { <option value="@k.ToString().ToLowerInvariant()">@k (@Model.Events.Count(e => e.Kind == k))</option> }</select></label>
+        <label>Employee<select data-f="actor"><option value="">Everyone</option>@foreach (var p in people) { <option value="@p">@p</option> }</select></label>
+        <label>From<input type="date" data-f="from" /></label>
+        <label>To<input type="date" data-f="to" /></label>
+        <button type="button" class="tp-filter-order" data-f="order" aria-pressed="false">Newest first</button>
+        <button type="button" class="tp-filter-reset" data-f="reset">Reset</button>
+    </div>
+    <p class="tp-trail-count" data-tp-count role="status" aria-live="polite">@Model.Events.Count recorded event(s) · times in Jordan time</p>
+    <ol class="tp-journey" data-tp-journey>
+        @foreach (var e in Model.Events)
+        {
+            var kind = e.Kind.ToString().ToLowerInvariant();
+            <li class="tp-k-@kind" data-kind="@kind" data-actor="@(e.Actor?.Name ?? "Orange system")" data-date="@e.AtUtc.ToJordan("yyyy-MM-dd")">
+                <span class="tp-dot" aria-hidden="true"></span>
+                <div class="tp-ev">
+                    <div class="tp-ev-top"><span class="tp-chip tp-k-@kind">@e.Kind</span><b>@e.Label</b><time datetime="@DateTime.SpecifyKind(e.AtUtc, DateTimeKind.Utc).ToString("O")">@e.AtUtc.ToJordan("d MMM yyyy · HH:mm:ss")</time></div>
+                    <p class="tp-ev-who"><b>@(e.Actor?.Name ?? "Orange system")</b>@if (e.Actor?.Role != null) { <span>@e.Actor.Role</span> }@if (e.Actor?.Unit != null) { <span>@e.Actor.Unit</span> }</p>
+                    <p class="tp-ev-meta"><span>@e.Reference</span>@if (e.Round != null) { <span>Round @e.Round</span> }@if (e.Version != null) { <span>@e.Version</span> }@if (e.Document != null) { <span class="tp-break">@e.Document</span> }</p>
+                    @if (e.NewStatus != null) { <p class="tp-ev-status"><span class="tp-chip">@(e.PreviousStatus ?? "—")</span> &rarr; <span class="tp-chip tp-chip-strong">@e.NewStatus</span></p> }
+                    @if (e.Comment != null) { <blockquote class="tp-break">@e.Comment</blockquote> }
+                </div>
+            </li>
+        }
+    </ol>
+    <p class="tp-trail-none" data-tp-none hidden>No events match these filters.</p>
+    @if (Model.Truncated) { <p class="tp-trail-note">Only the most recent events are shown. The complete record stays in the audit log.</p> }
+}

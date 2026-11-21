@@ -15,3 +15,10 @@ dotnet Tests/AuthSmoke/bin/Release/net10.0/AuthSmoke.dll
 ```
 
 Run the commands from the web project directory. No production database should be used.
+
+Face recognition, device passkeys and the "use my phone" QR / email-link flows can be run on their own (fresh `OrangeAuthCheck_` database as above):
+
+```powershell
+dotnet Tests/AuthSmoke/bin/Release/net10.0/AuthSmoke.dll --biometric-checks   # BiometricChecks + PhonePasskeyChecks
+dotnet Tests/AuthSmoke/bin/Release/net10.0/AuthSmoke.dll --phone-checks       # PhonePasskeyChecks only
+```

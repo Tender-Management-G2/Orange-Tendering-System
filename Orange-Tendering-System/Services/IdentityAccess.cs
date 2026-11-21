@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using Orange_Tendering_System.Services.Biometric;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
@@ -13,10 +15,22 @@ public static class IdentityAccess
 {
     public static async Task ValidateCookieAsync(CookieValidatePrincipalContext context)
     {
+        // The stamp validator refreshes Identity's principal on every request.
+        // Carry forward only the method from the already signed cookie after
+        // successful validation, never from a request header or query string.
+        var biometricMethod = context.Principal?.FindFirstValue(BiometricSignInService.AuthenticationMethodClaim);
         // Keep Identity's security-stamp validation, including role and password changes.
         await context.HttpContext.RequestServices.GetRequiredService<ISecurityStampValidator>().ValidateAsync(context);
         if (context.Principal?.Identity?.IsAuthenticated != true)
             return;
+        if (biometricMethod is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod or BiometricSignInService.PasswordStepMethod &&
+            context.Principal.FindFirst(BiometricSignInService.AuthenticationMethodClaim) is null &&
+            context.Principal.Identity is ClaimsIdentity identity)
+        {
+            identity.AddClaim(new Claim(BiometricSignInService.AuthenticationMethodClaim, biometricMethod));
+            context.ReplacePrincipal(context.Principal);
+            context.ShouldRenew = true;
+        }
 
         var userId = context.Principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
@@ -44,7 +58,9 @@ public sealed class SupplierApprovalGate(RequestDelegate next)
     private static readonly string[] PendingEnrollmentPaths =
     [
         "/Biometrics/FaceEnrollChallenge", "/Biometrics/FaceEnroll",
-        "/Biometrics/PasskeyRegisterOptions", "/Biometrics/PasskeyRegister"
+        "/Biometrics/FaceSetupChallenge", "/Biometrics/FaceSetupLogin",
+        "/Biometrics/PasskeyRegisterOptions", "/Biometrics/PasskeyRegister",
+        "/Biometrics/Phone/EnrollStart", "/Biometrics/Phone/EnrollEmail"
     ];
 
     public async Task InvokeAsync(HttpContext context, ApplicationDbContext db)
@@ -63,14 +79,21 @@ public sealed class SupplierApprovalGate(RequestDelegate next)
             var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             var approved = await db.Users.AsNoTracking().AnyAsync(u => u.Id == userId &&
                 u.Supplier != null && u.Supplier.Status == SupplierStatus.Approved);
-            if (!approved)
+            var method = context.User.FindFirstValue(BiometricSignInService.AuthenticationMethodClaim);
+            // A password-step session counts only while the owner's switch allows it (Biometric:SupplierPasswordOnly).
+            var biometricSession = method is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod ||
+                (method == BiometricSignInService.PasswordStepMethod &&
+                 context.RequestServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<Orange_Tendering_System.Models.Biometric.BiometricOptions>>().Value.SupplierPasswordOnly);
+            if (!approved || !biometricSession)
             {
                 if (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
                     context.Response.Redirect(context.Request.PathBase + "/Identity/Account/PendingApproval");
                 else
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsync("Supplier approval is required.");
+                    await context.Response.WriteAsync(approved
+                        ? "Supplier biometric sign-in is required."
+                        : "Supplier approval is required.");
                 }
                 return;
             }

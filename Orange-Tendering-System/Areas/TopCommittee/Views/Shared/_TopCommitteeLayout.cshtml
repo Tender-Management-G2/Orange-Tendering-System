@@ -1,0 +1,11 @@
+@*
+  Kept only so any view that still names the area layout gets the shared Top Committee shell.
+  The real layout (Officer design, Top Committee sidebar, search, bell, theme, language, scripts) is
+  /Views/Shared/_TopCommitteeLayout.cshtml; Areas/TopCommittee/Views/_ViewStart.cshtml points there directly.
+*@
+@{
+    Layout = "/Views/Shared/_TopCommitteeLayout.cshtml";
+}
+@section Styles { @await RenderSectionAsync("Styles", required: false) }
+@section Scripts { @await RenderSectionAsync("Scripts", required: false) }
+@RenderBody()

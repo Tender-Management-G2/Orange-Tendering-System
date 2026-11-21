@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.DataProtection;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -41,9 +43,11 @@ static class BiometricChecks
         // ---- Login page wiring ----
         using var anon = newClient();
         var loginHtml = await (await anon.GetAsync("/Identity/Account/Login")).Content.ReadAsStringAsync();
-        check(loginHtml.Contains("id=\"btnPasskeyLogin\"") && !Regex.IsMatch(loginHtml, "id=\"btnPasskeyLogin\"[^>]*disabled") &&
-              loginHtml.Contains("id=\"btnFaceLogin\"") && !Regex.IsMatch(loginHtml, "id=\"btnFaceLogin\"[^>]*disabled") && loginHtml.Contains("/js/biometric."),
-            "Login page offers passkey and Face Login");
+        check(loginHtml.Contains("id=\"signInMethods\"") && loginHtml.Contains("name=\"method\" value=\"password\"") &&
+              loginHtml.Contains("name=\"method\" value=\"face\"") && loginHtml.Contains("name=\"method\" value=\"fingerprint\"") &&
+              loginHtml.Contains("id=\"btnFaceLogin\"") && loginHtml.Contains("id=\"btnPasskeyStep\"") && loginHtml.Contains("/js/biometric.") &&
+              !loginHtml.Contains("btnPasskeyLogin") && !loginHtml.Contains("device passkey"),
+            "Login page lets the supplier choose Email & Password, Face ID or Fingerprint first (no separate passkey button)");
         check(loginHtml.Contains("id=\"forgot-password\"") && loginHtml.Contains("Input_Password"), "Login page keeps password form and Forgot Password link");
 
         // ---- Anti-forgery and authorization ----
@@ -174,15 +178,33 @@ static class BiometricChecks
         {
             var faceCsrf = await token(faceAnonymous, "/Identity/Account/Login");
             check((await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceLogin", forged)).StatusCode == HttpStatusCode.Unauthorized, "forged face login token creates no Identity cookie");
-            check((await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(faceAnonymous, faceCsrf, "/Biometrics/FaceChallenge", new { }), RandomFace(2), email))).StatusCode == HttpStatusCode.Unauthorized,
-                "a different face is rejected");
-            check((await faceAnonymous.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.Redirect, "a failed face match never signs the user in");
-            var matching = FaceBody(await FaceChallenge(faceAnonymous, faceCsrf, "/Biometrics/FaceChallenge", new { }), face, email);
-            var faceLogin = await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceLogin", matching);
-            check(faceLogin.StatusCode == HttpStatusCode.OK && (await faceAnonymous.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.OK, "the enrolled face signs in");
-            using var faceReplayer = newClient();
-            var replayFaceCsrf = await token(faceReplayer, "/Identity/Account/Login");
-            check((await Post(faceReplayer, replayFaceCsrf, "/Biometrics/FaceLogin", matching)).StatusCode == HttpStatusCode.Unauthorized, "a captured face login cannot be replayed");
+            // Password first (owner decision 2026-11-15): face sign-in is only a second step inside the
+            // supplier pre-auth transaction. Without a password step a face cannot even get a challenge,
+            // and an email named by the browser is ignored, even with the enrolled face.
+            var noStep = await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceChallenge", new { });
+            check(noStep.StatusCode == HttpStatusCode.Unauthorized && (await noStep.Content.ReadAsStringAsync()).Contains("\"restart\":true"),
+                "a face challenge needs a password step first");
+            var issued = await FaceChallenge(session, csrf, "/Biometrics/FaceEnrollChallenge", new { password });
+            check((await Post(faceAnonymous, faceCsrf, "/Biometrics/FaceLogin", FaceBody(issued, face, email))).StatusCode == HttpStatusCode.Unauthorized &&
+                  (await faceAnonymous.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.Redirect,
+                "the enrolled face alone (email + face, no password) never signs in");
+        }
+        // Employees (Other User) choose Face ID on the Login page too (owner decision 2026-11-17).
+        using (var employeeFace = newClient())
+        {
+            var startCsrf = await token(employeeFace, "/Identity/Account/Login");
+            var start = await employeeFace.PostAsync("/Identity/Account/Login?handler=IdentityStart", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Input.Email"] = email, ["Input.AccountType"] = "other", ["method"] = "face", ["__RequestVerificationToken"] = startCsrf
+            }));
+            check(start.StatusCode == HttpStatusCode.OK && (await start.Content.ReadAsStringAsync()).Contains("\"ready\""),
+                "an employee with Face ID set up opens the Face ID step from the Login page");
+            var employeeSignIn = await Post(employeeFace, startCsrf, "/Biometrics/FaceLogin",
+                FaceBody(await FaceChallenge(employeeFace, startCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+            var employeeBody = employeeSignIn.StatusCode == HttpStatusCode.OK ? await employeeSignIn.Content.ReadFromJsonAsync<JsonElement>() : default;
+            check(employeeSignIn.StatusCode == HttpStatusCode.OK && employeeBody.GetProperty("redirect").GetString() == "/EvaluationCommittee" &&
+                  (await employeeFace.GetAsync("/EvaluationCommittee")).StatusCode == HttpStatusCode.OK,
+                "Face ID signs the employee into the assigned workspace");
         }
         await SupplierFaceChecks(newClient, token, check, services, suffix);
         await FaceDemoChecks(newClient, token, check, services);
@@ -257,15 +279,15 @@ static class BiometricChecks
         var pendingLogin = await PasswordLogin(pending);
         check(pendingLogin.Headers.Location?.ToString().Contains("PendingApproval") == true, "pending supplier password sign-in lands on Pending Approval");
         var pendingPage = await (await pending.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
-        check(pendingPage.Contains("id=\"btnFaceEnroll\"") && pendingPage.Contains("<h1>Face Registration</h1>") &&
-              pendingPage.Contains("aria-current=\"step\">Face registration"), "after email verification the registration shows the Face Registration step");
+        check(pendingPage.Contains("id=\"btnFaceEnroll\"") && pendingPage.Contains("bring your identity to life.") &&
+              pendingPage.Contains("data-chapter=\"identity\""), "after email verification the registration shows the face enrollment step");
         var csrf = Csrf(pendingPage);
         var face = RandomFace(3);
         var enrolled = await Post(pending, csrf, "/Biometrics/FaceEnroll", FaceBody(await FaceChallenge(pending, csrf, "/Biometrics/FaceEnrollChallenge", new { password }), face, null));
         check(enrolled.StatusCode == HttpStatusCode.OK, "pending supplier enrolls a face during registration");
         var completed = await (await pending.GetAsync("/Identity/Account/PendingApproval?faceRegistered=true")).Content.ReadAsStringAsync();
-        check(completed.Contains("Face registered successfully") && completed.Contains("<h1>Fingerprint / Passkey Registration</h1>") && completed.Contains("id=\"btnPasskeyRegister\""),
-            "after face registration the supplier reaches Passkey Registration");
+        check(completed.Contains("Face samples registered for this account.") && completed.Contains("Fingerprint / Phone") && completed.Contains("id=\"btnPhoneQr\"") && completed.Contains("id=\"btnPasskeyRegister\"") && !completed.Contains("passkeyLabel"),
+            "after face registration the supplier sees backend-confirmed status and passkey setup");
         check((await pending.GetAsync("/Biometrics/Face")).Headers.Location?.ToString().Contains("PendingApproval") == true,
             "other biometric pages stay closed to a pending supplier");
         check((await pending.GetAsync("/Supplier")).Headers.Location?.ToString().Contains("PendingApproval") == true,
@@ -275,14 +297,14 @@ static class BiometricChecks
         using var resumed = newClient();
         await PasswordLogin(resumed);
         var resumedPage = await (await resumed.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
-        check(resumedPage.Contains("<h1>Fingerprint / Passkey Registration</h1>"), "interrupted enrollment resumes at passkey step without replacing the face");
+        check(resumedPage.Contains("Your identity has a place."), "interrupted enrollment resumes with the face samples intact");
         using var phoneKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var phoneId = RandomNumberGenerator.GetBytes(32);
         var creation = await (await Post(pending, csrf, "/Biometrics/PasskeyRegisterOptions", new { password })).Content.ReadFromJsonAsync<JsonElement>();
         check((await Post(pending, csrf, "/Biometrics/PasskeyRegister", Attestation("", creation.GetProperty("challenge").GetString()!, phoneId, phoneKey))).StatusCode == HttpStatusCode.OK,
             "pending supplier registers a real signed-credential passkey on the same account");
         var allDone = await (await pending.GetAsync("/Identity/Account/PendingApproval")).Content.ReadAsStringAsync();
-        check(allDone.Contains("<h1>Pending Approval</h1>") && allDone.Contains("Fingerprint / Passkey Registered Successfully"), "both enrollment steps complete before pending approval confirmation");
+        check(allDone.Contains("Your company is still awaiting administrator review.") && allDone.Contains("device(s) registered"), "both enrollment steps complete before pending approval confirmation");
         using (var scope = services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -300,11 +322,39 @@ static class BiometricChecks
         check((await PhoneLogin(pendingPhone)).StatusCode == HttpStatusCode.Unauthorized &&
             (await pendingPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.Redirect, "valid passkey cannot sign in a pending supplier");
 
+        // Step 1 of the sign-in page as the page script sends it (Login?handler=Credentials).
+        async Task<(HttpResponseMessage Response, string Csrf)> Credentials(HttpClient client, string pass, string? accountType = null)
+        {
+            var t = await token(client, "/Identity/Account/Login");
+            var fields = new Dictionary<string, string>
+            {
+                ["Input.Email"] = email, ["Input.Password"] = pass, ["__RequestVerificationToken"] = t
+            };
+            if (accountType is not null) fields["Input.AccountType"] = accountType;
+            var response = await client.PostAsync("/Identity/Account/Login?handler=Credentials", new FormUrlEncodedContent(fields));
+            return (response, t);
+        }
+
+        // Face ID / Fingerprint as the page script starts them: the method and the email, no password.
+        async Task<(HttpResponseMessage Response, string Csrf)> IdentityStart(HttpClient client, string method, string? who = null)
+        {
+            var t = await token(client, "/Identity/Account/Login");
+            var response = await client.PostAsync("/Identity/Account/Login?handler=IdentityStart", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Input.Email"] = who ?? email, ["method"] = method, ["__RequestVerificationToken"] = t
+            }));
+            return (response, t);
+        }
+
         using var visitor = newClient();
         var visitorCsrf = await token(visitor, "/Identity/Account/Login");
-        var pendingFace = await Post(visitor, visitorCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
-        check(pendingFace.StatusCode == HttpStatusCode.Unauthorized && (await pendingFace.Content.ReadAsStringAsync()).Contains("awaiting administrator approval"),
-            "a pending supplier's face is recognised but cannot sign in");
+        var pendingFace = await Post(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { });
+        check(pendingFace.StatusCode == HttpStatusCode.Unauthorized && (await visitor.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+            "a face cannot start a sign-in without the Face ID step");
+        var (pendingStart, pendingStartCsrf) = await IdentityStart(visitor, "face");
+        check(pendingStart.StatusCode == HttpStatusCode.Conflict && (await pendingStart.Content.ReadAsStringAsync()).Contains("not available") &&
+              (await Post(visitor, pendingStartCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized,
+            "a pending supplier's email opens no Face ID step");
 
         using (var scope = services.CreateScope())
         {
@@ -312,19 +362,127 @@ static class BiometricChecks
             (await db.Suppliers.SingleAsync(s => s.Id == companyId)).Status = SupplierStatus.Approved;
             await db.SaveChangesAsync();
         }
-        var approvedFace = await Post(visitor, visitorCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+
+        // Approved supplier with face enrolled. Email & Password: a wrong password gets the generic refusal and
+        // opens nothing. Face ID: the email alone opens the face step (no session yet); the face issues the session.
+        var (wrongStep, _) = await Credentials(visitor, password + "x");
+        check(wrongStep.StatusCode == HttpStatusCode.Unauthorized && (await wrongStep.Content.ReadAsStringAsync()).Contains("Invalid email or password"),
+            "a wrong password gets the one generic refusal");
+        check((await Post(visitor, visitorCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized,
+            "a refused password opens no face step");
+        var (unknownStart, unknownCsrf) = await IdentityStart(visitor, "face", "nobody-" + Guid.NewGuid().ToString("N")[..8] + "@supplier.invalid");
+        check(unknownStart.StatusCode == HttpStatusCode.Conflict && (await unknownStart.Content.ReadAsStringAsync()).Contains("not available") &&
+              (await Post(visitor, unknownCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized,
+            "an unknown email opens no Face ID step and gets the same answer as any other unavailable email");
+        var (noFingerprint, _) = await IdentityStart(visitor, "fingerprint", "nobody@supplier.invalid");
+        check(noFingerprint.StatusCode == HttpStatusCode.Conflict, "an unknown email opens no Fingerprint step");
+        var (step, stepCsrf) = await IdentityStart(visitor, "face");
+        var stepBody = await step.Content.ReadFromJsonAsync<JsonElement>();
+        check(step.StatusCode == HttpStatusCode.OK && stepBody.GetProperty("outcome").GetString() == "ready" &&
+              (await visitor.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+            "choosing Face ID with the email opens the supplier's face step without a session");
+        check((await visitor.PostAsync("/Identity/Account/Login?handler=PasswordOnly", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = stepCsrf })))
+                  .Headers.Location is null && (await visitor.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+            "the Face ID step cannot be turned into a session without the face (no password-only shortcut)");
+        (step, stepCsrf) = await IdentityStart(visitor, "face");
+        check((await Post(visitor, stepCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(visitor, stepCsrf, "/Biometrics/FaceChallenge", new { }), RandomFace(2), email))).StatusCode == HttpStatusCode.Unauthorized &&
+              (await visitor.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK, "a different face is rejected in the Face ID step");
+        var matching = FaceBody(await FaceChallenge(visitor, stepCsrf, "/Biometrics/FaceChallenge", new { }), face, email);
+        var approvedFace = await Post(visitor, stepCsrf, "/Biometrics/FaceLogin", matching);
         var approvedBody = await approvedFace.Content.ReadFromJsonAsync<JsonElement>();
         check(approvedFace.StatusCode == HttpStatusCode.OK && approvedBody.GetProperty("redirect").GetString() == "/Supplier" &&
-              (await visitor.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier signs in with face and opens the Supplier workspace");
+              (await visitor.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier signs in with email + Face ID and opens the Supplier workspace");
+        using (var replayer = newClient())
+        {
+            var replayCsrf = await token(replayer, "/Identity/Account/Login");
+            check((await Post(replayer, replayCsrf, "/Biometrics/FaceLogin", matching)).StatusCode == HttpStatusCode.Unauthorized &&
+                  (await replayer.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK, "a captured face login cannot be replayed in another browser");
+        }
+        using (var cancelled = newClient())
+        {
+            var (_, cancelCsrf) = await IdentityStart(cancelled, "face");
+            await cancelled.PostAsync("/Identity/Account/Login?handler=Cancel", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = cancelCsrf }));
+            check((await Post(cancelled, cancelCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized,
+                "cancelling the identity step ends the pre-auth transaction");
+        }
         using var approvedPhone = newClient();
         var approvedPasskey = await PhoneLogin(approvedPhone);
         check(approvedPasskey.StatusCode == HttpStatusCode.OK && (await approvedPasskey.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("redirect").GetString() == "/Supplier" &&
             (await approvedPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "approved supplier signs in independently with passkey and opens dashboard");
+        using (var stepPhone = newClient())
+        {
+            // Fingerprint: the email opens the step, the options are scoped to that account, and its
+            // fingerprint credential issues the session.
+            var (fingerprintStart, stepPhoneCsrf) = await IdentityStart(stepPhone, "fingerprint");
+            check(fingerprintStart.StatusCode == HttpStatusCode.OK && (await stepPhone.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+                "choosing Fingerprint with the email opens the step without a session");
+            var scoped = await (await Post(stepPhone, stepPhoneCsrf, "/Biometrics/PasskeyLoginOptions", new { })).Content.ReadFromJsonAsync<JsonElement>();
+            check(scoped.TryGetProperty("allowCredentials", out var allowed) && allowed.GetArrayLength() > 0,
+                "in the Fingerprint step only that account's credentials are offered");
+            var stepSigned = await Post(stepPhone, stepPhoneCsrf, "/Biometrics/PasskeyLogin", SignedAssertion(scoped, phoneId, phoneKey, userId, phoneCounter++));
+            check(stepSigned.StatusCode == HttpStatusCode.OK && (await stepPhone.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
+                "the fingerprint completes the supplier sign-in");
+        }
+        using (var legacy = newClient())
+        {
+            // A face enrolled before 2026-11-15 under the old folder-based Data Protection scope is still read,
+            // and re-encrypted under the current scope on first use.
+            using (var scope = services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var current = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>().CreateProtector("Orange.Biometric.FaceTemplate.v1");
+                var root = scope.ServiceProvider.GetRequiredService<IHostEnvironment>().ContentRootPath.TrimEnd(Path.DirectorySeparatorChar);
+                var keys = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ASP.NET", "DataProtection-Keys"));
+                var old = DataProtectionProvider.Create(keys, b => b.SetApplicationName(root + Path.DirectorySeparatorChar)).CreateProtector("Orange.Biometric.FaceTemplate.v1");
+                foreach (var row in await db.FaceTemplates.Where(t => t.UserId == userId).ToListAsync())
+                    row.ProtectedTemplate = old.Protect(current.Unprotect(row.ProtectedTemplate));
+                await db.SaveChangesAsync();
+            }
+            var (_, legacyCsrf) = await IdentityStart(legacy, "face");
+            var legacyFace = await Post(legacy, legacyCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(legacy, legacyCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+            bool migrated;
+            using (var scope = services.CreateScope())
+            {
+                var current = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>().CreateProtector("Orange.Biometric.FaceTemplate.v1");
+                migrated = (await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().FaceTemplates.AsNoTracking().Where(t => t.UserId == userId).ToListAsync())
+                    .All(t => { try { current.Unprotect(t.ProtectedTemplate); return true; } catch { return false; } });
+            }
+            check(legacyFace.StatusCode == HttpStatusCode.OK && migrated && (await legacy.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
+                "a face enrolled under the old key scope still signs in and is re-encrypted under the current scope");
+        }
+        using (var unreadable = newClient())
+        {
+            // Templates encrypted under other data-protection keys: the person is told to enroll again.
+            using (var scope = services.CreateScope())
+                await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().FaceTemplates.Where(t => t.UserId == userId)
+                    .ExecuteUpdateAsync(t => t.SetProperty(x => x.ProtectedTemplate, RandomNumberGenerator.GetBytes(64)));
+            var (_, unreadableCsrf) = await IdentityStart(unreadable, "face");
+            var unreadableFace = await Post(unreadable, unreadableCsrf, "/Biometrics/FaceLogin", FaceBody(await FaceChallenge(unreadable, unreadableCsrf, "/Biometrics/FaceChallenge", new { }), face, email));
+            check(unreadableFace.StatusCode == HttpStatusCode.Unauthorized && (await unreadableFace.Content.ReadAsStringAsync()).Contains("could not be opened") &&
+                  (await unreadable.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+                "an unreadable stored face asks for re-enrollment and signs nobody in");
+        }
+        using (var mismatch = newClient())
+        {
+            var (wrongType, mismatchCsrf) = await Credentials(mismatch, password, "other");
+            check(wrongType.StatusCode == HttpStatusCode.Conflict && (await wrongType.Content.ReadAsStringAsync()).Contains("supplier account") &&
+                  (await Post(mismatch, mismatchCsrf, "/Biometrics/FaceChallenge", new { })).StatusCode == HttpStatusCode.Unauthorized &&
+                  (await mismatch.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK,
+                "an account-type mismatch signs nobody in and opens no identity step");
+        }
+        using (var passwordChoice = newClient())
+        {
+            var (signedIn, _) = await Credentials(passwordChoice, password, "supplier");
+            var choiceBody = await signedIn.Content.ReadFromJsonAsync<JsonElement>();
+            check(signedIn.StatusCode == HttpStatusCode.OK && choiceBody.GetProperty("outcome").GetString() == "signedIn" &&
+                  choiceBody.GetProperty("redirect").GetString() == "/Supplier" && (await passwordChoice.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK,
+                "an approved supplier who chose Email & Password is signed in by the correct password");
+        }
 
         using var passwordOnly = newClient();
-        var refused = await PasswordLogin(passwordOnly);
-        check(refused.StatusCode == HttpStatusCode.OK && (await refused.Content.ReadAsStringAsync()).Contains("Supplier accounts sign in with face recognition") &&
-              (await passwordOnly.GetAsync("/Supplier")).StatusCode != HttpStatusCode.OK, "approved supplier with face enrolled cannot bypass it with the password");
+        var plainPost = await PasswordLogin(passwordOnly);
+        check(plainPost.StatusCode == HttpStatusCode.Redirect && plainPost.Headers.Location?.ToString() == "/Supplier" &&
+              (await passwordOnly.GetAsync("/Supplier")).StatusCode == HttpStatusCode.OK, "Email & Password also works as a plain form post (no JavaScript)");
         foreach (var status in new[] { SupplierStatus.Rejected, SupplierStatus.Suspended })
         {
             using var scope = services.CreateScope();
@@ -452,10 +610,10 @@ static class BiometricChecks
         return Base64Url.Encode(await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().UserPasskeys.Where(c => c.UserId == userId).Select(c => c.CredentialId).FirstAsync());
     }
 
-    static string Csrf(string html) =>
+    internal static string Csrf(string html) =>
         WebUtility.HtmlDecode(Regex.Match(html, "name=\\\"__RequestVerificationToken\\\"[^>]*value=\\\"([^\\\"]+)\\\"").Groups[1].Value);
 
-    static Task<HttpResponseMessage> Post(HttpClient client, string csrf, string path, object body)
+    internal static Task<HttpResponseMessage> Post(HttpClient client, string csrf, string path, object body)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body, options: Json) };
         request.Headers.Add("RequestVerificationToken", csrf);
@@ -469,22 +627,22 @@ static class BiometricChecks
         return dict;
     }
 
-    static byte[] AuthData(byte flags, uint counter, byte[]? attested = null)
+    static byte[] AuthData(byte flags, uint counter, byte[]? attested = null, string rpId = "localhost")
     {
-        var data = new List<byte>(SHA256.HashData(Encoding.UTF8.GetBytes("localhost"))) { flags };
+        var data = new List<byte>(SHA256.HashData(Encoding.UTF8.GetBytes(rpId))) { flags };
         data.AddRange([(byte)(counter >> 24), (byte)(counter >> 16), (byte)(counter >> 8), (byte)counter]);
         if (attested is not null) data.AddRange(attested);
         return data.ToArray();
     }
 
-    static object Attestation(string tokenValue, string challenge, byte[] credentialId, ECDsa key, byte flags = 0x45, string origin = Origin)
+    internal static object Attestation(string tokenValue, string challenge, byte[] credentialId, ECDsa key, byte flags = 0x45, string origin = Origin, string rpId = "localhost")
     {
         var p = key.ExportParameters(false);
         var cose = new List<byte> { 0xA5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20 };
         cose.AddRange(p.Q.X!); cose.AddRange([0x22, 0x58, 0x20]); cose.AddRange(p.Q.Y!);
         var attested = new List<byte>(new byte[16]) { (byte)(credentialId.Length >> 8), (byte)credentialId.Length };
         attested.AddRange(credentialId); attested.AddRange(cose);
-        var authData = AuthData(flags, 0, attested.ToArray());
+        var authData = AuthData(flags, 0, attested.ToArray(), rpId);
 
         var obj = new List<byte> { 0xA3 };
         obj.AddRange(CborText("fmt")); obj.AddRange(CborText("none"));
@@ -503,10 +661,10 @@ static class BiometricChecks
             response = new { clientDataJSON = clientData, authenticatorData = Base64Url.Encode(authData), signature = Base64Url.Encode(signature), userHandle = Base64Url.Encode(Encoding.UTF8.GetBytes(userId)) }, clientExtensionResults = new { } })
     };
 
-    static object SignedAssertion(JsonElement options, byte[] id, ECDsa key, string userId, uint counter)
+    internal static object SignedAssertion(JsonElement options, byte[] id, ECDsa key, string userId, uint counter, string origin = Origin, string rpId = "localhost", byte flags = 0x05)
     {
-        var clientData = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { type = "webauthn.get", challenge = options.GetProperty("challenge").GetString(), origin = Origin, crossOrigin = false }));
-        var authData = AuthData(0x05, counter);
+        var clientData = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { type = "webauthn.get", challenge = options.GetProperty("challenge").GetString(), origin, crossOrigin = false }));
+        var authData = AuthData(flags, counter, null, rpId);
         var signature = key.SignData(authData.Concat(SHA256.HashData(clientData)).ToArray(), HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
         return Assertion(id, Base64Url.Encode(clientData), authData, signature, userId);
     }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Orange_Tendering_System.Models.Biometric;
@@ -13,7 +14,10 @@ public static class BiometricServiceCollectionExtensions
     {
         services.Configure<BiometricOptions>(configuration.GetSection("Biometric"));
         services.AddMemoryCache();
-        services.AddDataProtection();
+        // One fixed application name: without it the key ring is scoped to the folder the app runs from, so face
+        // templates enrolled by one copy (Visual Studio, a worktree, another port) could not be read by another and
+        // every face sign-in failed. Changing it once means faces enrolled before must be enrolled again.
+        services.AddDataProtection().SetApplicationName("Orange-Tendering-System");
 
         // Identity's built-in passkey (WebAuthn) settings, shared by registration and sign-in so both ceremonies use
         // the same site id (RP ID) and origin rule.
@@ -43,6 +47,8 @@ public static class BiometricServiceCollectionExtensions
 
         services.AddSingleton<ChallengeStore>();
         services.AddSingleton<BiometricThrottle>();
+        services.AddSingleton<SupplierPreAuth>();
+        services.AddSingleton<PhoneLinkStore>();
         services.AddScoped<PasskeyService>();
         services.AddScoped<FaceService>();
         services.AddScoped<BiometricSignInService>();

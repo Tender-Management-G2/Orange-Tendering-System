@@ -32,56 +32,12 @@ public class ReportsController(ApplicationDbContext db, TenderWorkflowService wo
 
     public async Task<IActionResult> Details(int id)
     {
-        var report = await db.TenderReports.AsNoTracking().Include(r => r.TenderRound).ThenInclude(r => r.Tender).SingleOrDefaultAsync(r => r.Id == id);
-        return report == null ? NotFound() : View(report);
+        await Workflow.ReviewReport(id, User);
+        return RedirectToAction(nameof(Review), new { id });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> SubmitToManager(int id)
-    {
-        var committeeReport = await db.TenderReports
-            .Include(r => r.TenderRound).ThenInclude(r => r.Tender)
-            .SingleOrDefaultAsync(r => r.Id == id && r.ReportType == ReportType.FullEvaluation && r.Status == ReportStatus.Submitted);
-        if (committeeReport == null) return NotFound();
-        if (await db.AuditLogs.AnyAsync(a => a.Action == "ForwardEvaluationReportToManager"
-            && a.EntityName == nameof(TenderReport) && a.EntityId == id.ToString()))
-        {
-            TempData["ManagerForwarded"] = "This committee report has already been sent to the Sourcing Manager.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        var managerMember = await db.CommitteeMembers.SingleOrDefaultAsync(m =>
-            m.TenderId == committeeReport.TenderRound.TenderId
-            && m.CommitteeType == CommitteeType.Evaluation
-            && m.Responsibility == CommitteeResponsibility.SourcingManager);
-        if (managerMember == null)
-        {
-            TempData["ManagerForwardError"] = "No Sourcing Manager is assigned to this tender yet. Assign the manager, then try again.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        committeeReport.TenderRound.Tender.Status = TenderStatus.ManagerReview;
-        var now = DateTime.UtcNow;
-        db.Notifications.Add(new Notification
-        {
-            UserId = managerMember.UserId,
-            Title = "Evaluation report ready for review",
-            Message = $"The Sourcing Officer sent the committee evaluation report for {committeeReport.TenderRound.Tender.Title}.",
-            Link = "/SourcingManager/Reports",
-            CreatedAt = now
-        });
-        db.AuditLogs.Add(new AuditLog
-        {
-            UserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value,
-            Action = "ForwardEvaluationReportToManager",
-            EntityName = nameof(TenderReport),
-            EntityId = committeeReport.Id.ToString(),
-            CreatedAt = now
-        });
-        await db.SaveChangesAsync();
-        TempData["ManagerForwarded"] = "Committee report sent to the assigned Sourcing Manager.";
-        return RedirectToAction(nameof(Index));
-    }
+    public Task<IActionResult> SubmitToManager(int id) => Forward(id);
 
     public IActionResult Comparison(int? id) => RedirectToAction("Index", "Workflow");
     public IActionResult EvaluationResult(int? id) => RedirectToAction("Index", "Workflow");

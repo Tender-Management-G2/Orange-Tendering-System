@@ -1,14 +1,33 @@
 @model Orange_Tendering_System.ViewModels.RequirementsInput
 @inject Microsoft.AspNetCore.Identity.UserManager<Orange_Tendering_System.Models.Entities.ApplicationUser> People
+@inject Orange_Tendering_System.Services.TenderWorkflowService CommitteeConfiguration
 @inject Orange_Tendering_System.Data.ApplicationDbContext Records
 @using Microsoft.EntityFrameworkCore
 @{
-    // Pick people by name instead of pasting Identity user ids: only active accounts of the right role are offered (the server re-checks every choice).
-    async Task<List<(string Id, string Label, int? Dept)>> Pool(string role) => (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive)
-        .Select(u => (u.Id, (string.IsNullOrWhiteSpace(u.FullName) ? u.Email : u.FullName + " (" + u.Email + ")")!, u.DepartmentId)).OrderBy(u => u.Item2).ToList();
+    // Show only accounts eligible for the seat; Create validates the selection again.
+    async Task<List<(string Id, string Label, int? Dept)>> Pool(string role)
+    {
+        var result = new List<(string Id, string Label, int? Dept)>();
+        foreach (var person in (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive))
+        {
+            var roles = await People.GetRolesAsync(person);
+            if (roles.Contains(Orange_Tendering_System.Models.SystemRoles.Admin) ||
+                roles.Contains(Orange_Tendering_System.Models.SystemRoles.Supplier) ||
+                roles.Contains(Orange_Tendering_System.Models.SystemRoles.SourcingOfficer) ||
+                Orange_Tendering_System.Models.SystemRoles.AccountRoles(role).Any(required => !roles.Contains(required))) continue;
+            result.Add((person.Id, (string.IsNullOrWhiteSpace(person.FullName) ? person.Email : person.FullName + " (" + person.Email + ")")!, person.DepartmentId));
+        }
+        return result.OrderBy(u => u.Label).ToList();
+    }
+    var fixedEvaluation = await CommitteeConfiguration.StandingEvaluationDefaults();
+    Model.SourcingManagerId = fixedEvaluation.GetValueOrDefault("evaluation-manager") ?? "";
+    Model.FinancialRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-financial") ?? "";
+    Model.TechnicalRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-technical-1") ?? "";
     var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager);
-    var evaluators = await Pool(Orange_Tendering_System.Models.SystemRoles.EvaluationCommittee);
-    var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted).OrderByDescending(r => r.Id)
+    var financialRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.Finance);
+    var technicalRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.Technical);
+    var departmentRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.DepartmentRepresentative);
+    var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted && !r.Tenders.Any()).OrderByDescending(r => r.Id)
         .Select(r => new
         {
             id = r.Id, deptId = r.DepartmentId, title = r.Title, dept = r.Department.Name, why = r.Justification, priority = r.Priority.ToString(),
@@ -19,10 +38,10 @@
     var currencies = new[] { "JOD", "USD", "EUR", "SAR", "AED", "EGP" };
     var seats = new (string Field, string Title, string Hint, string Icon, List<(string Id, string Label, int? Dept)> Pool, string Value)[]
     {
-        ("SourcingManagerId", "Sourcing Manager", "Reviews the report and approves the weights", "M", managers, Model.SourcingManagerId),
-        ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", evaluators, Model.DepartmentRepresentativeId),
-        ("FinancialRepresentativeId", "Financial Representative", "Scores the financial side", "F", evaluators, Model.FinancialRepresentativeId),
-        ("TechnicalRepresentativeId", "Technical Representative", "Scores the technical side", "T", evaluators, Model.TechnicalRepresentativeId)
+        ("SourcingManagerId", "Sourcing Manager", "Reviews the signed report: approve, reject or return", "M", managers, Model.SourcingManagerId),
+        ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", departmentRepresentatives, Model.DepartmentRepresentativeId),
+        ("FinancialRepresentativeId", "Financial Representative", "Scores the financial side", "F", financialRepresentatives, Model.FinancialRepresentativeId),
+        ("TechnicalRepresentativeId", "Technical Representative", "Scores the technical side", "T", technicalRepresentatives, Model.TechnicalRepresentativeId)
     };
 }
 <dialog id="tc-dialog" class="tc-dialog" aria-labelledby="tc-title">
@@ -58,7 +77,7 @@
                     <label class="tc-field tc-wide"><span>Description</span><textarea asp-for="Description" required rows="3" placeholder="What is being bought and why"></textarea></label>
                     <div class="tc-field tc-wide"><span>Technical requirements</span><textarea asp-for="TechnicalRequirements" required rows="4" placeholder="Specifications the suppliers must meet"></textarea></div>
                     <div class="tc-field tc-wide"><span>Financial and commercial conditions</span>
-                        <select class="tc-template" data-target="CommercialConditions" aria-label="Commercial conditions template"><option value="">Quick pick…</option><option>Fixed price in the tender currency, valid for 90 days. Payment within 30 days of delivery and acceptance.</option><option>Fixed price, valid for 60 days. 30% advance payment, 70% on delivery and acceptance.</option><option>Unit prices, valid for 120 days. Payment in three milestones tied to delivery stages.</option></select>
+                        <select class="tc-template" data-target="CommercialConditions" aria-label="Commercial conditions template"><option value="">Quick pick…</option><option>price in the tender currency, valid for 90 days. Payment within 30 days of delivery and acceptance.</option><option>price, valid for 60 days. 30% advance payment, 70% on delivery and acceptance.</option><option>Unit prices, valid for 120 days. Payment in three milestones tied to delivery stages.</option></select>
                         <textarea asp-for="CommercialConditions" required rows="3" placeholder="Pricing validity, payment terms, taxes"></textarea></div>
                     <div class="tc-field"><span>Delivery expectations</span>
                         <select class="tc-template" data-target="DeliveryExpectations" aria-label="Delivery template"><option value="">Quick pick…</option><option>Delivery within 30 days of the purchase order.</option><option>Delivery within 60 days of the purchase order.</option><option>Phased delivery over 90 days according to a schedule agreed with the requesting department.</option></select>
@@ -74,7 +93,7 @@
             </section>
 
             <section class="tc-card" aria-labelledby="tc-s3">
-                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p>Four different people, one for each seat. A person already chosen is disabled in the other lists.</p></div></header>
+                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p>Choose active users assigned to each role by Admin. The department representative must belong to the requesting department.</p></div></header>
                 <div class="tc-seats">
                     @foreach (var s in seats)
                     {
@@ -180,14 +199,20 @@
         var vals = seatSelects.map(function (s) { return s.value; });
         if (new Set(vals).size !== 4) { showErrors(['Choose four different people for the four committee seats.']); return; }
         var b = $('tc-submit'); b.disabled = true; b.firstChild.textContent = 'Creating… ';
+        var motion = window.OrangeMotion ? OrangeMotion.begin({ mode: 'popup', title: 'Creating the tender', description: 'Saving the requirements and committee seats.' }) : null;
         fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
             .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
             .then(function (x) {
-                if (x.ok && x.d && x.d.id) { window.location.href = form.dataset.listUrl + '?created=' + x.d.id; return; }
+                if (x.ok && x.d && x.d.id) {
+                    var go = function () { window.location.href = form.dataset.listUrl + '?created=' + x.d.id; };
+                    if (motion && x.d.feedback) motion.finish(x.d.feedback).then(go, go); else go();
+                    return;
+                }
+                if (motion) motion.cancel();
                 b.disabled = false; b.firstChild.textContent = 'Create tender ';
                 showErrors((x.d && x.d.errors && x.d.errors.length) ? x.d.errors : ['The tender could not be created. Check the form and try again.']);
             })
-            .catch(function () { b.disabled = false; b.firstChild.textContent = 'Create tender '; showErrors(['The server could not be reached. Try again.']); });
+            .catch(function () { if (motion) motion.cancel(); b.disabled = false; b.firstChild.textContent = 'Create tender '; showErrors(['The server could not be reached. Try again.']); });
     });
     // Dialog open / close, and ?request=ID opens it with that purchase request chosen.
     var dlg = $('tc-dialog');
@@ -197,6 +222,9 @@
     dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
     var q = new URLSearchParams(window.location.search);
     if (q.get('request') || q.get('new')) { openDlg(q.get('request')); }
+    // ?title= comes from the Executive Agent hand-off; it only pre-fills the field, the user still reviews and submits.
+    var askedTitle = (q.get('title') || '').trim().slice(0, 200);
+    if (askedTitle) { $('Title').value = askedTitle; auto['Title'] = undefined; }
     showRequest(); seats(); progress();
 })();
 </script>

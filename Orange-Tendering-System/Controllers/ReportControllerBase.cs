@@ -22,7 +22,7 @@ public abstract class ReportControllerBase(TenderWorkflowService workflow) : Con
     }
     public async Task<IActionResult> Pdf(int id, bool download = false)
     {
-        var copy = await workflow.ReportPdf(id, User); PrivateResponse();
+        var copy = await workflow.ReportPdf(id, User, download); PrivateResponse();
         Response.Headers["X-Canonical-SHA256"] = copy.CanonicalHash;
         Response.Headers["X-Access-Copy-SHA256"] = copy.CopyHash;
         return download ? File(copy.Bytes, "application/pdf", copy.Name) : File(copy.Bytes, "application/pdf");
@@ -35,11 +35,14 @@ public abstract class ReportControllerBase(TenderWorkflowService workflow) : Con
     [HttpPost] public async Task<IActionResult> Resubmit(int id, int revisionId, string correction)
     {
         ValidateForm(); await workflow.ResubmitReportRevision(revisionId, correction, User);
-        var report = await workflow.ReviewReport(id, User); TempData["ReportMessage"] = "A new report version was generated. All required signatures must be collected again.";
+        var report = await workflow.ReviewReport(id, User);
+        var feedback = await OrangeWorkflowFeedback.For(this, workflow, report.Tender.Id);
+        if (feedback is not null) TempData.Orange(feedback);
+        else TempData["ReportMessage"] = "A new report version was generated. All required signatures must be collected again.";
         return RedirectToAction(nameof(Review), new { id = report.Versions.First().Id });
     }
     // The signature drawn on the pad arrives as a PNG data URL. It is required, must be a real PNG and must not be huge.
-    protected static byte[] ReadSignature(string? dataUrl)
+    public static byte[] ReadSignature(string? dataUrl)
     {
         const string prefix = "data:image/png;base64,";
         TenderWorkflowService.Require(!string.IsNullOrWhiteSpace(dataUrl) && dataUrl!.StartsWith(prefix, StringComparison.Ordinal) && dataUrl.Length < 400_000, "Draw your signature in the box first.");
@@ -52,9 +55,13 @@ public abstract class ReportControllerBase(TenderWorkflowService workflow) : Con
     protected async Task<IActionResult> Execute(int id, Func<Task> action)
     {
         ValidateForm(); await action();
+        // Orange Motion feedback for what was committed; id is the report here, the catalog needs its tender.
+        var feedback = await OrangeWorkflowFeedback.For(this, workflow, await workflow.TenderIdForReport(id) ?? 0);
         // Signing, voting and forwarding happen inside the tender popup: answer it with JSON instead of redirecting to a separate page.
-        if (IsAjax) return Json(new { ok = true });
-        TempData["ReportMessage"] = "The report lifecycle action was saved."; return RedirectToAction(nameof(Review), new { id });
+        if (IsAjax) return Json(new { ok = true, feedback = feedback?.ToJsonElement() });
+        if (feedback is not null) TempData.Orange(feedback);
+        else TempData["ReportMessage"] = "The report lifecycle action was saved.";
+        return RedirectToAction(nameof(Review), new { id });
     }
     private void ValidateForm()
     { if (!ModelState.IsValid) throw new WorkflowException(string.Join(" ", ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage))); }

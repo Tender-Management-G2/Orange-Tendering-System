@@ -1,32 +1,8 @@
+
 @*
-===========================================================
 ORANGE TENDER MANAGEMENT SYSTEM
+OWNER: Rjoub
 PAGE: Create Department
-
-DEVELOPER OWNER: Rjoub
-MODULE: Administration
-TRELLO TASK: Department Management
-TRELLO URL: https://trello.com/c/KHRsEmzE
-
-PURPOSE:
-Form to add a department.
-
-BUSINESS ACCESS:
-Admin
-
-ROUTE: /Admin/Departments/Create
-
-FUTURE IMPLEMENTATION:
-- POST Create with [ValidateAntiForgeryToken]; handle the
-  unique Name index violation with a friendly message.
-- Audit the creation.
-
-DEPENDENCIES:
-Departments, AuditLogs.
-
-STATUS:
-UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
-===========================================================
 *@
 
 @model CreateDepartmentViewModel
@@ -34,7 +10,8 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 @{
     ViewData["Title"] = "Create Department";
     ViewData["WorkspaceSection"] = "Departments";
-    ViewData["Description"] = "Add a new department to the organization.";
+    ViewData["Description"] =
+        "Add a department.";
 }
 
 <partial name="_PageHeader" />
@@ -62,8 +39,8 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
                 <input asp-for="Name"
                        class="form-control"
-                       placeholder="Enter department name"
-                       maxlength="100" />
+                       maxlength="100"
+                       placeholder="Enter department name" />
 
                 <span asp-validation-for="Name"
                       class="text-danger"></span>
@@ -79,22 +56,25 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
                 <textarea asp-for="Description"
                           class="form-control"
-                          rows="4"
-                          maxlength="500"
-                          placeholder="Enter department description"></textarea>
+                          rows="2"
+                          maxlength="160"
+                          placeholder="Brief description (up to 160 characters)"></textarea>
 
                 <span asp-validation-for="Description"
                       class="text-danger"></span>
             </div>
 
-            <!-- Status -->
-            <label class="pg-check">
-                <input asp-for="IsActive" />
-                Active
-            </label>
+            <!-- Department Status -->
+            <div class="pg-field pg-field-wide">
+                <label class="pg-check">
+                    <input asp-for="IsActive" />
+                    Active Department
+                </label>
+            </div>
 
         </div>
 
+        <!-- ACTIONS -->
         <div class="pg-actions">
 
             <button type="submit"
@@ -114,18 +94,6 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
     </form>
 
 </section>
-
-<nav class="pg-links" aria-label="Related pages">
-    <ul>
-        <li>
-            <a asp-area="Admin"
-               asp-controller="Departments"
-               asp-action="Index">
-                Back to Departments
-            </a>
-        </li>
-    </ul>
-</nav>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

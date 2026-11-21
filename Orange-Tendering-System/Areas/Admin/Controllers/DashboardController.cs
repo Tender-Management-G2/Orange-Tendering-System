@@ -31,7 +31,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             dashboard = new Orange_Tendering_System.ViewModels.WorkspaceDashboardViewModel
                 {
                     DataConnected = dashboard.DataConnected,
-                    DisplayName = User.Identity?.Name,  // عبّينا DisplayName من اسم المستخدم المسجل دخوله
+                    DisplayName = await _adminService.GetDisplayNameAsync(User) ?? User.Identity?.Name, // full name of the signed-in admin  // عبّينا DisplayName من اسم المستخدم المسجل دخوله
                 Metrics = dashboard.Metrics,
                     Trends = dashboard.Trends,
                     Tasks = dashboard.Tasks,

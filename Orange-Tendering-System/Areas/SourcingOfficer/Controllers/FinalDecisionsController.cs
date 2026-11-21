@@ -20,6 +20,9 @@ public sealed class FinalDecisionsController(TenderWorkflowService workflow, Fin
         catch (WorkflowException e) { items = []; TempData["FlashError"] = e.Message; }
         ViewBag.Suppliers = await db.Suppliers.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.CompanyName);
         ViewBag.Emails = await db.Users.AsNoTracking().Where(u => u.SupplierId != null).ToDictionaryAsync(u => u.Id, u => u.Email);
+        var tenderIds = items.Select(x => x.TenderId).Distinct().ToList();
+        ViewBag.Rounds = await db.TenderRounds.AsNoTracking().Where(r => tenderIds.Contains(r.TenderId)).GroupBy(r => r.TenderId)
+            .Select(g => new { g.Key, Max = g.Max(r => r.RoundNumber) }).ToDictionaryAsync(x => x.Key, x => x.Max);
         return View(items);
     }
 
@@ -27,15 +30,54 @@ public sealed class FinalDecisionsController(TenderWorkflowService workflow, Fin
     public async Task<IActionResult> Notify(int id)
     {
         var ajax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
-        try { await decisions.NotifySuppliers(id, User); TempData["Flash"] = "Suppliers were notified of the final result."; if (ajax) return Json(new { ok = true }); }
+        try
+        {
+            await decisions.NotifySuppliers(id, User);
+            var notified = OrangeFeedback.Popup("Suppliers notified!", "Every participating supplier was told the outcome.", OrangeVariant.Send);
+            if (ajax) return Json(new { ok = true, feedback = notified.ToJsonElement() });
+            TempData.Orange(notified);
+        }
         catch (WorkflowException e) { if (ajax) return BadRequest(new { error = e.Message }); TempData["FlashError"] = e.Message; }
         return RedirectToAction(nameof(Index));
+    }
+
+    // Re-Tender requested by the Top Committee and forwarded by the Manager: edit permitted details, deadline and invitations, then publish.
+    [HttpGet]
+    public async Task<IActionResult> Retender(int id)
+    {
+        try { return View(await workflow.RetenderPlan(id, User)); }
+        catch (WorkflowException e) { TempData["FlashError"] = e.Message; return RedirectToAction(nameof(Index)); }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Retender(int id, Orange_Tendering_System.ViewModels.RetenderInput input)
+    {
+        var ajax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+        if (ModelState.IsValid)
+        {
+            try
+            {
+                await workflow.PublishRetender(id, input, User);
+                var published = OrangeFeedback.Popup("New round published", "Previous and newly invited suppliers were notified. They must submit new offers.", OrangeVariant.Send);
+                if (ajax) return Json(new { ok = true, feedback = published.ToJsonElement() });
+                TempData.Orange(published);
+                return RedirectToAction("Index", "Workflow", new { open = id });
+            }
+            catch (WorkflowException e) { ModelState.AddModelError("", e.Message); }
+        }
+        if (ajax) return BadRequest(new { error = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault() ?? "Check the form." });
+        // Re-render with the entered values kept.
+        var plan = await workflow.RetenderPlan(id, User);
+        plan.Title = input.Title ?? ""; plan.Description = input.Description ?? "";
+        if (input.Deadline != default) plan.Deadline = input.Deadline.UtcDateTime;
+        ViewBag.Selected = input.SupplierIds ?? [];
+        return View(plan);
     }
 
     [HttpPost]
     public async Task<IActionResult> Retry(int id)
     {
-        try { await decisions.RetryEmails(id, User); TempData["Flash"] = "Failed e-mail deliveries were retried."; }
+        try { await decisions.RetryEmails(id, User); TempData.Orange(OrangeFeedback.Toast("Deliveries retried", "Failed e-mails were sent again.", OrangeVariant.Send)); }
         catch (WorkflowException e) { TempData["FlashError"] = e.Message; }
         return RedirectToAction(nameof(Index));
     }

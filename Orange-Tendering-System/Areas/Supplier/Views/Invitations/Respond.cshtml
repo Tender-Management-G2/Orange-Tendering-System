@@ -11,7 +11,7 @@
     <h2>@Model.TenderTitle</h2>
     <dl class="pg-dl">
         <div><dt>Round</dt><dd>@Model.RoundNumber</dd></div>
-        <div><dt>Deadline</dt><dd>@(Model.Deadline?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
+        <div><dt>Deadline</dt><dd>@(Model.Deadline?.ToJordan("yyyy-MM-dd HH:mm") ?? "—")</dd></div>
         <div><dt>Status</dt><dd>@Model.DisplayStatus</dd></div>
     </dl>
 
