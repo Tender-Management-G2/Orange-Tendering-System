@@ -2,12 +2,13 @@
 (() => {
   if (window.orangeTheme) return;
   const root = document.documentElement;
-  const key = 'orange-ui-theme';
+  const scope = root.dataset.themeScope;
+  const key = scope ? 'orange-ui-theme-' + scope : 'orange-ui-theme';
   const system = window.matchMedia?.('(prefers-color-scheme: light)');
   const valid = value => value === 'light' || value === 'dark';
   const read = () => { try { return localStorage.getItem(key); } catch { return null; } };
   let preference = read();
-  const preferred = () => valid(preference) ? preference : system?.matches ? 'light' : 'dark';
+  const preferred = () => valid(preference) ? preference : !scope && system?.matches ? 'light' : 'dark';
   const controls = '#theme-toggle,.ws-theme-toggle,[data-theme-toggle]';
   function synchronize() {
     const light = root.dataset.theme === 'light';

@@ -20,10 +20,15 @@ through WorkspaceNavigation.LayoutFor.
     var serverSearch = routeArea.Equals("Admin", StringComparison.OrdinalIgnoreCase)
         && routeAction.Equals("Index", StringComparison.OrdinalIgnoreCase)
         && new[] { "Users", "Suppliers", "Departments", "AuditLogs" }.Contains(routeController, StringComparer.OrdinalIgnoreCase);
+    var isDashboard = Active("Admin", new[] { "Dashboard" }, "Index") == "is-active";
+    var isCommitteeHome = Active("Admin", new[] { "Committees" }, "Index") == "is-active";
+    var isWorkspaceHome = string.IsNullOrEmpty(routeArea) && routeController.Equals("Workspace", StringComparison.OrdinalIgnoreCase)
+        && routeAction.Equals("Index", StringComparison.OrdinalIgnoreCase);
+    var isManagementList = Active("Admin", new[] { "Users", "Departments", "Suppliers", "AuditLogs" }, "Index") == "is-active";
     var pageTitle = ViewData["Title"]?.ToString() ?? $"{label} workspace";
 }
 <!doctype html>
-<html lang="@UiText.Lang(Context)" dir="@UiText.Dir(Context)">
+<html lang="@UiText.Lang(Context)" dir="@UiText.Dir(Context)" data-theme-scope="@(isDashboard ? "admin-dashboard" : null)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -38,11 +43,15 @@ through WorkspaceNavigation.LayoutFor.
     <link rel="stylesheet" href="~/css/officer-topbar.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/officer-theme.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin-pages.css" asp-append-version="true" />
+    @if (isManagementList)
+    {
+        <link rel="stylesheet" href="~/css/admin-management.css" asp-append-version="true" />
+    }
     @await RenderSectionAsync("Styles", required: false)
     <link rel="stylesheet" href="~/css/theme-surfaces.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/typography.css" asp-append-version="true" />
 </head>
-<body class="ws-shell ws-internal so-shell @ViewData["BodyClass"]" data-bilingual="true" data-workspace-role="Admin">
+<body class="ws-shell ws-internal so-shell @(isDashboard ? "admin-dashboard-page" : "") @(isManagementList ? "admin-management-page" : "") @ViewData["BodyClass"]" data-bilingual="true" data-workspace-role="Admin">
     <a class="ws-skip" href="#workspace-main">@UiText.T(Context, "Skip to main content")</a>
     <aside class="ws-sidebar" id="workspace-navigation" aria-label="@label workspace navigation">
         <div class="ws-sidebar-brand">
@@ -68,7 +77,7 @@ through WorkspaceNavigation.LayoutFor.
     <div class="ws-stage">
         <header class="ws-topbar">
             <button class="ws-icon-button ws-nav-open" type="button" aria-label="Open navigation" aria-controls="workspace-navigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
-            <div class="ws-search" data-global-search data-search-url="@Url.Action("Query", "Search", new { area = "" })"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="@UiText.T(Context, "Search for requests, tenders, bids, suppliers...")" aria-label="Search users and suppliers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
+            <div class="ws-search" data-global-search data-voice-term-url="@Url.Action("AdminVoiceTerm", "Search", new { area = "" })" data-voice-scope="@routeController.ToLowerInvariant()" data-search-url="@Url.Action("Query", "Search", new { area = "" })"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="m15 15 6 6" /></svg><input type="search" placeholder="@UiText.T(Context, "Search users and suppliers...")" aria-label="Search users and suppliers" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ws-search-results" /><div id="ws-search-results" class="ws-search-results" role="listbox" hidden></div></div>
             <div class="ws-topbar-actions">
                 <partial name="_LanguageSelector" />
                 <span data-search-feedback class="ws-sr-only" role="status" aria-live="polite"></span>
@@ -83,8 +92,7 @@ through WorkspaceNavigation.LayoutFor.
                 @* Admin page search: filters this page's records (server search on Users, Suppliers, Departments, Audit Logs).
                    The top bar now holds the same global search as every role (restored after the WorkV3 merge). *@
                 @* Shown on list pages only; forms and detail pages have nothing to filter. *@
-                @if (routeAction.Equals("Maintenance", StringComparison.OrdinalIgnoreCase) ||
-                    routeAction.Equals("Index", StringComparison.OrdinalIgnoreCase) && !routeController.Equals("Analytics", StringComparison.OrdinalIgnoreCase) && !routeController.Equals("HayaAdminReports", StringComparison.OrdinalIgnoreCase))
+                @if (!isManagementList && !isCommitteeHome && !isWorkspaceHome && routeAction.Equals("Index", StringComparison.OrdinalIgnoreCase) && !routeController.Equals("Analytics", StringComparison.OrdinalIgnoreCase) && !routeController.Equals("HayaAdminReports", StringComparison.OrdinalIgnoreCase))
                 {
                 <form class="pg-toolbar admin-page-search" data-admin-search data-server-search="@(serverSearch ? "true" : "false")" role="search">
                     <input type="search" name="search" placeholder="Search @pageTitle…" aria-label="Search @pageTitle" aria-describedby="admin-search-status" autocomplete="off" />

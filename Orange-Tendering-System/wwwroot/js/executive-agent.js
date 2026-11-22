@@ -7,10 +7,29 @@
   const mic = root.querySelector('[data-agent-mic]'), runButton = root.querySelector('[data-agent-run]');
   const topMic = document.querySelector('[data-voice-search]');
   const target = document.createElement('select'); target.className = 'agent-target'; target.setAttribute('aria-label','Microphone mode'); target.dataset.agentTarget = '';
-  for (const [value,text] of [['agent','أوامر صوتية'],['search','Voice search']]) { const o=document.createElement('option');o.value=value;o.textContent=text;target.append(o); }
-  if(topMic)topMic.before(target);
-  topMic?.setAttribute('title','أوامر صوتية مباشرة — اضغط واحكي');
-  topMic?.setAttribute('aria-label','بدء الأوامر الصوتية');
+  const adminSearch = document.body.dataset.workspaceRole === 'Admin';
+  const modes = adminSearch
+    ? [['agent', 'أوامر صوتية'], ['search', 'بحث صوتي بالعربي', 'ar-JO'], ['search-en', 'Voice search (English)', 'en-US']]
+    : [['agent', 'أوامر صوتية'], ['search', 'Voice search']];
+  for (const [value, text, speechLanguage] of modes) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    if (speechLanguage) option.dataset.speechLanguage = speechLanguage;
+    target.append(option);
+  }
+  if (topMic) {
+    // Admin starts in page search. Executive commands remain an explicit selection.
+    target.value = adminSearch ? 'search' : 'agent';
+    topMic.before(target);
+    const updateMicLabel = () => {
+      const commands = target.value === 'agent';
+      topMic.title = commands ? 'أوامر صوتية مباشرة — اضغط واحكي' : 'Voice search';
+      topMic.setAttribute('aria-label', commands ? 'بدء الأوامر الصوتية' : 'Voice search');
+    };
+    updateMicLabel();
+    target.addEventListener('change', updateMicLabel);
+  }
   const open = document.createElement('button');open.type='button';open.className='ws-icon-button';open.textContent='AI';open.title='Executive Agent';open.setAttribute('aria-label','Open Executive Agent');
   if(topMic)topMic.after(open);else root.before(open);
   const show = () => { if(!dialog.open)dialog.showModal();command.focus(); };

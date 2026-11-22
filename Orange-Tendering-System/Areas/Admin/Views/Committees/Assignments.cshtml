@@ -11,10 +11,10 @@
 </section>
 <section class="ws-panel pg-panel">
     <div class="pg-panel-head"><div><h2>Select a tender</h2><p>Each tender has its own two committees. Accounts can be created from each member's seat.</p></div></div>
-    <form method="get" asp-area="Admin" asp-controller="Committees" asp-action="Assignments" class="pg-toolbar">
+    <form method="get" asp-area="Admin" asp-controller="Committees" asp-action="Assignments" class="pg-toolbar" data-admin-voice-filter>
         <input type="text" name="search" value="@Model.Search" placeholder="Tender title or number" aria-label="Find tender" />
         <button type="submit" class="pg-btn pg-btn-primary">Search</button>
-        <a asp-area="Admin" asp-controller="Committees" asp-action="Index" class="pg-btn">Clear</a>
+        <a asp-area="Admin" asp-controller="Committees" asp-action="Index" class="pg-btn pg-btn-primary">Clear</a>
     </form>
     <div class="pg-table-wrap">
         <table class="pg-table" data-no-enhance>

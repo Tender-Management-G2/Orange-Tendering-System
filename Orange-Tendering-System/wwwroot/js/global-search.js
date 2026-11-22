@@ -8,8 +8,15 @@
   const voice = document.querySelector('[data-voice-search]');
   const language = document.querySelector('[data-voice-language]');
   const status = document.querySelector('[data-search-feedback]');
+  const isAdmin = document.body?.dataset.workspaceRole === 'Admin';
+  const pageFilters = isAdmin ? document.querySelector('form[data-admin-list-filters], form[data-admin-voice-filter]') : null;
+  const pageSearch = pageFilters?.querySelector('[name="search"]');
+  const pageLinks = isAdmin ? [...document.querySelectorAll('.admin-committee-choice a[href], .reports-center-card[href]')] : [];
   input.maxLength = 100;
   let timer, request, sequence = 0, active = -1, recognition, listening = false;
+  let voiceLookup;
+  pageSearch?.addEventListener("input", () => voiceLookup?.abort());
+  pageFilters?.addEventListener("submit", () => voiceLookup?.abort());
   const say = message => { if (status) status.textContent = message; };
   const close = () => { results.hidden = true; active = -1; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); };
   const node = (tag, cls, text) => { const n = document.createElement(tag); n.className = cls; n.textContent = text; return n; };
@@ -46,7 +53,7 @@
       }
     }, 220);
   };
-  input.addEventListener('input', search);
+  input.addEventListener('input', () => { voiceLookup?.abort(); search(); });
   input.addEventListener('search', search);
   input.addEventListener('keydown', event => {
     if (event.key === 'Escape') { ++sequence; clearTimeout(timer); request?.abort(); close(); return; }
@@ -59,23 +66,78 @@
     links.forEach((link, i) => { link.classList.toggle('is-active', i === active); link.setAttribute('aria-selected', String(i === active)); });
     input.setAttribute('aria-activedescendant', links[active].id); links[active].scrollIntoView({ block: 'nearest' });
   });
-  document.addEventListener('click', event => { if (!root.contains(event.target) && event.target !== voice && event.target !== language) { ++sequence; clearTimeout(timer); request?.abort(); close(); } });
+  document.addEventListener('click', event => { if (!root.contains(event.target) && !voice?.contains(event.target) && !language?.contains(event.target)) { ++sequence; clearTimeout(timer); request?.abort(); close(); } });
   if (!voice) return;
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (language) {
-    try { language.value = localStorage.getItem('orange-search-language') || (navigator.language.startsWith('ar') ? 'ar-JO' : 'en-US'); } catch { /* optional preference */ }
-    language.addEventListener('change', () => { recognition?.abort(); try { localStorage.setItem('orange-search-language', language.value); } catch { /* optional preference */ } });
+    const followsUiLanguage = isAdmin && language.hasAttribute('data-ui-language');
+    if (!followsUiLanguage) {
+      try { language.value = localStorage.getItem('orange-search-language') || (navigator.language.startsWith('ar') ? 'ar-JO' : 'en-US'); } catch { /* optional preference */ }
+    }
+    language.addEventListener('change', () => {
+      recognition?.abort();
+      if (followsUiLanguage) return;
+      try { localStorage.setItem('orange-search-language', language.value); } catch { /* optional preference */ }
+    });
   }
-  const reset = () => { listening = false; voice.classList.remove('is-listening'); voice.setAttribute('aria-pressed', 'false'); voice.setAttribute('aria-label', 'Voice search'); };
+  const reset = () => { recognition = null; listening = false; voice.classList.remove('is-listening'); voice.setAttribute('aria-pressed', 'false'); voice.setAttribute('aria-label', 'Voice search'); };
   voice.addEventListener('click', () => {
-    if (listening) { recognition?.abort(); reset(); say('Voice search stopped.'); return; }
+    voiceLookup?.abort();
+    if (listening) { const previous = recognition; reset(); previous?.abort(); say('Voice search stopped.'); return; }
     if (!Recognition || !window.isSecureContext) { const message = !Recognition ? 'This browser does not support voice search. Type your search instead.' : 'Microphone search requires HTTPS or localhost.'; say(message); window.orangeUi?.toast(message, 'info'); input.focus(); return; }
-    const current = new Recognition(); recognition = current; recognition.lang = language?.value || 'en-US'; recognition.interimResults = false; recognition.maxAlternatives = 1; recognition.continuous = false;
+    const current = new Recognition();
+    recognition = current;
+    const speechLanguage = isAdmin ? document.querySelector('[data-agent-target]')?.selectedOptions[0]?.dataset.speechLanguage : null;
+    recognition.lang = speechLanguage || language?.value || (document.documentElement.lang.toLowerCase().startsWith('ar') ? 'ar-JO' : 'en-US');
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
     listening = true; voice.setAttribute('aria-pressed', 'true'); voice.setAttribute('aria-label', 'Stop voice search'); voice.classList.add('is-listening'); say('Listening…');
-    recognition.onresult = event => { if (recognition !== current || !listening) return; const phrase = event.results[0]?.[0]?.transcript; if (phrase) { input.value = phrase.trim().slice(0, 100); input.dispatchEvent(new Event('input', { bubbles: true })); input.focus(); } };
+    recognition.onresult = async event => {
+      if (recognition !== current || !listening) return;
+      const phrase = event.results?.[0]?.[0]?.transcript?.trim();
+      if (!phrase) return;
+      const term = (isAdmin ? phrase.replace(/[.!?؟،؛。]+$/u, '').trimEnd() : phrase).slice(0, 100);
+      if (!term) return;
+      let resolved = term;
+      if (root.dataset.voiceTermUrl) {
+        const lookup = new AbortController();
+        voiceLookup = lookup;
+        try {
+          const url = new URL(root.dataset.voiceTermUrl, location.href);
+          url.searchParams.set("scope", pageSearch ? root.dataset.voiceScope : "global");
+          url.searchParams.set("q", term);
+          const response = await fetch(url, { signal: lookup.signal, credentials: "same-origin" });
+          if (response.ok && response.headers.get("content-type")?.includes("application/json")) {
+            const data = await response.json();
+            if (typeof data.term === "string" && data.term.trim()) resolved = data.term;
+          }
+        } catch { /* A failed match still searches the recognized text. */ }
+        if (lookup.signal.aborted || voiceLookup !== lookup) return;
+        voiceLookup = null;
+      }
+      if (pageSearch) {
+        close();
+        pageSearch.value = resolved;
+        pageSearch.focus();
+        pageFilters.requestSubmit();
+        return;
+      }
+      input.value = resolved;
+      input.focus();
+      if (pageLinks.length) {
+        const hits = pageLinks.filter(link => link.textContent.toLocaleLowerCase().includes(resolved.toLocaleLowerCase()));
+        if (hits.length) {
+          clearTimeout(timer); request?.abort(); ++sequence;
+          show(hits.map(link => ({ url: link.href, title: link.querySelector("strong")?.textContent || link.textContent.trim(), subtitle: "", type: document.title.split("|")[0].trim() })));
+          return;
+        }
+      }
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
     recognition.onend = () => { if (recognition === current) reset(); };
-    recognition.onerror = event => { if (recognition !== current) return; reset(); if (event.error === 'aborted') return; const messages = { 'not-allowed': 'Microphone permission was denied. Allow it in browser settings or type your search.', 'audio-capture': 'No microphone is available.', 'no-speech': 'No speech detected. Try again.', network: 'The browser speech service is unavailable. Type your search instead.' }; const message = messages[event.error] || 'Voice search stopped. Try again or type your search.'; say(message); window.orangeUi?.toast(message, 'info'); };
+    recognition.onerror = event => { if (recognition !== current) return; reset(); if (event.error === 'aborted') return; const messages = { 'not-allowed': 'Microphone permission was denied. Allow it in browser settings or type your search.', 'service-not-allowed': 'This browser blocked its speech recognition service. Type your search instead.', 'audio-capture': 'No microphone is available.', 'no-speech': 'No speech detected. Try again.', network: 'The browser speech service is unavailable. Type your search instead.' }; const message = messages[event.error] || 'Voice search stopped. Try again or type your search.'; say(message); window.orangeUi?.toast(message, 'info'); };
     try { recognition.start(); } catch { reset(); say('Unable to start the microphone. Try again or type your search.'); }
   });
-  window.addEventListener('pagehide', () => { recognition?.abort(); request?.abort(); clearTimeout(timer); });
+  window.addEventListener('pagehide', () => { voiceLookup?.abort(); recognition?.abort(); request?.abort(); clearTimeout(timer); });
 })();

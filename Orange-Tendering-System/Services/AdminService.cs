@@ -45,6 +45,29 @@ namespace Orange_Tendering_System.Services
             !_context.Users.Any(u => u.SupplierId == s.Id) ||
             _context.Users.Any(u => u.SupplierId == s.Id && u.EmailConfirmed));
 
+        public async Task<string> ResolveVoiceSearchTermAsync(string term, string? scope, CancellationToken cancellationToken)
+        {
+            IQueryable<string?>? labels = scope switch
+            {
+                "global" => _context.Users.Select(user => user.FullName)
+                    .Union(SubmittedSuppliers().Select(supplier => supplier.CompanyName)),
+                "users" => _context.Users.Select(user => user.FullName),
+                "departments" => _context.Departments.Select(department => department.Name),
+                "suppliers" => SubmittedSuppliers().Select(supplier => supplier.CompanyName),
+                "auditlogs" => _context.AuditLogs.Where(log => log.User != null).Select(log => log.User!.UserName)
+                    .Union(_context.AuditLogs.Select(log => log.Action))
+                    .Union(_context.AuditLogs.Select(log => log.EntityName)),
+                "committees" => _context.Tenders.Select(tender => tender.Title),
+                _ => null
+            };
+            if (labels is null) return term;
+
+            var matcher = new AdminVoiceSearchMatcher(term, forDepartments: scope == "departments");
+            await foreach (var label in labels.Distinct().AsAsyncEnumerable().WithCancellation(cancellationToken))
+                matcher.Consider(label);
+            return matcher.Resolve();
+        }
+
         // 1. ADMIN DASHBOARD
 
         // Full name of the signed-in user for greetings; null when the account has none.
@@ -763,10 +786,8 @@ namespace Orange_Tendering_System.Services
             // Search by name or email
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query = query.Where(u =>
-                    u.FullName.Contains(search) ||
-                    (u.Email != null &&
-                     u.Email.Contains(search)));
+                query = query.Where(u => u.FullName.Contains(search) ||
+                    (u.Email != null && u.Email.Contains(search)));
             }
 
             // =========================================

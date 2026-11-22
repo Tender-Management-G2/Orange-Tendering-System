@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Security;
 using System.Text;
@@ -63,6 +64,39 @@ public sealed class HayaReportExport(OrangeReportRenderer fontsInitialiser)
 
     private static string PageSetupXml() => "<pageMargins left=\"0.3\" right=\"0.3\" top=\"0.55\" bottom=\"0.55\" header=\"0.2\" footer=\"0.2\"/><pageSetup paperSize=\"9\" orientation=\"landscape\" fitToWidth=\"1\" fitToHeight=\"0\"/><printOptions horizontalCentered=\"0\" verticalCentered=\"0\"/>";
 
+    private static string ColumnDefinitions(HayaReportTable table, int lastColumn)
+    {
+        return string.Concat(Enumerable.Range(0, lastColumn + 1).Select(index =>
+        {
+            var longest = index < table.Columns.Length ? table.Columns[index].Length : 16;
+            if (index < table.Columns.Length)
+                longest = Math.Max(longest, table.Rows.Select(row => index < row.Length ? row[index]?.Length ?? 0 : 0).DefaultIfEmpty().Max());
+            var width = Math.Clamp(longest + 3, index == 0 ? 18 : 12, 42);
+            return $"<col min=\"{index + 1}\" max=\"{index + 1}\" width=\"{width}\" customWidth=\"1\"/>";
+        }));
+    }
+
+    private static string SummaryColumnDefinitions(IReadOnlyList<HayaReportTable> tables)
+    {
+        var lastColumn = Math.Max(4, tables.Select(table => table.Columns.Length - 1).DefaultIfEmpty(0).Max());
+        return string.Concat(Enumerable.Range(0, lastColumn + 1).Select(index =>
+        {
+            var longest = 12;
+            foreach (var table in tables)
+            {
+                if (index < table.Columns.Length) longest = Math.Max(longest, table.Columns[index].Length);
+                foreach (var row in table.Rows)
+                    if (index < row.Length) longest = Math.Max(longest, row[index]?.Length ?? 0);
+            }
+            var width = Math.Clamp(longest + 3, index == 0 ? 18 : 12, 42);
+            return $"<col min=\"{index + 1}\" max=\"{index + 1}\" width=\"{width}\" customWidth=\"1\"/>";
+        }));
+    }
+
+    private static string ExcelStylesXml() => """
+        <?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="#\,##0.00"/><numFmt numFmtId="165" formatCode="yyyy-mm-dd"/></numFmts><fonts count="5"><font><sz val="10"/><color rgb="FF1F2937"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF1F2937"/><name val="Arial"/></font><font><i/><sz val="9"/><color rgb="FF64748B"/><name val="Arial"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F2937"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF334155"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/></patternFill></fill></fills><borders count="3"><border/><border><left style="thin"><color rgb="FFD8DEE8"/></left><right style="thin"><color rgb="FFD8DEE8"/></right><top style="thin"><color rgb="FFD8DEE8"/></top><bottom style="thin"><color rgb="FFD8DEE8"/></bottom></border><border><bottom style="thin"><color rgb="FF334155"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="15"><xf fontId="0" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf fontId="1" fillId="2" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf fontId="3" borderId="2" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="2" fillId="2" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf fontId="1" fillId="2" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf fontId="2" fillId="2" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf fontId="3" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="3" borderId="2" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf fontId="0" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf fontId="0" borderId="1" numFmtId="164" applyFont="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="0" borderId="1" numFmtId="10" applyFont="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf fontId="0" borderId="1" numFmtId="165" applyFont="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf fontId="4" borderId="2" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf></cellXfs></styleSheet>
+        """;
+
     private static void AppendBrandHeader(StringBuilder sheet, List<string> merges, HayaReportModel model, ref int row, int lastColumn)
     {
         sheet.Append($"<row r=\"{row}\" ht=\"27\" customHeight=\"1\">{Cell(row, 0, "orange", WordmarkStyle)}{Cell(row, 1, "Sourcing & Tender Management System", SystemStyle)}</row>");
@@ -86,11 +120,40 @@ public sealed class HayaReportExport(OrangeReportRenderer fontsInitialiser)
         return $"{from} to {to}";
     }
 
+    // Excel uses a restrained charcoal/gray palette so exported workbooks read as formal documents,
+    // independent of the Orange colours used by the web UI and PDF template.
+    private static string FormalExcelStyles(string styles) => styles
+        .Replace("FFFF7900", "FF1F2937", StringComparison.Ordinal)
+        .Replace("FFFF7F2A", "FF334155", StringComparison.Ordinal)
+        .Replace("FFFFF4E8", "FFF8FAFC", StringComparison.Ordinal)
+        .Replace("FF222222", "FF1F2937", StringComparison.Ordinal)
+        .Replace("FF666666", "FF64748B", StringComparison.Ordinal)
+        .Replace("FFD9D9D9", "FFD8DEE8", StringComparison.Ordinal);
+
+    private static IEnumerable<HayaReportTable> ExportSections(HayaReportModel model)
+    {
+        foreach (var table in model.Tables)
+            yield return table;
+
+        foreach (var chart in model.Charts)
+        {
+            yield return new HayaReportTable(
+                chart.Title + " (chart data)",
+                ["Label", "Value"],
+                chart.Points.Select(point => new[]
+                {
+                    point.Label,
+                    point.Value.ToString("0.##############", CultureInfo.InvariantCulture)
+                }).ToList());
+        }
+    }
+
     public byte[] ToXlsx(HayaReportModel model)
     {
         var sheets = new List<(string Name, string Xml)>();
         var used = new HashSet<string>();
-        var summary = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"10\" topLeftCell=\"A11\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><cols><col min=\"1\" max=\"1\" width=\"30\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"30\" customWidth=\"1\"/><col min=\"3\" max=\"3\" width=\"4\" customWidth=\"1\"/><col min=\"4\" max=\"4\" width=\"18\" customWidth=\"1\"/><col min=\"5\" max=\"5\" width=\"30\" customWidth=\"1\"/></cols><sheetData>");
+        var sections = ExportSections(model).ToList();
+        var summary = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"10\" topLeftCell=\"A11\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><cols>" + SummaryColumnDefinitions(sections) + "</cols><sheetData>");
         var summaryMerges = new List<string>(); var r = 1;
         AppendBrandHeader(summary, summaryMerges, model, ref r, 4);
         summary.Append($"<row r=\"{r}\" ht=\"20\" customHeight=\"1\">{Cell(r, 0, "REPORT SUMMARY", SectionStyle)}</row>"); summaryMerges.Add(Merge(r, r, 0, 4)); r++;
@@ -101,13 +164,27 @@ public sealed class HayaReportExport(OrangeReportRenderer fontsInitialiser)
             var style = (r - firstKpiRow) % 2 == 0 ? AlternateRowStyle : BodyStyle;
             summary.Append($"<row r=\"{r}\">{Cell(r, 0, k.Label, style)}{Cell(r, 1, k.Value, style)}</row>"); r++;
         }
+        foreach (var table in sections)
+        {
+            summary.Append($"<row r=\"{r}\" ht=\"20\" customHeight=\"1\">{Cell(r, 0, table.Title.ToUpperInvariant(), SectionStyle)}</row>");
+            summaryMerges.Add(Merge(r, r, 0, Math.Max(4, table.Columns.Length - 1))); r++;
+            summary.Append($"<row r=\"{r}\" ht=\"22\" customHeight=\"1\">{string.Concat(table.Columns.Select((column, index) => Cell(r, index, column, HeaderStyle)))}</row>");
+            r++;
+            for (var rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+            {
+                var style = rowIndex % 2 == 1 ? AlternateRowStyle : BodyStyle;
+                summary.Append($"<row r=\"{r}\">{string.Concat(table.Rows[rowIndex].Select((value, index) => Cell(r, index, value, style, index < table.Columns.Length && IsDateColumn(table.Columns[index]))))}</row>");
+                r++;
+            }
+        }
         summary.Append($"<row r=\"{r + 1}\" ht=\"18\" customHeight=\"1\">{Cell(r + 1, 0, "Sourcing & Tender Management System · " + model.Title + " · Generated " + model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm") + " Jordan time", FooterStyle)}</row>");
         summaryMerges.Add(Merge(r + 1, r + 1, 0, 4));
         summary.Append("</sheetData>");
-        if (model.Kpis.Count > 0) summary.Append($"<autoFilter ref=\"A{firstKpiRow}:B{r - 1}\"/>");
+        if (model.Kpis.Count > 0)
+            summary.Append($"<autoFilter ref=\"A{firstKpiRow}:B{firstKpiRow + model.Kpis.Count}\"/>");
         summary.Append("<mergeCells count=\"" + summaryMerges.Count + "\">" + string.Concat(summaryMerges) + "</mergeCells>" + PageSetupXml() + "<headerFooter><oddFooter>&amp;LSourcing &amp; Tender Management System&amp;C" + Esc(model.Title) + "&amp;RPage &amp;P of &amp;N</oddFooter></headerFooter></worksheet>");
         sheets.Add((SheetName("Summary", used), summary.ToString()));
-        foreach (var t in model.Tables)
+        foreach (var t in sections)
         {
             var lastColumn = Math.Max(1, t.Columns.Length) - 1;
             // The branded metadata block needs five columns even when a report table has fewer fields.
@@ -200,7 +277,7 @@ public sealed class HayaReportExport(OrangeReportRenderer fontsInitialiser)
             AddTable(section, ["Metric", "Value"], model.Kpis.Select(k => new[] { k.Label, k.Value }).ToArray(), orange, cream, rule);
         }
 
-        foreach (var source in model.Tables)
+        foreach (var source in ExportSections(model))
         {
             AddHeading(section, source.Title, orange);
             if (source.Rows.Count == 0)

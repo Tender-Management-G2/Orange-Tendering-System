@@ -43,32 +43,35 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 <partial name="_PageHeader" />
 
 <!-- Supplier Status Summary -->
-<section class="pg-cards" aria-label="Supplier summary">
-
-    <article class="pg-card">
-        <span>Pending Registrations</span>
-        <strong>@Model.PendingCount</strong>
-        <small>Awaiting Admin review</small>
+<section class="dash-metrics admin-management-stats" aria-label="Supplier summary">
+    <article class="dash-metric dash-orange">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("list"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.PendingCount</strong>
+            <span>Pending Registrations</span>
+        </div>
     </article>
-
-    <article class="pg-card">
-        <span>Approved Suppliers</span>
-        <strong>@Model.ApprovedCount</strong>
-        <small>Approved companies</small>
+    <article class="dash-metric dash-blue">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("check"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.ApprovedCount</strong>
+            <span>Approved Suppliers</span>
+        </div>
     </article>
-
-    <article class="pg-card">
-        <span>Rejected</span>
-        <strong>@Model.RejectedCount</strong>
-        <small>Rejected registrations</small>
+    <article class="dash-metric dash-purple">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("shield"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.RejectedCount</strong>
+            <span>Rejected</span>
+        </div>
     </article>
-
-    <article class="pg-card">
-        <span>Suspended</span>
-        <strong>@Model.SuspendedCount</strong>
-        <small>Suspended companies</small>
+    <article class="dash-metric dash-green">
+        <span class="dash-metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24">@Html.Raw(WorkspaceNavigation.Icon("layers"))</svg></span>
+        <div class="dash-metric-copy">
+            <strong>@Model.SuspendedCount</strong>
+            <span>Suspended</span>
+        </div>
     </article>
-
 </section>
 
 <!-- Search and Filters -->
@@ -76,58 +79,68 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
       asp-controller="Suppliers"
       asp-action="Index"
       method="get"
-      class="pg-toolbar"
+      class="admin-list-filters"
+      data-admin-voice-filter
+      role="search"
       aria-label="Search and filters">
 
-    <input type="search"
-           name="search"
-           value="@Model.Search"
-           placeholder="Search company or registration number"
-           aria-label="Search suppliers"
-           maxlength="200" />
+    <div class="admin-filter-field admin-filter-search">
+        <label for="supplier-search">Search</label>
+        <div class="admin-supplier-search-input">
+            <input id="supplier-search" type="search"
+                   name="search"
+                   value="@Model.Search"
+                   placeholder="Search company or registration number"
+                   aria-label="Search suppliers"
+                   maxlength="200" />
+            <button type="submit" class="pg-btn" aria-label="Apply supplier filters" title="Apply supplier filters">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
+            </button>
+        </div>
+    </div>
 
-    <select name="statusFilter"
-            aria-label="Supplier status">
+    <div class="admin-filter-field">
+        <label for="supplier-status-filter">Status</label>
+        <select id="supplier-status-filter" name="statusFilter"
+                aria-label="Supplier status">
 
-        <option value="All"
-                selected="@(string.IsNullOrEmpty(Model.StatusFilter) || Model.StatusFilter == "All")">
-            Status: All
-        </option>
+            <option value="All"
+                    selected="@(string.IsNullOrEmpty(Model.StatusFilter) || Model.StatusFilter == "All")">
+                All statuses
+            </option>
 
-        <option value="Pending"
-                selected="@(Model.StatusFilter == "Pending")">
-            Pending
-        </option>
+            <option value="Pending"
+                    selected="@(Model.StatusFilter == "Pending")">
+                Pending
+            </option>
 
-        <option value="Approved"
-                selected="@(Model.StatusFilter == "Approved")">
-            Approved
-        </option>
+            <option value="Approved"
+                    selected="@(Model.StatusFilter == "Approved")">
+                Approved
+            </option>
 
-        <option value="Rejected"
-                selected="@(Model.StatusFilter == "Rejected")">
-            Rejected
-        </option>
+            <option value="Rejected"
+                    selected="@(Model.StatusFilter == "Rejected")">
+                Rejected
+            </option>
 
-        <option value="Suspended"
-                selected="@(Model.StatusFilter == "Suspended")">
-            Suspended
-        </option>
-    </select>
-
-   
-
+            <option value="Suspended"
+                    selected="@(Model.StatusFilter == "Suspended")">
+                Suspended
+            </option>
+        </select>
+    </div>
     <a asp-area="Admin"
        asp-controller="Suppliers"
        asp-action="Index"
-       class="pg-btn">
+       class="pg-btn pg-btn-primary admin-clear">
         Clear
     </a>
 
 </form>
 
 <!-- Suppliers Table -->
-<section class="ws-panel pg-panel"
+<section class="ws-panel pg-panel admin-list-records"
          aria-labelledby="tbl-suppliers">
 
     <div class="pg-panel-head">
@@ -139,7 +152,7 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
 
     <div class="pg-table-wrap">
 
-        <table class="pg-table">
+        <table class="pg-table admin-suppliers-table">
             <thead>
                 <tr>
                     <th>Company</th>
@@ -195,24 +208,27 @@ UI SCAFFOLD ONLY — BUSINESS LOGIC NOT IMPLEMENTED.
                             </td>
 
                             <td>
-                                <a class="pg-btn"
-                                   asp-area="Admin"
-                                   asp-controller="Suppliers"
-                                   asp-action="Details"
-                                   asp-route-id="@supplier.Id">
-                                    Details
-                                </a>
+                                <div class="admin-row-actions">
+                                    <a class="pg-btn"
+                                       asp-area="Admin"
+                                       asp-controller="Suppliers"
+                                       asp-action="Details"
+                                       data-modal="center"
+                                       asp-route-id="@supplier.Id">
+                                        Details
+                                    </a>
 
-                                <a class="pg-btn pg-btn-primary"
-                                   asp-area="Admin"
-                                   asp-controller="Suppliers"
-                                   asp-action="Review"
-                                   data-no-modal
-                                   asp-route-id="@supplier.Id">
-                                    @(supplier.Status == "Pending"
-                                        ? "Review"
-                                        : "Manage")
-                                </a>
+                                    <a class="pg-btn pg-btn-primary"
+                                       asp-area="Admin"
+                                       asp-controller="Suppliers"
+                                       asp-action="Review"
+                                       data-no-modal
+                                       asp-route-id="@supplier.Id">
+                                        @(supplier.Status == "Pending"
+                                            ? "Review"
+                                            : "Manage")
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     }
