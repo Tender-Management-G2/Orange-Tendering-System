@@ -15,7 +15,8 @@ namespace Orange_Tendering_System.Services;
 
 public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<ApplicationUser> users,
     IOptions<TenderApprovalPolicy> policyOptions, TimeProvider clock, ReportDocumentService reportDocuments,
-    IOptions<ReportRevisionPolicy> revisionPolicyOptions, IOptions<ReportSigningOptions> reportSigningOptions)
+    IOptions<ReportRevisionPolicy> revisionPolicyOptions, IOptions<ReportSigningOptions> reportSigningOptions,
+    OllamaChatClient evaluationSummaryModel, ILogger<TenderWorkflowService> logger)
 {
     private TenderApprovalPolicy Policy => policyOptions.Value;
     public DateTime Now => clock.GetUtcNow().UtcDateTime;
@@ -56,8 +57,8 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     }
     private void Audit(ApplicationUser actor, int tenderId, string action, object? evidence = null) => db.AuditLogs.Add(new AuditLog
     { UserId = actor.Id, EntityName = "Tender", EntityId = tenderId.ToString(), Action = action, NewValues = JsonSerializer.Serialize(evidence), CreatedAt = Now });
-    private void Notify(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
-    { UserId = userId, Title = title, Message = message, Link = $"/Workflow/Details/{tenderId}", CreatedAt = Now });
+    private void Notify(string userId, int tenderId, string title, string message, string? link = null) => db.Notifications.Add(new Notification
+    { UserId = userId, Title = title, Message = message, Link = link ?? $"/Workflow/Details/{tenderId}", CreatedAt = Now });
     // Notification whose link opens the evaluation meeting page ("Join meeting") for the person it is sent to.
     private void NotifyMeeting(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
     { UserId = userId, Title = title, Message = message, Link = $"/Meetings/Join/{tenderId}", CreatedAt = Now });
@@ -506,12 +507,14 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                 group.Single(x => x.EvaluationCriterionId != financialCriterionId).Score, s.WeightRound.ApprovedFinancial!.Value, s.WeightRound.ApprovedTechnical!.Value)
         }).ToArray();
         var bids = await Submitted(s.TenderRoundId); var ai = await db.Set<AiAnalysis>().FindAsync(s.AiAnalysisId);
+        var evaluationSummary = await SummarizeEvaluation(t.Id, s.WeightRound, ranking);
         var report = new TenderReport { TenderRoundId = s.TenderRoundId, ReportType = ReportType.FullEvaluation, CreatedByUserId = a.Id, CreatedAt = Now,
             RecommendedBidId = ranking.Count(x => x.Rank == 1) == 1 ? ranking.Single(x => x.Rank == 1).BidId : null,
             RankingSnapshotJson = JsonSerializer.Serialize(ranking),
             Content = JsonSerializer.Serialize(new { Tender = new { t.Id, t.Title, t.Description, t.PurchaseRequestId }, Requirements = s.WeightRound.RequirementsJson,
                 Weights = new { s.WeightRound.Version, s.WeightRound.ApprovedFinancial, s.WeightRound.ApprovedTechnical, s.WeightRound.ApprovedByUserId, s.WeightRound.ApprovedAt, TechnicalCriteria = s.WeightRound.ReadTechnicalCriteria() },
                 Scores = scores, MemberResults = memberResults, Ranking = ranking, Compliance = bids.Select(x => new { x.Id, x.ComplianceStatus, x.ComplianceNotes, x.MissingRequirements }), AI = new { ai!.Id, ai.Model, ai.Findings, ai.EvidenceJson, ai.ReviewedAt }, Justification = justification,
+                EvaluationAiSummary = evaluationSummary,
                 TieBlocker = ranking.Count(x => x.Rank == 1) > 1 ? "Exact highest-score tie: documented resolution policy required before award." : null }) };
         s.Report = report; s.State = SessionState.ReportDraft; s.CommitteeRound.TenderReport = report; s.ReportSentAt = Now;
         await db.SaveChangesAsync();
@@ -555,7 +558,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         tender.Status = TenderStatus.OfficerReview;
         await NotifyOfficer(tender.Id, "Signed evaluation report received", $"Report version {session.Report.VersionNumber} is ready to review and forward to the Sourcing Manager.");
         foreach (var member in await Members(tender.Id, CommitteeType.Evaluation))
-            Notify(member.UserId, tender.Id, "Evaluation report completed", $"Report version {session.Report.VersionNumber} was sent to the Sourcing Officer.");
+            Notify(member.UserId, tender.Id, "Evaluation report ready",
+                $"All four evaluations are complete. Open report version {session.Report.VersionNumber} to review or download the PDF. The Sourcing Officer also received it.",
+                $"/EvaluationCommittee/Workflow/Meeting/{tender.Id}#evaluation-report");
     }
 
     public Task FinalizeReport(int id, string comment, ClaimsPrincipal principal, string? documentHash = null, bool confirmed = false, byte[]? signatureImage = null) => Change(id, principal, "ReportFinalizationVote", async (t, a) =>

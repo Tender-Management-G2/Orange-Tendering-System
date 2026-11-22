@@ -76,7 +76,13 @@ public class ReportDocumentService(ApplicationDbContext db, OrangeReportRenderer
                     json.RootElement.TryGetProperty("OriginalReport", out var previous) ? Explanation(previous.GetString() ?? "", depth + 1) : "";
                 return original + "\nRevision clarification: " + correction.GetString();
             }
-            if (json.RootElement.TryGetProperty("Justification", out var justification)) return justification.GetString() ?? "";
+            if (json.RootElement.TryGetProperty("Justification", out var justification))
+            {
+                var explanation = justification.GetString() ?? "";
+                return json.RootElement.TryGetProperty("EvaluationAiSummary", out var summary) && summary.ValueKind == JsonValueKind.String
+                    ? explanation + "\n\nAI summary of committee scores (advisory): " + summary.GetString()
+                    : explanation;
+            }
         }
         catch (JsonException) { }
         return "Review the recommendation, source observations and audit record.";

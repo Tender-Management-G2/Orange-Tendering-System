@@ -10,6 +10,27 @@ namespace Orange_Tendering_System.Services;
 // as the meeting is scheduled; scoring is allowed only while EvaluationOpen is true (checked again by SubmitEvaluation).
 public partial class TenderWorkflowService
 {
+    private async Task<string?> SummarizeEvaluation(int tenderId, WeightRound weights, IReadOnlyList<RankedBid> ranking)
+    {
+        if (!evaluationSummaryModel.IsConfigured) return null;
+
+        var results = JsonSerializer.Serialize(new { FinancialWeight = weights.ApprovedFinancial, TechnicalWeight = weights.ApprovedTechnical, Ranking = ranking });
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+        try
+        {
+            var summary = await evaluationSummaryModel.ChatAsync(
+                [new { role = "system", content = "Summarize the supplied committee evaluation results in at most three plain English sentences. Refer to each bid by its offer ID. Use the provided weights, scores and ranks exactly. Preserve ties. Do not infer reasons, recommend a supplier or describe any offer as the winner. The official decision is made later." },
+                 new { role = "user", content = results }], json: false, temperature: 0, contextLength: 2048, ct: timeout.Token, maxOutputTokens: 160);
+            summary = summary.Trim();
+            return summary.Length is > 0 and <= 1000 ? summary : null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "AI score summary unavailable for evaluation of tender {TenderId}", tenderId);
+            return null;
+        }
+    }
+
     public async Task<EvaluationWorkspaceModel> EvaluationWorkspace(int tenderId, ClaimsPrincipal principal)
     {
         var details = await Details(tenderId, principal);

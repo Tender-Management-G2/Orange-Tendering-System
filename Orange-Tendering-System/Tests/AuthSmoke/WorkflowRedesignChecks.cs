@@ -33,10 +33,13 @@ public static class WorkflowRedesignChecks
 {
     private sealed class DocumentModelFixture : HttpMessageHandler
     {
+        public const string EvaluationSummary = "Three offers were ranked from the committee's weighted scores.";
         public int Requests { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             var body = await request.Content!.ReadAsStringAsync(ct);
+            if (body.Contains("Summarize the supplied committee evaluation results", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { message = new { content = EvaluationSummary } }) };
             if (body.Contains("Write a short internal tender award report", StringComparison.Ordinal))
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { message = new { content = "Top Committee approved the financial tender and recorded Beta Systems as the winning supplier." } }) };
             if (!body.Contains("QA marker", StringComparison.Ordinal))
@@ -515,7 +518,10 @@ public static class WorkflowRedesignChecks
         await Refuse(w => w.Forward(id, P(officer)), "the Officer cannot forward before four signed submissions");
         await Flow(w => w.SubmitEvaluation(id, Scores(89m, 90), P(fin), evaluationSignature));
         await Refuse(w => w.SubmitEvaluation(id, Scores(80, 80), P(fin), evaluationSignature), "a member cannot submit twice", "immutable");
-        foreach (var m in new[] { manager, depRep, tech }) await Flow(w => w.SubmitEvaluation(id, Scores(88, 92), P(m), evaluationSignature));
+        foreach (var m in new[] { manager, depRep }) await Flow(w => w.SubmitEvaluation(id, Scores(88, 92), P(m), evaluationSignature));
+        var evaluationReportLink = $"/EvaluationCommittee/Workflow/Meeting/{id}#evaluation-report";
+        Check(!await Read(d => d.Notifications.AnyAsync(n => n.Link == evaluationReportLink)), "the committee receives no report notification with three submissions");
+        await Flow(w => w.SubmitEvaluation(id, Scores(88, 92), P(tech), evaluationSignature));
         var session = await Read(d => d.Set<EvaluationSession>().Include(x => x.Report).Include(x => x.Invitations).SingleAsync(x => x.TenderRoundId == roundId));
         Check(session.State == SessionState.Finalized && session.Report != null && session.ReportSentAt != null && session.Report.RecommendedBidId == bidA.Id,
             "the fourth evaluation generates the report automatically and finalizes its recorded signatures");
@@ -526,6 +532,18 @@ public static class WorkflowRedesignChecks
         Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.Status == TenderStatus.OfficerReview)), "four signed score submissions send the completed report directly to the Officer");
         Check(await Read(d => d.Set<ReportSignature>().CountAsync(r => r.TenderReportId == session.ReportId && r.Decision == "SubmittedEvaluation")) == 4,
             "the generated report records the four submitted evaluation signatures");
+        using var frozenEvaluationReport = JsonDocument.Parse(session.Report.SnapshotJson!);
+        Check(frozenEvaluationReport.RootElement.GetProperty("Inputs").GetProperty("Explanation").GetString()!.Contains(DocumentModelFixture.EvaluationSummary),
+            "the frozen PDF inputs include an AI summary of the final scores");
+        var recipients = await Read(d => d.Notifications.Where(n => n.Link == evaluationReportLink).Select(n => n.UserId).ToListAsync());
+        Check(recipients.Order().SequenceEqual(new[] { manager.Id, depRep.Id, fin.Id, tech.Id }.Order()), "each assigned evaluator receives one link to the completed report");
+        using (var member = await Login(fin))
+        {
+            var workspace = await member.GetStringAsync("/EvaluationCommittee/Workflow/Meeting/" + id);
+            Check(workspace.Contains("id=\"evaluation-report\"") && workspace.Contains("Download report PDF"), "the completed report is visible in the evaluation workspace");
+            using var evaluationPdf = await member.GetAsync($"/EvaluationCommittee/Reports/Pdf/{session.ReportId}?download=true");
+            Check(evaluationPdf.IsSuccessStatusCode && evaluationPdf.Content.Headers.ContentType?.MediaType == "application/pdf", "an assigned evaluator can download the generated PDF");
+        }
         var handoff = await Chat(officer, SystemRoles.SourcingOfficer, $"Send the report to the Manager for T-{id}");
         Check(handoff.Kind == "agent-confirm", "officer chat previews forwarding the signed report");
         var forwarded = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", handoff.ConversationId);

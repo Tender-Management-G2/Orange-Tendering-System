@@ -182,11 +182,30 @@
         else { <p class="pg-hint">@(d.IsOfficer ? "Sourcing Officers do not score." : "Evaluation is not open.")</p> }
     </section>
 
+    @if (Model.Report is { } evaluationReport)
+    {
+        var signed = evaluationReport.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null);
+        <section class="ws-panel pg-panel pf-section" id="evaluation-report">
+            <div class="pf-section-head"><span class="pf-step">6</span><div><h2>Evaluation report</h2><p>Version @evaluationReport.Report.VersionNumber · @signed of 4 signatures</p></div></div>
+            <div class="pg-actions">
+                @if (evaluationReport.CanSignCommittee && !mySigned)
+                {
+                    <a class="pg-btn pg-btn-primary" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Review" asp-route-id="@evaluationReport.Report.Id">Review and sign the report</a>
+                }
+                else
+                {
+                    <a class="pg-btn" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Review" asp-route-id="@evaluationReport.Report.Id">Open report</a>
+                }
+                <a class="pg-btn" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Pdf" asp-route-id="@evaluationReport.Report.Id" asp-route-download="true">Download report PDF</a>
+            </div>
+        </section>
+    }
+
     @* G. Results and the committee report *@
     @if (d.Ranking.Count > 0)
     {
         <section class="ws-panel pg-panel pf-section">
-            <div class="pf-section-head"><span class="pf-step">6</span><div><h2>Calculated results</h2><p>Calculated by the system from all four evaluations and the approved weights. Scores are shown with one decimal; ranking uses full precision.</p></div></div>
+            <div class="pf-section-head"><span class="pf-step">@(Model.Report == null ? "6" : "7")</span><div><h2>Calculated results</h2><p>Calculated by the system from all four evaluations and the approved weights. Scores are shown with one decimal; ranking uses full precision.</p></div></div>
             <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Rank</th><th>Supplier</th><th class="pf-right">Final score</th>@foreach (var m in members) { <th class="pf-right">@Seat(m.Responsibility)</th> }</tr></thead><tbody>
             @foreach (var r in d.Ranking.OrderBy(x => x.Rank))
             {
@@ -199,16 +218,6 @@
                 }</tr>
             }
             </tbody></table></div>
-            @if (Model.Report != null)
-            {
-                var signed = Model.Report.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null);
-                <p class="pf-note">Evaluation report version @Model.Report.Report.VersionNumber — @signed of 4 signatures.@(s.State == SessionState.Finalized ? " Completed and sent to the Sourcing Officer." : "")</p>
-                <div class="pg-actions">
-                    @if (Model.Report.CanSignCommittee && !mySigned) { <a class="pg-btn pg-btn-primary" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Review" asp-route-id="@Model.Report.Report.Id">Review and sign the report</a> }
-                    else { <a class="pg-btn" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Review" asp-route-id="@Model.Report.Report.Id">Open the report</a> }
-                    <a class="pg-btn" asp-area="EvaluationCommittee" asp-controller="Reports" asp-action="Pdf" asp-route-id="@Model.Report.Report.Id" asp-route-download="true">Download PDF</a>
-                </div>
-            }
         </section>
     }
 </div>
