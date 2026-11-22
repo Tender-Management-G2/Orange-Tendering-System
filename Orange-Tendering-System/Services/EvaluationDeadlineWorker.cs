@@ -16,6 +16,7 @@ public class EvaluationDeadlineWorker(IServiceScopeFactory scopes, ILogger<Evalu
                 await Step("Evaluation opening processing", s => s.GetRequiredService<TenderWorkflowService>().OpenDueSessions(stoppingToken), stoppingToken);
                 await Step("External invitation delivery", s => s.GetRequiredService<ExternalInvitationDispatcher>().DispatchPending(stoppingToken), stoppingToken);
                 await Step("Approved registration invitations", s => s.GetRequiredService<TenderWorkflowService>().LinkRegisteredContacts(stoppingToken), stoppingToken);
+                await Step("Internal award reports", s => s.GetRequiredService<InternalAwardReportDispatcher>().DispatchPending(stoppingToken), stoppingToken);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }

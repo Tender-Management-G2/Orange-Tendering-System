@@ -24,7 +24,9 @@
     var officerArabic = area == "SourcingOfficer" && Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
 }
 <link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/evaluation-scores.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/tender-passport.css" asp-append-version="true" />
+<script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
 <script src="~/js/tender-passport.js" asp-append-version="true" defer></script>
 <div class="dash-board @(area == "Supplier" ? "dash-supplier" : "dash-internal") wfl">
     <section class="dash-welcome wfl-hero" aria-labelledby="wfl-title">
@@ -153,10 +155,11 @@
         }).catch(function () { body.innerHTML = '<div class="wf-loading wf-loading-error">The server could not be reached.</div>'; });
     }
     function wire() {
+        OrangeTechnicalEvaluation.wire(body);
         var sl = body.querySelector('#wp-fin');
         if (sl) { var tl = body.querySelector('#wp-tech'), fl = body.querySelector('#wp-fin-label'), tt = body.querySelector('#wp-tech-label'); var sync = function () { var v = Number(sl.value); tl.value = 100 - v; fl.textContent = v + '%'; tt.textContent = (100 - v) + '%'; sl.style.setProperty('--p', v + '%'); }; sl.addEventListener('input', sync); sync(); }
         var f = body.querySelector('#financial-weight'), t = body.querySelector('#technical-weight');
-        if (f && t) { f.addEventListener('input', function () { t.value = (100 - Number(f.value)).toFixed(4); }); t.addEventListener('input', function () { f.value = (100 - Number(t.value)).toFixed(4); }); }
+        if (f && t) { f.addEventListener('input', function () { t.value = 100 - Number(f.value); }); t.addEventListener('input', function () { f.value = 100 - Number(t.value); }); }
         body.querySelectorAll('time[data-local]').forEach(function (el) { var d = new Date(el.dataset.local); if (!isNaN(d)) el.textContent = d.toLocaleString('en-GB', { timeZone: 'Asia/Amman', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' (Jordan)'; });
         body.querySelectorAll('form').forEach(function (form) { form.addEventListener('submit', submit); });
         body.querySelectorAll('form[data-picker]').forEach(function (f) {
@@ -247,22 +250,13 @@
         body.querySelectorAll('[data-all-ok]').forEach(function (b) { b.addEventListener('click', function () { b.closest('form').querySelectorAll('tr[data-bid] [data-f=status]').forEach(function (s) { s.value = 'Compliant'; }); b.closest('form').querySelectorAll('tr[data-bid] [data-f=notes]').forEach(function (s) { s.selectedIndex = 0; }); }); });
         body.querySelectorAll('select.wp-quick').forEach(function (q) { q.addEventListener('change', function () { var t = q.parentElement.querySelector('textarea'); if (t && q.value) { t.value = q.value; q.value = ''; t.focus(); } }); });
         body.querySelectorAll('form[data-evaluator-scores]').forEach(function (form) {
-            var financialWeight = Number(form.dataset.financialWeight), technicalWeight = Number(form.dataset.technicalWeight);
-            var recommendation = form.querySelector('select[name="recommendation.RecommendedBidId"]');
-            var deviation = form.querySelector('[data-rank-deviation]'), explanation = deviation.querySelector('textarea');
-            if (!Number.isFinite(financialWeight) || !Number.isFinite(technicalWeight) || Math.abs(financialWeight + technicalWeight - 100) > 1e-6) return;
-            var sync = function () {
-                var ranked = Array.prototype.slice.call(form.querySelectorAll('[data-score-row]')).map(function (row) {
-                    var financial = row.querySelector('[data-score="financial"]'), technical = row.querySelector('[data-score="technical"]');
-                    return { id: row.dataset.bid, score: financial.value !== '' && technical.value !== '' && financial.checkValidity() && technical.checkValidity()
-                        ? (Number(financial.value) * financialWeight + Number(technical.value) * technicalWeight) / 100 : null };
+            function updateTechnicalResults() {
+                form.querySelectorAll('[data-score-row]').forEach(function (row) {
+                    OrangeTechnicalEvaluation.score(row, '[data-score="technical"]');
                 });
-                var complete = ranked.length > 0 && ranked.every(function (row) { return row.score !== null; });
-                var top = complete ? Math.max.apply(null, ranked.map(function (row) { return row.score; })) : null;
-                var differs = complete && recommendation.value !== '' && !ranked.some(function (row) { return row.id === recommendation.value && Math.abs(row.score - top) < 1e-9; });
-                deviation.hidden = !differs; explanation.disabled = !differs; explanation.required = differs;
-            };
-            form.addEventListener('input', sync); form.addEventListener('change', sync); sync();
+            }
+            form.addEventListener('input', updateTechnicalResults);
+            updateTechnicalResults();
         });
         var pad = function (n) { return ('0' + n).slice(-2); }, local = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
         body.querySelectorAll('select[data-preset="deadline"]').forEach(function (sel) { sel.addEventListener('change', function () { if (!sel.value) return; var d = new Date(); d.setDate(d.getDate() + Number(sel.value)); d.setHours(17, 0, 0, 0); sel.closest('form').querySelector('input[name=deadline]').value = local(d); }); });

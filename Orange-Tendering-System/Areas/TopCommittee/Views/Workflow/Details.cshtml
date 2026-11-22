@@ -45,10 +45,12 @@ else {
 }
 @if (w.State == WeightState.Approved) { <p><strong>Approved and locked:</strong> Financial @w.ApprovedFinancial!.Value.ToString("0.######")% / Technical @w.ApprovedTechnical!.Value.ToString("0.######")%.</p><p>Requirements version @w.Version · Approved @w.ApprovedAt?.ToJordan("yyyy-MM-dd HH:mm") by @w.ApprovedByUserId.</p> }
 @if (Model.IsEvaluator && w.State == WeightState.Proposals && w.Proposals.All(x => x.MemberUserId != Model.UserId)) {
-<form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post"><p>One final independent proposal per member. Submission cannot be edited.</p><label>Financial weight %<input id="financial-weight" name="financial" type="number" min="0" max="100" step="0.0001" required /></label><label>Technical weight %<input id="technical-weight" name="technical" type="number" min="0" max="100" step="0.0001" required /></label><button>Submit final proposal</button></form>
+<form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post"><p>One final independent proposal per member. Submission cannot be edited.</p><label>Financial weight %<input id="financial-weight" name="financial" type="number" min="0" max="100" step="1" required /></label><label>Technical weight %<input id="technical-weight" name="technical" type="number" min="0" max="100" step="1" required /></label><button>Submit final proposal</button></form>
 }
 @if (Model.CanApproveWeights && w.State == WeightState.AwaitingApproval) {
-<form asp-area="EvaluationCommittee" asp-controller="WeightApprovals" asp-action="Approve" asp-route-id="@id" method="post"><p>Approve the displayed four proposals and exact averages for this requirements version.</p><button>Formally approve and lock weights</button></form>
+<partial name="_ApproveTechnicalWeights" model='(w!, Model.Tender.Items.AsEnumerable())' />
+<script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
+<script>OrangeTechnicalEvaluation.wire(document);</script>
 }
 }
 </section>
@@ -115,7 +117,7 @@ else {
 @if (Model.IsEvaluator && !submitted && s.State == SessionState.Scheduled && Model.UtcNow >= s.StartsAt && Model.UtcNow < s.EndsAt) {
 <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post"><p>Scores range from 0–100 and are independent of the approved weight percentages. Submit all eligible suppliers together.</p>
 @{ var scoreIndex = 0; }
-@foreach (var eligible in s.EligibleBids) { <fieldset><legend>Bid #@eligible.BidId</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" /><label>Financial score<input name="scores[@scoreIndex].Financial" type="number" min="0" max="100" step="0.0001" required /></label><label>Technical score<input name="scores[@scoreIndex].Technical" type="number" min="0" max="100" step="0.0001" required /></label><label>Observations and justification<textarea name="scores[@scoreIndex].Justification" maxlength="2000" required></textarea></label></fieldset> scoreIndex++; }
+@foreach (var eligible in s.EligibleBids) { <fieldset><legend>Bid #@eligible.BidId</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" /><label>Financial score<input name="scores[@scoreIndex].Financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required /></label><partial name="_TechnicalScoreInputs" model='(s.WeightRound.ReadTechnicalCriteria(), scoreIndex, "technical")' /><label>Observations and justification<textarea name="scores[@scoreIndex].Justification" maxlength="2000" required></textarea></label></fieldset> scoreIndex++; }
 <button>Submit complete final evaluation</button></form>
 }
 @if (Model.IsOfficer && s.State == SessionState.Scheduled && s.Submissions.Count == 4) {

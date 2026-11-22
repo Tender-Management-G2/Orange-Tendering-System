@@ -26,16 +26,17 @@ public sealed partial class SupplierOfferService
         if (invitation == null || invitation.Bids.Any(b => b.Status != BidStatus.Draft)) return null;
         var tender = invitation.TenderRound.Tender;
         var draft = invitation.Bids.OrderByDescending(b => b.Id).FirstOrDefault();
-        var neededBy = await context.PurchaseRequests.Where(p => p.Id == tender.PurchaseRequestId).Select(p => p.NeededBy).SingleAsync();
+        var request = await context.PurchaseRequests.Where(p => p.Id == tender.PurchaseRequestId).Select(p => new { p.NeededBy, p.EvaluationMethod }).SingleAsync();
         var model = new SupplierDraftOfferViewModel
         {
             InvitationId = invitation.Id, BidId = draft?.Id, TenderId = tender.Id, TenderTitle = tender.Title, CompanyName = invitation.Supplier.CompanyName,
-            Deadline = invitation.TenderRound.Deadline, NeededBy = neededBy, RequiredDocuments = OfferDocumentTypes.Parse(tender.RequiredDocuments),
+            Deadline = invitation.TenderRound.Deadline, NeededBy = request.NeededBy, RequiredCurrency = request.EvaluationMethod == TenderEvaluationMethod.LowestPrice ? tender.Currency : null, RequiredDocuments = OfferDocumentTypes.Parse(tender.RequiredDocuments),
             Requirements = PublicRequirements(tender),
             ItemContext = tender.Items.OrderBy(x => x.Id).Select(x => new OfferItemContext(x.Id, x.Name, x.Category?.Name, x.Specifications, x.Quantity, x.Unit)).ToList(),
             ExistingDocuments = draft?.Documents.Select(d => new SupplierDocumentViewModel { Id = d.Id, FileName = d.FileName, DocumentType = d.DocumentType, SizeBytes = d.SizeBytes, UploadedAt = d.UploadedAt }).ToList() ?? []
         };
         model.Input = draft == null ? new SupplierDraftOfferInputModel { ValidUntil = (invitation.TenderRound.Deadline ?? workflow.Now).Date.AddDays(90) } : ToInput(draft);
+        if (model.RequiredCurrency != null) model.Input.CurrencyCode = model.RequiredCurrency;
         model.Input.Items = tender.Items.OrderBy(x => x.Id).Select(x =>
         {
             var line = draft?.Items.FirstOrDefault(i => i.TenderItemId == x.Id);
@@ -67,7 +68,7 @@ public sealed partial class SupplierOfferService
         IncludeShipping = bid.ShippingCost > 0, ShippingCost = bid.ShippingCost, IncludeInstallation = bid.InstallationCost > 0, InstallationCost = bid.InstallationCost,
         IncludeMaintenance = bid.MaintenanceCost > 0, MaintenanceCost = bid.MaintenanceCost, MaintenanceDescription = bid.MaintenanceDescription,
         IncludeOther = bid.OtherCost > 0, OtherCost = bid.OtherCost, OtherCostDescription = bid.OtherCostDescription,
-        TaxMode = bid.TaxRate.HasValue || bid.TaxAmount == 0 ? "Rate" : "Amount", TaxRate = bid.TaxRate, TaxIncludesCharges = bid.TaxIncludesCharges, TaxAmount = bid.TaxAmount,
+        TaxMode = bid.TaxRate.HasValue ? "Rate" : "Amount", TaxRate = bid.TaxRate, TaxIncludesCharges = bid.TaxIncludesCharges, TaxAmount = bid.TaxAmount,
         WarrantyMonths = bid.WarrantyMonths, WarrantyType = bid.WarrantyType, WarrantyTerms = bid.WarrantyTerms, Deviations = bid.Deviations, AfterSalesSupport = bid.AfterSalesSupport
     };
 
@@ -76,11 +77,18 @@ public sealed partial class SupplierOfferService
     public Task<(int? BidId, List<string> Errors)> SaveDraftAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files) =>
         SaveOfferAsync(userId, invitationId, input, files, submit: false);
 
-    public Task<(int? BidId, List<string> Errors)> SubmitOfferAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files) =>
-        SaveOfferAsync(userId, invitationId, input, files, submit: true);
+    public Task<(int? BidId, List<string> Errors)> SubmitOfferAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files, string? expectedDraftHash = null) =>
+        SaveOfferAsync(userId, invitationId, input, files, submit: true, expectedDraftHash);
+
+    internal static string DraftFingerprint(Bid bid) => Reports.ReportCryptography.Hash(JsonSerializer.Serialize(new
+    {
+        bid.Id, Terms = ToInput(bid),
+        Items = bid.Items.OrderBy(i => i.TenderItemId).Select(i => new { i.TenderItemId, i.Quantity, i.UnitPrice, i.OfferedProduct, i.OfferedSpecifications, i.Notes }),
+        Documents = bid.Documents.OrderBy(d => d.Id).Select(d => new { d.Id, d.DocumentType, d.FileName, d.SizeBytes })
+    }));
 
     // All changes to an offer, including attachments, are committed together or not at all.
-    private async Task<(int? BidId, List<string> Errors)> SaveOfferAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files, bool submit)
+    private async Task<(int? BidId, List<string> Errors)> SaveOfferAsync(string userId, int invitationId, SupplierDraftOfferInputModel input, IReadOnlyList<UploadedOfferFile> files, bool submit, string? expectedDraftHash = null)
     {
         var errors = new List<string>();
         var form = await GetOfferFormAsync(userId, invitationId);
@@ -101,6 +109,8 @@ public sealed partial class SupplierOfferService
             var current = await context.Bids.Include(b => b.Items).Include(b => b.Documents).Where(b => b.TenderInvitationId == invitationId).ToListAsync();
             if (current.Any(b => b.Status != BidStatus.Draft)) return (null, ["This offer was already submitted. Submitted offers cannot be changed."]);
             var target = current.FirstOrDefault();
+            if (expectedDraftHash != null && (target == null || DraftFingerprint(target) != expectedDraftHash))
+                return (null, ["The draft changed. Review it again before confirming submission."]);
             if (target == null) { target = new Bid { TenderInvitationId = invitationId, RevisionNumber = 1, Status = BidStatus.Draft, CreatedAt = workflow.Now }; context.Bids.Add(target); }
             CopyTerms(bid, target);
             context.BidItems.RemoveRange(target.Items.Where(i => bid.Items.All(n => n.TenderItemId != i.TenderItemId)));

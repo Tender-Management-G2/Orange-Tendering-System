@@ -29,7 +29,10 @@
     }
     var aiRows = AiRows();
 }
-@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /> }
+@section Styles {
+    <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/evaluation-scores.css" asp-append-version="true" />
+}
 <partial name="_PageHeader" />
 <div class="pf-page">
     @if (TempData["WorkflowMessage"] is string message) { <p class="pf-note" role="status">@message</p> }
@@ -138,9 +141,9 @@
         }
     </section>
 
-    @* F. Scoring, recommendation and signature (one submission) *@
+    @* F. Scoring and signature (one submission) *@
     <section class="ws-panel pg-panel pf-section" id="evaluate">
-        <div class="pf-section-head"><span class="pf-step">5</span><div><h2>Your evaluation and recommendation</h2><p>Score each offer on the two approved criteria (0–100, at most one decimal, e.g. 89.5), recommend one supplier and sign. You submit once; it cannot be edited.</p></div></div>
+        <div class="pf-section-head"><span class="pf-step">5</span><div><h2>Your evaluation</h2><p>Score each offer on the two approved criteria (whole numbers from 0 to 99) and sign. You submit once; it cannot be edited.</p></div></div>
         @if (Model.CanScore)
         {
             <form asp-action="SubmitEvaluation" asp-route-id="@t.Id" method="post" class="pg-form" data-evaluation-form data-wf="@w.ApprovedFinancial?.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-wt="@w.ApprovedTechnical?.ToString(System.Globalization.CultureInfo.InvariantCulture)">
@@ -148,29 +151,21 @@
                 @for (var i = 0; i < Model.Offers.Count; i++)
                 {
                     var o = Model.Offers[i];
-                    <fieldset class="pf-item" style="grid-template-columns:1fr" data-score-row data-bid="@o.Bid.Id" data-name="@o.Supplier.Name">
+                    <fieldset class="pf-item evaluation-card" data-score-row>
                         <legend><b>@o.Supplier.Name</b> <span class="pf-muted">· @Money(o.GrandTotal, o.Bid.CurrencyCode)</span></legend>
                         <input type="hidden" name="scores[@i].BidId" value="@o.Bid.Id" />
-                        <div class="pf-score">
-                            <div class="pg-field"><label for="j@(i)" class="pf-required">Justification</label><textarea id="j@(i)" name="scores[@i].Justification" rows="2" maxlength="2000" required placeholder="Main reasons for these two scores"></textarea></div>
-                            <div class="pg-field"><label for="f@(i)" class="pf-required">Financial</label><input id="f@(i)" name="scores[@i].Financial" type="number" min="0" max="100" step="0.1" inputmode="decimal" required data-score="f" /></div>
-                            <div class="pg-field"><label for="t@(i)" class="pf-required">Technical</label><input id="t@(i)" name="scores[@i].Technical" type="number" min="0" max="100" step="0.1" inputmode="decimal" required data-score="t" /></div>
+                        <div class="evaluation-score-line">
+                            <label for="f@(i)">Financial score <small>/ 100</small></label>
+                            <input id="f@(i)" name="scores[@i].Financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required data-score="f" />
                         </div>
+                        <partial name="_TechnicalScoreInputs" model='(w.ReadTechnicalCriteria(), i, "t")' />
+                        <div class="pg-field"><label for="j@(i)">Score justification</label><textarea id="j@(i)" name="scores[@i].Justification" rows="2" maxlength="2000" required></textarea></div>
                         <small class="pf-muted">Your weighted score (display only): <b data-weighted>—</b></small>
                     </fieldset>
                 }
-                <div class="pg-form-grid">
-                    <div class="pg-field"><label for="rec" class="pf-required">Recommended supplier</label>
-                        <select id="rec" name="recommendation.RecommendedBidId" required><option value="">Choose an eligible offer</option>@foreach (var o in Model.Offers) { <option value="@o.Bid.Id">@o.Supplier.Name</option> }</select>
-                        <small class="pf-muted" data-own-top></small></div>
-                    <div class="pg-field pg-field-wide"><label for="reason" class="pf-required">Reason for your recommendation</label><textarea id="reason" name="recommendation.Reason" rows="3" maxlength="2000" required></textarea></div>
-                    <div class="pg-field pg-field-wide" data-deviation hidden><label for="dev" class="pf-required">Why not the offer your own scores rank first?</label><textarea id="dev" name="recommendation.DeviationJustification" rows="2" maxlength="2000" minlength="20" disabled></textarea></div>
-                    <div class="pg-field pg-field-wide"><label for="concerns">Concerns or observations (optional)</label><textarea id="concerns" name="recommendation.Concerns" rows="2" maxlength="2000"></textarea>
-                        <small class="pf-muted">Need information from a supplier first? <a asp-area="" asp-controller="Clarifications" asp-action="Index">Request a clarification</a> before submitting.</small></div>
-                </div>
                 <partial name="~/Views/Shared/_ReportSignaturePad.cshtml" />
-                <label class="pg-check"><input type="checkbox" required /> These are my final, independent scores and recommendation. I understand they cannot be changed.</label>
-                <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary" data-confirm="Submit your final evaluation? Your scores, recommendation and signature are recorded once and cannot be changed.">Sign and submit my evaluation</button></div>
+                <label class="pg-check"><input type="checkbox" required /> These are my final, independent scores. My signature will be included in the evaluation report.</label>
+                <div class="pg-actions"><button type="submit" class="pg-btn pg-btn-primary" data-confirm="Submit your final evaluation? Your scores and signature are recorded once and cannot be changed.">Sign and submit my evaluation</button></div>
             </form>
         }
         else if (Model.Mine?.SubmittedAt != null)
@@ -179,7 +174,6 @@
             <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Supplier</th><th class="pf-right">Financial</th><th class="pf-right">Technical</th><th>Justification</th></tr></thead><tbody>
             @foreach (var g in d.Scores.Where(x => x.CommitteeMemberId == Model.MySeat!.Id).GroupBy(x => x.BidId)) { <tr><td>@Name(g.Key)</td><td class="pf-right pf-num">@g.First(x => x.EvaluationCriterion.Type == CriterionType.Financial).Score.ToString("0.0")</td><td class="pf-right pf-num">@g.First(x => x.EvaluationCriterion.Type == CriterionType.Technical).Score.ToString("0.0")</td><td>@g.First().Comment</td></tr> }
             </tbody></table></div>
-            @if (Model.Mine.RecommendedBidId is int myRec) { <p class="pg-hint">Your recommendation: <b>@Name(myRec)</b> — @Model.Mine.RecommendationReason</p> }
         }
         else if (Model.BeforeStart && d.IsEvaluator)
         {
@@ -188,11 +182,11 @@
         else { <p class="pg-hint">@(d.IsOfficer ? "Sourcing Officers do not score." : "Evaluation is not open.")</p> }
     </section>
 
-    @* G. Results, recommendations and the committee report *@
+    @* G. Results and the committee report *@
     @if (d.Ranking.Count > 0)
     {
         <section class="ws-panel pg-panel pf-section">
-            <div class="pf-section-head"><span class="pf-step">6</span><div><h2>Results and recommendations</h2><p>Calculated by the system from all four evaluations and the approved weights. Scores are shown with one decimal; ranking uses full precision.</p></div></div>
+            <div class="pf-section-head"><span class="pf-step">6</span><div><h2>Calculated results</h2><p>Calculated by the system from all four evaluations and the approved weights. Scores are shown with one decimal; ranking uses full precision.</p></div></div>
             <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Rank</th><th>Supplier</th><th class="pf-right">Final score</th>@foreach (var m in members) { <th class="pf-right">@Seat(m.Responsibility)</th> }</tr></thead><tbody>
             @foreach (var r in d.Ranking.OrderBy(x => x.Rank))
             {
@@ -205,10 +199,6 @@
                 }</tr>
             }
             </tbody></table></div>
-            <h3 style="margin:8px 0 0;font-size:16px">Member recommendations</h3>
-            <ul class="pf-ai" style="list-style:none;padding:0">
-            @foreach (var m in members) { var p = s.Invitations.FirstOrDefault(x => x.CommitteeMemberId == m.Id); <li><article><b>@Who(m.UserId)</b> (@Seat(m.Responsibility)): @(p?.RecommendedBidId is int rb ? "recommends " + Name(rb) : "no recommendation recorded")<div style="white-space:pre-line">@p?.RecommendationReason</div>@if (!string.IsNullOrWhiteSpace(p?.Concerns)) { <small>Concerns: @p.Concerns</small> }</article></li> }
-            </ul>
             @if (Model.Report != null)
             {
                 var signed = Model.Report.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null);
@@ -223,6 +213,7 @@
     }
 </div>
 @section Scripts {
+<script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
 <script>
 (function () {
     var form = document.querySelector('[data-evaluation-form]');
@@ -233,25 +224,14 @@
         return;
     }
     var wf = parseFloat(form.dataset.wf), wt = parseFloat(form.dataset.wt);
-    var rec = form.querySelector('[name="recommendation.RecommendedBidId"]'), dev = form.querySelector('[data-deviation]'), devInput = dev.querySelector('textarea'), ownTop = form.querySelector('[data-own-top]');
-    function oneDecimal(input) {
-        var v = input.value.trim(), ok = v === '' || /^\d{1,3}(\.\d)?$/.test(v) && parseFloat(v) <= 100;
-        input.setCustomValidity(ok ? '' : 'Enter a score from 0 to 100 with at most one decimal place (for example 89.5).');
-        return ok;
-    }
     function update() {
-        var best = null, bestIds = [];
         form.querySelectorAll('[data-score-row]').forEach(function (row) {
-            var f = row.querySelector('[data-score=f]'), t = row.querySelector('[data-score=t]'), out = row.querySelector('[data-weighted]');
-            oneDecimal(f); oneDecimal(t);
-            if (f.value === '' || t.value === '' || !f.checkValidity() || !t.checkValidity()) { out.textContent = '—'; return; }
-            var score = (parseFloat(f.value) * wf + parseFloat(t.value) * wt) / 100;
+            var f = row.querySelector('[data-score=f]'), out = row.querySelector('[data-weighted]');
+            var technical = OrangeTechnicalEvaluation.score(row, '[data-score=t]');
+            if (f.value === '' || technical === null || !f.checkValidity()) { out.textContent = '—'; return; }
+            var score = (parseFloat(f.value) * wf + technical * wt) / 100;
             out.textContent = score.toFixed(1);
-            if (best === null || score > best + 1e-9) { best = score; bestIds = [row.dataset.bid]; } else if (Math.abs(score - best) < 1e-9) bestIds.push(row.dataset.bid);
         });
-        ownTop.textContent = bestIds.length ? 'Your scores rank first: ' + bestIds.map(function (id) { return form.querySelector('[data-score-row][data-bid="' + id + '"]').dataset.name; }).join(', ') : '';
-        var deviates = rec.value !== '' && bestIds.length > 0 && bestIds.indexOf(rec.value) < 0;
-        dev.hidden = !deviates; devInput.disabled = !deviates; devInput.required = deviates;
     }
     form.addEventListener('input', update); form.addEventListener('change', update); update();
 })();

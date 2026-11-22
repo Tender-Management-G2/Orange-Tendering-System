@@ -1,0 +1,89 @@
+[data-score-row].evaluation-card {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+[data-score-row] .evaluation-score-line {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 5rem);
+    align-items: center;
+    gap: 8px 12px;
+}
+
+[data-score-row] .evaluation-score-line label {
+    display: inline;
+    color: var(--ws-ink);
+    font-size: .875rem;
+    font-weight: 700;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+[data-score-row] .evaluation-score-line small {
+    display: inline;
+    color: var(--ws-muted);
+    font-weight: 500;
+}
+
+[data-score-row] :is(.evaluation-score-line, .evaluation-criteria) input[data-score-digits] {
+    display: block;
+    box-sizing: border-box;
+    width: 5rem;
+    max-width: 100%;
+    margin: 0;
+    padding: .45rem .5rem;
+    border: 1px solid var(--ws-rule);
+    border-radius: 8px;
+    background: var(--ws-surface);
+    color: var(--ws-ink);
+    font: inherit;
+}
+
+[data-score-row] .evaluation-criteria {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .875rem;
+    line-height: 1.45;
+}
+
+[data-score-row] .evaluation-criteria :is(th, td) {
+    padding: .55rem .4rem;
+    border-block-end: 1px solid var(--ws-rule);
+    text-align: start;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+}
+
+[data-score-row] .evaluation-criteria th {
+    font-size: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+[data-score-row] .evaluation-criteria thead {
+    background: var(--ws-surface);
+    color: var(--ws-muted);
+}
+
+[data-score-row] .evaluation-criteria thead th:nth-child(2) {
+    width: 4.5rem;
+}
+
+[data-score-row] .evaluation-criteria thead th:nth-child(3) {
+    width: 6rem;
+}
+
+[data-score-row] .evaluation-criteria tfoot {
+    background: var(--ws-surface);
+    font-weight: 700;
+}
+
+@media (max-width: 480px) {
+    [data-score-row] .evaluation-criteria thead th:nth-child(2) {
+        width: 3.5rem;
+    }
+
+    [data-score-row] .evaluation-criteria thead th:nth-child(3) {
+        width: 4.5rem;
+    }
+}

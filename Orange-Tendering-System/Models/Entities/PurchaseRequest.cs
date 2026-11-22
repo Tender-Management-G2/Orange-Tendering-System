@@ -19,6 +19,7 @@ namespace Orange_Tendering_System.Models.Entities
         [Required]
         public string Justification { get; set; } = string.Empty;
 
+        public TenderEvaluationMethod? EvaluationMethod { get; set; }
         public RequestPriority Priority { get; set; } = RequestPriority.Normal;
 
         public DateTime? NeededBy { get; set; }

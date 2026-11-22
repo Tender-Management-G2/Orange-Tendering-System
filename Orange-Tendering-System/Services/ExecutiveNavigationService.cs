@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
@@ -22,7 +22,7 @@ public sealed class ExecutiveNavigationService(TenderWorkflowService workflow, U
     ApplicationDbContext db, IActionDescriptorCollectionProvider descriptors, LinkGenerator links,
     IAuthorizationPolicyProvider policies, IAuthorizationService authorization)
 {
-    public async Task<ExecutivePage[]> Catalog(ClaimsPrincipal principal)
+    public async Task<ExecutivePage[]> Catalog(ClaimsPrincipal principal, string? workspaceRole = null)
     {
         var actor = await workflow.Actor(principal);
         if (!actor.EmailConfirmed || actor.MustChangePassword || await users.IsLockedOutAsync(actor)) throw new AgentException("Complete account verification first.", 403);
@@ -30,7 +30,7 @@ public sealed class ExecutiveNavigationService(TenderWorkflowService workflow, U
         var current = new ClaimsPrincipal(new ClaimsIdentity(principal.Claims.Where(c => c.Type != ClaimTypes.Role)
             .Concat(roles.Select(r => new Claim(ClaimTypes.Role, r))), principal.Identity?.AuthenticationType ?? "Identity.Application"));
         var pages = new List<ExecutivePage>();
-        var available = WorkspaceNavigation.Workspaces.Where(w => roles.Contains(w.Role)).ToArray();
+        var available = WorkspaceNavigation.Workspaces.Where(w => roles.Contains(w.Role) && (workspaceRole == null || workspaceRole == w.Role)).ToArray();
         foreach (var workspace in available)
             foreach (var item in workspace.Items) await Add(workspace.Area, item);
         foreach (var item in WorkspaceNavigation.SharedItems) await Add("", item);
@@ -87,6 +87,72 @@ public sealed class ExecutiveNavigationService(TenderWorkflowService workflow, U
             1 => new("Navigate", matches[0].Url, $"Opening {matches[0].Label} / فتح الصفحة", matches),
             > 1 => new("Choose", null, "أي صفحة تقصد؟ اختَر من الصفحات المسموحة. / Choose the page you meant.", matches),
             _ => new("Unrecognized", null, "لم يتم تحديد صفحة مسموحة بشكل مؤكد. / No permitted page was identified with certainty.", []) };
+    }
+
+    // Spoken English page names written in Arabic letters by speech recognition (e.g. "الانفيتيشن"). Used only by MatchLoose.
+    private static readonly Dictionary<string, string[]> Spoken = new()
+    {
+        ["Invitations"] = ["انفيتيشن", "انفيتيشنز", "انفتيشن", "انفتيشنز", "انفكتشن", "انفيكيشن", "انفيتيشين", "دعوه", "دعوات"],
+        ["My Offers"] = ["اوفرز", "اوفر", "عرض", "عروض"],
+        ["Dashboard"] = ["داشبورد", "داش بورد", "رئيسيه"],
+        ["My Tasks"] = ["تاسكات", "تاسك", "مهام"],
+        ["Notifications"] = ["نوتيفيكيشن", "نوتيفيكيشنز", "اشعار", "اشعارات"],
+        ["Reports"] = ["ريبورت", "ريبورتس", "تقارير"],
+        ["Profile"] = ["بروفايل", "بروفيل"],
+        ["Clarifications"] = ["كلاريفيكيشن", "كلاريفيكيشنز", "استفسار", "استفسارات"],
+        ["Received Bids"] = ["بيدز", "عروض الموردين"],
+        ["Suppliers"] = ["سبلايرز", "موردين"],
+        ["Users"] = ["يوزرز", "مستخدمين"],
+        ["Tender"] = ["تندر", "تندرات", "مناقصات", "عطاءات"],
+        ["My Requests"] = ["ريكويست", "ريكويستس", "طلبات"],
+        ["Request"] = ["ريكويست", "ريكويستس", "طلبات"],
+        ["Final Decisions"] = ["قرارات", "ديسيجن"],
+        ["Settings"] = ["سيتينجز", "اعدادات"],
+    };
+
+    // Tolerant matching for the chat/voice agent: exact first (Match), then a page name contained in the sentence, then a near
+    // spelling (speech recognition). Still only pages from the user's authorized Catalog; never a URL from the transcript.
+    public static ExecutiveNavigationResult MatchLoose(string command, string? currentArea, IReadOnlyList<ExecutivePage> pages)
+    {
+        var exact = Match(command, currentArea, pages);
+        if (exact.State != "Unrecognized") return exact;
+        var key = " " + Normalize(command) + " ";
+        var tokens = key.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var scored = new List<(ExecutivePage Page, int Score)>();
+        foreach (var page in pages)
+        {
+            var names = page.Aliases.Append(page.Label).Concat(Spoken.GetValueOrDefault(page.Label) ?? []).Select(Normalize).Where(n => n.Length >= 3).Distinct();
+            var best = 0;
+            foreach (var name in names)
+            {
+                if (key.Contains(" " + name + " ")) best = Math.Max(best, 100 + name.Length);
+                else if (!name.Contains(' ') && name.Length >= 5 && tokens.Any(t => t.Length >= 5 && Distance(t, name) <= (name.Length >= 8 ? 2 : 1))) best = Math.Max(best, 50 + name.Length);
+            }
+            if (best > 0) scored.Add((page, best));
+        }
+        if (scored.Count == 0) return exact;
+        var top = scored.Max(s => s.Score);
+        var winners = scored.Where(s => s.Score == top).Select(s => s.Page).DistinctBy(p => p.Url).ToArray();
+        if (winners.Length > 1 && !string.IsNullOrEmpty(currentArea))
+        {
+            var local = winners.Where(p => p.Area.Equals(currentArea, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (local.Length > 0) winners = local;
+        }
+        return winners.Length == 1
+            ? new("Navigate", winners[0].Url, $"Opening {winners[0].Label} / فتح الصفحة", winners)
+            : new("Choose", null, "أي صفحة تقصد؟ اختَر من الصفحات المسموحة. / Choose the page you meant.", winners);
+    }
+
+    private static int Distance(string a, string b)
+    {
+        if (Math.Abs(a.Length - b.Length) > 2) return 99;
+        var d = new int[a.Length + 1, b.Length + 1];
+        for (var i = 0; i <= a.Length; i++) d[i, 0] = i;
+        for (var j = 0; j <= b.Length; j++) d[0, j] = j;
+        for (var i = 1; i <= a.Length; i++)
+            for (var j = 1; j <= b.Length; j++)
+                d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+        return d[a.Length, b.Length];
     }
 
     public static string Normalize(string value)

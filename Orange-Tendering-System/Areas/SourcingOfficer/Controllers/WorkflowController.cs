@@ -35,7 +35,12 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
         catch (WorkflowException e) when (ajax) { return BadRequest(new { errors = new[] { e.Message } }); }
     }
     [HttpPost] public Task<IActionResult> RequestWeights(int id) => Execute(id, () => Workflow.RequestWeights(id, User));
-    [HttpPost] public Task<IActionResult> ApproveWeights(int id) => Execute(id, () => Workflow.ApproveWeights(id, User));
+    [HttpPost] public Task<IActionResult> ApproveWeights(int id, List<TechnicalCriterionInput> criteria) => Execute(id, () =>
+    {
+        if (!ModelState.IsValid) throw new WorkflowException("Enter a valid weight for each technical criterion.");
+        return Workflow.ApproveWeights(id, User, criteria);
+    });
+    [HttpPost] public Task<IActionResult> FinalizeFinancialReview(int id) => Execute(id, () => Workflow.FinalizeFinancialReview(id, User));
     [HttpPost] public Task<IActionResult> ReturnWeights(int id, int[] memberIds, string note) => Execute(id, () => Workflow.ReturnWeights(id, memberIds, note, User));
     [HttpPost] public Task<IActionResult> SubmitPreTender(int id, string? note) => Execute(id, () => Workflow.SubmitPreTender(id, note, User));
     [HttpPost] public Task<IActionResult> OpenBidding(int id, DateTimeOffset deadline) => Execute(id, () => Workflow.OpenBidding(id, deadline, User));
@@ -59,6 +64,7 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
     // (the server refuses Compliant when documents are missing). Every result is recorded and audited as the Officer's check. Offers already checked are left alone.
     private async Task AutoCheckOffers(int id)
     {
+        if (await db.Tenders.AnyAsync(t => t.Id == id && t.PurchaseRequest.EvaluationMethod == TenderEvaluationMethod.LowestPrice)) return;
         var bids = await db.Bids.AsNoTracking().Where(b => b.Status == BidStatus.Submitted && b.ComplianceStatus == ComplianceStatus.NotChecked && b.TenderInvitation.TenderRound.TenderId == id && b.TenderInvitation.TenderRound.Status == TenderRoundStatus.Closed)
             .Select(b => new { b.Id, Docs = db.Documents.Count(d => d.BidId == b.Id) }).ToListAsync();
         foreach (var bid in bids)

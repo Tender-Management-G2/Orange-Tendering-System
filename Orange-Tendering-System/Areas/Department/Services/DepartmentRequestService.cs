@@ -26,7 +26,7 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
         request.Justification, request.Priority, request.NeededBy,
         request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm
         { Name = i.Name, CategoryId = i.CategoryId, CategoryName = i.Category?.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList(),
-        request.Documents.OrderBy(d => d.Id).Select(d => d.FileName).ToList());
+        request.Documents.OrderBy(d => d.Id).Select(d => d.FileName).ToList(), request.EvaluationMethod);
 
     public static string Version(PurchaseRequest request) => Convert.ToHexString(SHA256.HashData(
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
@@ -39,7 +39,7 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
     public static RequestForm Form(PurchaseRequest request) => new()
     {
         Id = request.Id, Version = Version(request), Title = request.Title,
-        Justification = request.Justification, Priority = request.Priority, NeededBy = request.NeededBy,
+        Justification = request.Justification, Priority = request.Priority, EvaluationMethod = request.EvaluationMethod, NeededBy = request.NeededBy,
         Items = Snapshot(request).Items, ExistingDocuments = request.Documents.ToList(),
         ReturnComment = request.Status == PurchaseRequestStatus.Returned
             ? request.Reviews.OrderByDescending(r => r.SubmissionNumber).FirstOrDefault()?.Comment : null
@@ -58,6 +58,8 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
 
     public async Task<int> Save(ApplicationUser user, RequestForm form, bool submit, string storageRoot)
     {
+        if ((submit && form.EvaluationMethod == null) || (form.EvaluationMethod.HasValue && !Enum.IsDefined(form.EvaluationMethod.Value)))
+            throw new InvalidOperationException("Choose a valid evaluation method before submitting.");
         var written = new List<string>();
         // Recheck ownership, workflow and the displayed version inside the same transaction as the write.
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -80,6 +82,7 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
             request.Title = GenerateTitle(form.Items.Select(i => i.Name.Trim()).ToList(), department);
             request.Justification = form.Justification.Trim();
             request.Priority = form.Priority;
+            request.EvaluationMethod = form.EvaluationMethod;
             request.NeededBy = form.NeededBy?.Date;
             request.Items = form.Items.Select(i => new PurchaseRequestItem
             {

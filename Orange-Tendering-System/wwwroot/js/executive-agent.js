@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 (() => {
   const root = document.querySelector('[data-executive-agent]'); if (!root) return;
   const dialog = root.querySelector('dialog'), command = root.querySelector('[data-agent-command]');
@@ -78,7 +78,8 @@
     }catch(e){stopSpeech(true);message(`Microphone unavailable: ${e.message}. Type your command instead.`,true);}finally{starting=false;}
   }
   mic.addEventListener('click',()=>listen(false));
-  if(topMic)topMic.addEventListener('click',event=>{if(target.value!=='agent')return;event.preventDefault();event.stopImmediatePropagation();const topLanguage=document.querySelector('[data-voice-language]');if(topLanguage)language.value=topLanguage.value;listen(true);},true);
+  // Voice commands run in the Orange AI chat (one assistant for pages, data, files and prepared actions) when it is on the page.
+  if(topMic)topMic.addEventListener('click',event=>{if(target.value!=='agent')return;event.preventDefault();event.stopImmediatePropagation();const topLanguage=document.querySelector('[data-voice-language]');if(topLanguage)language.value=topLanguage.value;if(window.OrangeAI){window.OrangeAI.voice(language.value);return;}listen(true);},true);
   function navigateTo(url){if(typeof url!=='string'||!url.startsWith('/')||url.startsWith('//'))throw new Error('تم رفض رابط غير مسموح.');const next=new URL(url,location.origin);if(next.origin!==location.origin)throw new Error('تم رفض رابط خارج الموقع.');location.assign(next.href);}
   function offerPages(choices){for(const page of choices||[]){const button=document.createElement('button');button.type='button';button.textContent=page.label;button.addEventListener('click',async()=>{try{const r=await post('Navigate',{pageId:page.id,area:root.dataset.area});if(r.state==='Navigate')navigateTo(r.url);else message(r.message,true);}catch(e){message(e.message,true);}});voiceNotice.append(button);}}
   function link(url,text,parent){if(!url?.startsWith('/')||url.startsWith('//'))return;const a=document.createElement('a');a.href=url;a.textContent=text;a.target='_blank';a.rel='noopener';parent.append(a);}

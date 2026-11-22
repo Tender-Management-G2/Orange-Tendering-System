@@ -19,7 +19,7 @@ public sealed partial class ReportingService
         var tenders = TenderQuery(filter);
         if (scope.AllTenders) return tenders;
         return tenders.Where(t => t.CommitteeMembers.Any(m => m.UserId == scope.UserId &&
-            (scope.Manager && m.CommitteeType == CommitteeType.Evaluation && m.Responsibility == CommitteeResponsibility.SourcingManager ||
+            (scope.Manager && m.Responsibility == CommitteeResponsibility.SourcingManager ||
             scope.Executive && (m.CommitteeType == CommitteeType.Top || m.CommitteeType == TopCommitteeCompatibility.LegacyTop) &&
                 t.Rounds.Any(r => r.CommitteeRounds.Any(c => c.CommitteeType == CommitteeType.Top || c.CommitteeType == TopCommitteeCompatibility.LegacyTop)))));
     }

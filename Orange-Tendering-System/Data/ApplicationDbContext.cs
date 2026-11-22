@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Models.Entities;
 
@@ -54,11 +54,15 @@ namespace Orange_Tendering_System.Data
 
         // Final decision relay (Top Committee -> Manager -> Officer -> Suppliers)
         public DbSet<FinalDecisionNotice> FinalDecisionNotices => Set<FinalDecisionNotice>();
+        public DbSet<InternalAwardReport> InternalAwardReports => Set<InternalAwardReport>();
         public DbSet<SupplierResultDelivery> SupplierResultDeliveries => Set<SupplierResultDelivery>();
 
         // AI Chat Assistant (per-user history)
         public DbSet<AiChatConversation> AiChatConversations => Set<AiChatConversation>();
         public DbSet<AiChatMessage> AiChatMessages => Set<AiChatMessage>();
+        public DbSet<AiChatFile> AiChatFiles => Set<AiChatFile>();
+        public DbSet<AiKnowledgeDocument> AiKnowledgeDocuments => Set<AiKnowledgeDocument>();
+        public DbSet<AiKnowledgeChunk> AiKnowledgeChunks => Set<AiKnowledgeChunk>();
 
         private void ProtectReportHistory()
         {
@@ -125,6 +129,9 @@ namespace Orange_Tendering_System.Data
                 .HasOne(u => u.Supplier).WithMany().HasForeignKey(u => u.SupplierId);
             builder.Entity<Supplier>()
                 .HasOne(s => s.ReviewedByUser).WithMany().HasForeignKey(s => s.ReviewedByUserId);
+
+            builder.Entity<AiKnowledgeDocument>().HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<AiKnowledgeDocument>().HasMany(x => x.Chunks).WithOne(x => x.Document).HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Cascade);
 
             // One person per Evaluation Committee responsibility within a tender. Top Committee members leave
             // Responsibility null, so the filter ignores them.

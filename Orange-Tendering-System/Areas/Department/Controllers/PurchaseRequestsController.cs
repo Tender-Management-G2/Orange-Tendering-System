@@ -169,6 +169,8 @@ public class PurchaseRequestsController : Controller
             if (!UnitsOfMeasure.All.Contains(form.Items[i].Unit ?? ""))
                 ModelState.AddModelError($"Items[{i}].Unit", "Choose a unit of measure from the list.");
         }
+        if (intent == "submit" && form.EvaluationMethod is null)
+            ModelState.AddModelError(nameof(form.EvaluationMethod), "Choose an evaluation method before submitting.");
         await ValidateAttachments(form.Attachments);
         if (!ModelState.IsValid) return View(edit ? "Edit" : "Create", await Context(form, user));
         try

@@ -38,7 +38,7 @@ public abstract class ReportControllerBase(TenderWorkflowService workflow) : Con
         var report = await workflow.ReviewReport(id, User);
         var feedback = await OrangeWorkflowFeedback.For(this, workflow, report.Tender.Id);
         if (feedback is not null) TempData.Orange(feedback);
-        else TempData["ReportMessage"] = "A new report version was generated. All required signatures must be collected again.";
+        else TempData["ReportMessage"] = "A new report version was generated from the recorded evaluation submissions.";
         return RedirectToAction(nameof(Review), new { id = report.Versions.First().Id });
     }
     // The signature drawn on the pad arrives as a PNG data URL. It is required, must be a real PNG and must not be huge.

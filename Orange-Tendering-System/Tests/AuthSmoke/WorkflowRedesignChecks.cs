@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -20,6 +22,7 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services;
+using Orange_Tendering_System.Services.Assistant;
 using Orange_Tendering_System.Services.Biometric;
 using Orange_Tendering_System.ViewModels;
 
@@ -28,6 +31,38 @@ using Orange_Tendering_System.ViewModels;
 // one-decimal scores, member recommendations, automatic report generation and the Manager's executive summary.
 public static class WorkflowRedesignChecks
 {
+    private sealed class DocumentModelFixture : HttpMessageHandler
+    {
+        public int Requests { get; private set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var body = await request.Content!.ReadAsStringAsync(ct);
+            if (body.Contains("Write a short internal tender award report", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { message = new { content = "Top Committee approved the financial tender and recorded Beta Systems as the winning supplier." } }) };
+            if (!body.Contains("QA marker", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.BadRequest);
+            Requests++;
+            const string analysis = """
+                {"items":[
+                  {"source":1,"explanation":"المبلغ المطلوب هو 1250 JOD.","quote":"QA marker: total is 1250 JOD."},
+                  {"source":1,"explanation":"المبلغ 9999.","quote":"QA marker: total is 1250 JOD."},
+                  {"source":1,"explanation":"تاريخ تسليم غير موثق.","quote":"Delivery is Thursday."}
+                ]}
+                """;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { message = new { content = analysis } }) };
+        }
+    }
+
+    private sealed class ActivationInbox : Microsoft.AspNetCore.Identity.UI.Services.IEmailSender
+    {
+        public List<(string Email, string Subject)> Messages { get; } = [];
+        public Task SendEmailAsync(string email, string subject, string htmlMessage)
+        {
+            Messages.Add((email, subject));
+            return Task.CompletedTask;
+        }
+    }
+
     public static async Task Run()
     {
         var root = Environment.GetEnvironmentVariable("AUTH_PROJECT_ROOT") ?? throw new InvalidOperationException("AUTH_PROJECT_ROOT required");
@@ -37,17 +72,27 @@ public static class WorkflowRedesignChecks
         Environment.SetEnvironmentVariable("ConnectionStrings__Default Connection", connection);
         Environment.SetEnvironmentVariable("DemoData__Enabled", "false");
         var password = "Rd!9" + suffix + suffix;
+        var inbox = new ActivationInbox();
+        var documentModel = new DocumentModelFixture();
         using var factory = new WebApplicationFactory<WebAppMarker>().WithWebHostBuilder(b =>
         {
             b.UseContentRoot(root).UseEnvironment("Development");
             b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Default Connection"] = connection, ["BootstrapAdmin:Email"] = "", ["BootstrapAdmin:Password"] = "",
-                ["DemoData:Enabled"] = "false", ["Logging:LogLevel:Default"] = "Error"
+                ["DemoData:Enabled"] = "false", ["Logging:LogLevel:Default"] = "Error",
+                ["Smtp:Mode"] = "LocalInbox", ["Smtp:Host"] = "localhost", ["Smtp:Port"] = "1025",
+                ["Smtp:AllowInsecureLoopback"] = "true", ["Smtp:From"] = "sender@example.test",
+                ["Smtp:Username"] = "", ["Smtp:Password"] = "",
+                ["AccountLinks:PublicBaseUrl"] = "https://localhost",
+                ["Ollama:BaseUrl"] = "http://document-fixture.invalid/", ["Ollama:Model"] = "document-fixture"
             }));
             b.ConfigureTestServices(s =>
             {
                 s.RemoveAll<IHostedService>();
+                s.RemoveAll<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>();
+                s.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(inbox);
+                s.AddHttpClient<OllamaChatClient>().ConfigurePrimaryHttpMessageHandler(() => documentModel);
                 s.PostConfigure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, options =>
                 {
                     var validate = options.Events.OnValidatePrincipal;
@@ -61,6 +106,14 @@ public static class WorkflowRedesignChecks
                 });
             });
         });
+        ClaimsPrincipal ChatPrincipal(ApplicationUser actor, string role) => new(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, actor.Id), new Claim(ClaimTypes.Role, role)], "Check"));
+        async Task<ChatReply> Chat(ApplicationUser actor, string role, string command, int? conversation = null)
+        {
+            using var scope = factory.Services.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<AiChatService>()
+                .SendAsync(ChatPrincipal(actor, role), conversation, command, CancellationToken.None);
+        }
         var passes = 0;
         void Check(bool ok, string name) { if (!ok) throw new InvalidOperationException("FAIL " + name); passes++; Console.WriteLine("PASS " + name); }
         T Scoped<T>(IServiceScope sc) where T : notnull => sc.ServiceProvider.GetRequiredService<T>();
@@ -101,6 +154,79 @@ public static class WorkflowRedesignChecks
 
         // ---- Department: categories, generated title, required specifications ----
         Check(await db.ProcurementCategories.CountAsync(c => c.IsActive) >= 14 && await db.ProcurementCategories.AnyAsync(c => c.Name == "IT & Electronics"), "migration seeds manageable procurement categories");
+        var categoryName = "AI category " + suffix;
+        var categoryTools = AgentTools.Detect("بدي اعمل كاتاغوري جديده")!;
+        var categoryEngine = Scoped<AgentEngine>(setup);
+        var adminActor = new AssistantUser(admin.Id, admin.FullName, SystemRoles.Admin, [SystemRoles.Admin], department.Id, department.Name, null);
+        var requestActor = new AssistantUser(requester.Id, requester.FullName, SystemRoles.RequestingDepartment, [SystemRoles.RequestingDepartment], department.Id, department.Name, null);
+        var deniedCategory = await categoryEngine.StartAsync(requestActor, categoryTools, "بدي اعمل كاتاغوري جديده", true, default);
+        Check(deniedCategory.Payload == null && deniedCategory.Text.Contains("مدير النظام"), "AI denies category creation for a non-Admin");
+        var categoryStart = await categoryEngine.StartAsync(adminActor, categoryTools, "بدي اعمل كاتاغوري جديده", true, default);
+        var collecting = AgentEngine.Read(categoryStart.Payload)!;
+        Check(collecting.Asking == "name", "AI asks for the new category name");
+        var categoryPreview = await categoryEngine.ContinueAsync(collecting, adminActor, P(admin), categoryName, null, default);
+        var confirming = AgentEngine.Read(categoryPreview.Payload)!;
+        Check(confirming.State == "Confirming" && !await db.ProcurementCategories.AnyAsync(c => c.Name == categoryName), "AI requires confirmation before writing a category");
+        var categoryResult = await categoryEngine.ContinueAsync(confirming, adminActor, P(admin), "أكّد", confirming.ActionId, default);
+        var savedCategory = await db.ProcurementCategories.AsNoTracking().SingleAsync(c => c.Name == categoryName);
+        Check(AgentEngine.Read(categoryResult.Payload)?.State == "Done" && savedCategory.IsActive &&
+            await db.AuditLogs.AnyAsync(a => a.Action == "CategoryCreated" && a.EntityId == savedCategory.Id.ToString()),
+            "AI creates, verifies and audits the confirmed category");
+
+        var followUpName = "Redai " + suffix;
+        var previousChat = new AiChatConversation { UserId = admin.Id, Title = "Category follow-up", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+        db.AiChatConversations.Add(previousChat);
+        foreach (var (role, content) in new[] { ("user", "بدي اعمل كاتاغوري جديده"), ("assistant", "What should I name it?"),
+            ("user", followUpName), ("assistant", "Open the Categories page and add a category manually.") })
+            db.AiChatMessages.Add(new AiChatMessage { Conversation = previousChat, Role = role, Content = content, CreatedAt = DateTime.UtcNow.AddMinutes(-2) });
+        await db.SaveChangesAsync();
+        var chatPrincipal = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(ClaimTypes.NameIdentifier, admin.Id), new Claim(ClaimTypes.Role, SystemRoles.Admin)
+        ], "Check"));
+        var chat = Scoped<AiChatService>(setup);
+        var followUp = await chat.SendAsync(chatPrincipal, previousChat.Id, "انت بدك تعملها انشاء", default);
+        var followUpPlan = AgentEngine.Read(followUp.Payload);
+        Check(followUp.Kind == "agent-confirm" && followUp.Reply.Contains(followUpName) && followUpPlan != null &&
+            !await db.ProcurementCategories.AnyAsync(c => c.Name == followUpName), "chat recovers the user's category and name from an older conversation");
+        var followUpResult = await chat.SendAsync(chatPrincipal, previousChat.Id, "أكّد", default, actionId: followUpPlan!.ActionId);
+        Check(followUpResult.Kind == "agent-done" && await db.ProcurementCategories.AnyAsync(c => c.Name == followUpName && c.IsActive),
+            "chat confirmation creates the category without opening the Admin form");
+
+        using (var adminChat = await Login(admin))
+        {
+            var page = await adminChat.GetStringAsync("/Admin");
+            var csrf = WebUtility.HtmlDecode(Regex.Match(page, "data-csrf=\"([^\"]+)\"").Groups[1].Value);
+            Check(!string.IsNullOrEmpty(csrf), "Admin chat includes its antiforgery token");
+            async Task<ChatReply> Say(string message, int? conversationId = null, Guid? actionId = null)
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, "/AiChat/Send")
+                {
+                    Content = JsonContent.Create(new { message, conversationId, actionId, page = "/Admin" })
+                };
+                request.Headers.Add("RequestVerificationToken", csrf);
+                using var response = await adminChat.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+                return (await response.Content.ReadFromJsonAsync<ChatReply>())!;
+            }
+            var email = "chat.user." + suffix.ToLowerInvariant() + "@example.invalid";
+            var chooseCreation = await Say("بدي تعملو انشاء");
+            Check(chooseCreation.Kind == "create-kind", "chat asks what to create when the record type is missing");
+            var onboarding = await Say("يوزر", chooseCreation.ConversationId);
+            Check(onboarding.Kind == "agent-plan" && onboarding.Reply.Contains("الاسم"), "new employee chat asks for missing information");
+            var review = await Say($"الاسم: Lina Saleh، البريد: {email}، الدور: Finance، القسم: IT Department", onboarding.ConversationId);
+            var reviewPlan = AgentEngine.Read(review.Payload);
+            Check(review.Kind == "agent-confirm" && reviewPlan != null && review.Reply.Contains(email) &&
+                !await db.Users.AnyAsync(u => u.Email == email), "chat accepts the employee details together and waits for confirmation");
+            var negative = await Say("do not confirm", onboarding.ConversationId, reviewPlan!.ActionId);
+            Check(negative.Kind == "agent-confirm" && !await db.Users.AnyAsync(u => u.Email == email),
+                "a negative phrase with an action ID cannot create an account");
+            var saved = await Say("أكّد", onboarding.ConversationId, reviewPlan.ActionId);
+            var account = await users.FindByEmailAsync(email);
+            Check(saved.Kind == "agent-done" && account is { PasswordHash: null, MustChangePassword: true } &&
+                account.DepartmentId == department.Id && await users.IsInRoleAsync(account, SystemRoles.Finance) &&
+                inbox.Messages.Count(m => m.Email == email && m.Subject.Contains("Activate")) == 1,
+                "chat creates the authorized employee and sends one activation message without setting a password");
+        }
         Check(DepartmentRequestService.GenerateTitle(["Laptop", "Network switch"], "IT Department") == "Laptop + 1 more item — IT Department", "request title is generated from items and department");
         Check(DepartmentRequestService.GenerateTitle([new string('x', 400)], "IT Department").Length <= 200, "generated title respects the 200-character limit");
         bool ValidQuantity(decimal quantity)
@@ -110,7 +236,7 @@ public static class WorkflowRedesignChecks
         }
         Check(!ValidQuantity(1.006m) && ValidQuantity(1m) && ValidQuantity(10m), "department quantity accepts whole numbers and rejects decimal fractions");
         var it = await db.ProcurementCategories.SingleAsync(c => c.Name == "IT & Electronics"); var tel = await db.ProcurementCategories.SingleAsync(c => c.Name == "Telecommunications");
-        var form = new RequestForm { Justification = "The IT team needs new laptops and a switch for the new office.", NeededBy = DateTime.UtcNow.Date.AddDays(60),
+        var form = new RequestForm { EvaluationMethod = TenderEvaluationMethod.Weighted, Justification = "The IT team needs new laptops and a switch for the new office.", NeededBy = DateTime.UtcNow.Date.AddDays(60),
             Items = [new() { Name = "Laptop", CategoryId = it.Id, Specifications = "Core i7, 16 GB RAM, 512 GB SSD", Quantity = 2, Unit = "Piece" },
                      new() { Name = "Network switch", CategoryId = tel.Id, Specifications = "24-port gigabit managed", Quantity = 1, Unit = "Piece" }] };
         var prId = await new DepartmentRequestService(db, users).Save(requester, form, submit: true, Path.Combine(Path.GetTempPath(), "redesign-" + suffix));
@@ -121,6 +247,52 @@ public static class WorkflowRedesignChecks
         var createPage = await requesterClient.GetStringAsync("/Department/PurchaseRequests/Create");
         Check(createPage.Contains("IT Department") && createPage.Contains("Items[0].CategoryId") && createPage.Contains("Telecommunications") && !createPage.Contains("name=\"Title\""),
             "request form shows department automatically, item categories and no title input");
+        var documentCsrf = WebUtility.HtmlDecode(Regex.Match(createPage, "data-csrf=\"([^\"]+)\"").Groups[1].Value);
+        var documentUpload = new MultipartFormDataContent();
+        documentUpload.Add(new StringContent("QA marker: total is 1250 JOD. Valid unit information is included."), "file", "analysis-check.txt");
+        var uploaded = await DocumentRequest("/AiChat/Upload", documentUpload);
+        var analysisReply = await DocumentRequest("/AiChat/Send", JsonContent.Create(new { conversationId = uploaded.ConversationId, message = "بدي تحليل للملف" }));
+        Check(analysisReply.Kind == "document-analysis" && analysisReply.Reply.Contains("QA marker: total is 1250 JOD.") &&
+            !analysisReply.Reply.Contains("9999") && !analysisReply.Reply.Contains("Thursday") &&
+            new[] { "PDF", "Excel", "Word" }.All(format => analysisReply.Reply.Contains(format)),
+            "document analysis shows supported findings before asking for a format and omits unsupported claims");
+        foreach (var (choice, extension) in new[] { ("Excel", "xlsx"), ("Word", "docx"), ("PDF", "pdf") })
+        {
+            var exported = await DocumentRequest("/AiChat/Send", JsonContent.Create(new { conversationId = uploaded.ConversationId, message = choice }));
+            using var file = JsonDocument.Parse(exported.Payload!);
+            var card = file.RootElement.GetProperty("file");
+            var bytes = await requesterClient.GetByteArrayAsync(card.GetProperty("downloadUrl").GetString());
+            using var stream = new MemoryStream(bytes);
+            var preservesFooting = extension switch
+            {
+                "xlsx" => SheetContainsEvidence(stream),
+                "docx" => WordContainsEvidence(stream),
+                _ => bytes.AsSpan().StartsWith("%PDF-"u8)
+            };
+            Check(exported.Kind == "file" && card.GetProperty("format").GetString() == extension && preservesFooting,
+                $"{choice} downloads the same saved analysis");
+        }
+        Check(documentModel.Requests == 1, "format selection does not rerun document analysis");
+        Check(await Scoped<AiChatService>(setup).DeleteAsync(ChatPrincipal(requester, SystemRoles.RequestingDepartment), uploaded.ConversationId), "test analysis conversation cleaned up");
+        await Scoped<AiChatFileStore>(setup).CleanupAsync(default);
+        async Task<ChatReply> DocumentRequest(string url, HttpContent data)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = data };
+            request.Headers.Add("RequestVerificationToken", documentCsrf);
+            using var response = await requesterClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"{url}: {response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+            return (await response.Content.ReadFromJsonAsync<ChatReply>())!;
+        }
+        static bool SheetContainsEvidence(Stream stream)
+        {
+            using var book = new ClosedXML.Excel.XLWorkbook(stream);
+            return book.Worksheet(1).CellsUsed().Any(c => c.GetString().Contains("QA marker: total is 1250 JOD."));
+        }
+        static bool WordContainsEvidence(Stream stream)
+        {
+            using var word = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(stream, false);
+            return word.MainDocumentPart?.Document.InnerText.Contains("QA marker: total is 1250 JOD.") == true;
+        }
         pr.Status = PurchaseRequestStatus.Accepted; await db.SaveChangesAsync();
 
         // ---- Tender preparation, weight revision and direct bidding ----
@@ -131,7 +303,7 @@ public static class WorkflowRedesignChecks
         Check(await Read(d => d.TenderItems.Where(i => i.TenderId == id).AllAsync(i => i.CategoryId != null)) && await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.RequiredDocuments == "OfficialQuotation,ProductDatasheet")),
             "tender inherits item categories and stores the required offer documents");
         await Flow(w => w.RequestWeights(id, P(officer)));
-        await Refuse(w => w.Propose(id, 40.555m, 59.445m, P(manager)), "weight proposals accept at most two decimals", "2 decimal");
+        await Refuse(w => w.Propose(id, 40.5m, 59.5m, P(manager)), "weight proposals reject fractional percentages", "whole-number");
         foreach (var m in new[] { manager, depRep, fin, tech }) await Flow(w => w.Propose(id, 40, 60, P(m)));
         var departmentSeatId = await Read(d => d.CommitteeMembers.Where(c => c.TenderId == id && c.UserId == depRep.Id).Select(c => c.Id).SingleAsync());
         await Flow(w => w.ReturnWeights(id, [departmentSeatId], "Please revisit the technical weighting.", P(officer)));
@@ -145,7 +317,28 @@ public static class WorkflowRedesignChecks
             "two selected proposals reopen with the Officer's note recorded");
         await Flow(w => w.Propose(id, 42, 58, P(fin)));
         await Flow(w => w.Propose(id, 43, 57, P(tech)));
-        await Flow(w => w.ApproveWeights(id, P(officer)));
+        using (var officerClient = await Login(officer))
+        using (var detail = new HttpRequestMessage(HttpMethod.Get, "/SourcingOfficer/Workflow/Details/" + id))
+        {
+            detail.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var response = await officerClient.SendAsync(detail);
+            var html = await response.Content.ReadAsStringAsync();
+            Check(response.IsSuccessStatusCode && html.Contains("data-technical-total") && html.Contains("criteria[3].Weight"),
+                "the Officer's approval form renders the interactive technical criteria table");
+            Check(html.Contains("value=\"16 GB RAM\"") && html.Contains("value=\"512 GB SSD\"") && html.Contains("value=\"Processor (CPU)\""),
+                "technical weights offer tender specification details and laptop component suggestions");
+        }
+        var technicalCriteria = new[] {
+            new TechnicalCriterionInput { Name = "Specifications", Weight = 40 },
+            new TechnicalCriterionInput { Name = "Experience", Weight = 25 },
+            new TechnicalCriterionInput { Name = "Support", Weight = 20 },
+            new TechnicalCriterionInput { Name = "Delivery", Weight = 17 }
+        };
+        await Refuse(w => w.ApproveWeights(id, P(officer), technicalCriteria), "102% cannot be approved", "Reduce the technical criteria by 2%");
+        technicalCriteria[3].Weight = 13;
+        await Refuse(w => w.ApproveWeights(id, P(officer), technicalCriteria), "98% cannot be approved", "Add 2%");
+        technicalCriteria[3].Weight = 15;
+        await Flow(w => w.ApproveWeights(id, P(officer), technicalCriteria));
         await Refuse(w => w.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(90), P(officer)), "submission deadline cannot be after the department's needed-by date", "needs the items");
         await Flow(w => w.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(5), P(officer)));
         foreach (var s in suppliers) await Flow(w => w.Invite(id, s.Company.Id, P(officer)));
@@ -172,8 +365,12 @@ public static class WorkflowRedesignChecks
         Check(SupplierOfferService.ReadUpload("ReferenceImage", "photo.pdf", pdf).Error != null, "product images reject PDF files");
         async Task<(int? Bid, List<string> Errors)> Submit(int index, Action<SupplierDraftOfferInputModel> edit, params string[] docs)
         {
+            return await SubmitForTender(id, index, edit, docs);
+        }
+        async Task<(int? Bid, List<string> Errors)> SubmitForTender(int tenderId, int index, Action<SupplierDraftOfferInputModel> edit, params string[] docs)
+        {
             using var sc = factory.Services.CreateScope(); var service = Scoped<SupplierOfferService>(sc);
-            var inv = await Scoped<ApplicationDbContext>(sc).TenderInvitations.SingleAsync(i => i.SupplierId == suppliers[index].Company.Id);
+            var inv = await Scoped<ApplicationDbContext>(sc).TenderInvitations.SingleAsync(i => i.SupplierId == suppliers[index].Company.Id && i.TenderRound.TenderId == tenderId);
             var page = await service.GetOfferFormAsync(suppliers[index].User.Id, inv.Id);
             if (page == null) return await service.SubmitOfferAsync(suppliers[index].User.Id, inv.Id, new SupplierDraftOfferInputModel(), docs.Select(File).ToList());
             var input = page.Input; input.CurrencyCode = "JOD"; input.DeliveryDays = 20; input.PaymentTerms = "Net 30 days after delivery"; input.TechnicalProposal = "Proposal";
@@ -269,7 +466,12 @@ public static class WorkflowRedesignChecks
         var roundId = await Read(d => d.TenderRounds.Where(r => r.TenderId == id).Select(r => r.Id).SingleAsync());
         var aiId = await Read(async d => { var ai = new AiAnalysis { TenderRoundId = roundId, Status = "Completed", Model = "fixture", EvidenceJson = "{}", Findings = "{\"Strengths\":\"Alpha has the longest warranty\"}" }; d.Add(ai); await d.SaveChangesAsync(); return ai.Id; });
         await Flow(w => w.ReviewAi(id, aiId, P(officer)));
-        await Flow(w => w.Setup(id, new SessionInput { AiAnalysisId = aiId, StartsAt = DateTimeOffset.UtcNow.AddHours(2), EndsAt = DateTimeOffset.UtcNow.AddHours(3), MeetingUrl = "https://meet.jit.si/OrangeTender-redesign-" + suffix }, P(officer)));
+        var schedule = await Chat(officer, SystemRoles.SourcingOfficer, $"Schedule evaluation meeting T-{id}");
+        schedule = await Chat(officer, SystemRoles.SourcingOfficer, DateTime.UtcNow.AddHours(2).ToJordan("yyyy-MM-dd HH:mm"), schedule.ConversationId);
+        schedule = await Chat(officer, SystemRoles.SourcingOfficer, "60", schedule.ConversationId);
+        Check(schedule.Kind == "agent-confirm", "officer chat previews the evaluation meeting date and duration");
+        var scheduled = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", schedule.ConversationId);
+        Check(scheduled.Reply.Contains("Meeting scheduled"), "confirmed officer chat schedules the meeting");
 
         // ---- Before the meeting: page access yes, scoring no ----
         using (var member = await Login(fin))
@@ -288,12 +490,11 @@ public static class WorkflowRedesignChecks
             Check((await stranger.GetAsync("/Meetings/Join/" + id)).StatusCode == HttpStatusCode.NotFound, "a user outside the committee cannot open the meeting page");
         List<ScoreInput> Scores(decimal fa, decimal ta) =>
         [
-            new() { BidId = bidA.Id, Financial = fa, Technical = ta, Justification = "Alpha" },
-            new() { BidId = bidB.Id, Financial = 70, Technical = 70, Justification = "Beta" },
-            new() { BidId = bidC.Id, Financial = 60, Technical = 60, Justification = "Gamma" }
+            new() { BidId = bidA.Id, Financial = fa, TechnicalScores = [ta, ta - 10, ta, ta], Justification = "Alpha" },
+            new() { BidId = bidB.Id, Financial = 70, TechnicalScores = [70, 70, 70, 70], Justification = "Beta" },
+            new() { BidId = bidC.Id, Financial = 60, TechnicalScores = [60, 60, 60, 60], Justification = "Gamma" }
         ];
-        MemberRecommendationInput Rec(int bidId, string? deviation = null) => new() { RecommendedBidId = bidId, Reason = "Best value for the department.", DeviationJustification = deviation };
-        await Refuse(w => w.SubmitEvaluation(id, Scores(90, 90), P(fin), null, Rec(bidA.Id)), "scoring is refused before the meeting start", "Scoring opens");
+        await Refuse(w => w.SubmitEvaluation(id, Scores(90, 90), P(fin), null), "scoring is refused before the meeting start", "Scoring opens");
         await Read(async d => { var s = await d.Set<EvaluationSession>().SingleAsync(x => x.TenderRoundId == roundId); s.StartsAt = DateTime.UtcNow.AddMinutes(-5); await d.SaveChangesAsync(); return 0; });
 
         // ---- During the meeting: precision, recommendation rules, automatic report ----
@@ -304,27 +505,31 @@ public static class WorkflowRedesignChecks
             var popupResponse = await member.SendAsync(popupRequest);
             var popup = await popupResponse.Content.ReadAsStringAsync();
             Check(popupResponse.StatusCode == HttpStatusCode.OK && popup.Contains("class=\"wp-form wp-scores\"")
-                && popup.Contains("name=\"recommendation.RecommendedBidId\"") && popup.Contains("name=\"recommendation.DeviationJustification\"")
-                && popup.Contains("step=\"0.1\""), "Tariq5 popup scoring is available during the meeting with current recommendation and precision rules");
+                && !popup.Contains("name=\"recommendation.") && popup.Contains("data-pad")
+                && popup.Contains("maxlength=\"2\"") && popup.Contains("data-score-digits"), "Tariq5 popup scoring is available during the meeting with two-digit scores and a signature pad");
         }
-        await Refuse(w => w.SubmitEvaluation(id, Scores(89.95m, 90), P(fin), null, Rec(bidA.Id)), "a score with two decimals (89.95) is refused, not rounded", "one decimal");
-        await Refuse(w => w.SubmitEvaluation(id, Scores(89.5m, 90), P(fin), null, Rec(bidB.Id)), "recommending an offer below one's own top score needs a justification", "deviation");
-        await Flow(w => w.SubmitEvaluation(id, Scores(89.5m, 90), P(fin), null, Rec(bidB.Id, "Beta offers local support that the department relies on.")));
-        await Refuse(w => w.SubmitEvaluation(id, Scores(80, 80), P(fin), null, Rec(bidA.Id)), "a member cannot submit twice", "immutable");
-        foreach (var m in new[] { manager, depRep, tech }) await Flow(w => w.SubmitEvaluation(id, Scores(88, 92), P(m), null, Rec(bidA.Id)));
+        await Refuse(w => w.SubmitEvaluation(id, Scores(89.95m, 90), P(fin), null), "a decimal score is refused", "whole-number");
+        await Refuse(w => w.SubmitEvaluation(id, Scores(100, 90), P(fin), null), "a three-digit financial score is refused", "whole-number");
+        await Refuse(w => w.SubmitEvaluation(id, Scores(89, 100), P(fin), null), "a three-digit technical score is refused", "whole-number");
+        var evaluationSignature = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=");
+        await Refuse(w => w.Forward(id, P(officer)), "the Officer cannot forward before four signed submissions");
+        await Flow(w => w.SubmitEvaluation(id, Scores(89m, 90), P(fin), evaluationSignature));
+        await Refuse(w => w.SubmitEvaluation(id, Scores(80, 80), P(fin), evaluationSignature), "a member cannot submit twice", "immutable");
+        foreach (var m in new[] { manager, depRep, tech }) await Flow(w => w.SubmitEvaluation(id, Scores(88, 92), P(m), evaluationSignature));
         var session = await Read(d => d.Set<EvaluationSession>().Include(x => x.Report).Include(x => x.Invitations).SingleAsync(x => x.TenderRoundId == roundId));
-        Check(session.State == SessionState.ReportDraft && session.Report != null && session.ReportSentAt != null && session.Report.RecommendedBidId == bidA.Id,
-            "the fourth evaluation generates the report automatically and opens signing");
-        Check(session.Report!.Content.Contains("MemberRecommendations") && session.Invitations.Count(x => x.RecommendedBidId == bidA.Id) == 3
-            && session.Invitations.Single(x => x.RecommendedBidId == bidB.Id).RecommendationReason!.Contains("Deviation from own ranking"), "member recommendations and deviation reasons are recorded in the report");
+        Check(session.State == SessionState.Finalized && session.Report != null && session.ReportSentAt != null && session.Report.RecommendedBidId == bidA.Id,
+            "the fourth evaluation generates the report automatically and finalizes its recorded signatures");
+        Check(!session.Report!.Content.Contains("MemberRecommendations") && session.Invitations.All(x => x.RecommendedBidId == null),
+            "the report ranks offers from scores alone and stores no individual supplier recommendation");
         var stored = await Read(d => d.EvaluationScores.Where(x => x.BidId == bidA.Id).Select(x => x.Score).ToListAsync());
-        Check(stored.Contains(89.5m) && stored.Contains(88m), "entered scores are stored exactly as typed");
-        foreach (var m in new[] { manager, depRep, fin })
-        { using var sc = factory.Services.CreateScope(); var w = Scoped<TenderWorkflowService>(sc); await w.ReportPdf(session.ReportId!.Value, P(m)); await w.FinalizeReport(id, "", P(m), session.Report.PdfSha256, true); }
-        await Refuse(w => w.Forward(id, P(officer)), "the report cannot be forwarded with three of four signatures");
-        { using var sc = factory.Services.CreateScope(); var w = Scoped<TenderWorkflowService>(sc); await w.ReportPdf(session.ReportId!.Value, P(tech)); await w.FinalizeReport(id, "", P(tech), session.Report.PdfSha256, true); }
-        Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.Status == TenderStatus.OfficerReview)), "four signatures send the completed report to the Officer");
-        await Flow(w => w.Forward(id, P(officer)));
+        Check(stored.Contains(89m) && stored.Contains(87.5m), "financial scores and weighted technical totals are stored");
+        Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.Status == TenderStatus.OfficerReview)), "four signed score submissions send the completed report directly to the Officer");
+        Check(await Read(d => d.Set<ReportSignature>().CountAsync(r => r.TenderReportId == session.ReportId && r.Decision == "SubmittedEvaluation")) == 4,
+            "the generated report records the four submitted evaluation signatures");
+        var handoff = await Chat(officer, SystemRoles.SourcingOfficer, $"Send the report to the Manager for T-{id}");
+        Check(handoff.Kind == "agent-confirm", "officer chat previews forwarding the signed report");
+        var forwarded = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", handoff.ConversationId);
+        Check(forwarded.Reply.Contains("Report sent to the Sourcing Manager"), "officer chat forwards the signed report on confirmation");
 
         // ---- Manager executive summary ----
         var summary = new ExecutiveSummaryInput { BusinessNeed = "The IT team needs laptops and a switch.", KeyFindings = "Three compliant offers; Alpha ranks first.",
@@ -342,6 +547,152 @@ public static class WorkflowRedesignChecks
             && await Read(d => d.TenderReports.AnyAsync(r => r.ReportType == ReportType.ExecutiveSummary && r.Status == ReportStatus.Submitted)), "submitting the summary sends the report to the Top Committee");
         await Refuse(w => w.SaveExecutiveSummary(id, summary, P(manager)), "a submitted executive summary cannot be edited");
         Check(await Read(d => d.TenderReports.AnyAsync(r => r.Id == session.ReportId && r.PdfSha256 == session.Report.PdfSha256)), "the signed evaluation report itself was not changed");
+
+        // Financial-only routing uses real submitted offers and the same signed Manager-to-Top approval path.
+        form.EvaluationMethod = TenderEvaluationMethod.LowestPrice;
+        int financialRequest;
+        using (var sc = factory.Services.CreateScope())
+        {
+            financialRequest = await new DepartmentRequestService(Scoped<ApplicationDbContext>(sc), Scoped<UserManager<ApplicationUser>>(sc))
+                .Save(requester, form, submit: true, Path.Combine(Path.GetTempPath(), "financial-" + suffix));
+            var pendingRequest = await Chat(officer, SystemRoles.SourcingOfficer, $"Accept purchase request PR-{financialRequest}");
+            Check(pendingRequest.Kind == "agent-confirm" && pendingRequest.Reply.Contains("PR-"), "chat prepares a specific request for review");
+            var accepted = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", pendingRequest.ConversationId);
+            Check(accepted.Kind == "agent-done" && accepted.Reply.Contains("Purchase request accepted"), "chat accepts the request only after confirmation");
+        }
+        int financialTender;
+        using (var sc = factory.Services.CreateScope())
+        {
+            financialTender = await Scoped<TenderWorkflowService>(sc).Create(new RequirementsInput
+            {
+                PurchaseRequestId = financialRequest, Title = "Financial price comparison", Description = "Comparable equipment",
+                TechnicalRequirements = "Meet the specifications", CommercialConditions = "Price in JOD",
+                DeliveryExpectations = "20 days", MandatoryCompliance = "Quote required", SourcingManagerId = manager.Id,
+                EstimatedValue = 3000, Currency = "JOD", RequiredDocuments = ["OfficialQuotation"]
+            }, P(officer));
+        }
+        await Refuse(w => w.RequestWeights(financialTender, P(officer)), "financial-only tenders cannot request committee weights");
+        Check(!await Read(d => d.CommitteeMembers.AnyAsync(m => m.TenderId == financialTender && m.CommitteeType == CommitteeType.Evaluation)),
+            "financial-only tenders have no Evaluation Committee assignments");
+        await Flow(w => w.OpenBidding(financialTender, DateTimeOffset.UtcNow.AddDays(5), P(officer)));
+        var supplierRefs = string.Join(", ", suppliers.Select(s => $"S-{s.Company.Id}"));
+        var invitationsPlan = await Chat(officer, SystemRoles.SourcingOfficer, $"Invite suppliers {supplierRefs} to T-{financialTender}");
+        Check(invitationsPlan.Kind == "agent-confirm" && invitationsPlan.Reply.Contains("Beta Systems"), "chat previews the exact selected invitation recipients");
+        var invitationsSent = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", invitationsPlan.ConversationId);
+        Check(invitationsSent.Reply.Contains("Sent 3 invitations"), "chat sends the selected invitations");
+        var financialBids = new List<int>();
+        for (var index = 0; index < suppliers.Count; index++)
+        {
+            var supplier = suppliers[index];
+
+            var invitation = await Read(d => d.TenderInvitations.SingleAsync(i => i.SupplierId == supplier.Company.Id && i.TenderRound.TenderId == financialTender));
+            if (index == 0)
+            {
+                var prepared = await Chat(supplier.User, SystemRoles.Supplier, $"Accept my invitation INV-{invitation.Id}");
+                Check(prepared.Kind == "agent-confirm", "supplier chat only prepares acceptance of their own invitation");
+                var accepted = await Chat(supplier.User, SystemRoles.Supplier, "confirm", prepared.ConversationId);
+                Check(accepted.Reply.Contains("Invitation accepted"), "supplier chat accepts their invitation on confirmation");
+            }
+            else await Flow(w => w.Respond(financialTender, invitation.Id, true, P(supplier.User)));
+            if (index == 0)
+            {
+                var offerDraft = await Chat(supplier.User, SystemRoles.Supplier, $"Prepare my offer INV-{invitation.Id}");
+                foreach (var answer in new[] { "JOD", "Laptop model | 10 | Core i7 and 16 GB RAM\nSwitch model | 10 | 24 managed ports",
+                    "20", "Net 30 days after delivery", DateTime.UtcNow.AddDays(90).ToString("yyyy-MM-dd"), "0" })
+                    offerDraft = await Chat(supplier.User, SystemRoles.Supplier, answer, offerDraft.ConversationId);
+                Check(offerDraft.Kind == "agent-confirm" && offerDraft.Reply.Contains("Laptop model"), "supplier chat collects real quote fields and preview");
+                var saved = await Chat(supplier.User, SystemRoles.Supplier, "confirm", offerDraft.ConversationId);
+                Check(saved.Reply.Contains("Draft saved"), "supplier chat saves a draft on confirmation");
+                using (var sc = factory.Services.CreateScope())
+                {
+                    var pdfBytes = session.Report!.PdfContent!;
+                    using var stream = new MemoryStream(pdfBytes);
+                    var file = new Microsoft.AspNetCore.Http.FormFile(stream, 0, stream.Length, "file", "test-quotation.pdf");
+                    await Scoped<AiChatService>(sc).UploadAsync(ChatPrincipal(supplier.User, SystemRoles.Supplier), offerDraft.ConversationId, file, false, CancellationToken.None);
+                }
+                var attachment = await Chat(supplier.User, SystemRoles.Supplier, $"Attach the file to my offer INV-{invitation.Id}", offerDraft.ConversationId);
+                attachment = await Chat(supplier.User, SystemRoles.Supplier, "1", attachment.ConversationId);
+                attachment = await Chat(supplier.User, SystemRoles.Supplier, "OfficialQuotation", attachment.ConversationId);
+                Check(attachment.Kind == "agent-confirm" && attachment.Reply.Contains("test-quotation.pdf"), "supplier chat previews the selected uploaded quotation");
+                var attached = await Chat(supplier.User, SystemRoles.Supplier, "confirm", attachment.ConversationId);
+                Check(attached.Reply.Contains("Document attached"), "confirmed chat attachment is saved with the draft");
+                var submission = await Chat(supplier.User, SystemRoles.Supplier, $"Submit my offer INV-{invitation.Id}", attachment.ConversationId);
+                Check(submission.Kind == "agent-confirm" && submission.Reply.Contains("Grand total"), "supplier chat previews totals before submission");
+                var sent = await Chat(supplier.User, SystemRoles.Supplier, "confirm", submission.ConversationId);
+                Check(sent.Reply.Contains("Offer submitted"), "supplier chat sends the offer after confirmation and document checks");
+                financialBids.Add(await Read(d => d.Bids.Where(b => b.TenderInvitationId == invitation.Id && b.Status == BidStatus.Submitted).Select(b => b.Id).SingleAsync()));
+            }
+            else
+            {
+                var offer = await SubmitForTender(financialTender, index, input =>
+                {
+                    foreach (var line in input.Items) line.UnitPrice = 20;
+                }, "OfficialQuotation");
+                Check(offer.Bid.HasValue, "financial-only offer submitted: " + string.Join(", ", offer.Errors));
+                financialBids.Add(offer.Bid!.Value);
+            }
+        }
+        await Flow(w => w.CloseBidding(financialTender, P(officer)));
+        using (var officerClient = await Login(officer))
+        using (var detail = new HttpRequestMessage(HttpMethod.Get, "/SourcingOfficer/Workflow/Details/" + financialTender))
+        {
+            detail.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var response = await officerClient.SendAsync(detail);
+            var html = await response.Content.ReadAsStringAsync();
+            Check(response.IsSuccessStatusCode && html.Contains("FinalizeFinancialReview") && !html.Contains("Schedule and invite the committee"),
+                "the financial-only workflow shows screening and skips committee scheduling");
+        }
+        await Refuse(w => w.FinalizeFinancialReview(financialTender, P(officer)), "financial review waits for screening", "Complete compliance");
+        foreach (var bid in financialBids)
+            await Flow(w => w.Compliance(financialTender, bid, ComplianceStatus.Compliant, "Meets the requirements.", "", P(officer)));
+        // The cheapest offer is withdrawn from consideration through a recorded screening result.
+        await Flow(w => w.Compliance(financialTender, financialBids[0], ComplianceStatus.NonCompliant,
+            "One specification is missing.", "Minimum specification", P(officer)));
+        await Refuse(w => w.FinalizeFinancialReview(financialTender, P(officer)), "equal lowest totals block the recommendation", "tied");
+        await Flow(w => w.Compliance(financialTender, financialBids[2], ComplianceStatus.NonCompliant,
+            "Required evidence is missing.", "Required evidence", P(officer)));
+        await Flow(w => w.FinalizeFinancialReview(financialTender, P(officer)));
+        var priceReport = await Read(d => d.TenderReports.SingleAsync(r => r.TenderRound.TenderId == financialTender));
+        Check(priceReport.RecommendedBidId == financialBids[1]
+            && await Read(d => d.Tenders.AnyAsync(t => t.Id == financialTender && t.Status == TenderStatus.ManagerReview)),
+            "the lowest compliant offer goes directly to Manager Review");
+        using (var sc = factory.Services.CreateScope())
+        {
+            var w = Scoped<TenderWorkflowService>(sc);
+            await w.ReportPdf(priceReport.Id, P(manager));
+            await w.SubmitExecutiveSummary(financialTender, summary, P(manager), priceReport.PdfSha256!, true, null);
+        }
+        Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == financialTender && t.Status == TenderStatus.TopCommitteeReview)),
+            "financial-only recommendations continue to Top Committee after the Manager signs");
+        var topCard = await Chat(chiefs[0], SystemRoles.TopCommittee, $"Approve and sign T-{financialTender}");
+        Check(topCard.Kind == "agent-action" && topCard.Payload?.Contains("top_vote") == true
+            && await Read(d => d.Tenders.AnyAsync(t => t.Id == financialTender && t.Status == TenderStatus.TopCommitteeReview)),
+            "Top chat prepares an approval card without voting before verified consent");
+        foreach (var chief in chiefs)
+        {
+            using var sc = factory.Services.CreateScope();
+            var w = Scoped<TenderWorkflowService>(sc);
+            await w.ReportPdf(priceReport.Id, P(chief));
+            await w.TopVote(financialTender, VoteDecision.Approve, "", P(chief), priceReport.PdfSha256, true);
+        }
+        Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == financialTender && t.Status == TenderStatus.Awarded
+            && t.AwardedBidId == financialBids[1])), "four Top approvals award the financial-only tender to the lowest compliant supplier");
+
+        var fileReply = await Chat(suppliers[0].User, SystemRoles.Supplier, "Export this text to Word: Quotation delivered successfully");
+        Check(fileReply.Kind == "file" && fileReply.Payload?.Contains(".docx") == true, "chat generates a Word export from supplied text");
+        var accessCheck = await Chat(suppliers[0].User, SystemRoles.Supplier, $"Accept purchase request PR-{financialRequest}");
+        Check(accessCheck.Kind != "agent-confirm", "the supplier workspace cannot prepare an Officer approval");
+        var mailBeforeAward = inbox.Messages.Count;
+        using (var sc = factory.Services.CreateScope())
+            await Scoped<InternalAwardReportDispatcher>(sc).DispatchPending(CancellationToken.None);
+        var awardReport = await Read(d => d.InternalAwardReports.Include(r => r.OfficerNotification).Include(r => r.ManagerNotification)
+            .SingleAsync(r => r.TenderId == financialTender));
+        Check(awardReport.AiWritten && awardReport.OfficerNotification.UserId == officer.Id && awardReport.ManagerNotification.UserId == manager.Id
+            && awardReport.ManagerNotification.Message.Contains("Beta Systems") && awardReport.OfficerEmailSentAt != null
+            && awardReport.ManagerEmailSentAt != null && inbox.Messages.Count == mailBeforeAward + 2, "both award recipients receive the AI report in-app and by email");
+        using (var sc = factory.Services.CreateScope())
+            await Scoped<InternalAwardReportDispatcher>(sc).DispatchPending(CancellationToken.None);
+        Check(inbox.Messages.Count == mailBeforeAward + 2, "reprocessing a delivered award report does not send duplicate email");
 
         Console.WriteLine($"RESULT PASS={passes} FAIL=0 DATABASE=OrangeAuthCheck_Redesign_{suffix}. Real SQL Server; working database unchanged.");
 

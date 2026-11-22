@@ -162,6 +162,8 @@ public partial class TenderWorkflowService
             Require(input.DocumentHash == report.PdfSha256, "The report version/hash changed; reopen the current PDF.");
             Require(await db.AuditLogs.AnyAsync(x => x.EntityName == "TenderReport" && x.EntityId == reportId.ToString() && x.UserId == actor.Id && x.Action == "ProtectedReportViewed" && x.NewValues!.Contains(input.DocumentHash)), "Open the report before returning it for revision.");
             Require(!await db.Set<ReportRevision>().AnyAsync(x => x.TenderReportId == reportId && x.Status != RevisionStatus.Resubmitted), "This report already has an outstanding revision request.");
+            Require(session.AiAnalysisId != null || input.Target == RevisionTarget.SourcingOfficer,
+                "Financial-only comparisons can be returned only to the Sourcing Officer.");
             var route = RevisionRoute(stage.Value, input, actor);
             var revision = new ReportRevision { RequestId = input.RequestId, TenderReportId = reportId, SourceStage = stage.Value, SourceSessionState = session.State,
                 TargetStage = input.Target, Correction = input.Correction, Feedback = input.Feedback, RequiredAction = input.RequiredAction,
@@ -218,12 +220,24 @@ public partial class TenderWorkflowService
             CreatedAt = Now, CreatedByUserId = actor.Id, RecommendedBidId = ranking.Count(x => x.Rank == 1) == 1 ? ranking.Single(x => x.Rank == 1).BidId : null,
             RankingSnapshotJson = JsonSerializer.Serialize(ranking), Content = JsonSerializer.Serialize(new { Justification = ReportDocumentService.Explanation(old.Content), TextualCorrection = correction, RevisionRequestId = revision.Id, OriginalReportId = old.Id }) };
         await reportDocuments.Invalidate(old, version, Now);
-        session.Report = next; session.State = SessionState.ReportDraft; session.ReportSentAt = Now; tender.Status = TenderStatus.Evaluation;
-        session.ReportReviewRound = new CommitteeRound { TenderRoundId = session.TenderRoundId, CommitteeType = CommitteeType.Evaluation, RoundNumber = version,
+        var financialOnly = session.AiAnalysisId == null;
+        session.Report = next; session.ReportSentAt = Now;
+        session.State = financialOnly ? SessionState.Finalized : SessionState.ReportDraft;
+        tender.Status = financialOnly ? TenderStatus.ManagerReview : TenderStatus.Evaluation;
+        if (!financialOnly) session.ReportReviewRound = new CommitteeRound { TenderRoundId = session.TenderRoundId, CommitteeType = CommitteeType.Evaluation, RoundNumber = version,
             TenderReport = next, StartedAt = Now, FinancialWeight = session.WeightRound.ApprovedFinancial, TechnicalWeight = session.WeightRound.ApprovedTechnical };
         revision.ResubmittedReport = next; revision.ResubmittedAt = Now; revision.CorrectionSummary = correction; revision.Status = RevisionStatus.Resubmitted;
         await db.SaveChangesAsync();
         await reportDocuments.Prepare(next, session);
-        foreach (var member in await Members(tender.Id, CommitteeType.Evaluation)) Notify(member.UserId, tender.Id, "New report version requires signatures", $"Version {version} incorporates the recorded narrative correction. Review and sign again; no old signature carries forward.");
+        if (financialOnly)
+        {
+            next.Status = ReportStatus.Submitted;
+            next.SubmittedAt = Now;
+            var manager = await AssignedManagerId(tender.Id, session);
+            if (manager != null) Notify(manager, tender.Id, "Revised financial report ready", "Review the corrected narrative and unchanged price comparison.");
+        }
+        else if (!await CompleteFromSignedEvaluations(tender, session))
+            foreach (var member in await Members(tender.Id, CommitteeType.Evaluation))
+                Notify(member.UserId, tender.Id, "New report version requires signatures", $"Version {version} incorporates the recorded narrative correction. Review and sign this legacy report version.");
     }
 }

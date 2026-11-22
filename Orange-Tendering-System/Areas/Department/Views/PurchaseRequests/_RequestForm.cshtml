@@ -40,6 +40,9 @@
     <div class="pr-card-head"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg> Request Details</h2></div>
     <div class="pg-form-grid">
         <div class="pg-field"><label asp-for="NeededBy" class="pf-required">Needed by</label><input asp-for="NeededBy" type="date" required min="@DateTime.UtcNow.ToString("yyyy-MM-dd")" /><span asp-validation-for="NeededBy"></span></div>
+        <div class="pg-field"><label asp-for="EvaluationMethod">Evaluation method</label>
+            <select asp-for="EvaluationMethod"><option value="">Choose before sending</option><option value="Weighted">Committee weight proposals</option><option value="LowestPrice">100% financial — lowest compliant price</option></select>
+            <span asp-validation-for="EvaluationMethod"></span></div>
         <div class="pg-field"><label asp-for="Priority">Priority</label><select asp-for="Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select></div>
         <div class="pg-field pg-field-wide"><label asp-for="Justification" class="pf-required">Business justification</label><textarea asp-for="Justification" rows="3" maxlength="10000" required placeholder="Why the department needs these items"></textarea><span asp-validation-for="Justification"></span></div>
     </div>
@@ -54,4 +57,4 @@
     <div class="pg-field pr-file-field"><label asp-for="Attachments">↥ &nbsp;Choose Files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" data-fv-max-mb="5" /><span asp-validation-for="Attachments"></span><small data-file-count></small></div>
 </section>
 <section class="pr-title-strip"><span aria-hidden="true">⚑</span><div>Request Title (Auto-generated)<strong data-title-preview data-department="@Model.DepartmentName">@(string.IsNullOrEmpty(Model.Title) ? "Generated from your items" : Model.Title)</strong></div></section>
-<div class="pr-form-actions"><button type="submit" name="intent" value="save" class="pg-btn" data-om="toast" data-om-working="Saving your draft">▣ &nbsp;@(Model.Id == 0 ? "Save Draft" : "Save Changes")</button><button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary" data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">➤ &nbsp;@(Model.Id == 0 ? "Submit Request" : "Resubmit Request")</button></div>
+<div class="pr-form-actions"><button type="submit" name="intent" value="save" class="pg-btn" data-om="toast" data-om-working="Saving your draft">▣ &nbsp;@(Model.Id == 0 ? "Save Draft" : "Save Changes")</button><button type="submit" name="intent" value="submit" disabled="@(Model.EvaluationMethod == null)" class="pg-btn pg-btn-primary" data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">➤ &nbsp;@(Model.Id == 0 ? "Submit Request" : "Resubmit Request")</button></div>

@@ -1,0 +1,40 @@
+@model Orange_Tendering_System.ViewModels.WorkflowDetails
+@using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.Services
+
+<div class="wp-actions">
+    <h4>Financial only · Review offer compliance</h4>
+    @foreach (var bid in Model.Bids.Where(b => b.Status == BidStatus.Submitted))
+    {
+        <details class="wp-opt" open="@(bid.ComplianceStatus is ComplianceStatus.NotChecked or ComplianceStatus.PendingClarification)">
+            <summary>@bid.TenderInvitation.Supplier.CompanyName · @TenderWorkflowService.TotalOfferPrice(bid).ToString("0.####") @bid.CurrencyCode · @bid.ComplianceStatus</summary>
+            <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Compliance" asp-route-id="@Model.Tender.Id" method="post" class="wp-form">
+                <input name="bidId" type="hidden" value="@bid.Id" />
+                <label>Compliance result
+                    <select name="status" required>
+                        <option value="">Choose</option>
+                        <option value="Compliant" selected="@(bid.ComplianceStatus == ComplianceStatus.Compliant)">Compliant</option>
+                        <option value="NonCompliant" selected="@(bid.ComplianceStatus == ComplianceStatus.NonCompliant)">Non-compliant</option>
+                        <option value="PendingClarification" selected="@(bid.ComplianceStatus == ComplianceStatus.PendingClarification)">Pending clarification</option>
+                    </select>
+                </label>
+                <label>Verification notes<textarea name="notes" maxlength="2000" required>@bid.ComplianceNotes</textarea></label>
+                <label>Missing requirements<textarea name="missing" maxlength="2000">@bid.MissingRequirements</textarea></label>
+                <button>Save compliance</button>
+            </form>
+        </details>
+    }
+    @if (Model.Tender.Rounds.Max(r => r.RoundNumber) < Model.MaxRounds)
+    {
+        <details class="wp-opt"><summary>Re-tender</summary>
+            <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Retender" asp-route-id="@Model.Tender.Id" method="post" class="wp-form">
+                <label>Reason<textarea name="reason" maxlength="2000" required></textarea></label>
+                <button>Start a new round</button>
+            </form>
+        </details>
+    }
+    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="FinalizeFinancialReview" asp-route-id="@Model.Tender.Id" method="post" class="wp-form">
+        <button class="wp-primary">Confirm screening and send result to Manager</button>
+        <small>The system selects the unique lowest compliant total automatically.</small>
+    </form>
+</div>

@@ -57,6 +57,9 @@
         const count = document.querySelector('[data-file-count]');
         if (count) count.textContent = attachmentInput.files.length ? `${attachmentInput.files.length} file(s) selected` : '';
     });
+    const evaluationMethod = document.getElementById("EvaluationMethod");
+    const send = evaluationMethod?.form?.querySelector('[name="intent"][value="submit"]');
+    evaluationMethod?.addEventListener("change", () => { if (send) send.disabled = !evaluationMethod.value; });
     reindex();
     // Saving and submitting are sent by Orange Motion (data-om on the buttons; docs/ORANGE_MOTION.md).
 })();

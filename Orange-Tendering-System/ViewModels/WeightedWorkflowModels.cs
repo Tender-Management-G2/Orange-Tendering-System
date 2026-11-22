@@ -14,20 +14,27 @@ public class RequirementsInput
     [Required, MaxLength(4000)] public string DeliveryExpectations { get; set; } = "";
     [Required, MaxLength(4000)] public string MandatoryCompliance { get; set; } = "";
     [Required] public string SourcingManagerId { get; set; } = "";
-    [Required] public string DepartmentRepresentativeId { get; set; } = "";
-    [Required] public string FinancialRepresentativeId { get; set; } = "";
-    [Required] public string TechnicalRepresentativeId { get; set; } = "";
+    public string? DepartmentRepresentativeId { get; set; } = "";
+    public string? FinancialRepresentativeId { get; set; } = "";
+    public string? TechnicalRepresentativeId { get; set; } = "";
     [Range(0.01, double.MaxValue)] public decimal EstimatedValue { get; set; }
     [Required, RegularExpression("^[A-Z]{3}$")] public string Currency { get; set; } = "JOD";
     public bool IsCritical { get; set; }
     // Offer document types every supplier must attach (OfferDocumentTypes keys).
     public List<string> RequiredDocuments { get; set; } = [];
 }
+public sealed class TechnicalCriterionInput
+{
+    public string? Name { get; set; }
+    public decimal? Weight { get; set; }
+}
+
 public class ScoreInput
 {
     public int BidId { get; set; }
     [Required, Range(typeof(decimal), "0", "100")] public decimal? Financial { get; set; }
-    [Required, Range(typeof(decimal), "0", "100")] public decimal? Technical { get; set; }
+    [Range(typeof(decimal), "0", "100")] public decimal? Technical { get; set; }
+    public List<decimal?> TechnicalScores { get; set; } = [];
     [Required, MaxLength(2000)] public string Justification { get; set; } = "";
 }
 public class SessionInput

@@ -125,6 +125,8 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                     "This user does not have the selected role.",
                 "DepartmentRequired" =>
                     "A department is required for this role.",
+                "OfficerAlreadyActive" =>
+                    "Only one active Sourcing Officer is allowed.",
                 "SelfAdminRemoval" =>
                     "You cannot remove your own Admin role.",
                 "LastAdmin" =>

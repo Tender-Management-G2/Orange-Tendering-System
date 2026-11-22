@@ -44,7 +44,7 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
         return new { run!.State, steps, actions };
     }
 
-    public async Task<object> Run(Guid requestId, string? command, ClaimsPrincipal principal, CancellationToken ct)
+    public async Task<object> Run(Guid requestId, string? command, ClaimsPrincipal principal, CancellationToken ct, string? chatWorkspaceRole = null)
     {
         var actor = await Actor(principal);
         command = command?.Trim();
@@ -71,7 +71,7 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
         try
         {
             var current = new ClaimsPrincipal(new ClaimsIdentity((await users.GetRolesAsync(actor)).Select(r => new Claim(ClaimTypes.Role, r)), "CurrentIdentity"));
-            var context = ExecutiveSiteKnowledge.ContextPrompt(current, await navigation.Catalog(principal), command!);
+            var context = ExecutiveSiteKnowledge.ContextPrompt(current, await navigation.Catalog(principal, chatWorkspaceRole), command!);
             messages.Insert(1, new { role = "system", content = context });
             guideRead = ExecutiveSiteKnowledge.IsProcedural(command!);
             Audit(actor.Id, run.Id, "AgentKnowledgeLoaded", new { Source = "Server-reviewed site guide, not a model tool invocation", ContextHash = Hash(context), ProceduralGuide = guideRead });
@@ -99,7 +99,7 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
                     Require(++count <= 12, "Tool step limit reached. Review completed steps.");
                     var f = call.GetProperty("function"); var name = f.GetProperty("name").GetString() ?? ""; var args = f.GetProperty("arguments");
                     Audit(actor.Id, run.Id, "AgentToolStarted", new { Step = count, Tool = name, ArgumentsHash = Hash(args.GetRawText()) }); await db.SaveChangesAsync(ct);
-                    var value = await Dispatch(run.Id, count, name, args, principal, ct);
+                    var value = await Dispatch(run.Id, count, name, args, principal, ct, chatWorkspaceRole);
                     if (name == "site_help") guideRead = true;
                     Audit(actor.Id, run.Id, "AgentToolSucceeded", new { Step = count, Tool = name, Result = value }); await db.SaveChangesAsync(ct);
                     results.Add(new { step = count, tool = name, result = value });
@@ -133,7 +133,34 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
     private static int TenderId(JsonElement args)
     { Require(args.GetProperty("tenderId").TryGetInt32(out var id) && id > 0, "A positive tender ID is required."); return id; }
 
-    public async Task<object> Dispatch(Guid runId, int step, string tool, JsonElement args, ClaimsPrincipal principal, CancellationToken ct = default)
+    internal async Task<object> PrepareTopApproval(int tenderId, ClaimsPrincipal principal, CancellationToken ct)
+    {
+        var actor = await Actor(principal);
+        var args = JsonSerializer.SerializeToElement(new
+        {
+            tenderId, operation = "top_vote", decision = "Approve",
+            comment = "Approval requested by the assigned Top Committee member."
+        });
+        var run = new ExecutiveAgentRun { Id = Guid.NewGuid(), UserId = actor.Id, InputHash = Hash(args.GetRawText()), CreatedAt = workflow.Now };
+        db.Add(run);
+        await db.SaveChangesAsync(ct);
+        try
+        {
+            var prepared = await Dispatch(run.Id, 1, "prepare_action", args, principal, ct, SystemRoles.TopCommittee);
+            run.State = "Completed";
+            run.ResultJson = JsonSerializer.Serialize(prepared, Json);
+            await db.SaveChangesAsync(ct);
+            return prepared;
+        }
+        catch (AgentException)
+        {
+            run.State = "Failed";
+            await db.SaveChangesAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<object> Dispatch(Guid runId, int step, string tool, JsonElement args, ClaimsPrincipal principal, CancellationToken ct = default, string? chatWorkspaceRole = null)
     {
         var actor = await Actor(principal);
         Require(await db.ExecutiveAgentRuns.AnyAsync(x => x.Id == runId && x.UserId == actor.Id && x.State == "Running", ct), "Execution not found or no longer active.", 404);
@@ -142,9 +169,16 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
             Keys(args, "topic"); var topic = Text(args, "topic", 200); Require(topic.Length > 0, "A site question is required.");
             // Rebuild role claims from Identity, not a stale cookie or a model's assertion.
             var current = new ClaimsPrincipal(new ClaimsIdentity((await users.GetRolesAsync(actor)).Select(r => new Claim(ClaimTypes.Role, r)), "CurrentIdentity"));
-            return ExecutiveSiteKnowledge.Read(current, await navigation.Catalog(principal), topic);
+            return ExecutiveSiteKnowledge.Read(current, await navigation.Catalog(principal, chatWorkspaceRole), topic);
         }
-        if (tool == "navigate_page") { Keys(args, "pageId"); return await navigation.Resolve(null, null, principal, Text(args, "pageId", 150)); }
+        if (tool == "navigate_page")
+        {
+            Keys(args, "pageId");
+            var pageId = Text(args, "pageId", 150);
+            if (chatWorkspaceRole != null)
+                Require((await navigation.Catalog(principal, chatWorkspaceRole)).Any(p => p.Id == pageId), "That page is unavailable in this workspace.", 403);
+            return await navigation.Resolve(null, null, principal, pageId);
+        }
         if (tool == "search_records")
         {
             Keys(args, "query"); var query = Text(args, "query", 100); Require(query.Length >= 2, "Use at least two search characters.");
@@ -152,12 +186,19 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
             var roles = await users.GetRolesAsync(actor);
             var hits = new List<InternalDashboardService.SearchHit>();
             string[] workspaces = [SystemRoles.Admin, SystemRoles.RequestingDepartment, SystemRoles.SourcingOfficer, SystemRoles.EvaluationCommittee, SystemRoles.SourcingManager, SystemRoles.TopCommittee];
-            foreach (var role in roles.Where(workspaces.Contains)) hits.AddRange(await dashboard.SearchAsync(role, principal, query));
+            foreach (var role in roles.Where(role => workspaces.Contains(role) && (chatWorkspaceRole == null || chatWorkspaceRole == role)))
+                hits.AddRange(await dashboard.SearchAsync(role, principal, query));
             return hits.Distinct().Take(18).ToArray();
         }
         if (tool is "tender_status" or "open_report")
         {
             Keys(args, "tenderId"); var tender = await ReadTender(TenderId(args), actor);
+            if (chatWorkspaceRole != null && chatWorkspaceRole != SystemRoles.SourcingOfficer)
+                Require(await db.CommitteeMembers.AnyAsync(m => m.TenderId == tender.Id && m.UserId == actor.Id &&
+                    (chatWorkspaceRole == SystemRoles.TopCommittee && m.CommitteeType == CommitteeType.Top ||
+                     chatWorkspaceRole == SystemRoles.EvaluationCommittee && m.CommitteeType == CommitteeType.Evaluation ||
+                     chatWorkspaceRole == SystemRoles.SourcingManager && m.Responsibility == CommitteeResponsibility.SourcingManager), ct),
+                    "This report is unavailable in your current workspace.", 403);
             if (tool == "tender_status") return new { tender.Id, tender.Title, Status = tender.Status.ToString(), Url = $"/Workflow/Details/{tender.Id}" };
             var reportId = await CurrentReport(tender.Id);
             Require(reportId != null, "No current report exists.", 404);
@@ -165,10 +206,16 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
             return new { ReportId = reportId, review.Report.VersionNumber, DocumentHash = review.Report.PdfSha256,
                 PdfUrl = $"/ExecutiveAgent/Pdf/{reportId}", Status = "Ready for the user to open and review; not signed" };
         }
-        if (tool == "draft_tender") return await DraftTender(args, actor, ct);
+        if (tool == "draft_tender")
+        {
+            Require(chatWorkspaceRole == null || chatWorkspaceRole == SystemRoles.SourcingOfficer, "This action is unavailable in your current workspace.", 403);
+            return await DraftTender(args, actor, ct);
+        }
         Require(tool == "prepare_action", "Unknown tool. No action was invoked.", 403);
         Keys(args, "tenderId", "operation", "comment", "decision");
-        var op = Text(args, "operation", 40); var id = TenderId(args); var comment = Text(args, "comment", 2000); var decision = Text(args, "decision", 20);
+        var op = Text(args, "operation", 40);
+        Require(chatWorkspaceRole == null || chatWorkspaceRole == OperationWorkspace(op), "This action is unavailable in your current workspace.", 403);
+        var id = TenderId(args); var comment = Text(args, "comment", 2000); var decision = Text(args, "decision", 20);
         Require(ExecutiveAgentClient.Operations.Contains(op), "Action is not permitted.", 403);
         Require(op == "top_vote" ? decision is "Approve" or "Reject" or "Retender" : decision == "", "Invalid decision for this operation.");
         Require(comment.Length > 0, "An action explanation is required.");
@@ -221,6 +268,15 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
         return new { state = "FormReady", purchaseRequest = chosen, title, formUrl = url,
             message = "The existing New Tender form is prefilled (request, title, description, items and standing committee). Nothing was created: the user completes commercial conditions, delivery, compliance, estimated value and the department representative, then presses Create." };
     }
+
+    private static string? OperationWorkspace(string operation) => operation switch
+    {
+        "request_weights" or "approve_weights" or "forward_report" or "notify_suppliers" => SystemRoles.SourcingOfficer,
+        "sign_evaluation_report" => SystemRoles.EvaluationCommittee,
+        "forward_decision" or "approve_manager_report" => SystemRoles.SourcingManager,
+        "top_vote" => SystemRoles.TopCommittee,
+        _ => null
+    };
 
     private static bool ReportOperation(string op) => op is "sign_evaluation_report" or "approve_manager_report" or "top_vote" or "forward_report";
     private static bool Sensitive(string op) => op is "approve_weights" or "sign_evaluation_report" or "approve_manager_report" or "top_vote" or "notify_suppliers";
@@ -349,9 +405,16 @@ public sealed class ExecutiveAgentService(ApplicationDbContext db, TenderWorkflo
             await db.SaveChangesAsync(); await tx.CommitAsync(); await tx.DisposeAsync();
             // Existing mail orchestration runs only AFTER the signed SQL decision is committed.
             // A duplicate confirmation never enters this branch. SMTP outages leave existing retry rows.
-            if (action.Operation == "notify_suppliers")
+            var awardEmails = action.Operation == "top_vote" && action.Decision == nameof(VoteDecision.Approve);
+            if (action.Operation == "notify_suppliers" || awardEmails)
             {
-                try { await notifications.SendPendingEmails(action.TenderId, principal); Audit(actor.Id, action.RunId, "AgentEmailAttempted", new { actionId, Scope = "Existing authorized recipient/delivery rows; inspect per-recipient delivery status" }); await db.SaveChangesAsync(); }
+                try
+                {
+                    if (awardEmails) await notifications.SendAwardEmails(action.TenderId);
+                    else await notifications.SendPendingEmails(action.TenderId, principal);
+                    Audit(actor.Id, action.RunId, "AgentEmailAttempted", new { actionId, Scope = "Existing authorized recipient/delivery rows; inspect per-recipient delivery status" });
+                    await db.SaveChangesAsync();
+                }
                 catch (Exception) { db.ChangeTracker.Clear(); Audit(actor.Id, action.RunId, "AgentEmailFailed", new { actionId, Error = "SQL notifications committed; email delivery requires review/retry in the existing workflow." }); await db.SaveChangesAsync(); }
             }
             return new { actionId, state = "Succeeded", duplicate = false, operation = action.Operation, emailStatus = action.Operation == "notify_suppliers" ? "Inspect existing per-recipient delivery statuses; SQL success does not prove email delivery." : null };

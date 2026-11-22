@@ -13,6 +13,7 @@ public sealed class SupplierDraftOfferViewModel
     public string CompanyName { get; set; } = string.Empty;
     public DateTime? Deadline { get; set; }
     public DateTime? NeededBy { get; set; }
+    public string? RequiredCurrency { get; set; }
     public List<(string Label, string Value)> Requirements { get; set; } = [];
     public string[] RequiredDocuments { get; set; } = [];
     public List<SupplierDocumentViewModel> ExistingDocuments { get; set; } = [];
