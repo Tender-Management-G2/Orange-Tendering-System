@@ -37,9 +37,15 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
     private static string Cell(int row, int col, string? text, bool header = false, bool numeric = true)
     {
         var style = header ? " s=\"1\"" : "";
-        if (numeric && !header && decimal.TryParse(text?.Replace(",", ""), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var number) && text!.Length < 15 && !text.Contains('-'))
-            return $"<c r=\"{Col(col)}{row}\"{style}><v>{number.ToString(System.Globalization.CultureInfo.InvariantCulture)}</v></c>";
-        return $"<c r=\"{Col(col)}{row}\" t=\"inlineStr\"{style}><is><t xml:space=\"preserve\">{Esc(text)}</t></is></c>";
+        if (!header && DateTime.TryParseExact(text, ["yyyy-MM-dd HH:mm", "yyyy-MM-dd"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            return $"<c r=\"{Col(col)}{row}\" s=\"2\"><v>{date.ToOADate().ToString(CultureInfo.InvariantCulture)}</v></c>";
+        if (numeric && !header && text is { Length: > 1 and < 20 } && text[^1] == '%' && decimal.TryParse(text[..^1], NumberStyles.Number, CultureInfo.InvariantCulture, out var percent))
+            return $"<c r=\"{Col(col)}{row}\" s=\"3\"><v>{(percent / 100).ToString(CultureInfo.InvariantCulture)}</v></c>";
+        if (numeric && !header && decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) && text!.Length < 20)
+            return $"<c r=\"{Col(col)}{row}\"{(style.Length == 0 && Regex.IsMatch(text, @"^-?\d+\.\d{2}$") ? " s=\"4\"" : style)}><v>{number.ToString(System.Globalization.CultureInfo.InvariantCulture)}</v></c>";
+        // Inline strings are never formulas. Prefix formula-like user text so spreadsheet apps cannot reinterpret it on edit.
+        var safe = text is { Length: > 0 } && "=+-@\t\r".Contains(text[0]) ? "'" + text : text;
+        return $"<c r=\"{Col(col)}{row}\" t=\"inlineStr\"{style}><is><t xml:space=\"preserve\">{Esc(safe)}</t></is></c>";
     }
 
     public byte[] ToXlsx(ReportModel model)
@@ -61,6 +67,7 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
             r++;
         }
         summary.Append($"<row r=\"{r}\">{Cell(r, 0, model.Title, true)}</row>"); r++;
+        if (!string.IsNullOrWhiteSpace(model.Description)) SummaryLine("Reporting scope", model.Description, numeric: false);
         if (model.Header is { } author)
         {
             SummaryLine("Prepared by", author.PreparedBy, numeric: false);
@@ -71,11 +78,16 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
         r++;
         foreach (var k in model.Kpis) SummaryLine(k.Label, k.Value);
         summary.Append("</sheetData></worksheet>");
-        sheets.Add((SheetName("Summary", used), summary.ToString()));
+        if (!model.SummaryLast) sheets.Add((SheetName("Summary", used), summary.ToString()));
         foreach (var t in model.Tables)
         {
             var sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><cols>");
-            for (var i = 0; i < t.Columns.Length; i++) sb.Append($"<col min=\"{i + 1}\" max=\"{i + 1}\" width=\"{Math.Clamp(t.Columns[i].Length + 5, 17, 42)}\" customWidth=\"1\"/>");
+            // Widths follow the header and the longest of the first rows, so values are readable without resizing.
+            for (var i = 0; i < t.Columns.Length; i++)
+            {
+                var longest = t.Rows.Take(300).Select(row => i < row.Length ? Math.Min(row[i]?.Length ?? 0, 60) : 0).DefaultIfEmpty(0).Max();
+                sb.Append($"<col min=\"{i + 1}\" max=\"{i + 1}\" width=\"{Math.Clamp(Math.Max(t.Columns[i].Length + 4, longest + 2), 10, 62)}\" customWidth=\"1\"/>");
+            }
             sb.Append("</cols><sheetData>");
             sb.Append($"<row r=\"1\">{string.Concat(t.Columns.Select((c, i) => Cell(1, i, c, true)))}</row>");
             var rowNumber = 2;
@@ -87,6 +99,7 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
             sb.Append($"</sheetData><autoFilter ref=\"A1:{Col(t.Columns.Length - 1)}{rowNumber - 1}\"/></worksheet>");
             sheets.Add((SheetName(t.Title, used), sb.ToString()));
         }
+        if (model.SummaryLast) sheets.Add((SheetName("Summary", used), summary.ToString()));
         using var stream = new MemoryStream();
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, true))
         {
@@ -99,8 +112,59 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
             Add("xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
                 + string.Concat(sheets.Select((_, i) => $"<Relationship Id=\"rId{i + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet{i + 1}.xml\"/>"))
                 + $"<Relationship Id=\"rId{sheets.Count + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>");
-            Add("xl/styles.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFF7900\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf/></cellStyleXfs><cellXfs count=\"2\"><xf/><xf fontId=\"1\" fillId=\"2\" applyFont=\"1\" applyFill=\"1\"/></cellXfs></styleSheet>");
+            Add("xl/styles.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"3\"><numFmt numFmtId=\"164\" formatCode=\"yyyy-mm-dd hh:mm\"/><numFmt numFmtId=\"165\" formatCode=\"0.0%\"/><numFmt numFmtId=\"166\" formatCode=\"#,##0.00\"/></numFmts><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFF7900\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf/></cellStyleXfs><cellXfs count=\"5\"><xf/><xf fontId=\"1\" fillId=\"2\" applyFont=\"1\" applyFill=\"1\"/><xf numFmtId=\"164\" applyNumberFormat=\"1\"/><xf numFmtId=\"165\" applyNumberFormat=\"1\"/><xf numFmtId=\"166\" applyNumberFormat=\"1\"/></cellXfs></styleSheet>");
             for (var i = 0; i < sheets.Count; i++) Add($"xl/worksheets/sheet{i + 1}.xml", sheets[i].Xml);
+        }
+        return stream.ToArray();
+    }
+
+    public byte[] ToDocx(ReportModel model)
+    {
+        const string w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        static bool Arabic(string value) => value.Any(c => c is >= '\u0600' and <= '\u06ff');
+        static string Run(string value, bool bold = false)
+        {
+            var rtl = Arabic(value) ? "<w:rtl/>" : "";
+            return $"<w:r><w:rPr>{(bold ? "<w:b/>" : "")}{rtl}</w:rPr><w:t xml:space=\"preserve\">{Esc(value)}</w:t></w:r>";
+        }
+        static string Paragraph(string value, string? style = null, bool bold = false)
+        {
+            var bidi = Arabic(value) ? "<w:bidi/>" : "";
+            return $"<w:p><w:pPr>{(style == null ? "" : $"<w:pStyle w:val=\"{style}\"/>")}{bidi}</w:pPr>{Run(value, bold)}</w:p>";
+        }
+        static string Table(ReportTable table)
+        {
+            var b = new StringBuilder("<w:tbl><w:tblPr><w:tblBorders><w:bottom w:val=\"single\" w:sz=\"4\" w:color=\"DDDDDD\"/><w:insideH w:val=\"single\" w:sz=\"4\" w:color=\"DDDDDD\"/></w:tblBorders></w:tblPr>");
+            void Row(IEnumerable<string> cells, bool header)
+            {
+                b.Append("<w:tr>");
+                foreach (var cell in cells) b.Append("<w:tc><w:tcPr><w:tcW w:w=\"0\" w:type=\"auto\"/></w:tcPr>").Append(Paragraph(cell ?? "", bold: header)).Append("</w:tc>");
+                b.Append("</w:tr>");
+            }
+            Row(table.Columns, true);
+            foreach (var cells in table.Rows) Row(cells, false);
+            return b.Append("</w:tbl>").ToString();
+        }
+        var body = new StringBuilder();
+        body.Append(Paragraph(model.Title, "Title"));
+        body.Append(Paragraph($"Generated {model.GeneratedAt.ToJordan("yyyy-MM-dd HH:mm")} (Jordan time)"));
+        if (!string.IsNullOrWhiteSpace(model.Description)) body.Append(Paragraph(model.Description));
+        foreach (var k in model.Kpis) body.Append(Paragraph($"{k.Label}: {k.Value}"));
+        foreach (var t in model.Tables) { body.Append(Paragraph(t.Title, "Heading1")); body.Append(t.Rows.Count == 0 ? Paragraph("No records in the authorized scope.") : Table(t)); }
+        body.Append(model.Tables.Any(t => t.Columns.Length > 8)
+            ? "<w:sectPr><w:pgSz w:w=\"23811\" w:h=\"16838\" w:orient=\"landscape\"/><w:pgMar w:top=\"900\" w:right=\"900\" w:bottom=\"900\" w:left=\"900\"/></w:sectPr>"
+            : "<w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/><w:pgMar w:top=\"900\" w:right=\"900\" w:bottom=\"900\" w:left=\"900\"/></w:sectPr>");
+        var document = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:document xmlns:w=\"{w}\"><w:body>{body}</w:body></w:document>";
+        var styles = $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:styles xmlns:w=\"{w}\"><w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/><w:rPr><w:rFonts w:ascii=\"Calibri\" w:hAnsi=\"Calibri\" w:cs=\"Arial\"/><w:sz w:val=\"20\"/></w:rPr></w:style><w:style w:type=\"paragraph\" w:styleId=\"Title\"><w:name w:val=\"Title\"/><w:rPr><w:b/><w:color w:val=\"E65F00\"/><w:sz w:val=\"34\"/></w:rPr></w:style><w:style w:type=\"paragraph\" w:styleId=\"Heading1\"><w:name w:val=\"heading 1\"/><w:rPr><w:b/><w:color w:val=\"E65F00\"/><w:sz w:val=\"26\"/></w:rPr></w:style></w:styles>";
+        using var stream = new MemoryStream();
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, true))
+        {
+            void Add(string path, string content) { var e = zip.CreateEntry(path, CompressionLevel.Optimal); using var sw = new StreamWriter(e.Open(), new UTF8Encoding(false)); sw.Write(content); }
+            Add("[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/><Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/></Types>");
+            Add("_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>");
+            Add("word/_rels/document.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>");
+            Add("word/document.xml", document);
+            Add("word/styles.xml", styles);
         }
         return stream.ToArray();
     }
@@ -112,7 +176,7 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
         if (model.Header is { } header) doc.Info.Author = header.PreparedBy;
         doc.Styles[StyleNames.Normal]!.Font.Name = "Orange Sans"; doc.Styles[StyleNames.Normal]!.Font.Size = 9;
         var section = doc.AddSection();
-        section.PageSetup.Orientation = Orientation.Landscape; section.PageSetup.PageFormat = PageFormat.A4;
+        section.PageSetup.Orientation = Orientation.Landscape; section.PageSetup.PageFormat = model.Tables.Any(t => t.Columns.Length > 10) ? PageFormat.A3 : PageFormat.A4;
         section.PageSetup.LeftMargin = section.PageSetup.RightMargin = "1.4cm"; section.PageSetup.TopMargin = "1.4cm"; section.PageSetup.BottomMargin = "1.4cm";
         var orange = new Color(255, 121, 0);
         if (model.Header is { } letterhead) AddLetterhead(section, letterhead, orange);
@@ -131,7 +195,7 @@ public sealed class ReportExport(OrangeReportRenderer fontsInitialiser)
             var h = section.AddParagraph(t.Title); h.Format.Font.Size = 12; h.Format.Font.Bold = true; h.Format.SpaceBefore = "14pt"; h.Format.SpaceAfter = "4pt"; h.Format.KeepWithNext = true;
             if (t.Rows.Count == 0) { section.AddParagraph("No records.").Format.Font.Color = Colors.Gray; continue; }
             var table = section.AddTable(); table.Borders.Color = new Color(220, 220, 220); table.Borders.Width = 0.5;
-            var width = 26.9 / t.Columns.Length;
+            var width = (section.PageSetup.PageFormat == PageFormat.A3 ? 38.5 : 26.9) / t.Columns.Length;
             foreach (var _ in t.Columns) table.AddColumn($"{width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}cm");
             var head = table.AddRow(); head.HeadingFormat = true; head.Shading.Color = orange; head.Format.Font.Color = Colors.White; head.Format.Font.Bold = true;
             for (var i = 0; i < t.Columns.Length; i++) head.Cells[i].AddParagraph(t.Columns[i]);

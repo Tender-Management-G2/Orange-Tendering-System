@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Orange Intelligence visual message reference schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "role",
+    "text",
+    "visuals"
+  ],
+  "properties": {
+    "role": {
+      "const": "assistant"
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 6000
+    },
+    "visuals": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "title"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "kpi_set",
+              "bar_chart",
+              "line_chart",
+              "scatter_chart",
+              "donut_chart",
+              "data_table",
+              "timeline",
+              "network_focus",
+              "evidence_list",
+              "file_preview",
+              "recommendations",
+              "empty_state"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "dataRef": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object"
+    }
+  }
+}

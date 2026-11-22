@@ -34,6 +34,8 @@ public sealed class ReportModel
     public AnalyticsReportHeader? Header { get; set; }
     public List<ReportKpi> Kpis { get; } = [];
     public List<ReportTable> Tables { get; } = [];
+    // Workbooks open on their first data sheet; the scope/filters summary follows the tables.
+    public bool SummaryLast { get; init; }
 }
 
 public sealed partial class ReportingService(ApplicationDbContext db, TimeProvider clock, bool ownsContext = false) : IDisposable

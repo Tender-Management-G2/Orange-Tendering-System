@@ -1,0 +1,28 @@
+/* Collapsible workspace sidebar: an 84px icon rail at desktop widths (>= 1080px, where the sidebar is fixed). */
+.ws-sidebar-collapse { display: none; }
+@media (min-width: 1080px) {
+  body.ws-shell .ws-sidebar { transition: width .28s cubic-bezier(.2, .75, .25, 1); }
+  body.ws-shell .ws-stage { transition: margin .28s cubic-bezier(.2, .75, .25, 1); }
+  .ws-sidebar-collapse { display: grid; place-items: center; position: absolute; top: 34px; right: -15px; z-index: 5; width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid #ffffff2e; background: #26282b; color: #f2f2f2; cursor: pointer; box-shadow: 0 4px 14px #0006; transition: transform .2s, background .2s; }
+  .ws-sidebar-collapse:hover { background: #ff7900; color: #111; }
+  .ws-sidebar-collapse svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .28s; }
+  html.ws-sidebar-collapsed .ws-sidebar-collapse svg { transform: rotate(180deg); }
+  body.ws-shell .ws-sidebar { overflow: visible; }
+
+  html.ws-sidebar-collapsed body.so-shell.ws-shell[data-workspace-role] { --ws-sidebar-width: 84px; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-sidebar-brand { padding: 22px 10px 24px !important; justify-content: center; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-sidebar-brand .ws-brand { gap: 0 !important; font-size: 0 !important; justify-content: center; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-logo { width: 56px !important; height: 56px !important; font-size: 15px !important; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-primary-nav { padding: 4px 10px 12px !important; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-nav-item { justify-content: center; padding: 10px 0 !important; gap: 0 !important; font-size: 0 !important; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-nav-item span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-nav-item svg { width: 26px !important; height: 26px !important; }
+  html.ws-sidebar-collapsed body.ws-shell .ws-sidebar-bottom, html.ws-sidebar-collapsed body.ws-shell .ws-sidebar-architecture { display: none; }
+  [dir="rtl"] .ws-sidebar-collapse { right: auto; left: -15px; }
+  [dir="rtl"] .ws-sidebar-collapse svg { transform: rotate(180deg); }
+  html.ws-sidebar-collapsed [dir="rtl"] .ws-sidebar-collapse svg, [dir="rtl"] html.ws-sidebar-collapsed .ws-sidebar-collapse svg { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.ws-shell .ws-sidebar, body.ws-shell .ws-stage, .ws-sidebar-collapse svg { transition: none !important; }
+}

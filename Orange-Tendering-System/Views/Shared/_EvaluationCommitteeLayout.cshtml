@@ -47,6 +47,7 @@ through WorkspaceNavigation.LayoutFor.
         </div>
         <nav class="ws-primary-nav" aria-label="Evaluation Committee navigation">
             <a class="ws-nav-item @Active("EvaluationCommittee", new[] { "Dashboard" })" asp-area="EvaluationCommittee" asp-controller="Dashboard" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("home"))</svg><span>@UiText.T(Context, "Dashboard")</span></a>
+            <a class="ws-nav-item @Active("", new[] { "Intelligence" })" asp-area="" asp-controller="Intelligence" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("radar"))</svg><span>@UiText.T(Context, "Orange Intelligence")</span></a>
             <a class="ws-nav-item @Active("EvaluationCommittee", new[] { "Workflow", "Evaluations", "Criteria", "Reports" })" asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("tender"))</svg><span>@UiText.T(Context, "Weighted Evaluation")</span></a>
             <a class="ws-nav-item @Active("", new[] { "Clarifications" })" asp-area="" asp-controller="Clarifications" asp-action="Index"><svg viewBox="0 0 24 24" aria-hidden="true">@Html.Raw(WorkspaceNavigation.Icon("chat"))</svg><span>@UiText.T(Context, "Clarifications")</span></a>
         </nav>

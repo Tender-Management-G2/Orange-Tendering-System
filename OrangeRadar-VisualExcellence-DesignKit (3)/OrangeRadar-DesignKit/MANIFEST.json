@@ -1,0 +1,177 @@
+[
+  {
+    "file": ".claude/skills/orange-radar-live-voice/SKILL.md",
+    "bytes": 1216,
+    "sha256": "f805f3f63d157b9ad85b32fe898faf1702a817e53357edff3da071fe19f62175"
+  },
+  {
+    "file": ".claude/skills/orange-radar-motion/SKILL.md",
+    "bytes": 1090,
+    "sha256": "4f12ed3cb8cb370083f6cc659e46251ed96e7d83c19981dacad0af5202be2d30"
+  },
+  {
+    "file": ".claude/skills/orange-radar-network/SKILL.md",
+    "bytes": 1265,
+    "sha256": "6ee7cbdaac56fb7eeefb561e51de8cc8f40f15746463f0090f4be8fab7b4a19f"
+  },
+  {
+    "file": ".claude/skills/orange-radar-orchestrator/SKILL.md",
+    "bytes": 1121,
+    "sha256": "37172a6dbc92ad8ff4cb0a8ef158735459213aa96c6d39db07487b8be36539ea"
+  },
+  {
+    "file": ".claude/skills/orange-radar-quality-gate/SKILL.md",
+    "bytes": 1178,
+    "sha256": "bbbacde01059ba09b1de59030f097b9ebafe2062df06d856a33e0e7fec1ffc24"
+  },
+  {
+    "file": ".claude/skills/orange-radar-visual-design/SKILL.md",
+    "bytes": 1122,
+    "sha256": "99a5c6b8310d1ca9586e64d3caf48e472326b85ab671a59f88d9d96e89f13999"
+  },
+  {
+    "file": "MASTER-PROMPT.md",
+    "bytes": 10165,
+    "sha256": "757e12e8390411fdea4fe8da20965a90e13a120a70db654aecd6bd8e12bfc692"
+  },
+  {
+    "file": "README.md",
+    "bytes": 2702,
+    "sha256": "b6b979f09b599a506f5385857b2e1115c8581d1531a2c3d1ce85333af2e485ab"
+  },
+  {
+    "file": "START-HERE-AR.md",
+    "bytes": 1695,
+    "sha256": "8c54bc1bef3946836278ac8c3e7c684e9ee0f37298f64c721447b6dea9f4e817"
+  },
+  {
+    "file": "references/IMAGE-GUIDE.md",
+    "bytes": 1944,
+    "sha256": "e308b635badf931920ce827535f3931b89dd488a2e985ac065752052b0084aa5"
+  },
+  {
+    "file": "references/TECHNICAL-SOURCES.md",
+    "bytes": 1687,
+    "sha256": "b648541a7276fed37fcb76bf746db761a55fe27a2ea4aa8fd1af57c43d5f76ed"
+  },
+  {
+    "file": "references/contact-sheet.jpg",
+    "bytes": 251718,
+    "sha256": "c5e47f0e18125f3adc4c5b2ff42e8911cc28c663f0e6838a5a4cc501616045ed"
+  },
+  {
+    "file": "references/images/01-page-vertical-direction.png",
+    "bytes": 3103956,
+    "sha256": "55f0ea98908472ec8133ba0da00ad466d27b381dfb030033dc2ea5aead64323f"
+  },
+  {
+    "file": "references/images/02-network-all-suppliers.png",
+    "bytes": 2053522,
+    "sha256": "4636a1cb3fb027d9c01164614f6d1ad2c1cb7281019d3bec7426b980180178fd"
+  },
+  {
+    "file": "references/images/03-network-category-layout.png",
+    "bytes": 2777615,
+    "sha256": "b934db63b4d99d5f9bceac653b818d2d4d4396f0542f6227c0acee764b877c5f"
+  },
+  {
+    "file": "references/images/04-network-cluster-inspector.png",
+    "bytes": 1964298,
+    "sha256": "3f582ba42640394f955182aeba497e531b31d3edc83eb9886cc86669b2ddbe74"
+  },
+  {
+    "file": "references/images/05-network-focus-voice.png",
+    "bytes": 1958049,
+    "sha256": "950f0fe0592ee84c2ec1f628a56aa29bf21f69ac4048fc9891e75ae07636e95f"
+  },
+  {
+    "file": "references/images/06-forensic-evidence.png",
+    "bytes": 2043058,
+    "sha256": "a4e5e0f3fb42d8e78dd4c421822cc14365807a906a070c04e30df57692d87c6b"
+  },
+  {
+    "file": "references/images/07-voice-waveform-direction.png",
+    "bytes": 2082172,
+    "sha256": "1322a2b0c16a3c53f376a4874207842e252d8c37e0c602d7a6fba5ae335fa67f"
+  },
+  {
+    "file": "specs/00-BASELINE.md",
+    "bytes": 2670,
+    "sha256": "e5e5ee1450ead7bca5275afbe16fb62c836543611a5aafc31d378a0c88c71e56"
+  },
+  {
+    "file": "specs/01-PAGE-BLUEPRINT.md",
+    "bytes": 4196,
+    "sha256": "ff1f76889f0cbc8a5c0510fc584deb125ca8b0b8b154a2d1fd20f66edd57c629"
+  },
+  {
+    "file": "specs/02-NETWORK.md",
+    "bytes": 8967,
+    "sha256": "7ac2c8a8138bdc6c63cc50506b9999f0bb5f2765542b156322004dbf8190ae9f"
+  },
+  {
+    "file": "specs/03-DESIGN-MOTION.md",
+    "bytes": 3504,
+    "sha256": "fda222f6d71bf1e30c7657dbdacfcf8c17081b2741f42a2af079890d1e9599a9"
+  },
+  {
+    "file": "specs/04-VOICE.md",
+    "bytes": 4725,
+    "sha256": "5d05453467313e0d9593d70dc082af119c60d6e1ff45d664ddc06e36c14fb81b"
+  },
+  {
+    "file": "specs/05-INTEGRATION.md",
+    "bytes": 3056,
+    "sha256": "1bb11ff46d17eb35478f137db6556304f918da853c3207427339e7a780819586"
+  },
+  {
+    "file": "specs/06-ACCEPTANCE.md",
+    "bytes": 4425,
+    "sha256": "63c7bf170a6920e7b2510e2bf5c298a22771225c157982fe163ce6184a775138"
+  },
+  {
+    "file": "starter/README.md",
+    "bytes": 776,
+    "sha256": "7895ee5d66cf1a73ad76a9b3d340a487457f50b5025336c46f16bac7fc0a6c4f"
+  },
+  {
+    "file": "starter/audio-envelope.mjs",
+    "bytes": 882,
+    "sha256": "3cf76bd225e16f45960df4f26dc16f165b925f6694aa81209de5bddaa845b0e2"
+  },
+  {
+    "file": "starter/network-semantics.mjs",
+    "bytes": 2607,
+    "sha256": "8e3a88dbb77bf2d195ce8fa9241ca2824394ce6f2144ce587323434e77120000"
+  },
+  {
+    "file": "starter/network-semantics.test.mjs",
+    "bytes": 1718,
+    "sha256": "7e7e9b6444e31d55c871c70275e7285b2e8469cf4e7e1f7bd63fc8fc88a74498"
+  },
+  {
+    "file": "starter/radar-tokens.css",
+    "bytes": 1956,
+    "sha256": "22d210c40db4ea6d2e34b5cbaad92493ade0cc882ea3a771a5246e222d5813e1"
+  },
+  {
+    "file": "tools/Install-Skills.ps1",
+    "bytes": 849,
+    "sha256": "bc9f3e6bd323ca1ce87c1c371a96af988d42140d4dd9314506114790f1ea86c4"
+  },
+  {
+    "file": "tools/Preflight.ps1",
+    "bytes": 1399,
+    "sha256": "c732dad43a01390659c50897e878c759621ca17563b897262db31a048f2bb908"
+  },
+  {
+    "file": "tools/README.md",
+    "bytes": 1735,
+    "sha256": "d4694f1da5fe798db8eec85687255273486a9067ab4718f72597710cf6349305"
+  },
+  {
+    "file": "tools/capture-radar.mjs",
+    "bytes": 2452,
+    "sha256": "92bca1e47136b894a17310922f9fdf2da2499dafdb181d18b6b5463c8132ae1a"
+  }
+]

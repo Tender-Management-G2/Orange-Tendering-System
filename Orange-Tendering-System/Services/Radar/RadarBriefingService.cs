@@ -74,8 +74,7 @@ public sealed class RadarBriefingService(RadarService radar, RadarOllamaClient o
         var context = w.Findings.Where(f => f.Level == "Context").OrderByDescending(f => f.SampleSize).Take(3).ToList();
         if (context.Count > 0)
         {
-            var edges = w.Graph.Edges.Where(e => e.FindingIds.Any(id => context.Any(c => c.Id == id))).Select(e => e.Id).ToList();
-            Add("relationships", ar ? "العلاقات المتكررة" : "Recurring relationships", "network", context.SelectMany(c => c.SupplierIds).Distinct(), context.SelectMany(c => c.SupplierIds).Distinct().Select(id => $"s-{id}"), edges, context[0].Id, "selection",
+            Add("relationships", ar ? "العلاقات المتكررة" : "Recurring relationships", "network", context.SelectMany(c => c.SupplierIds).Distinct(), context.SelectMany(c => c.SupplierIds).Distinct().Select(id => $"s-{id}"), [], context[0].Id, "selection",
                 context.Select(c => new BriefingFact(c.Title, string.Join(" · ", c.SupplierIds.Select(id => w.Suppliers.First(s => s.SupplierId == id).Name)))).ToList(),
                 ar ? $"رصدنا {w.Findings.Count(f => f.Level == "Context")} علاقة سياقية، أبرزها: {context[0].Explanation} هذه علاقات واقعية وليست مؤشرات على مخالفة."
                    : $"Orange Radar found {w.Findings.Count(f => f.Level == "Context")} contextual relationships. The strongest: {context[0].Explanation} These are factual relationships, not concerns by themselves.");
@@ -84,15 +83,14 @@ public sealed class RadarBriefingService(RadarService radar, RadarOllamaClient o
         if (signals.Count > 0)
             foreach (var (signal, i) in signals.Select((s, i) => (s, i)))
             {
-                var edges = w.Graph.Edges.Where(e => e.FindingIds.Contains(signal.Id)).Select(e => e.Id).ToList();
-                Add($"signal-{i + 1}", (ar ? "مؤشر للمراجعة: " : "Review signal: ") + signal.Title, "forensic", signal.SupplierIds, signal.SupplierIds.Select(id => $"s-{id}"), edges, signal.Id, "selection",
+                Add($"signal-{i + 1}", (ar ? "نمط سلوكي: " : "Behavior pattern: ") + signal.Title, "price", signal.SupplierIds, signal.SupplierIds.Select(id => $"s-{id}"), [], signal.Id, "selection",
                     signal.Metrics.Select(m => new BriefingFact(m.Key, m.Value)).Take(4).Append(new BriefingFact(ar ? "حجم العينة" : "Sample size", signal.SampleSize.ToString())).ToList(),
                     (ar ? "مؤشر للمراجعة وليس دليلاً: " : "A review signal, not proof: ") + signal.Explanation + (ar ? " تفسير بديل محتمل: " : " A legitimate explanation is possible: ") + signal.Limitations);
             }
         else
         {
             var insufficient = w.Detectors.Where(d => d.State is "insufficient" or "notRun").Select(d => d.Label).ToList();
-            Add("signals", ar ? "مؤشرات المراجعة" : "Review signals", "forensic", [], [], [], null, "fit",
+            Add("signals", ar ? "أنماط الأسعار والتوقيت" : "Price and timing patterns", "price", [], [], [], null, "fit",
                 w.Detectors.Select(d => new BriefingFact(d.Label, d.State == "ok" ? $"{d.Findings}" : d.State)).ToList(),
                 ar ? "لم تُرصد مؤشرات تستدعي المراجعة بالعتبات الحالية." + (insufficient.Count > 0 ? $" بعض الكواشف تفتقر إلى بيانات كافية: {insufficient.Count}." : "")
                    : "No review signals were detected at the current thresholds." + (insufficient.Count > 0 ? $" {insufficient.Count} detectors do not have enough data yet, so absence of signals is not a clean bill of health." : ""));
@@ -102,8 +100,6 @@ public sealed class RadarBriefingService(RadarService radar, RadarOllamaClient o
         var follow = new List<BriefingFact>();
         if (comp.LowCompetitionRounds > 0) follow.Add(new(ar ? "المنافسة" : "Competition", ar ? "توسيع قائمة الدعوات في الجولات منخفضة المنافسة" : "Widen invitation lists where rounds fell below the minimum"));
         if (signals.Count > 0) follow.Add(new(ar ? "الأدلة" : "Evidence", ar ? $"مراجعة أدلة {signals[0].Id} يدوياً قبل أي استنتاج" : $"Review the evidence of {signals[0].Id} manually before drawing conclusions"));
-        if (w.DocumentDna.State != "ok") follow.Add(new(ar ? "المستندات" : "Documents", ar ? "تشغيل تحليل الحمض النووي للمستندات" : "Run Document DNA to compare bid documents semantically"));
-        if (sum.Awards < options.Value.Thresholds.RotationMinAwards) follow.Add(new(ar ? "البيانات" : "Data", ar ? "أنماط الترسية تحتاج إلى ترسيات رسمية أكثر" : "Award patterns need more official awards"));
         Add("follow-up", ar ? "الخطوات المقترحة" : "Recommended follow-up", "overview", [], [], [], null, "fit", follow,
             ar ? "هذه خطوات مراجعة مقترحة فقط؛ لا يغيّر أورانج رادار أي حالة مورد أو قرار رسمي." : "These are suggested review steps only; Orange Radar never changes a supplier's status or any official decision.");
 

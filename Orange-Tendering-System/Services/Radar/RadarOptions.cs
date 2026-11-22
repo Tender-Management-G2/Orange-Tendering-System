@@ -2,7 +2,7 @@ namespace Orange_Tendering_System.Services.Radar;
 
 // ORANGE RADAR configuration (appsettings section "OrangeRadar"). Every path and model name is configuration so team members
 // with different hardware or folders only change appsettings / User Secrets. Nothing here is required for the analytics:
-// without Ollama, Whisper or Piper the market, network and forensic views keep working.
+// without Ollama, Whisper or Piper the market and network views keep working.
 public sealed class RadarOptions
 {
     public RadarModelOptions Models { get; set; } = new();
@@ -28,6 +28,11 @@ public sealed class RadarModelOptions
     public string KeepAlive { get; set; } = "15m";
     public int TimeoutSeconds { get; set; } = 90;
     public int MaxToolRounds { get; set; } = 4;
+    // Structured-output router for requests the rule parser recognised as a file or page action but could not complete.
+    // Empty model = ChatModel. Thinking stays off: RadarChecks --intent-bench measured no accuracy gain for much higher latency.
+    public bool IntentRouter { get; set; } = true;
+    public string? RouterModel { get; set; }
+    public bool RouterThink { get; set; }
 }
 
 // Conservative, configurable demonstration thresholds for the forensic detectors (docs/ORANGE_RADAR.md explains each one).
@@ -35,18 +40,14 @@ public sealed class RadarThresholds
 {
     public int MinimumBidsForCompetition { get; set; } = 3;
     public int JointParticipationMinRounds { get; set; } = 3;
+    // Network "competition" view: suppliers are linked when they both submitted offers in at least this many distinct closed rounds.
+    public int CompetitionLinkMinRounds { get; set; } = 2;
     public int PriceGapMinRounds { get; set; } = 3;
     public double PriceGapMaxVariation { get; set; } = 0.02;
     public double PriceGapMinRatio { get; set; } = 1.005;
     public double PriceGapMaxRatio { get; set; } = 1.15;
-    public int PriceSimilarityMinLines { get; set; } = 3;
-    public double PriceSimilarityTolerance { get; set; } = 0.005;
-    public int RotationMinAwards { get; set; } = 3;
     public int TimingMinRounds { get; set; } = 3;
     public int TimingWindowMinutes { get; set; } = 10;
-    // Measured with qwen3-embedding:0.6b on the demo documents: re-worded passages 0.88, unrelated proposals 0.45-0.53,
-    // verbatim tender text 0.97 (removed as template). Re-measure before changing the embedding model.
-    public double SemanticSimilarity { get; set; } = 0.85;
     public double TemplateSimilarity { get; set; } = 0.88;
     public int SemanticMinChunkCharacters { get; set; } = 120;
 }
@@ -58,8 +59,22 @@ public sealed class RadarWhisperOptions
     public int Threads { get; set; } = 6;
     // "auto" = GPU via Vulkan when available, else CPU; "cpu" = CPU only (keeps all VRAM for the language model).
     public string Runtime { get; set; } = "auto";
+    // Sizes Whisper's 30 s encoder window to the utterance. Measured (RadarChecks --stt-bench): same word error rate as the full
+    // window on the test set and about 1.2 s faster per utterance on this GPU, so it stays on.
     public bool AdaptiveAudioContext { get; set; } = true;
     public int MaxSeconds { get; set; } = 30;
+    // 1 = greedy decoding. Beam search (5) did not lower the error rate on the test set and was slower, so greedy is the default.
+    public int BeamSize { get; set; } = 1;
+    // Auto mode accepts Whisper's language guess only at or above this probability; below it the utterance is decoded as both
+    // Arabic and English and the more confident transcript wins. 0 = single-pass auto detection (previous behaviour).
+    public double LanguageConfidence { get; set; } = 0.8;
+    // Transcripts below this mean token probability wait for the user's confirmation and are never sent automatically.
+    // Calibrated with --stt-bench: 0.8 held 13 of 28 wrong transcripts and 8 of 101 correct ones (0.6 held none).
+    public double ReliableConfidence { get; set; } = 0.8;
+    // Optional decoder context per language (never used for detection). Off by default: a domain vocabulary prompt was measured
+    // to raise the word error rate (Whisper small copied prompt phrases into short commands).
+    public string? EnglishPrompt { get; set; }
+    public string? ArabicPrompt { get; set; }
 }
 
 public sealed class RadarPiperOptions

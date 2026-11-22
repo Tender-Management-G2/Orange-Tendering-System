@@ -1,0 +1,341 @@
+{
+  "version": "2026.11.21-New-Five-Tab-Intelligence",
+  "description": "Original clean design and implementation kit",
+  "sourceOfTruth": [
+    "Official PDF AI 01–10",
+    "current repo and authorized database",
+    "owner five-tab decision"
+  ],
+  "files": [
+    {
+      "path": "00_START_HERE/DELIVERY_MAP.md",
+      "bytes": 1180,
+      "sha256": "423c450a2d6670c641debc5fbbd00e0c48946b7d667487af6466b8914eadee66"
+    },
+    {
+      "path": "00_START_HERE/README_AR.md",
+      "bytes": 4566,
+      "sha256": "6698da429ddedbbadb155a5daeb6996a117d3e157f925496d53e77f8102e971f"
+    },
+    {
+      "path": "00_START_HERE/README_EN.md",
+      "bytes": 1326,
+      "sha256": "23d761bf1a1ba4fcb98875c6cd4dab33d94bd724101dc308f2bfedba6dc77667"
+    },
+    {
+      "path": "00_START_HERE/WINDOWS_SETUP_AR.md",
+      "bytes": 1388,
+      "sha256": "103a66267539416e85c0401c416d011055513ec659d5f831e38d67f7ceff4b4c"
+    },
+    {
+      "path": "01_REQUIREMENTS/MVC Project - Updates (original).pdf",
+      "bytes": 114319,
+      "sha256": "7b3719c555a244488ecb4c7b99179befaae1a1f0019340b871766bf473d6f35f"
+    },
+    {
+      "path": "01_REQUIREMENTS/OFFICIAL_REQUIREMENTS_01_10_AR.md",
+      "bytes": 2294,
+      "sha256": "85f9b5ced169e171291500112d5b2af987bef37bd798e80d1f94f86da0d5bf23"
+    },
+    {
+      "path": "01_REQUIREMENTS/REQUIREMENTS_MATRIX.md",
+      "bytes": 2745,
+      "sha256": "e3687aeed573189139bb2680ecc4f1d51f0a055cab30021425e40d53869a1571"
+    },
+    {
+      "path": "01_REQUIREMENTS/SOURCE_PRIORITY_AND_GAPS.md",
+      "bytes": 1664,
+      "sha256": "339c97f8668646be72308349c17980e72c3fde1549450ceb83abb2e4bf1e53b1"
+    },
+    {
+      "path": "01_REQUIREMENTS/Sourcing System - Original Brief V5.docx",
+      "bytes": 53624,
+      "sha256": "cb5a49182bb37b8fb9602912b1c725749f15db53154002eaca6436246a79b7bc"
+    },
+    {
+      "path": "01_REQUIREMENTS/TRACEABILITY.csv",
+      "bytes": 1006,
+      "sha256": "8a2f639faca7b80b6a9518c573756cbed1a6e489727fff65fe6772667d61210b"
+    },
+    {
+      "path": "01_REQUIREMENTS/TenderingOrangeSystem - historical reference.md",
+      "bytes": 102678,
+      "sha256": "dd14fb619aab216de67234ad18e83a2c96f340a67682adbe95479321f52e4a3f"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/00_NORTH_STAR.md",
+      "bytes": 2365,
+      "sha256": "473aa00aa30338fb1e99ff3a1ec0c1bed433868eb947bb2cb4199ba36dd21185"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/01_PAGE_SHELL_AND_NAVIGATION.md",
+      "bytes": 1798,
+      "sha256": "cf22e84ab020cc2409d6f7c3e8f2475b3c16223d64957b52dddaaa3653433f7c"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/02_OVERVIEW_TAB.md",
+      "bytes": 801,
+      "sha256": "d7e2996692fd2f3ca3c614617f37695abe3c831b1670225f3ff655941e40a2c1"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/03_SUPPLIERS_TAB.md",
+      "bytes": 2325,
+      "sha256": "a4789ddbb07126047d5407b5d7b369840c9b140cb3561c985e44633ff17a4702"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/04_TENDERS_TAB.md",
+      "bytes": 1335,
+      "sha256": "d3150e99c1d6880373f5caa3d4d8aab5364c956ca9b97f0a5432603bb68b2b9c"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/05_FORENSICS_TAB.md",
+      "bytes": 1299,
+      "sha256": "c7589e6c928b0a17fd074a5da2dc5410ea1e8a05484789b356f23e8fc14b5d28"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/06_AI_STUDIO_TAB.md",
+      "bytes": 1303,
+      "sha256": "348e2a2f5b0925d9979b76e3f41b1eb956010544653bd6c4afe2543fbeb35ae5"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/07_FILTER_STATE_MATRIX.md",
+      "bytes": 1896,
+      "sha256": "1bf6e1d8062805a4ac313f3ebf64c18766b0e5cece7ee2fd78617afca153f391"
+    },
+    {
+      "path": "02_PRODUCT_BLUEPRINT/08_MICROCOPY_AND_EMPTY_STATES.md",
+      "bytes": 1272,
+      "sha256": "8421a0bb99d6a87a2a50a3ddcfe5a7f4afc394f369335bb309f20f333a37c0e1"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/01_Suppliers_Primary_Cinematic_Concept.png",
+      "bytes": 1897238,
+      "sha256": "225411f0926501ee6c0aec046351255a3a9607ed26f2a5423da07d74f84c131d"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/02_Overview_OneTab.png",
+      "bytes": 77869,
+      "sha256": "8d1d5e9ff4dbd74f640e255bb730fc555e293c92ae797450956d625c1bbf6056"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/03_Tenders_DeepDive_OneTab.png",
+      "bytes": 91936,
+      "sha256": "f1ad1ff0aa8ec9e7e1a7a588b7813ed4274b733412fcfeb74af9b70d0019c5e3"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/04_Forensics_Evidence_OneTab.png",
+      "bytes": 93029,
+      "sha256": "c19e749e1ce729b6fa929a7baa0a20d6a15647b6df4cb94728149588ee54e8b7"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/05_AI_Studio_Generative_OneTab.png",
+      "bytes": 84952,
+      "sha256": "9e2ae851bf199f07a8df3eb72907a47bfa901b24ae192468ed425e24e583f511"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/06_Live_Voice_Expanded.png",
+      "bytes": 74224,
+      "sha256": "0f7cb5b92431611545ae53fe50ed5d79c32303bcfd55fda54a3d34df8edc1877"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/07_Supplier_Drilldown_OneTab.png",
+      "bytes": 72581,
+      "sha256": "9b43693ac5bf7804435c11e22b20e1ecef4dad4c78efa3c230c41b7afd44ef8c"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/ASSET_PROVENANCE.md",
+      "bytes": 746,
+      "sha256": "efe527dbc63b9899bc48dd80eeadfe552fe5eecf1da23ee47d7565b8e5e9122c"
+    },
+    {
+      "path": "03_VISUAL_REFERENCES/IMAGE_GUIDE.md",
+      "bytes": 2172,
+      "sha256": "406235c19551d9762c07ae6564b3df13192844fef566066d48527097edef728b"
+    },
+    {
+      "path": "04_ENGINEERING/00_EXISTING_SYSTEM_FIRST.md",
+      "bytes": 2096,
+      "sha256": "7c734b8012af3af66a2fd4dce073133c3dea871f6248c0614e05b9e60f05f7f6"
+    },
+    {
+      "path": "04_ENGINEERING/01_SPHERICAL_NETWORK_ENGINE.md",
+      "bytes": 3923,
+      "sha256": "892e8a665269470510163f6d0b988d11a4804d95ac1aee9d9f2286efbe2bf283"
+    },
+    {
+      "path": "04_ENGINEERING/02_GRAPH_SEMANTICS_AND_EVIDENCE.md",
+      "bytes": 1939,
+      "sha256": "beec9076e2d8c4149d566539313434f8ccd77d3cfcf80c742a9b5691d4e35a33"
+    },
+    {
+      "path": "04_ENGINEERING/03_VOICE_AND_AI_DIRECTOR.md",
+      "bytes": 2080,
+      "sha256": "83c3b7c28c59080aa5ddfd8205fd1784a45f1227ca63d6218fb5db6b68200ca2"
+    },
+    {
+      "path": "04_ENGINEERING/04_GENERATIVE_UI_SCHEMA.md",
+      "bytes": 2171,
+      "sha256": "4d9d99ac9d6b18a017a3529bad93d23c4de6586369eccd09acd36a152f2a1c10"
+    },
+    {
+      "path": "04_ENGINEERING/05_SECURE_AI_AND_PERMISSION_SCOPES.md",
+      "bytes": 1998,
+      "sha256": "3ef51ebbffba9166769fe7e9371f0b09e10bbaa35e76b1db370f78f2ef5f54f9"
+    },
+    {
+      "path": "04_ENGINEERING/06_TENDER_LIFECYCLE_METRICS.md",
+      "bytes": 1483,
+      "sha256": "0bbb98dff53bd62a143937f4394fdc482d8582640368943726b2fa3f542659a7"
+    },
+    {
+      "path": "04_ENGINEERING/07_DOCUMENT_INTELLIGENCE.md",
+      "bytes": 1245,
+      "sha256": "57507ce0f5158efdaa256293ae899ae739e30f72dbe658490b4025f31c66f056"
+    },
+    {
+      "path": "04_ENGINEERING/08_RECOMMENDED_TECH_STACK_AND_LINKS.md",
+      "bytes": 1483,
+      "sha256": "983e532d20dff2cfa7f62300e11eb5896d5561cf7b3713fd395303b2afee2e2d"
+    },
+    {
+      "path": "04_ENGINEERING/09_API_SURFACE_CONTRACTS.md",
+      "bytes": 1537,
+      "sha256": "0edd6c3c45a67f22c075be55aa2c8e7f7cf06d0c26610ebe5a898a66a7b2e7fb"
+    },
+    {
+      "path": "04_ENGINEERING/10_QUALITY_BAR_AND_LIGHT_THEME.md",
+      "bytes": 1120,
+      "sha256": "117e4e5a7daa6097123129625b540cd1eb3246c2377a37eec6d50544c1aa0bc1"
+    },
+    {
+      "path": "05_DESIGN_SYSTEM/MOTION_AND_PERFORMANCE.md",
+      "bytes": 1510,
+      "sha256": "0ccf54879383f6ae3b926aa91ea0315009e45c02043c28ba34f301d55ed536e0"
+    },
+    {
+      "path": "05_DESIGN_SYSTEM/VISUAL_TOKENS.md",
+      "bytes": 1137,
+      "sha256": "54f65485488ed42c145a01eb24ffd048c3ab94187ac9db41a9e4f884949da40b"
+    },
+    {
+      "path": "05_DESIGN_SYSTEM/tokens.css",
+      "bytes": 1118,
+      "sha256": "962792d1e24d0503ec0dfba5d19f9f45fcd525979a00cb630b4b506182a1026e"
+    },
+    {
+      "path": "05_DESIGN_SYSTEM/tokens.json",
+      "bytes": 493,
+      "sha256": "92f9b3e830b5cd0e6b520fb5115002fc6d41116a9f002762f5c7389719ff8345"
+    },
+    {
+      "path": "06_ACCEPTANCE/01_ACCEPTANCE_CRITERIA.md",
+      "bytes": 2489,
+      "sha256": "8c5ff913593d2a03fb2c7f6056bc39916494c96dd1b21884cfb5fcb20d1839a6"
+    },
+    {
+      "path": "06_ACCEPTANCE/02_VISUAL_QA_PROTOCOL.md",
+      "bytes": 1175,
+      "sha256": "2bc38bde3d10baa89bb3a124e18e871af79691cb9e5d54971d3f4b65c8297a83"
+    },
+    {
+      "path": "06_ACCEPTANCE/03_DEMO_SCRIPT_AR.md",
+      "bytes": 1178,
+      "sha256": "a1d3a7fc0c189a0fd92ae1e5d573d91fb3fd59f71d4a1dfbe6ace58912f656c7"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/01-oi-repo-guardian/SKILL.md",
+      "bytes": 1168,
+      "sha256": "ea17951d939897a92d8cb5c98816d41da1ec59df28b6da5fc9342a2df2fe2d08"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/02-oi-information-architect/SKILL.md",
+      "bytes": 1051,
+      "sha256": "76eb69157f8a9359d4c666aa59e8c75b0b47b0df9a93b473b87c517bcfc56892"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/03-oi-supplier-universe/SKILL.md",
+      "bytes": 1249,
+      "sha256": "ea61d13919c15d4bd9ef2698953c2d47635b6697c55bbd7b198186099354c9f1"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/04-oi-visual-craft/SKILL.md",
+      "bytes": 1122,
+      "sha256": "570f22453c3930bd2b0210ec50b6f6235b5842fac357200fabb966b153b394e7"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/05-oi-live-voice/SKILL.md",
+      "bytes": 1163,
+      "sha256": "9b93c03a462ce072c2d45efb0e772549dcb10204601df5015f2d6c74acd1ce6c"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/06-oi-tender-forensics/SKILL.md",
+      "bytes": 1110,
+      "sha256": "d00883aecbf9a01d5f671304f5c32bbb1d5b791b4f70bbfffb294d23cd6233c4"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/07-oi-generative-intelligence/SKILL.md",
+      "bytes": 1239,
+      "sha256": "2210f91437922781a61c2a5c89d5349ae31986f3354fbab70c44f6b23e6b5a0a"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/.claude/skills/08-oi-visual-gate/SKILL.md",
+      "bytes": 1130,
+      "sha256": "56371ca6492220d52f58ccf7b88e4ed1b246e7aa2c53242fb2a5a9b7a201e574"
+    },
+    {
+      "path": "07_CLAUDE_SKILLS/README.md",
+      "bytes": 659,
+      "sha256": "7fe087fcca2cf20acbde7f10a59e87442af15c03531a06abe72907c4c542e814"
+    },
+    {
+      "path": "08_TOOLS/Install-Skills.ps1",
+      "bytes": 1355,
+      "sha256": "fdc510fd28bea71f4f317731994ab8f886da61a1dcfee05145db97b4390c3808"
+    },
+    {
+      "path": "08_TOOLS/Preflight.ps1",
+      "bytes": 1693,
+      "sha256": "9e95615a90cc7db7e9dbe62feb4b4183e7bfcd9231bcf2c23751acdd4d9a74b0"
+    },
+    {
+      "path": "08_TOOLS/README.md",
+      "bytes": 1057,
+      "sha256": "6ddc5f315bacdd0485802dfdd3cc73c7cb924af9f9ee348e7fcb9cfc1a4b40f8"
+    },
+    {
+      "path": "08_TOOLS/ai_ui_allowlist.schema.json",
+      "bytes": 1296,
+      "sha256": "1259bc8b6a25bf04d923bf8bf2303b5851ffffac2fc3113133fd482acd3452c0"
+    },
+    {
+      "path": "08_TOOLS/graph_semantics.mjs",
+      "bytes": 1024,
+      "sha256": "634d6b19533cc6aba44c1a6cca47aff205816b4d2dee0b663a0fae087c1297a0"
+    },
+    {
+      "path": "08_TOOLS/graph_semantics.test.mjs",
+      "bytes": 1144,
+      "sha256": "2f682d9d1a36922f8ee4fc38abf8c5640491267e3c19e7f54d56ec6831e14c09"
+    },
+    {
+      "path": "08_TOOLS/sample_only_NOT_REAL_DATA.json",
+      "bytes": 511,
+      "sha256": "7105218e4f5efa845cb3633e1abb2f9557ca250086c69ece4c57aa407667261f"
+    },
+    {
+      "path": "08_TOOLS/verify_kit.py",
+      "bytes": 1153,
+      "sha256": "260edc3a73fc15b9818d71eeeea665d5c47d8cf1c8189e550e6597c5674259e0"
+    },
+    {
+      "path": "DESIGN_GALLERY.html",
+      "bytes": 3016,
+      "sha256": "ea1c2df959135fa78ed0b1ccecc9aabaedc1e39b28bdd1cca0c387f2cffdccb7"
+    },
+    {
+      "path": "MASTER_PROMPT.md",
+      "bytes": 8548,
+      "sha256": "75392a1b9ccf516471a6426e47c5d8f3bf9d22b901473522fb1f6935ff0cf57a"
+    }
+  ]
+}

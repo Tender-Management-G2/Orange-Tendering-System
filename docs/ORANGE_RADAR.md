@@ -2,23 +2,46 @@
 
 *See the market. Speak to your data.*
 
-Route: **`/SourcingOfficer/MarketIntelligence`** (sidebar: **Market Intelligence**). Sourcing Officer role only.
+Route: **`/Intelligence`** (sidebar: **Orange Intelligence**), `Controllers/IntelligenceController.cs`, view `Views/Intelligence/Index.cshtml`.
+The old `/SourcingOfficer/MarketIntelligence` address redirects there.
+
+## Orange Intelligence V3 (2026-11-21)
+
+- **Access:** every internal role except Supplier (Admin, Sourcing Officer/Manager, Requesting Department, Department
+  Representative, Technical, Finance, Evaluation Committee, top executives). **Data scope** is enforced in
+  `RadarDataService.ScopeAsync`: procurement, management, executives and Admin see the whole market; every other role sees only
+  the tenders of their department and the tenders whose committee they sit on, and only the suppliers invited to them.
+  The snapshot cache key includes the scope, so the AI analyst, briefing, report and charts all read the same scoped data.
+- **Five exclusive tabs** (one shown at a time, `#overview|suppliers|tenders|forensics|studio`): Overview (scope KPIs, lifecycle
+  funnel, items worth attention, shortcuts) · Suppliers (4 KPIs, market snapshot, the 3D **Supplier Universe**
+  `wwwroot/js/orange-intelligence-universe.js` with Universe/Category/Competition/Tender/Evidence arrangements, inspector on
+  selection, 2D network and table fallbacks, supplier insight charts) · Tenders (any tender in scope: lifecycle from recorded
+  timestamps incl. *created → winner notification sent* (`FinalDecisionNotices.SuppliersNotifiedAt`), offers of closed rounds,
+  unit prices, Excel export) · Forensics (findings, evidence, Document DNA, timeline) · AI Studio (conversation, voice, uploads,
+  PDF report, what-if).
+- **One AI session:** the voice stage element moves between the Suppliers bar and AI Studio; the inline companion in the tab
+  bar covers the other tabs. The analyst tool `build_visual` (allowlisted datasets, `Services/Radar/RadarVisuals.cs`) draws
+  charts/tables *inside the chat* from server calculations; the page renders them with its own components.
+- **Files:** `POST /Intelligence/Extract` reads PDF (text layer), XLSX (all sheets, largest table), CSV or TXT in memory
+  (`RadarFileExtractor.cs`); the content is attached to questions as untrusted, attributed data. `POST /Intelligence/ExportTable`
+  writes any on-page table to .xlsx.
 
 "The market" means the suppliers and procurement activity recorded in this system, never the external supplier market.
 
 ## What it does
 
-| Area | What the officer gets |
+One long page with a sticky scene navigator (Overview · Network · Market · Forensics · Analyst · Reports) and a single document scroll.
+Selection, the open finding, pinned findings and the replay date are one page state shared by every scene and by the AI analyst.
+
+| Scene | What the officer gets |
 |---|---|
-| Market summary | Registered vs eligible suppliers, suppliers that bid, analysed tenders/rounds, submitted offers, average offers per round/tender, historical awarded value **per currency**, detected relationships, review signals. Every tile has its definition as a tooltip. |
-| Market Overview | Supplier landscape (participation × win rate, bubble = awarded value, colour = category), competition per round (invited vs submitted, minimum line), award distribution (per currency, HHI), Supplier DNA radar, competition by department, recurring competitor pairs. Each chart has a table view. |
-| Supplier Network | Cytoscape graph: suppliers, tenders (expand on demand), shared-contact and document nodes; fact / context / signal edges with distinct colours and line styles; reveal animation, dynamic focus, evidence-path animation, group formation, shortest path, search, filters, multi-select (Shift+click), PNG export, full screen, relationship table. |
-| Price Intelligence | Relative price position over time (offer total ÷ round median − 1) and unit prices per tender item (same item, quantity, unit, currency and round). |
-| Forensic Intelligence | 8 detectors with state (analysed / insufficient data / not run), findings with evidence records, method, sample size, period and limitations; Document DNA (SHA-256 + local embeddings) with side-by-side passage comparison. |
-| Context panel | Details (supplier profile, DNA, comparison), Evidence, Scenario (hypothetical dependency simulator), Analyst (voice + text). Resizable and collapsible. |
-| Timeline | Historical replay of offers (shown when bidding closed, never at private submission time), awards and patterns; play/pause/speed/scrub/reset. |
-| Brief Me | Guided story of verified scenes (mode, suppliers, graph edges, evidence, camera) with narration; play/pause/previous/next/replay/stop and "Ask about this". |
-| Export report | PDF intelligence report with charts and network images, statistics, findings, alternative explanations, limitations, conversation record and an AI interpretation whose sentences passed the figure check. Separate from official evaluation reports. |
+| 01 Command deck | Scope and period, Brief me, Export, live conversation; six primary KPIs (registered/eligible, suppliers that bid, closed rounds, offers + sealed excluded, official awarded value per currency, review signals) and "More market metrics". Demo marker when the data is the fictional demo market. |
+| 02 Market network | Every registered supplier (isolated ones included) in four semantic views of the same stable ids: **Category** (registered category frames - a classification, not a relationship), **Competition** (links = distinct closed rounds both bid in, groups = connected components, singleton shelf), **Tender** (closed rounds by date on top, suppliers below, offers and official awards) and **Forensic** (detector findings only, review signals by default, context and shared contact/document nodes on demand). Deterministic preset layouts animated between views; group click zooms and opens the inspector; supplier click highlights its links while keeping market context; double-click / "Focus" opens an ego view with its closed rounds; edge click shows why the link exists with records, method, limitations and an alternative explanation; multi-select (Shift+click, up to 5) compares and cross-highlights every chart; path tracing; search; relationship and category filters; competition minimum; legend; zoom/fit/reset/full screen; PNG; accessible table; historical replay strip. |
+| 03 Market patterns | Competition per closed round (featured), competition by department + recurring pairs, relative price position over time, unit prices per item, supplier landscape (participation × win rate, or × response rate when no award exists), award distribution (compact "missing data" state), Supplier DNA comparison. Each chart has a table view and follows the shared selection. |
+| 04 Forensic lab | 8 detector states, findings list (review signals first, context one click away), evidence inspector with a drawing of the finding's own structure, metrics, method, sample, period, limitations, supporting records, pin to report, show in network; Document DNA (exact SHA-256 vs semantic, side-by-side passages); dated event timeline with "Replay in network". |
+| 05 AI conversation | Voice stage (orb + waveform from the real microphone or Piper playback signal only), controls (language, mute, voice replies, stop, end, speed, "Follow the analyst", experimental barge-in), transcript with tool and page-action trace, context chips, suggestions, text input. A compact dock shows the same session while the officer works in other scenes. |
+| 06 Reports & scenario | PDF report from the current scope, selection, pinned findings and optionally the conversation / AI interpretation; dependency simulator with hypothetical before → after. Both read-only. |
+| Brief Me | Guided story of verified scenes that moves through the scenes (explicit user intent), with narration and play/pause/previous/next/replay/stop and "Ask about this". |
 
 ## Architecture (no new tables, no migrations)
 
@@ -28,7 +51,8 @@ Services/Radar/
   RadarSnapshot.cs         read-only snapshot of the period + sealing rule, 60 s memory cache
   RadarAnalytics.cs        market metrics, landscape, competition, awards, DNA, prices, simulator
   RadarForensics.cs        the 8 detectors (pure LINQ, stable finding ids)
-  RadarGraph.cs            Cytoscape nodes/edges (stable ids, no duplicates)
+  RadarGraph.cs            graph nodes/edges (stable ids, no duplicates, every registered supplier) + network
+                           projections: closed-round incidence, competition links, competition groups
   RadarDocumentDna.cs      SHA-256, text extraction (ProtectedDocumentStore), embeddings cache, cosine
   RadarService.cs          facade used by the page, AI tools, briefing and report
   RadarOllamaClient.cs     loopback-only streaming /api/chat with tools, /api/embed, warm-up
@@ -40,9 +64,10 @@ Services/Radar/
   RadarDemoSeeder.cs       fictional demonstration market (isolated database only)
 Areas/SourcingOfficer/Controllers/MarketIntelligenceController.cs
 Areas/SourcingOfficer/Views/MarketIntelligence/Index.cshtml
-wwwroot/js/orange-radar.js, orange-radar-voice.js, orange-radar-capture.js (AudioWorklet)
+wwwroot/js/orange-radar.js (page state, scenes, charts, lab, studio, AI commands),
+  orange-radar-network.js (network engine), orange-radar-voice.js, orange-radar-capture.js (AudioWorklet)
 wwwroot/css/orange-radar.css
-wwwroot/lib/cytoscape (3.30.4, MIT), wwwroot/lib/echarts (5.6.0, Apache-2.0)
+wwwroot/lib/echarts (5.6.1, Apache-2.0). The network is a dependency-free Canvas 2D engine (wwwroot/js/orange-radar-network.js); wwwroot/lib/cytoscape is no longer loaded by this page.
 Tools/OrangeRadar/radar_piper_worker.py
 Tests/RadarChecks
 ```
@@ -74,9 +99,10 @@ The 0.85 semantic threshold was measured on the demo documents with `qwen3-embed
 ## AI analyst
 
 * Model: `qwen3.5:4b` via local Ollama, `think: false`, streaming, 8192-token context (the tool schemas + page state + history need ~2.3–3.5 k prompt tokens, so 4096 would truncate), keep-alive 15 min, warmed when a live conversation starts.
-* Tools — data (server): `market_overview`, `supplier_profile`, `compare_suppliers`, `relationships`, `evidence`, `compare_documents`, `search_documents`, `simulate_unavailable`; visual (client commands): `show_view`, `highlight`, `show_path`, `set_period`, `timeline`, `start_briefing`, `generate_report`.
+* Tools — data (server): `market_overview`, `supplier_profile`, `compare_suppliers`, `relationships`, `evidence`, `compare_documents`, `search_documents`, `simulate_unavailable`; visual (client commands): `show_view`, `network_view` (category / competition / tender / forensic), `focus_category` (validated against registered categories), `highlight`, `show_path`, `set_period`, `timeline`, `start_briefing`, `generate_report`.
 * Every argument is validated against a strict schema and every id against the snapshot; unknown tools, wrong types, out-of-range or over-long values are rejected and reported back to the model. The browser executes only whitelisted commands — never model-generated code, HTML or SQL. All tools are read-only.
-* The page sends structured context (mode, selection, finding, chart point, filters, scenario), never screenshots.
+* The page sends structured context (mode, network view, selection, finding, chart point, filters, scenario), never screenshots.
+* Page commands call the same transition functions as the officer's clicks. Commands of a cancelled or older turn are ignored. With "Follow the analyst" off, AI-directed section changes show a one-click jump instead of scrolling.
 * **Grounding guard:** each streamed sentence is checked; a figure not found in the tool results / page context / user's words (allowing rounding and %↔fraction) is marked in the transcript and that sentence is not read aloud. Document text is passed as `untrustedText` and the prompt forbids following it.
 
 ## Live conversation
@@ -116,6 +142,15 @@ Launch profile **`https (Orange Radar demo database)`** uses database `OrangeTen
 | Browser voice turn (fake mic, Vulkan Whisper) | STT 2.1–2.4 s, analyst 2.3 s to first sentence → first audio ≈ 5 s after the user stops speaking (incl. 0.85 s end-of-speech detection) |
 | Document DNA (6 bid docs, first run / cached) | 3.1 s / 0.96 s |
 
+## Network rules
+
+* Category membership is a registered classification. A line between suppliers exists only for a detector finding or (competition view) shared closed rounds; nothing is aggregated into an invented category link and there is no hub node. Group "links to other categories" counts distinct real supplier pairs.
+* Competition: a pair is linked when both submitted offers in at least N distinct closed rounds (`OrangeRadar:Thresholds:CompetitionLinkMinRounds`, default 2, adjustable in Filters); each round counts once. It is ordinary market context, never a signal.
+* Node colour = registered category, shape = entity (supplier circle, closed round square, shared contact hexagon, document diamond), size = closed rounds with an offer (34-64 px, square-root scale). Hollow = no closed-round offer; dashed outline = not approved. Grey = context, amber dashed = review signal, violet dashed = semantic document similarity, orange = selection / path.
+* Layouts are deterministic presets (no physics). One motion coordinator cancels any running transition before the next; `prefers-reduced-motion` makes every change instant.
+* The replay shows only what was available at the cursor date (offers when their round closed, patterns when established).
+* Only the selected network view is stored in browser storage; no names, ids, findings or conversation.
+
 ## Limitations
 
 * Text extraction: TXT, CSV and DOCX only (existing extractor); PDFs and images are matched by SHA-256 only.
@@ -123,3 +158,5 @@ Launch profile **`https (Orange Radar demo database)`** uses database `OrangeTen
 * Barge-in depends on browser echo cancellation and was not verified with a real microphone and loudspeakers.
 * Speech recognition quality depends on microphone and accent; Whisper small occasionally confuses Arabic words.
 * Thresholds are demonstration defaults for a small academic dataset.
+* Pinned findings and the investigation state last for the page visit only; durable saved investigations need server storage (separate scope).
+* Claim-to-evidence validation is the numeric grounding guard only; a sentence without numbers is not proven by it.

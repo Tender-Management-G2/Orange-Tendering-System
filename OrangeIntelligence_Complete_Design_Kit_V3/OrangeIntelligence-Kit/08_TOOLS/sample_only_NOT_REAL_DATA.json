@@ -1,0 +1,23 @@
+{
+  "NOTICE": "ILLUSTRATIVE ONLY. NEVER copy into production, calculations, or report exports.",
+  "suppliers": [
+    {
+      "id": "DEMO-S1",
+      "name": "Example Supplier A",
+      "category": "IT",
+      "sample": true
+    },
+    {
+      "id": "DEMO-S2",
+      "name": "Example Supplier B",
+      "category": "IT",
+      "sample": true
+    }
+  ],
+  "tender": {
+    "id": "DEMO-T15",
+    "durationDays": 24,
+    "sample": true
+  },
+  "warning": "Source actual figures from authorized SQL Server queries."
+}

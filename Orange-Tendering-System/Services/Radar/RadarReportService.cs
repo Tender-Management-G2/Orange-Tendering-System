@@ -63,7 +63,7 @@ public sealed class RadarReportService(RadarService radar, RadarOllamaClient oll
             ["Historical awarded value", s.AwardedValue.Count == 0 ? "No official awards" : string.Join("; ", s.AwardedValue.Select(v => $"{v.Currency} {v.Value:N2} ({v.Count})")), w.Definitions["awardedValue"]],
             ["Sealed (excluded)", $"{s.SealedRounds} open rounds, {s.SealedBids} offers", "Offers in rounds whose bidding is still open are never analysed."]
         ], [4.2, 3.6, 9.8]);
-        Images(section, request.Images, 0, 2);
+        Images(section, request.Images, "Competition per round");
 
         Heading(section, "2. Competition");
         var c = w.Competition;
@@ -79,7 +79,7 @@ public sealed class RadarReportService(RadarService radar, RadarOllamaClient oll
         Table(section, ["Supplier", "Invited", "Offers in rounds", "Awards / awarded bid", "Rel. price", "Compliance"],
             compare.Select(x => new[] { x.Name, x.Invitations.ToString(), x.Participations.ToString(), $"{x.Wins} / {x.AwardedTendersBid}", x.RelativePrice is { } r ? r.ToString("+0.0%;-0.0%", CultureInfo.InvariantCulture) : "n/a", x.ComplianceChecked == 0 ? "n/a" : $"{x.Compliant}/{x.ComplianceChecked}" }).ToArray(),
             [5.6, 2, 2.6, 3, 2.2, 2.2]);
-        Images(section, request.Images, 2, 4);
+        Images(section, request.Images, "Relative price position over time");
 
         Heading(section, "4. Relationships and review signals");
         if (findings.Count == 0) Body(section, "No relationships or review signals were detected at the configured thresholds.");
@@ -120,7 +120,6 @@ public sealed class RadarReportService(RadarService radar, RadarOllamaClient oll
             $"Offers in rounds still open for bidding are sealed and excluded ({s.SealedBids} offers in {s.SealedRounds} rounds).",
             "Prices are compared only within the same round, tender item, quantity, unit and currency; totals include extra costs.",
             "Awarded value is the official award amount, not payments. Currencies are never added together.",
-            $"Document DNA: {w.DocumentDna.State} ({w.DocumentDna.Readable} readable of {w.DocumentDna.BidDocuments} bid documents). Only TXT, CSV and DOCX text is extracted; PDF and images are matched by SHA-256 only.",
             "Thresholds are conservative demonstration settings (OrangeRadar:Thresholds) and small samples limit every statistic."
         }) Body(section, "- " + l);
 
@@ -179,9 +178,9 @@ public sealed class RadarReportService(RadarService radar, RadarOllamaClient oll
         foreach (var r in rows) { var row = t.AddRow(); for (var i = 0; i < head.Length && i < r.Length; i++) row.Cells[i].AddParagraph(Clip(r[i], 400)); }
         s.AddParagraph().Format.SpaceAfter = "4pt";
     }
-    private static void Images(Section s, RadarReportImage[]? images, int from, int to)
+    private static void Images(Section s, RadarReportImage[]? images, string allowedTitle)
     {
-        foreach (var img in (images ?? []).Skip(from).Take(to - from))
+        foreach (var img in (images ?? []).Where(i => i.Title == allowedTitle).Take(1))
         {
             var match = Regex.Match(img.DataUrl ?? "", @"^data:image/(png|jpeg);base64,([A-Za-z0-9+/=]+)$");
             if (!match.Success || match.Groups[2].Value.Length > 4_000_000) continue;

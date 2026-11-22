@@ -54,7 +54,7 @@ public static class RadarAnalytics
             .OrderBy(a => a.AwardedAt).ToList();
     }
 
-    // ---------- Supplier landscape and DNA ----------
+    // ---------- Supplier landscape ----------
 
     public sealed record SupplierStats(int SupplierId, string Name, string Category, string Status, int Invitations, int Participations, int Tenders,
         int AwardedTendersBid, int Wins, double? WinRate, double? ParticipationRate, IReadOnlyList<CurrencyValue> AwardedValue,
@@ -87,20 +87,6 @@ public static class RadarAnalytics
                 dates.Count == 0 ? null : dates.Min(), dates.Count == 0 ? null : dates.Max());
         }).ToList();
     }
-
-    public sealed record DnaDimension(string Key, string Label, double? Value, string Basis);
-    public sealed record SupplierDna(int SupplierId, string Name, IReadOnlyList<DnaDimension> Dimensions);
-
-    // Every dimension is a share between 0 and 1 with its numerator/denominator. Missing data stays null (never imputed).
-    public static SupplierDna Dna(SupplierStats x, int maxParticipations) => new(x.SupplierId, x.Name,
-    [
-        new("participation", "Participation", maxParticipations == 0 ? null : (double)x.Participations / maxParticipations, $"{x.Participations} of the most active supplier's {maxParticipations} rounds"),
-        new("response", "Response rate", x.ParticipationRate, x.Invitations == 0 ? "No closed-round invitations" : $"Offers in {Math.Round((x.ParticipationRate ?? 0) * x.Invitations)} of {x.Invitations} invited rounds"),
-        new("winRate", "Win rate", x.WinRate, x.AwardedTendersBid == 0 ? "No awarded tender bid on" : $"{x.Wins} of {x.AwardedTendersBid} awarded tenders"),
-        new("price", "Price position", x.RelativePrice is { } r ? Math.Clamp(0.5 - r * 2, 0, 1) : null, x.PricedRounds == 0 ? "No comparable rounds" : $"{(x.RelativePrice >= 0 ? "+" : "")}{x.RelativePrice:P1} vs round median over {x.PricedRounds} rounds (higher = cheaper)"),
-        new("compliance", "Compliance", x.ComplianceChecked == 0 ? null : (double)x.Compliant / x.ComplianceChecked, x.ComplianceChecked == 0 ? "No compliance checks recorded" : $"{x.Compliant} of {x.ComplianceChecked} checked offers compliant"),
-        new("documents", "Document verification", x.Documents == 0 ? null : (double)x.VerifiedDocuments / x.Documents, x.Documents == 0 ? "No registration documents" : $"{x.VerifiedDocuments} of {x.Documents} registration documents verified")
-    ]);
 
     // ---------- Competition ----------
 

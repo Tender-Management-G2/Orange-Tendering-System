@@ -10,6 +10,10 @@ dotnet run --project Tests/RadarChecks                 # analytics, detectors, g
 dotnet run --project Tests/RadarChecks -- --speech     # + real local Piper -> Whisper round trip (Arabic and English)
 dotnet run --project Tests/RadarChecks -- --speech --cpu            # force CPU Whisper
 dotnet run --project Tests/RadarChecks -- --speech --full-context   # disable the adaptive audio context
+dotnet run --project Tests/RadarChecks -- --scenarios          # user requests -> real analyst turn -> files compared with SQL (local team DB, read-only)
+dotnet run --project Tests/RadarChecks -- --intent-bench       # rules vs local models (thinking on/off) on labelled requests (team DB + Ollama)
+node Tests/RadarChecks/stt-pipeline.js <corpus>                # replay recordings through the page's speech front end (old vs current)
+dotnet run --project Tests/RadarChecks -- --stt-bench <corpus> # Whisper settings on those WAVs: WER/CER, language, latency, confidence flags
 ```
 
 `--speech` needs the model paths of `OrangeRadar` configuration defaults (see `docs/ORANGE_RADAR.md`).

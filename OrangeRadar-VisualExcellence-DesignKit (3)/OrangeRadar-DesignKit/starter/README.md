@@ -1,0 +1,3 @@
+# Optional implementation starters
+
+These are original, small reference utilities, not installed dependencies or production code. The graph helpers demonstrate count deduplication, isolation and aggregation only. They assume server-authorized data and do not implement authentication, immutable replay or actual repo models. Use or adapt after reading real code; do not import fixtures into runtime. Run example tests with Node 18+ (`node --test starter/network-semantics.test.mjs` from kit root). CSS uses placeholder `.orange-radar` and theme selector; map to existing theme and test contrast and layout. Audio utility reads an already connected analyser; lifecycle stays in existing voice pipeline. Do not commit this pack's scripts or examples wholesale into application.

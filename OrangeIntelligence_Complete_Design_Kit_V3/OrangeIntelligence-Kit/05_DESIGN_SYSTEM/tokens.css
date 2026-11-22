@@ -1,0 +1,17 @@
+/* Concept-only tokens. Scope inside .orange-intelligence instead of altering global app CSS. */
+.orange-intelligence {
+  --oi-bg: #0b1320; --oi-surface: #122338; --oi-elevated: #182c43;
+  --oi-border: #2e4259; --oi-orange: #ff7900; --oi-ink: #ecf3fb;
+  --oi-muted: #a9bacc; --oi-success: #55c9a3; --oi-info: #57a9dd;
+  --oi-warning: #f1b35a; --oi-radius: 16px; --oi-body: 16px;
+  color: var(--oi-ink); background: var(--oi-bg);
+  font-family: Inter, system-ui, sans-serif;
+}
+.orange-intelligence[dir="rtl"] { font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif; }
+.orange-intelligence[data-theme="light"] {
+  --oi-bg: #f4f6f8; --oi-surface: #fff; --oi-elevated: #eef2f7;
+  --oi-border: #c9d4e1; --oi-ink: #122033; --oi-muted: #455b74;
+}
+.orange-intelligence .oi-kpi-number { font-size: clamp(2rem, 3vw, 2.9rem); font-weight: 700; }
+.orange-intelligence .oi-body { font-size: 1rem; line-height: 1.55; }
+@media (prefers-reduced-motion: reduce) { .orange-intelligence *, .orange-intelligence *::before, .orange-intelligence *::after { transition-duration: 0.01ms!important; animation-duration: 0.01ms!important; } }

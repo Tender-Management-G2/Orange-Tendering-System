@@ -1,0 +1,47 @@
+/* OPTIONAL starter, scoped to the actual Radar root after inspecting current selectors. */
+.orange-radar {
+  --radar-bg: #f5f7fa;
+  --radar-surface: #ffffff;
+  --radar-canvas: #f0f4f8;
+  --radar-text: #142134;
+  --radar-muted: #526277;
+  --radar-border: #d9e1ea;
+  --radar-primary: #c34d00;
+  --radar-on-primary: #fff;
+  --radar-focus: #c34d00;
+  --radar-review: #8a5700;
+  --radar-edge: #74879c;
+  --radar-blue: #2269ae;
+  --radar-teal: #087d72;
+  --radar-violet: #7554b8;
+  --radar-radius: 14px;
+  --radar-section-gap: 40px;
+  --radar-ease: cubic-bezier(.2,.75,.25,1);
+  --radar-fast: 200ms;
+  --radar-camera: 450ms;
+  color: var(--radar-text);
+}
+/* Map this example selector to the existing app's real theme attribute. */
+[data-theme="dark"] .orange-radar, .orange-radar[data-theme="dark"] {
+  --radar-bg: #0b1422;
+  --radar-surface: #111e30;
+  --radar-canvas: #091524;
+  --radar-text: #eaf0f7;
+  --radar-muted: #a9b8c9;
+  --radar-border: #293c51;
+  --radar-primary: #ff8a3d;
+  --radar-on-primary: #131a23;
+  --radar-focus: #ff9b55;
+  --radar-review: #f5bf63;
+  --radar-edge: #61788e;
+  --radar-blue: #70b7f5;
+  --radar-teal: #54c5b5;
+  --radar-violet: #b7a0ef;
+}
+.orange-radar .radar-scene { margin-block: var(--radar-section-gap); min-width: 0; scroll-margin-top: var(--radar-sticky-offset, 100px); }
+.orange-radar .radar-canvas { width: 100%; min-width: 0; height: clamp(440px, 70vh, 760px); background: var(--radar-canvas); border: 1px solid var(--radar-border); border-radius: var(--radar-radius); }
+.orange-radar :focus-visible { outline: 2px solid var(--radar-focus); outline-offset: 3px; }
+.orange-radar .radar-transcript { overflow-wrap: anywhere; }
+@media (max-width: 640px) { .orange-radar { --radar-section-gap: 28px; } .orange-radar .radar-canvas { height: 420px; } }
+@media (prefers-reduced-motion: reduce) { .orange-radar { --radar-fast: 0ms; --radar-camera: 0ms; } }
+/* JS graph/RAF transitions must honor reduced motion separately. */

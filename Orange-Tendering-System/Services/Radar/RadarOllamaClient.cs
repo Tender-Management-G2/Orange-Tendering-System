@@ -108,6 +108,34 @@ public sealed class RadarOllamaClient(HttpClient http, IOptions<RadarOptions> op
         }
     }
 
+    // One non-streamed reply constrained by Ollama structured outputs (format = JSON schema). The caller still validates it:
+    // the schema shapes the output, it does not make its content trustworthy. think = null leaves the model default.
+    public async Task<(JsonElement Value, double Ms, string? Thinking)> ChatJsonAsync(string model, IReadOnlyList<object> messages, object schema, bool? think, CancellationToken ct, int maxTokens = 300)
+    {
+        var body = new Dictionary<string, object?>
+        {
+            ["model"] = model, ["stream"] = false, ["messages"] = messages, ["format"] = schema, ["keep_alive"] = Settings.KeepAlive,
+            ["options"] = new { temperature = 0, num_ctx = Settings.ContextLength, num_predict = think == true ? maxTokens * 8 : maxTokens }
+        };
+        if (think != null) body["think"] = think;
+        var watch = Stopwatch.StartNew();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(Settings.TimeoutSeconds, 10, 600)));
+        HttpResponseMessage response;
+        try { response = await client.PostAsJsonAsync(Endpoint("/api/chat"), body, timeout.Token); }
+        catch (HttpRequestException e) { throw new RadarAiUnavailableException("Local Ollama is not reachable.", e); }
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode) throw new RadarAiUnavailableException($"The local model returned HTTP {(int)response.StatusCode}.");
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>(timeout.Token);
+            var message = json.GetProperty("message");
+            var content = message.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
+            var thinking = message.TryGetProperty("thinking", out var th) ? th.GetString() : null;
+            try { using var doc = JsonDocument.Parse(content); return (doc.RootElement.Clone(), watch.Elapsed.TotalMilliseconds, thinking); }
+            catch (JsonException) { throw new RadarAiUnavailableException("The local model did not return valid JSON for the requested schema."); }
+        }
+    }
+
     public async Task<float[][]> EmbedAsync(IReadOnlyList<string> inputs, CancellationToken ct)
     {
         if (inputs.Count == 0) return [];

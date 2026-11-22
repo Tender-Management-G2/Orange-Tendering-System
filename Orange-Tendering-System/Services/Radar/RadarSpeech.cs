@@ -7,11 +7,15 @@ using Whisper.net;
 
 namespace Orange_Tendering_System.Services.Radar;
 
-public sealed record RadarTranscript(string Text, string Language, double AudioSeconds, double ProcessingMs);
+// Confidence is the mean probability of the recognised text tokens (0-1). Reliable transcripts may be sent automatically; the
+// page asks the user to confirm or correct the others. LanguageProbability is Whisper's own guess (1 when the user chose it).
+public sealed record RadarTranscript(string Text, string Language, double AudioSeconds, double ProcessingMs,
+    double Confidence = 0, bool Reliable = false, double LanguageProbability = 1, bool LanguageArbitrated = false);
 public sealed class RadarSpeechException(string message, int status = 503) : Exception(message) { public int Status { get; } = status; }
 
-// Local speech recognition with Whisper.net (CPU). The model is loaded once and kept; each utterance is a short 16 kHz mono WAV
-// cut by the browser's voice-activity detection. Audio is processed in memory and never written to disk or kept.
+// Local speech recognition with Whisper.net (Vulkan GPU, CPU fallback). The model is loaded once and kept; each utterance is a
+// 16 kHz mono WAV cut by the page's endpointer (wwwroot/js/orange-radar-audio.js). Audio is processed in memory and never stored.
+// Transcription only: translation is never enabled, so speech stays in the language it was spoken in.
 public sealed class RadarSpeechRecognizer(IOptions<RadarOptions> options, ILogger<RadarSpeechRecognizer> logger) : IDisposable
 {
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -48,25 +52,88 @@ public sealed class RadarSpeechRecognizer(IOptions<RadarOptions> options, ILogge
         {
             try { ChooseRuntime(); factory ??= WhisperFactory.FromPath(ModelPath!); }
             catch (Exception e) { loadError = "failed to load: " + e.Message; logger.LogWarning(e, "Whisper model failed to load"); throw new RadarSpeechException("The Whisper runtime could not load the model."); }
-            var builder = factory.CreateBuilder()
-                .WithThreads(Math.Clamp(options.Value.Whisper.Threads, 1, Environment.ProcessorCount))
-                .WithNoContext().WithSingleSegment().WithNoSpeechThreshold(0.6f);
-            builder = language is "ar" or "en" ? builder.WithLanguage(language) : builder.WithLanguage("auto");
-            // Whisper always encodes a 30 s window (1500 frames, 50 per second). For short spoken turns the window is sized
-            // to the utterance plus a margin, which cuts encoder time substantially (measured in docs/ORANGE_RADAR.md).
-            if (options.Value.Whisper.AdaptiveAudioContext)
-                builder = builder.WithAudioContextSize(Math.Min(1500, (int)Math.Ceiling((samples.Length / 16000.0 + 2) * 50 / 64.0) * 64));
-            await using var processor = builder.Build();
-            var text = new StringBuilder(); var detected = language;
-            await foreach (var segment in processor.ProcessAsync(samples, ct))
+            var settings = options.Value.Whisper;
+            double languageProbability = 1; var arbitrated = false;
+            Decoded best;
+            if (language is "ar" or "en") best = await DecodeAsync(samples, language, ct);
+            else if (settings.LanguageConfidence <= 0) best = await DecodeAsync(samples, "auto", ct);
+            else
             {
-                text.Append(segment.Text);
-                if (!string.IsNullOrEmpty(segment.Language)) detected = segment.Language;
+                // Whisper's guess covers ~100 languages and is unstable on short or accented commands (English heard as Arabic,
+                // Persian or Urdu). Only Arabic and English are supported here, so an unsure guess is settled by decoding both.
+                await using (var detector = Builder(samples.Length, "auto").Build())
+                {
+                    var (code, probability) = detector.DetectLanguageWithProbability(samples);
+                    languageProbability = probability;
+                    language = code ?? "";
+                }
+                if (language is "ar" or "en" && languageProbability >= settings.LanguageConfidence) best = await DecodeAsync(samples, language, ct);
+                else
+                {
+                    arbitrated = true;
+                    var english = await DecodeAsync(samples, "en", ct); var arabic = await DecodeAsync(samples, "ar", ct);
+                    best = arabic.Confidence > english.Confidence ? arabic : english;
+                }
             }
-            var result = Clean(text.ToString());
-            return new RadarTranscript(result, detected is "ar" or "en" ? detected : RadarGrounding.IsArabic(result) ? "ar" : "en", samples.Length / 16000.0, watch.Elapsed.TotalMilliseconds);
+            var text = Clean(best.Text);
+            var detected = best.Language is "ar" or "en" ? best.Language : RadarGrounding.IsArabic(text) ? "ar" : "en";
+            var reliable = text.Length > 0 && best.Confidence >= settings.ReliableConfidence && !EchoesPrompt(text, detected);
+            if (!reliable && EchoesPrompt(text, detected)) text = "";
+            return new RadarTranscript(text, detected, samples.Length / 16000.0, watch.Elapsed.TotalMilliseconds, Math.Round(best.Confidence, 3), reliable,
+                Math.Round(languageProbability, 3), arbitrated);
         }
         finally { gate.Release(); }
+    }
+
+    private sealed record Decoded(string Text, string Language, double Confidence);
+
+    private WhisperProcessorBuilder Builder(int sampleCount, string language)
+    {
+        var settings = options.Value.Whisper;
+        var builder = factory!.CreateBuilder()
+            .WithThreads(Math.Clamp(settings.Threads, 1, Environment.ProcessorCount))
+            .WithNoContext().WithSingleSegment().WithNoSpeechThreshold(0.6f).WithProbabilities()
+            .WithLanguage(language);
+        // Whisper always encodes a 30 s window (1500 frames, 50 per second); the adaptive option sizes it to the utterance.
+        if (settings.AdaptiveAudioContext)
+            builder = builder.WithAudioContextSize(Math.Min(1500, (int)Math.Ceiling((sampleCount / 16000.0 + 2) * 50 / 64.0) * 64));
+        if (settings.BeamSize > 1) builder = builder.WithBeamSearchSamplingStrategy(beam => beam.WithBeamSize(Math.Min(8, settings.BeamSize)));
+        return builder;
+    }
+
+    private string? Prompt(string language) => language switch
+    {
+        "en" => options.Value.Whisper.EnglishPrompt,
+        "ar" => options.Value.Whisper.ArabicPrompt,
+        _ => null
+    };
+
+    private async Task<Decoded> DecodeAsync(float[] samples, string language, CancellationToken ct)
+    {
+        var builder = Builder(samples.Length, language);
+        if (Prompt(language) is { Length: > 0 } prompt) builder = builder.WithPrompt(prompt);
+        await using var processor = builder.Build();
+        var text = new StringBuilder(); var detected = language; double sum = 0; var count = 0;
+        await foreach (var segment in processor.ProcessAsync(samples, ct))
+        {
+            text.Append(segment.Text);
+            if (!string.IsNullOrEmpty(segment.Language)) detected = segment.Language;
+            // Text tokens only: timestamps and control tokens ([_BEG_], <|en|>) say nothing about recognition quality.
+            foreach (var token in segment.Tokens ?? [])
+                if (token.Text is { Length: > 0 } t && !t.StartsWith("[_") && !t.StartsWith("<|")) { sum += token.Probability; count++; }
+            if (count == 0 && segment.Probability > 0) { sum += segment.Probability; count++; }
+        }
+        return new Decoded(text.ToString(), detected, count == 0 ? 0 : sum / count);
+    }
+
+    // With nothing intelligible to transcribe, Whisper can repeat its prompt; that is never the user's request.
+    private bool EchoesPrompt(string text, string language)
+    {
+        var prompt = Prompt(language);
+        if (string.IsNullOrWhiteSpace(prompt) || text.Length < 12) return false;
+        static string Norm(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        var t = Norm(text);
+        return t.Length >= 10 && Norm(prompt).Contains(t[..Math.Min(t.Length, 40)]);
     }
 
     // Loads the model (and the GPU runtime) when a conversation starts, so the first spoken turn is not a cold start.

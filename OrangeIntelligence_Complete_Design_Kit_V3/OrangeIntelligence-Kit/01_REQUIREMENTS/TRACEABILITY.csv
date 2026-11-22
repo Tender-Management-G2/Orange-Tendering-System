@@ -1,0 +1,11 @@
+requirement,expected,design_spec,acceptance
+AI-01,Shared internal page; suppliers denied,01_PAGE_SHELL_AND_NAVIGATION.md,role/nav + server scope test
+AI-02,Interactive charts tables cards KPIs and files,02_OVERVIEW_TAB.md / 06_AI_STUDIO_TAB.md,"render, lifecycle & upload/download"
+AI-03,Real dynamic data,07_FILTER_STATE_MATRIX.md,refresh after authorized row update
+AI-04,Any tender report,04_TENDERS_TAB.md,select tender + lifecycle + official outcomes
+AI-05,Chatbot in pages,03_VOICE_AND_AI_DIRECTOR.md,cross-page role-aware chatbot
+AI-06,Rich answers + Excel/PDF analyze/export,04_GENERATIVE_UI_SCHEMA.md,"inline chart/table/card, upload and export"
+AI-07,Custom visual analytics,06_AI_STUDIO_TAB.md,ad hoc chart rendered inside thread
+AI-08,Recommendations only,05_SECURE_AI_AND_PERMISSION_SCOPES.md,no domain writes
+AI-09,Secure AI,05_SECURE_AI_AND_PERMISSION_SCOPES.md,server auth & sealed data gate
+AI-10,Only real data,02_GRAPH_SEMANTICS_AND_EVIDENCE.md,provenance & missing data text
