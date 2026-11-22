@@ -105,9 +105,10 @@ public static class UnifiedTenderChecks
         db.AddRange(supplier, competitor); await db.SaveChangesAsync();
         var supplierUser = await User("supplier", SystemRoles.Supplier, supplier.Id);
         var outsider = await User("outsider", SystemRoles.Supplier, competitor.Id);
+        var requestCategory = await db.ProcurementCategories.SingleAsync(c => c.Name == SupplierCategories.InformationTechnology);
         var request = new PurchaseRequest { DepartmentId = department.Id, CreatedByUserId = requester.Id, Title = "Unified purchase", Justification = "Test",
             Status = PurchaseRequestStatus.Submitted, CreatedAt = DateTime.UtcNow, SubmittedAt = DateTime.UtcNow,
-            Items = { new PurchaseRequestItem { Name = "Laptop", Quantity = 2, Unit = "unit", Specifications = "16 GB RAM" } } };
+            Items = { new PurchaseRequestItem { Name = "Laptop", CategoryId = requestCategory.Id, Quantity = 2, Unit = "unit", Specifications = "16 GB RAM" } } };
         db.Add(request); await db.SaveChangesAsync();
 
         async Task<string> Token(HttpClient client, string path)
@@ -125,6 +126,12 @@ public static class UnifiedTenderChecks
             { ["Input.Email"] = u.Email!, ["Input.Password"] = password, ["__RequestVerificationToken"] = token }));
             Check(response.StatusCode == HttpStatusCode.Redirect, "Identity login " + u.FullName);
             return client;
+        }
+        async Task<string> Ajax(HttpClient client, string path)
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Get, path); message.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var response = await client.SendAsync(message); Check(response.StatusCode == HttpStatusCode.OK, "authorized response " + path);
+            return await response.Content.ReadAsStringAsync();
         }
         using var officerClient = await Login(officer);
         var inbox = await officerClient.GetStringAsync("/SourcingOfficer/PurchaseRequests");
@@ -182,7 +189,22 @@ public static class UnifiedTenderChecks
         await flow.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(3), Principal(officer));
         Check(await db.Tenders.AnyAsync(t => t.Id == id && t.Status == TenderStatus.Bidding)
             && !await db.PreTenderReviews.AnyAsync(r => r.TenderId == id), "approved weights allow bidding without a Top Committee pre-tender review");
-        await flow.Invite(id, supplier.Id, Principal(officer));
+        var pickerPopup = await Ajax(officerClient, "/SourcingOfficer/Workflow/Details/" + id);
+        var categoryFilter = Regex.Match(pickerPopup, "<select data-supplier-category>(.*?)</select>", RegexOptions.Singleline).Groups[1].Value;
+        Check(categoryFilter.StartsWith("<option value=\"\">All categories", StringComparison.Ordinal)
+              && WebUtility.HtmlDecode(categoryFilter).Contains("· in this tender") && !categoryFilter.Contains(" selected"),
+            "a tender's item category is highlighted without hiding suppliers in other categories");
+        using var inviteSelected = new HttpRequestMessage(HttpMethod.Post, "/SourcingOfficer/Workflow/InviteAll/" + id);
+        inviteSelected.Headers.Add("X-Requested-With", "XMLHttpRequest");
+        inviteSelected.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = createToken,
+            ["supplierIds"] = supplier.Id.ToString()
+        });
+        using var inviteResponse = await officerClient.SendAsync(inviteSelected);
+        Check(inviteResponse.StatusCode == HttpStatusCode.OK
+              && (await db.TenderInvitations.Where(i => i.TenderRound.TenderId == id).Select(i => i.SupplierId).ToListAsync()).SequenceEqual(new[] { supplier.Id }),
+            "the invitation form sends only the selected eligible supplier from another category");
         await flow.Invite(id, competitor.Id, Principal(officer));
         var dormant = new Supplier { CompanyName = "INACTIVE_SUPPLIER", RegistrationNumber = suffix + "D", Email = "inactive@unified.test", Status = SupplierStatus.Approved };
         db.Add(dormant); await db.SaveChangesAsync();
@@ -194,12 +216,6 @@ public static class UnifiedTenderChecks
         await flow.Respond(id, invitation.Id, true, Principal(supplierUser));
         Check(await db.Notifications.Where(n => n.UserId == supplierUser.Id).AllAsync(n => !n.Message.Contains("weights")), "new supplier notifications omit weights");
         using var supplierClient = await Login(supplierUser);
-        async Task<string> Ajax(HttpClient client, string path)
-        {
-            using var message = new HttpRequestMessage(HttpMethod.Get, path); message.Headers.Add("X-Requested-With", "XMLHttpRequest");
-            var response = await client.SendAsync(message); Check(response.StatusCode == HttpStatusCode.OK, "authorized response " + path);
-            return await response.Content.ReadAsStringAsync();
-        }
         var popup = await Ajax(supplierClient, "/Supplier/Workflow/Details/" + id);
         Check(popup.Contains("Prepare my offer") && !popup.Contains("COMPETITOR_SECRET_NAME") && !popup.Contains("Weights") && !popup.Contains("Committee")
             && !popup.Contains("40%") && !popup.Contains("60%"), "supplier popup has no committee, weights or competitor data");

@@ -28,6 +28,7 @@
     <link rel="preload" href="~/assets/auth-studio/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <style>@@font-face{font-family:"Inter";src:url("@Url.Content("~/assets/auth-studio/fonts/inter-latin-wght-normal.woff2")") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}</style>
     <link rel="stylesheet" href="~/css/home-cinema.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/orange-motion.css" asp-append-version="true" />
     @* Emitted raw: the .NET importmap tag helper would replace this map with its own. *@
     @Html.Raw("<script type=\"importmap\">{ \"imports\": { \"three\": \"" + Url.Content("~/js/vendor/three/build/three.module.min.js") + "\" } }</script>")
     <link rel="stylesheet" href="~/css/theme-surfaces.css" asp-append-version="true" />
@@ -83,7 +84,8 @@
     @* GSAP 3.12.5 served locally (same pinned version): no wait on an external CDN. *@
     <script src="~/js/vendor/gsap.min.js" asp-append-version="true"></script>
     <script src="~/js/vendor/ScrollTrigger.min.js" asp-append-version="true"></script>
+    <script src="~/js/orange-motion.js" asp-append-version="true"></script>
     <script src="~/js/home-cinema.js" asp-append-version="true"></script>
-    <script type="module" src="~/js/home-hq3d.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/home-hq3d.js" asp-append-version="true" onerror="document.documentElement.classList.add('hq3-static')"></script>
 </body>
 </html>

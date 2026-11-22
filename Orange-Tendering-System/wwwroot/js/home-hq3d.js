@@ -15,7 +15,17 @@ const root = document.documentElement;
 const section = document.getElementById("home"), stage = document.getElementById("hq-stage"), canvas = document.getElementById("hq3-canvas");
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function webgl() { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch (e) { return false; } }
-if (!section || !canvas || !webgl()) { root.classList.add("hq3-static"); } else { init(); }
+if (!section || !stage || !canvas || !webgl()) {
+  root.classList.add("hq3-static");
+} else {
+  try {
+    init();
+  } catch (error) {
+    root.classList.remove("hq3-live");
+    root.classList.add("hq3-static");
+    console.error("Could not initialize the homepage 3D scene.", error);
+  }
+}
 
 function init() {
   const small = innerWidth < 760, lowPower = small || (navigator.hardwareConcurrency || 8) <= 4;
@@ -679,7 +689,6 @@ function init() {
     const W = stage.clientWidth, H = stage.clientHeight;
     renderer.setSize(W, H, false);
     if (composer) { composer.setSize(W, H); bloom.resolution.set(W / 2, H / 2); }
-    stage.classList.toggle("hq-wide", W >= 1100 && W / H >= 1.2); stage.classList.toggle("hq-narrow", !(W >= 1100 && W / H >= 1.2));
   }
   const clock = new THREE.Clock();
   renderer.shadowMap.autoUpdate = false; let shadowSig = "";

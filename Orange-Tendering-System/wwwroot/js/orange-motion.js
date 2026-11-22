@@ -163,6 +163,15 @@
         stop() { this.loops.forEach(a => a.cancel()); this.loops = []; this.svg.getAnimations({ subtree: true }).forEach(a => a.cancel()); }
     }
 
+    function createLoadingFruit(host) {
+        const fruit = new Fruit(host, 4);
+        if (!reduced()) fruit.process();
+        return {
+            assemble: () => fruit.assemble(fruit.settle()),
+            stop: () => fruit.stop()
+        };
+    }
+
     function normalize(feedback, fallbackMode) {
         const f = Object.assign({}, feedback || {});
         f.variant = VARIANTS.includes(String(f.variant).toLowerCase()) ? String(f.variant).toLowerCase() : 'save';
@@ -479,6 +488,6 @@
     }
     window.addEventListener('pageshow', event => { if (event.persisted) document.querySelectorAll('form').forEach(f => sending.delete(f)); });
 
-    window.OrangeMotion = { config, show, begin, submit, feedbackFrom, variants: VARIANTS.slice() };
+    window.OrangeMotion = { config, show, begin, submit, feedbackFrom, createLoadingFruit, variants: VARIANTS.slice() };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', autoplay); else autoplay();
 })();

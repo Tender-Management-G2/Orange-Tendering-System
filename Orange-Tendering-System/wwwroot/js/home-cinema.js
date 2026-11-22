@@ -10,6 +10,27 @@
   var clamp = function (v, a, b) { return Math.min(b, Math.max(a, v)); };
   var fmt = function (n) { return (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1"); };
 
+  (function loadingScene() {
+    var loader = $(".hq-loading");
+    if (!loader || !window.OrangeMotion) return;
+    var fruit = window.OrangeMotion.createLoadingFruit($(".om-stage", loader));
+    var observer = new MutationObserver(async function () {
+      if (!root.matches(".hq3-live,.hq3-static")) return;
+      observer.disconnect();
+      if (root.classList.contains("hq3-static")) {
+        fruit.stop();
+        return;
+      }
+      loader.classList.add("is-assembling");
+      try {
+        await fruit.assemble();
+      } finally {
+        loader.classList.remove("is-assembling");
+      }
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+  })();
+
   /* ---------- navigation ---------- */
   (function nav() {
     var burger = $(".hc-burger"), links = $("#hc-links");
