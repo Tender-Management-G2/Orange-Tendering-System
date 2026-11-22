@@ -2044,6 +2044,7 @@ public async Task<string> UpdateUserAsync(
                     d.Id,
                     d.FileName,
                     d.DocumentType,
+                    d.UploadedAt,
                     d.ExpiresAt,
                     d.VerificationStatus,
                     d.VerificationNotes
@@ -2056,6 +2057,7 @@ public async Task<string> UpdateUserAsync(
                     Id = d.Id,
                     FileName = d.FileName,
                     DocumentType = d.DocumentType,
+                    UploadedAt = d.UploadedAt,
                     ExpiresAt = d.ExpiresAt,
                     VerificationStatus =
                         d.VerificationStatus?.ToString()
@@ -2142,7 +2144,8 @@ public async Task<string> UpdateUserAsync(
             });
 
             document.VerificationStatus = model.Status;
-            document.VerificationNotes = model.Notes?.Trim();
+            if (!string.IsNullOrWhiteSpace(model.Notes))
+                document.VerificationNotes = model.Notes.Trim();
             document.VerifiedByUserId = adminId;
             document.VerifiedAt = DateTime.UtcNow;
 

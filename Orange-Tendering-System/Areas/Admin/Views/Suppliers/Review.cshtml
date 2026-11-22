@@ -38,7 +38,6 @@ offers.
 ===========================================================
 *@
 
-@using Orange_Tendering_System.Models.Entities
 @model SupplierDetailsViewModel
 
 @{
@@ -46,6 +45,14 @@ offers.
     ViewData["WorkspaceSection"] = "Suppliers";
     ViewData["Description"] =
         "Verify legal documents and manage supplier approval.";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/supplier-document-review.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/supplier-document-review.js" asp-append-version="true"></script>
 }
 
 <partial name="_PageHeader" />
@@ -121,29 +128,29 @@ offers.
 </section>
 
 <!-- Legal Documents -->
-<section class="ws-panel pg-panel">
+<section class="ws-panel pg-panel supplier-document-review" aria-labelledby="legal-documents-heading">
     <div class="pg-panel-head">
-        <h2>Legal Document Verification</h2>
+        <h2 id="legal-documents-heading">Legal Document Verification</h2>
         <p>Review company registration and legal documents.</p>
     </div>
 
     <div class="pg-table-wrap">
-        <table class="pg-table">
-            <thead>
-                <tr>
-                    <th>Document</th>
-                    <th>Type</th>
-                    <th>Expiry</th>
-                    <th>Status</th>
-                    <th>Verification</th>
+        <table class="pg-table document-review-table" role="table" aria-labelledby="legal-documents-heading">
+            <thead role="rowgroup">
+                <tr role="row">
+                    <th role="columnheader" scope="col">Document</th>
+                    <th role="columnheader" scope="col">Type</th>
+                    <th role="columnheader" scope="col">Uploaded / Expiry</th>
+                    <th role="columnheader" scope="col">Current Status</th>
+                    <th role="columnheader" scope="col">Verification Review</th>
                 </tr>
             </thead>
 
-            <tbody>
+            <tbody role="rowgroup">
                 @if (!Model.Documents.Any())
                 {
-                    <tr>
-                        <td colspan="5">
+                    <tr role="row">
+                        <td role="cell" colspan="5" class="document-review-empty">
                             No documents uploaded.
                         </td>
                     </tr>
@@ -152,38 +159,88 @@ offers.
                 {
                     @foreach (var document in Model.Documents)
                     {
-                        <tr>
-                            <td>
+                        var extension = System.IO.Path.GetExtension(document.FileName);
+                        var fileType = extension.TrimStart('.').ToUpperInvariant();
+                        var fileStyle = fileType switch
+                        {
+                            "PDF" => "pdf",
+                            "PNG" or "JPG" or "JPEG" => "image",
+                            _ => "other"
+                        };
+                        var documentType = document.DocumentType is { Length: > 0 } type
+                            ? System.Text.RegularExpressions.Regex.Replace(type, "(?<=[a-z])(?=[A-Z])", " ")
+                            : "—";
+                        var status = document.VerificationStatus is "Rejected" or "Verified"
+                            ? document.VerificationStatus
+                            : "Pending";
+                        var isRejected = status == "Rejected";
+                        var statusId = $"document-status-{document.Id}";
+                        var notesId = $"document-notes-{document.Id}";
+
+                        <tr role="row" data-document-row>
+                            <td role="cell" class="document-review-file-cell">
                                 <a asp-area="Admin"
                                    asp-controller="Suppliers"
                                    asp-action="Document"
                                    asp-route-id="@document.Id"
+                                   class="document-review-file"
+                                   title="@document.FileName"
+                                   aria-label="Download @document.FileName"
                                    data-no-modal
-                                   target="_blank"
-                                   rel="noopener noreferrer">@document.FileName</a>
+                                   download="@document.FileName">
+                                    <span class="document-review-file-type" data-file-style="@fileStyle" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                                            <path d="M6 3h8l5 5v13H6zM14 3v6h5" />
+                                            @if (fileStyle == "image")
+                                            {
+                                                <path d="m8.5 17 3-3 2.5 2 1.5-1.5 1 1" />
+                                                <circle cx="10" cy="11" r=".7" />
+                                            }
+                                            else
+                                            {
+                                                <path d="M9 13h7m-7 4h5" />
+                                            }
+                                        </svg>
+                                        <span>@(fileType.Length is > 0 and <= 6 ? fileType : "FILE")</span>
+                                    </span>
+                                    <span class="document-review-filename" dir="auto">
+                                        <span class="document-review-stem">@System.IO.Path.GetFileNameWithoutExtension(document.FileName)</span>
+                                        @if (extension.Length <= 7)
+                                        {
+                                            <span>@extension</span>
+                                        }
+                                    </span>
+                                    <span class="document-review-download" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                                            <path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" />
+                                        </svg>
+                                    </span>
+                                </a>
                             </td>
 
-                            <td>@(document.DocumentType ?? "—")</td>
-
-                            <td>
-                                @(document.ExpiresAt?.ToString("yyyy-MM-dd")
-                                    ?? "—")
+                            <td role="cell">
+                                <span class="document-review-mobile-label" aria-hidden="true">Type</span>
+                                @documentType
                             </td>
 
-                            <td>
-                                <span class="pg-status">
-                                    @document.VerificationStatus
-                                </span>
+                            <td role="cell" class="document-review-dates">
+                                <div><span>Uploaded</span> @document.UploadedAt.ToJordan("dd MMM yyyy")</div>
+                                <div><span>Expiry</span> @(document.ExpiresAt?.ToString("dd MMM yyyy") ?? "—")</div>
                             </td>
 
-                            <td>
+                            <td role="cell">
+                                <span class="document-review-mobile-label" aria-hidden="true">Current Status</span>
+                                <span class="ui-pill document-review-status" data-status="@status">@status</span>
+                            </td>
+
+                            <td role="cell" class="document-review-controls">
                                 @if (Model.Status != "Approved")
                                 {
                                     <form asp-area="Admin"
                                           asp-controller="Suppliers"
                                           asp-action="VerifyDocument"
                                           method="post"
-                                          class="pg-form">
+                                          class="pg-form document-review-form">
 
                                         @Html.AntiForgeryToken()
 
@@ -196,48 +253,40 @@ offers.
                                                value="@document.Id" />
 
                                         <div class="pg-field">
-                                            <label>
-                                                Verification Status
-                                            </label>
-
-                                            <select name="Status"
+                                            <label for="@statusId">Verification Status</label>
+                                            <select id="@statusId" name="Status"
                                                     class="form-control"
                                                     required>
-                                                <option value="Pending" selected="@(document.VerificationStatus == "Pending")">
-                                                    Pending
-                                                </option>
-                                                <option value="Verified" selected="@(document.VerificationStatus == "Verified")">
-                                                    Verified
-                                                </option>
-                                                <option value="Rejected" selected="@(document.VerificationStatus == "Rejected")">
-                                                    Rejected
-                                                </option>
+                                                <option value="Pending" selected="@(status == "Pending")">Pending</option>
+                                                <option value="Verified" selected="@(status == "Verified")">Verified</option>
+                                                <option value="Rejected" selected="@isRejected">Rejected</option>
                                             </select>
                                         </div>
 
-                                        <div class="pg-field">
-                                            <label>Verification Notes</label>
-
-                                            <textarea name="Notes"
+                                        <div class="pg-field document-review-notes" hidden="@(!isRejected)">
+                                            <label for="@notesId">Review Notes</label>
+                                            <textarea id="@notesId" name="Notes"
+                                                      required="@isRejected"
+                                                      disabled="@(!isRejected)"
                                                       data-fv-required-when="Status=Rejected"
-                                                      data-fv-label="Verification notes"
                                                       data-fv-msg="Please give the reason for rejecting this document."
                                                       data-fv-msg-ar="يرجى ذكر سبب رفض هذا المستند."
                                                       class="form-control"
                                                       maxlength="1000"
                                                       rows="2"
-                                                      placeholder="Add review notes">@document.VerificationNotes</textarea>
+                                                      placeholder="Explain why this document was rejected">@document.VerificationNotes</textarea>
                                         </div>
 
                                         <button type="submit"
                                                 class="pg-btn pg-btn-primary">
-                                            Save Verification
+                                            Save Review
                                         </button>
+                                        <div class="document-review-result" role="status" aria-atomic="true"></div>
                                     </form>
                                 }
                                 else
                                 {
-                                    <span>
+                                    <span class="document-review-locked">
                                         Verification locked while approved.
                                     </span>
                                 }

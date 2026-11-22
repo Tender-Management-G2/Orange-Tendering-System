@@ -1,0 +1,253 @@
+body.so-shell.ws-shell[data-workspace-role="Admin"] .supplier-document-review.ws-panel {
+    container-type: inline-size;
+    background: var(--sod-card);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 6%);
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .supplier-document-review .pg-panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+
+.supplier-document-review .pg-panel-head p {
+    margin: 0;
+    color: var(--sod-muted);
+}
+
+.document-review-table.pg-table {
+    table-layout: fixed;
+    min-width: 0;
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-table :is(th, td) {
+    padding: 12px;
+    text-align: start;
+    vertical-align: middle;
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-table th {
+    color: var(--sod-ink);
+    white-space: normal;
+}
+
+.document-review-table th:nth-child(1) { width: 30%; }
+.document-review-table th:nth-child(2) { width: 14%; }
+.document-review-table th:nth-child(3) { width: 19%; }
+.document-review-table th:nth-child(4) { width: 14%; }
+.document-review-table th:nth-child(5) { width: 23%; }
+
+.document-review-table td {
+    overflow-wrap: anywhere;
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-table tbody tr:hover {
+    background: #ff790009;
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-table tbody tr:only-child > .document-review-empty[colspan] {
+    padding: 20px 12px;
+    font-size: var(--fs-caption);
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-table tbody tr:only-child > .document-review-empty[colspan]::before {
+    content: none;
+}
+
+.document-review-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 6px;
+    border: 1px solid var(--sod-border);
+    border-radius: 10px;
+    background: var(--sod-card-2);
+    color: var(--sod-ink);
+    text-decoration: none;
+}
+
+.document-review-file:hover,
+.document-review-file:focus-visible {
+    border-color: var(--ws-accent);
+    color: var(--sod-ink);
+}
+
+.document-review-file-type,
+.document-review-download {
+    display: grid;
+    flex: none;
+    place-items: center;
+    border-radius: 6px;
+}
+
+.document-review-file-type {
+    gap: 1px;
+    min-width: 34px;
+    padding: 3px;
+    background: var(--sod-card);
+    color: var(--sod-muted);
+    font-size: 9px;
+    font-weight: 750;
+    line-height: 1;
+}
+
+.document-review-file-type[data-file-style="pdf"] {
+    background: #e5533d17;
+    color: #ff8b7d;
+}
+
+.document-review-file-type[data-file-style="image"] {
+    background: #3b9eff17;
+    color: #82bdff;
+}
+
+:root[data-theme="light"] .document-review-file-type[data-file-style="pdf"] { color: #a62d20; }
+:root[data-theme="light"] .document-review-file-type[data-file-style="image"] { color: #225e96; }
+
+.document-review-file svg {
+    width: 17px;
+    height: 17px;
+}
+
+.document-review-filename {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.document-review-stem {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.document-review-download {
+    width: 30px;
+    height: 30px;
+    margin-inline-start: auto;
+    border: 1px solid var(--sod-border);
+    color: var(--sod-ink-2);
+}
+
+.document-review-file:hover .document-review-download,
+.document-review-file:focus-visible .document-review-download {
+    background: #ff790018;
+    color: var(--sod-ink);
+}
+
+.document-review-dates div + div { margin-top: 4px; }
+.document-review-dates span,
+.document-review-mobile-label,
+.document-review-locked { color: var(--sod-muted); }
+.document-review-dates span { margin-inline-end: 4px; }
+.document-review-mobile-label { display: none; }
+
+.document-review-status.ui-pill {
+    gap: 5px;
+    padding: 3px 8px;
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.document-review-status[data-status="Pending"] { background: #ff9a1f19; color: #ffbb6b; border-color: #ff9a1f40; }
+.document-review-status[data-status="Verified"] { background: #1fbf8019; color: #65dbac; border-color: #1fbf8040; }
+.document-review-status[data-status="Rejected"] { background: #e5533d19; color: #ff9183; border-color: #e5533d40; }
+:root[data-theme="light"] .document-review-status[data-status="Pending"] { color: #8a4800; }
+:root[data-theme="light"] .document-review-status[data-status="Verified"] { color: #165d40; }
+:root[data-theme="light"] .document-review-status[data-status="Rejected"] { color: #9d2418; }
+
+.document-review-form {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+}
+
+.document-review-form .pg-field { gap: 3px; }
+.document-review-notes[hidden] { display: none; }
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-form.pg-form :is(select, textarea) {
+    min-height: 36px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    font-size: var(--fs-sm);
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-form.pg-form textarea { min-height: 58px; }
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-form .pg-btn {
+    justify-self: start;
+    min-height: 33px;
+    padding-inline: 12px;
+    border-radius: 7px;
+    border: 1px solid #ff7900;
+    background: #ff7900;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-form .pg-btn:hover:not(:disabled) {
+    background: #ff912b;
+    box-shadow: none;
+    transform: none;
+}
+
+body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-form .pg-btn:disabled { cursor: wait; }
+.document-review-result { color: var(--sod-ink); font-size: 12px; }
+.document-review-result:empty { position: absolute; }
+.document-review-result[data-error] { color: #ff9183; }
+:root[data-theme="light"] .document-review-result[data-error] { color: #9d2418; }
+
+@container (max-width: 760px) {
+    body.so-shell.ws-shell[data-workspace-role="Admin"] .supplier-document-review .pg-table-wrap {
+        border: 0;
+        border-radius: 0;
+    }
+
+    .document-review-table.pg-table,
+    .document-review-table tbody { display: block; }
+
+    .document-review-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .document-review-table tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: start;
+        gap: 10px 12px;
+        padding: 12px;
+        border: 1px solid var(--sod-border);
+        border-radius: 10px;
+    }
+
+    .document-review-table tr + tr { margin-top: 10px; }
+    body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-table td {
+        display: block;
+        padding: 0;
+        border: 0;
+    }
+
+    .document-review-table .document-review-file-cell,
+    .document-review-table .document-review-controls,
+    .document-review-table .document-review-empty { grid-column: 1 / -1; }
+
+    body.so-shell.ws-shell[data-workspace-role="Admin"] .document-review-table .document-review-controls {
+        padding-top: 10px;
+        border-top: 1px solid var(--sod-border);
+    }
+
+    .document-review-mobile-label {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 12px;
+    }
+}

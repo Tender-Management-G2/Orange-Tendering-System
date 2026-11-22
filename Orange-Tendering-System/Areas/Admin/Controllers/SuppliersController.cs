@@ -108,10 +108,14 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
         public async Task<IActionResult> VerifyDocument(
             SupplierDocumentReviewViewModel model)
         {
+            var wantsJson = Request.Headers.Accept == "application/json";
             if (!ModelState.IsValid)
             {
-                TempData["ErrorMessage"] =
-                    "Please enter valid document review details.";
+                const string validationMessage = "Please enter valid document review details.";
+                if (wantsJson)
+                    return BadRequest(new { message = validationMessage });
+
+                TempData["ErrorMessage"] = validationMessage;
 
                 return RedirectToAction(nameof(Review),
                     new { id = model.SupplierId });
@@ -125,9 +129,7 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
             var result = await _adminService
                 .ReviewSupplierDocumentAsync(model, adminId);
 
-            TempData[result == "Success"
-                ? "SuccessMessage"
-                : "ErrorMessage"] = result switch
+            var message = result switch
                 {
                     "Success" => "Document review saved successfully.",
                     "NotFound" => "Document or supplier not found.",
@@ -140,12 +142,25 @@ namespace Orange_Tendering_System.Areas.Admin.Controllers
                         "Suspend the supplier before changing document verification.",
                     _ => "Unable to review the document."
                 };
+
+            if (wantsJson)
+            {
+                if (result != "Success")
+                    return BadRequest(new { message });
+
+                return Ok(new { message, status = model.Status.ToString() });
+            }
+
             if (result == "Success")
             {
                 TempData.Remove("SuccessMessage");
                 TempData.Orange(model.Status == DocumentVerificationStatus.Verified
                     ? OrangeFeedback.Toast("Document verified", "The document review is saved.", OrangeVariant.Approve)
                     : OrangeFeedback.Toast("Document review saved", $"The document is marked {model.Status}.", OrangeVariant.Return));
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
             }
 
             return RedirectToAction(nameof(Review),
