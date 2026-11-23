@@ -29,6 +29,7 @@ namespace Orange_Tendering_System.Data
         public DbSet<TenderItem> TenderItems => Set<TenderItem>();
         public DbSet<TenderInvitation> TenderInvitations => Set<TenderInvitation>();
         public DbSet<Bid> Bids => Set<Bid>();
+        public DbSet<BidBankGuarantee> BidBankGuarantees => Set<BidBankGuarantee>();
         public DbSet<BidItem> BidItems => Set<BidItem>();
 
         // Committees, evaluation and reports
@@ -121,6 +122,8 @@ namespace Orange_Tendering_System.Data
             builder.Entity<RoundDecision>();
             builder.Entity<ExternalSupplierInvitation>();
             builder.Entity<Bid>().ToTable(t => t.HasCheckConstraint("CK_Bids_TaxRate", "[TaxRate] IS NULL OR ([TaxRate] >= 0 AND [TaxRate] <= 100)"));
+            builder.Entity<BidBankGuarantee>().HasOne(g => g.Bid).WithOne(b => b.BankGuarantee)
+                .HasForeignKey<BidBankGuarantee>(g => g.BidId);
             builder.Entity<PreTenderReview>().ToTable(t => t.HasCheckConstraint("CK_PreTenderReview_Threshold", "[ApprovalsRequired] >= 1 AND [ApprovalsRequired] <= 4"));
 
             // Supplier and ApplicationUser are linked twice (account's company, and the Admin who reviewed it),

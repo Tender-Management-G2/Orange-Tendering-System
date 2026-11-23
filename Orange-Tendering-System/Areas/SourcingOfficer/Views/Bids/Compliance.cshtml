@@ -2,6 +2,10 @@
 @{ ViewData["Title"] = "Check offer requirements"; ViewData["WorkspaceSection"] = "Received Bids"; ViewData["Description"] = "Compare the offer with the tender's required documents and conditions."; }
 <div class="so-page">
     <partial name="_PageHeader" />
+    @if (ViewData["BankGuaranteeReview"] is Orange_Tendering_System.Services.BankGuaranteeVerification.Review guarantee)
+    {
+        <partial name="_BankGuaranteeReview" model="guarantee" />
+    }
     @if (TempData["ComplianceSaved"] is string saved) { <div class="so-alert" role="status">@saved</div> }
     <section class="ws-panel pg-panel">
         <div class="pg-panel-head">

@@ -131,12 +131,20 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             Require(!await Role(person!, i == 0 ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager), i == 0 ? "The Sourcing Manager seat is only for a dedicated Sourcing Manager, not an Evaluation Committee member." : "A Sourcing Manager cannot take a committee member seat.");
             if (i == 1) Require(person!.DepartmentId == pr!.DepartmentId, "Department representative must belong to the requesting department.");
         }
-        var requirements = JsonSerializer.Serialize(new { input.TechnicalRequirements, input.CommercialConditions, input.DeliveryExpectations, input.MandatoryCompliance });
+        var requirements = new Dictionary<string, string>
+        {
+            [nameof(input.TechnicalRequirements)] = input.TechnicalRequirements,
+            [nameof(input.CommercialConditions)] = input.CommercialConditions,
+            [nameof(input.DeliveryExpectations)] = input.DeliveryExpectations,
+            [nameof(input.MandatoryCompliance)] = input.MandatoryCompliance
+        };
         var requiredDocuments = (input.RequiredDocuments ?? []).Distinct().ToList();
+        AddGuaranteeRequirement(OfferDocumentTypes.LegalGuarantee, input.LegalGuaranteeMonths);
+        AddGuaranteeRequirement(OfferDocumentTypes.BankGuarantee, input.BankGuaranteeMonths);
         Require(requiredDocuments.All(k => OfferDocumentTypes.Find(k) != null), "Choose required documents from the list.");
         Require(requiredDocuments.Count > 0, "Choose at least one document every supplier must attach (for example the official quotation).");
         // The accepted request's items (with category, quantity, unit and specifications) become the official tender items unchanged.
-        var tender = new Tender { PurchaseRequestId = pr!.Id, Title = input.Title, Description = input.Description, Requirements = requirements,
+        var tender = new Tender { PurchaseRequestId = pr!.Id, Title = input.Title, Description = input.Description, Requirements = JsonSerializer.Serialize(requirements),
             RequiredDocuments = string.Join(",", requiredDocuments),
             CreatedByUserId = actor.Id, CreatedAt = Now, EstimatedValue = input.EstimatedValue, Currency = input.Currency, IsCritical = input.IsCritical,
             Items = pr.Items.Select(x => new TenderItem { Name = x.Name, CategoryId = x.CategoryId, Quantity = x.Quantity, Specifications = x.Specifications, Unit = x.Unit }).ToList() };
@@ -154,6 +162,19 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         else Audit(actor, tender.Id, "EvaluationCommitteeAssigned", new { Members = ids });
         Audit(actor, tender.Id, "RequirementsCreated", input);
         await db.SaveChangesAsync(); await tx.CommitAsync(); return tender.Id;
+
+        void AddGuaranteeRequirement(string key, int? validity)
+        {
+            var label = OfferDocumentTypes.Label(key).ToLowerInvariant();
+            if (validity is not int months)
+            {
+                Require(!requiredDocuments.Contains(key), $"Enter the minimum validity in months to require a {label}.");
+                return;
+            }
+            Require(months > 0, $"Enter a positive number of whole months for the {label}.");
+            if (!requiredDocuments.Contains(key)) requiredDocuments.Add(key);
+            requirements[key] = months == 1 ? "Minimum validity: 1 month" : $"Minimum validity: {months} months";
+        }
     }
     public Task RequestWeights(int id, ClaimsPrincipal principal) => Change(id, principal, "WeightRequestSent", async (t, a) =>
     {
@@ -272,6 +293,11 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             var invite = await db.TenderInvitations.Include(x => x.Supplier).SingleOrDefaultAsync(x => x.Id == input.InvitationId && x.TenderRoundId == r.Id && x.SupplierId == a.SupplierId);
             Require(await Role(a, SystemRoles.Supplier) && invite?.Status == InvitationStatus.Accepted && invite.Supplier.Status == SupplierStatus.Approved, "An accepted invitation and eligible supplier account are required.");
             Require(t.Status == TenderStatus.Bidding && r.Status == TenderRoundStatus.Open && r.Deadline > Now && w.State == WeightState.Approved, "Bidding is closed or weights are not approved.");
+            var requiredDocuments = OfferDocumentTypes.Parse(t.RequiredDocuments);
+            Require(!requiredDocuments.Contains(OfferDocumentTypes.LegalGuarantee),
+                "Open the supplier offer form to attach the required legal guarantee.");
+            Require(!requiredDocuments.Contains(OfferDocumentTypes.BankGuarantee),
+                "Open the supplier offer form to provide the required bank guarantee.");
             Require(!await db.Bids.AnyAsync(x => x.TenderInvitationId == input.InvitationId), "This invitation already has a bid. Submitted bids are immutable; revision policy is required.");
             var items = await db.TenderItems.Where(x => x.TenderId == id).ToListAsync();
             Require(input.Lines.Count == items.Count && input.Lines.Select(x => x.TenderItemId).Distinct().Count() == items.Count && input.Lines.All(x => items.Any(y => y.Id == x.TenderItemId) && x.UnitPrice.HasValue && x.UnitPrice >= 0 && decimal.Round(x.UnitPrice.Value, 2) == x.UnitPrice), "Price every tender item exactly once using two decimal places.");
@@ -302,6 +328,17 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             Require(bid.DeliveryDays is > 0 && bid.Items.Count > 0 && bid.Items.All(i => i.Quantity > 0 && i.UnitPrice > 0),
                 "Complete the delivery days and positive quantities and prices.");
             Require(!bid.ValidUntil.HasValue || bid.ValidUntil.Value.Date >= Now.Date, "Offer validity has expired.");
+            var requiredDocuments = OfferDocumentTypes.Parse(t.RequiredDocuments);
+            if (requiredDocuments.Contains(OfferDocumentTypes.LegalGuarantee))
+                Require(await db.Documents.AnyAsync(d => d.BidId == bid.Id && d.DocumentType == OfferDocumentTypes.LegalGuarantee),
+                    "Required document missing: Legal guarantee.");
+            if (requiredDocuments.Contains(OfferDocumentTypes.BankGuarantee))
+            {
+                var guarantee = await db.BidBankGuarantees.AsNoTracking().SingleOrDefaultAsync(g => g.BidId == bid.Id);
+                Require(BankGuaranteeVerification.HasCompleteDetails(guarantee), "Complete the required bank guarantee details in the supplier offer form.");
+                Require(await db.Documents.AnyAsync(d => d.BidId == bid.Id && d.DocumentType == OfferDocumentTypes.BankGuarantee && d.ContentType == "application/pdf"),
+                    "Required document missing: Bank guarantee (PDF).");
+            }
             Require(bid.ShippingCost >= 0 && bid.InstallationCost >= 0 && bid.MaintenanceCost >= 0 && bid.TaxAmount >= 0 && bid.OtherCost >= 0, "Offer costs cannot be negative.");
             var expected = await db.TenderItems.Where(i => i.TenderId == t.Id).Select(i => i.Id).ToListAsync();
             Require(expected.Order().SequenceEqual(bid.Items.Select(i => i.TenderItemId).Order()), "Price every tender item exactly once.");

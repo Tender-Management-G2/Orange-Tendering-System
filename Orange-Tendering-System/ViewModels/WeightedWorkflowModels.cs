@@ -22,6 +22,10 @@ public class RequirementsInput
     public bool IsCritical { get; set; }
     // Offer document types every supplier must attach (OfferDocumentTypes keys).
     public List<string> RequiredDocuments { get; set; } = [];
+    [Range(1, int.MaxValue, ErrorMessage = "Enter a positive number of whole months for the legal guarantee.")]
+    public int? LegalGuaranteeMonths { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Enter a positive number of whole months for the bank guarantee.")]
+    public int? BankGuaranteeMonths { get; set; }
 }
 public sealed class TechnicalCriterionInput
 {

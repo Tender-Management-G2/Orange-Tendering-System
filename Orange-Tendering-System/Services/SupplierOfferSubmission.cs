@@ -35,6 +35,8 @@ public sealed partial class SupplierOfferService
             ItemContext = tender.Items.OrderBy(x => x.Id).Select(x => new OfferItemContext(x.Id, x.Name, x.Category?.Name, x.Specifications, x.Quantity, x.Unit)).ToList(),
             ExistingDocuments = draft?.Documents.Select(d => new SupplierDocumentViewModel { Id = d.Id, FileName = d.FileName, DocumentType = d.DocumentType, SizeBytes = d.SizeBytes, UploadedAt = d.UploadedAt }).ToList() ?? []
         };
+        if (draft != null && model.RequiredDocuments.Contains(OfferDocumentTypes.BankGuarantee))
+            draft.BankGuarantee = await context.BidBankGuarantees.AsNoTracking().SingleOrDefaultAsync(g => g.BidId == draft.Id);
         model.Input = draft == null ? new SupplierDraftOfferInputModel { ValidUntil = (invitation.TenderRound.Deadline ?? workflow.Now).Date.AddDays(90) } : ToInput(draft);
         if (model.RequiredCurrency != null) model.Input.CurrencyCode = model.RequiredCurrency;
         model.Input.Items = tender.Items.OrderBy(x => x.Id).Select(x =>
@@ -51,7 +53,9 @@ public sealed partial class SupplierOfferService
     {
         var rows = new List<(string, string)>();
         var labels = new Dictionary<string, string> { ["TechnicalRequirements"] = "Technical requirements", ["CommercialConditions"] = "Commercial conditions",
-            ["DeliveryExpectations"] = "Delivery", ["MandatoryCompliance"] = "Mandatory requirements" };
+            ["DeliveryExpectations"] = "Delivery", ["MandatoryCompliance"] = "Mandatory requirements",
+            [OfferDocumentTypes.LegalGuarantee] = OfferDocumentTypes.Label(OfferDocumentTypes.LegalGuarantee),
+            [OfferDocumentTypes.BankGuarantee] = OfferDocumentTypes.Label(OfferDocumentTypes.BankGuarantee) };
         try
         {
             using var json = JsonDocument.Parse(tender.Requirements ?? "{}");
@@ -69,7 +73,12 @@ public sealed partial class SupplierOfferService
         IncludeMaintenance = bid.MaintenanceCost > 0, MaintenanceCost = bid.MaintenanceCost, MaintenanceDescription = bid.MaintenanceDescription,
         IncludeOther = bid.OtherCost > 0, OtherCost = bid.OtherCost, OtherCostDescription = bid.OtherCostDescription,
         TaxMode = bid.TaxRate.HasValue ? "Rate" : "Amount", TaxRate = bid.TaxRate, TaxIncludesCharges = bid.TaxIncludesCharges, TaxAmount = bid.TaxAmount,
-        WarrantyMonths = bid.WarrantyMonths, WarrantyType = bid.WarrantyType, WarrantyTerms = bid.WarrantyTerms, Deviations = bid.Deviations, AfterSalesSupport = bid.AfterSalesSupport
+        WarrantyMonths = bid.WarrantyMonths, WarrantyType = bid.WarrantyType, WarrantyTerms = bid.WarrantyTerms, Deviations = bid.Deviations, AfterSalesSupport = bid.AfterSalesSupport,
+        BankGuarantee = bid.BankGuarantee is { } guarantee ? new BankGuaranteeInput
+        {
+            Issuer = guarantee.Issuer, Number = guarantee.Number, Amount = guarantee.Amount,
+            Currency = guarantee.Currency, ExpiresOn = guarantee.ExpiresOn
+        } : new()
     };
 
     public sealed record UploadedOfferFile(string DocumentType, string FileName, string ContentType, byte[] Bytes);
@@ -109,10 +118,21 @@ public sealed partial class SupplierOfferService
             var current = await context.Bids.Include(b => b.Items).Include(b => b.Documents).Where(b => b.TenderInvitationId == invitationId).ToListAsync();
             if (current.Any(b => b.Status != BidStatus.Draft)) return (null, ["This offer was already submitted. Submitted offers cannot be changed."]);
             var target = current.FirstOrDefault();
+            if (target != null && bid.BankGuarantee != null)
+                await context.Entry(target).Reference(b => b.BankGuarantee).LoadAsync();
             if (expectedDraftHash != null && (target == null || DraftFingerprint(target) != expectedDraftHash))
                 return (null, ["The draft changed. Review it again before confirming submission."]);
             if (target == null) { target = new Bid { TenderInvitationId = invitationId, RevisionNumber = 1, Status = BidStatus.Draft, CreatedAt = workflow.Now }; context.Bids.Add(target); }
             CopyTerms(bid, target);
+            if (bid.BankGuarantee is { } guarantee)
+            {
+                var saved = target.BankGuarantee ??= new();
+                saved.Issuer = guarantee.Issuer;
+                saved.Number = guarantee.Number;
+                saved.Amount = guarantee.Amount;
+                saved.Currency = guarantee.Currency;
+                saved.ExpiresOn = guarantee.ExpiresOn;
+            }
             context.BidItems.RemoveRange(target.Items.Where(i => bid.Items.All(n => n.TenderItemId != i.TenderItemId)));
             foreach (var line in bid.Items)
             {
@@ -233,6 +253,34 @@ public sealed partial class SupplierOfferService
         var kept = form.ExistingDocuments.Where(d => !input.RemoveDocumentIds.Contains(d.Id)).ToList();
         if (submit) foreach (var key in form.RequiredDocuments)
             if (files.All(f => f.DocumentType != key) && kept.All(d => d.DocumentType != key)) errors.Add($"Required document missing: {OfferDocumentTypes.Label(key)}.");
+        var bankFiles = files.Count(f => f.DocumentType == OfferDocumentTypes.BankGuarantee);
+        if (form.RequiredDocuments.Contains(OfferDocumentTypes.BankGuarantee))
+        {
+            var guarantee = input.BankGuarantee;
+            bid.BankGuarantee = new BidBankGuarantee
+            {
+                Issuer = Text(guarantee.Issuer, 40, "Bank issuer", false),
+                Number = Text(guarantee.Number, 40, "Bank guarantee number", false)?.ToUpperInvariant(),
+                Amount = guarantee.Amount,
+                Currency = Text(guarantee.Currency, 3, "Bank guarantee currency", false),
+                ExpiresOn = guarantee.ExpiresOn
+            };
+            if (bid.BankGuarantee.Issuer is not (null or BankGuaranteeVerification.IssuerCode))
+                errors.Add("Choose the demo bank shown on the offer form.");
+            if (bid.BankGuarantee.Currency != null && !CurrencyRules.Offer.Contains(bid.BankGuarantee.Currency))
+                errors.Add("Choose a supported currency for the bank guarantee.");
+            if (guarantee.Amount is decimal amount && (amount <= 0 || amount > 999999999 ||
+                decimal.Round(amount, CurrencyRules.Decimals(bid.BankGuarantee.Currency)) != amount))
+                errors.Add("Enter a valid positive amount for the bank guarantee.");
+            if (submit && !BankGuaranteeVerification.HasCompleteDetails(bid.BankGuarantee))
+                errors.Add("Complete the bank guarantee issuer, number, amount, currency and expiration date.");
+            if (bankFiles + kept.Count(d => d.DocumentType == OfferDocumentTypes.BankGuarantee) > 1)
+                errors.Add("Attach one bank guarantee PDF. Remove the saved copy before replacing it.");
+        }
+        else if (bankFiles > 0)
+        {
+            errors.Add("This tender does not request a bank guarantee.");
+        }
         if (files.Count > MaxFiles || files.Sum(f => (long)f.Bytes.Length) > MaxTotalBytes) errors.Add($"Attach at most {MaxFiles} files, {MaxTotalBytes / 1024 / 1024} MB in total.");
         return bid;
     }
@@ -262,6 +310,8 @@ public sealed partial class SupplierOfferService
         };
         if (documentType == "ReferenceImage" && type is not ("image/png" or "image/jpeg"))
             return (null, $"{name}: product images must be valid PNG or JPEG files.");
+        if (documentType == OfferDocumentTypes.BankGuarantee && type != "application/pdf")
+            return (null, $"{name}: the bank guarantee must be a valid PDF.");
         return type == null ? (null, $"{name}: only valid PDF, PNG or JPEG files are accepted.") : (new UploadedOfferFile(documentType, name, type, bytes), null);
     }
 }

@@ -99,10 +99,37 @@
             @foreach (var kind in OfferDocumentTypes.All.Where(kind => Model.RequiredDocuments.Contains(kind.Key)))
             {
                 var existing = Model.ExistingDocuments.Where(d => d.DocumentType == kind.Key && (kind.Key != "ReferenceImage" || !d.FileName.StartsWith("Item-", StringComparison.Ordinal))).ToList();
+                var isBankGuarantee = kind.Key == OfferDocumentTypes.BankGuarantee;
+                var extensions = isBankGuarantee ? ".pdf" : kind.Key == "ReferenceImage" ? ".png,.jpg,.jpeg" : ".pdf,.png,.jpg,.jpeg";
                 <div class="soffer-doc" data-doc data-required="true" data-key="@kind.Key">
                     <div class="soffer-doc-name"><span aria-hidden="true">▤</span><strong>@kind.Label</strong><em>Required</em></div>
+                    @if (isBankGuarantee || kind.Key == OfferDocumentTypes.LegalGuarantee)
+                    {
+                        var validity = Model.Requirements.FirstOrDefault(requirement => requirement.Label == kind.Label).Value;
+                        <small>@validity</small>
+                    }
+                    @if (isBankGuarantee)
+                    {
+                        <div class="soffer-optional-grid">
+                            <label>Issuing bank
+                                <select asp-for="Input.BankGuarantee.Issuer" required>
+                                    <option value="">Choose issuing bank</option>
+                                    <option value="@BankGuaranteeVerification.IssuerCode">@BankGuaranteeVerification.IssuerName</option>
+                                </select>
+                            </label>
+                            <label>Guarantee number <input asp-for="Input.BankGuarantee.Number" maxlength="40" required /></label>
+                            <label>Guarantee amount <input asp-for="Input.BankGuarantee.Amount" type="number" min="0.001" max="999999999" step="0.001" required /></label>
+                            <label>Guarantee currency
+                                <select asp-for="Input.BankGuarantee.Currency" required>
+                                    <option value="">Choose currency</option>
+                                    @foreach (var currency in CurrencyRules.Offer) { <option value="@currency">@currency</option> }
+                                </select>
+                            </label>
+                            <label>Expiration date <input asp-for="Input.BankGuarantee.ExpiresOn" type="date" required /></label>
+                        </div>
+                    }
                     <ul data-doc-list>@foreach (var document in existing) { <li data-existing><span>@document.FileName <small>(@((document.SizeBytes / 1024.0).ToString("0")) KB, saved)</small></span><label><input type="checkbox" name="Input.RemoveDocumentIds" value="@document.Id" /> remove</label></li> }</ul>
-                    <label class="soffer-file-button">Choose File<input type="file" name="doc_@kind.Key" multiple accept="@(kind.Key == "ReferenceImage" ? ".png,.jpg,.jpeg" : ".pdf,.png,.jpg,.jpeg")" data-doc-input /></label>
+                    <label class="soffer-file-button">Choose File<input type="file" name="doc_@kind.Key" multiple="@(!isBankGuarantee)" accept="@extensions" data-doc-input /></label>
                 </div>
             }
         </div>

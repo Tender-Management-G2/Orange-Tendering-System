@@ -80,10 +80,21 @@ public sealed class SupplierDraftOfferInputModel
     [StringLength(2000)]
     public string? AfterSalesSupport { get; set; }
 
+    public BankGuaranteeInput BankGuarantee { get; set; } = new();
+
     // Existing attachments of a draft the supplier removes before submitting.
     public List<int> RemoveDocumentIds { get; set; } = new();
 
     public List<SupplierDraftItemInputModel> Items { get; set; } = new();
+}
+
+public sealed class BankGuaranteeInput
+{
+    [StringLength(40)] public string? Issuer { get; set; }
+    [StringLength(40)] public string? Number { get; set; }
+    public decimal? Amount { get; set; }
+    [StringLength(3)] public string? Currency { get; set; }
+    public DateOnly? ExpiresOn { get; set; }
 }
 
 public sealed class SupplierDraftItemInputModel

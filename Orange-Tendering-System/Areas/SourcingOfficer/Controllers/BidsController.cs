@@ -3,6 +3,7 @@
 // Module: Sourcing Officer / Bid Management
 // Purpose: MVC endpoints for the Bids pages of the Sourcing Officer workspace.
 // Compatibility GET routes: use the persisted, authorized weighted workflow.
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ namespace Orange_Tendering_System.Areas.SourcingOfficer.Controllers;
 
 [Area("SourcingOfficer")]
 [Authorize(Roles = SystemRoles.SourcingOfficer)]
-public class BidsController(ApplicationDbContext db, TenderWorkflowService workflow) : Controller
+public class BidsController(ApplicationDbContext db, TenderWorkflowService workflow, BankGuaranteeVerification verification, IConfiguration configuration) : Controller
 {
     public async Task<IActionResult> Index(int? id)
     {
@@ -71,6 +72,7 @@ public class BidsController(ApplicationDbContext db, TenderWorkflowService workf
     public async Task<IActionResult> Details(int id)
     {
         var bid = await db.Bids.AsNoTracking().Include(b => b.TenderInvitation).ThenInclude(i => i.Supplier).Include(b => b.TenderInvitation.TenderRound).ThenInclude(r => r.Tender).Include(b => b.Items).ThenInclude(i => i.TenderItem).Include(b => b.Documents).SingleOrDefaultAsync(b => b.Id == id);
+        if (bid != null) await AddBankGuaranteeReview(bid);
         return bid == null ? NotFound() : View(bid);
     }
 
@@ -81,7 +83,30 @@ public class BidsController(ApplicationDbContext db, TenderWorkflowService workf
             .Include(b => b.TenderInvitation).ThenInclude(i => i.TenderRound).ThenInclude(r => r.Tender)
             .Include(b => b.Documents)
             .SingleOrDefaultAsync(b => b.Id == id && b.Status == BidStatus.Submitted);
+        if (bid != null) await AddBankGuaranteeReview(bid);
         return bid == null ? NotFound() : View(bid);
+    }
+
+    private async Task AddBankGuaranteeReview(Bid bid)
+    {
+        var tender = bid.TenderInvitation.TenderRound.Tender;
+        if (bid.Status != BidStatus.Submitted || tender.CreatedByUserId != User.FindFirstValue(ClaimTypes.NameIdentifier))
+            return;
+        var document = bid.Documents.SingleOrDefault(d => d.DocumentType == OfferDocumentTypes.BankGuarantee && d.ContentType == "application/pdf");
+        if (document == null) return;
+
+        var guarantee = await db.BidBankGuarantees.AsNoTracking().SingleOrDefaultAsync(g => g.BidId == bid.Id);
+        if (guarantee == null || !BankGuaranteeVerification.HasCompleteDetails(guarantee)) return;
+
+        var token = verification.IssueLinkToken(guarantee);
+        var path = Url.RouteUrl(BankGuaranteeVerification.RouteName, new { area = "", token })!;
+        var origin = $"{Request.Scheme}://{Request.Host}";
+        if (Uri.TryCreate(configuration["BankGuarantees:PublicOrigin"], UriKind.Absolute, out var configured)
+            && configured.Scheme == Uri.UriSchemeHttps && configured.AbsolutePath == "/"
+            && configured.UserInfo.Length == 0 && configured.Query.Length == 0 && configured.Fragment.Length == 0)
+            origin = configured.GetLeftPart(UriPartial.Authority);
+        ViewData["BankGuaranteeReview"] = new BankGuaranteeVerification.Review(document.Id, path,
+            BankGuaranteeVerification.QrImage(origin + path));
     }
 
     [HttpPost, ValidateAntiForgeryToken]

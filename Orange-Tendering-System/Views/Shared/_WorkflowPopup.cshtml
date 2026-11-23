@@ -64,7 +64,9 @@
     try
     {
         using var reqDoc = JsonDocument.Parse(Model.Tender.Requirements ?? "");
-        var labels = new Dictionary<string, string> { ["TechnicalRequirements"] = "Technical", ["CommercialConditions"] = "Commercial", ["DeliveryExpectations"] = "Delivery", ["MandatoryCompliance"] = "Compliance" };
+        var labels = new Dictionary<string, string> { ["TechnicalRequirements"] = "Technical", ["CommercialConditions"] = "Commercial", ["DeliveryExpectations"] = "Delivery", ["MandatoryCompliance"] = "Compliance",
+            [OfferDocumentTypes.LegalGuarantee] = OfferDocumentTypes.Label(OfferDocumentTypes.LegalGuarantee),
+            [OfferDocumentTypes.BankGuarantee] = OfferDocumentTypes.Label(OfferDocumentTypes.BankGuarantee) };
         foreach (var prop in reqDoc.RootElement.EnumerateObject()) requirementRows.Add((labels.TryGetValue(prop.Name, out var l) ? l : prop.Name, prop.Value.ToString()));
     }
     catch { requirementRows.Clear(); }

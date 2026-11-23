@@ -265,6 +265,8 @@ public sealed partial class AgentTools
     {
         var bid = await db.Bids.AsNoTracking().Include(b => b.Items).ThenInclude(i => i.TenderItem).Include(b => b.Documents)
             .SingleAsync(b => b.TenderInvitationId == invitationId && b.Status == BidStatus.Draft);
+        if (bid.Documents.Any(d => d.DocumentType == OfferDocumentTypes.BankGuarantee))
+            bid.BankGuarantee = await db.BidBankGuarantees.AsNoTracking().SingleOrDefaultAsync(g => g.BidId == bid.Id);
         values["draftHash"] = SupplierOfferService.DraftFingerprint(bid);
         return "\n" + BidDetails(bid, ar);
     }

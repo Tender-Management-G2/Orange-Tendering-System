@@ -50,7 +50,9 @@ public partial class TenderWorkflowService
         {
             using var json = JsonDocument.Parse(t.Requirements ?? "{}");
             var labels = new Dictionary<string, string> { ["TechnicalRequirements"] = "Technical requirements", ["CommercialConditions"] = "Commercial conditions",
-                ["DeliveryExpectations"] = "Delivery expectations", ["MandatoryCompliance"] = "Mandatory requirements" };
+                ["DeliveryExpectations"] = "Delivery expectations", ["MandatoryCompliance"] = "Mandatory requirements",
+                [OfferDocumentTypes.LegalGuarantee] = OfferDocumentTypes.Label(OfferDocumentTypes.LegalGuarantee),
+                [OfferDocumentTypes.BankGuarantee] = OfferDocumentTypes.Label(OfferDocumentTypes.BankGuarantee) };
             foreach (var p in json.RootElement.EnumerateObject())
                 if (p.Value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(p.Value.GetString()))
                     requirements.Add((labels.GetValueOrDefault(p.Name, p.Name), p.Value.GetString()!));

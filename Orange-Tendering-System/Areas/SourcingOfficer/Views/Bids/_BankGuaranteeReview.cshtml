@@ -1,0 +1,10 @@
+@model Orange_Tendering_System.Services.BankGuaranteeVerification.Review
+<section class="ws-panel pg-panel" aria-labelledby="bank-guarantee-review-title">
+    <h2 id="bank-guarantee-review-title">Bank guarantee</h2>
+    <p>Scan the QR code or open the issuing bank's demo verification portal.</p>
+    <img src="@Model.QrImage" width="144" height="144" alt="QR code for bank guarantee verification" />
+    <div class="so-actions">
+        <a href="@Model.VerificationPath" class="pg-btn pg-btn-primary" target="_blank" rel="noopener noreferrer">Verify guarantee</a>
+        <a asp-controller="Workflow" asp-action="Download" asp-route-id="@Model.DocumentId" class="pg-btn">Download guarantee PDF</a>
+    </div>
+</section>
