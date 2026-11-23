@@ -1,0 +1,77 @@
+@using System.Globalization
+@using Orange_Tendering_System.Services
+@model BankGuaranteeVerification.Result
+@{
+    Layout = null;
+    var arabic = CultureInfo.GetCultureInfo("ar-JO");
+    var (title, description, tone) = Model.State switch
+    {
+        BankGuaranteeVerification.Status.Matched => ("الكفالة مطابقة وسارية", "رقم الكفالة ومبلغها وعملتها وتاريخ انتهائها تطابق سجل المحاكاة، والكفالة ضمن مدة سريانها.", "success"),
+        BankGuaranteeVerification.Status.Expired => ("الكفالة منتهية", "بيانات الكفالة تطابق سجل المحاكاة، لكن تاريخ انتهائها قد مضى.", "warning"),
+        BankGuaranteeVerification.Status.NoMatch => ("تعذّر تأكيد بيانات الكفالة", "قد يكون رقم الكفالة غير موجود في سجل المحاكاة، أو قد يختلف المبلغ أو العملة أو تاريخ الانتهاء. راجع بيانات العرض وقارنها بالكفالة المرفقة.", "warning"),
+        _ => ("رابط التحقق غير متاح", "افتح مراجعة العرض لإنشاء رابط تحقق جديد.", "warning")
+    };
+}
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>محاكاة التحقق من الكفالة البنكية | @BankGuaranteeVerification.IssuerNameArabic</title>
+    <link rel="stylesheet" href="~/css/bank-guarantee-portal.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="bank-site-header">
+        <div class="bank-utility">
+            <div class="bank-container">مشروع <bdi lang="en">Orange Tendering</bdi></div>
+        </div>
+        <div class="bank-container bank-brand">
+            <div class="bank-identity">
+                <strong>@BankGuaranteeVerification.IssuerNameArabic</strong>
+                <span lang="en" dir="ltr">@BankGuaranteeVerification.IssuerName</span>
+            </div>
+            <span class="bank-demo-label">محاكاة تعليمية</span>
+        </div>
+    </header>
+    <main>
+        <section class="bank-hero" aria-labelledby="bank-title">
+            <div class="bank-container bank-hero-inner">
+                <div class="bank-hero-copy">
+                    <h1 id="bank-title">التحقق من الكفالة البنكية</h1>
+                    <p>نعرض نتيجة مطابقة بيانات الكفالة مع سجل إصدارات تدريبي.</p>
+                </div>
+                <div class="bank-hero-art" aria-hidden="true">
+                    <div class="bank-paper"><span></span><span></span><span></span></div>
+                    <span class="bank-paper-seal"></span>
+                </div>
+            </div>
+        </section>
+        <div class="bank-container bank-main">
+            <section class="bank-result bank-result-@tone" aria-labelledby="bank-result-title" data-verification-state="@Model.State">
+                <span class="bank-result-mark" aria-hidden="true">@(tone == "success" ? "✓" : "!")</span>
+                <h2 id="bank-result-title">@title</h2>
+                <p>@description</p>
+                @if (Model.State == BankGuaranteeVerification.Status.NoMatch)
+                {
+                    <a class="bank-demo-link" asp-controller="BankGuaranteePortal" asp-action="Demo">شاهد مثالًا لكفالة مطابقة</a>
+                }
+            </section>
+            @if (Model.Issued is { } issued)
+            {
+                <section class="bank-record" aria-labelledby="bank-record-title">
+                    <h2 id="bank-record-title">بيانات الكفالة</h2>
+                    <dl>
+                        <div><dt>رقم الكفالة</dt><dd><bdi>@issued.Number</bdi></dd></div>
+                        <div><dt>البنك المُصدر في المحاكاة</dt><dd>@BankGuaranteeVerification.IssuerNameArabic</dd></div>
+                        <div><dt>قيمة الكفالة</dt><dd><bdi>@CurrencyRules.Format(issued.Amount, issued.Currency)</bdi></dd></div>
+                        <div><dt>تاريخ انتهاء السريان</dt><dd><time datetime="@issued.ExpiresOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@issued.ExpiresOn.ToString("d MMMM yyyy", arabic)</time></dd></div>
+                    </dl>
+                </section>
+            }
+        </div>
+    </main>
+    <footer class="bank-footer">
+        <div class="bank-container">تستخدم هذه الصفحة بيانات تدريبية مستقلة عن أنظمة بنك الإسكان.</div>
+    </footer>
+</body>
+</html>

@@ -57,6 +57,7 @@ builder.Services.AddTransient<SmtpEmailSender>();
 builder.Services.AddTransient<IEmailSender>(services => services.GetRequiredService<SmtpEmailSender>());
 builder.Services.AddScoped<EmployeeProvisioning>();
 builder.Services.AddSingleton<AccountLinkGenerator>();
+builder.Services.AddSingleton<BankGuaranteeVerification>();
 
 builder.Services.AddControllersWithViews(options => options.Filters.Add<OrangeMotionResultFilter>());
 builder.Services.AddBiometrics(builder.Configuration);

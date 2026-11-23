@@ -86,5 +86,6 @@ namespace Orange_Tendering_System.Models.Entities
 
         public ICollection<BidItem> Items { get; set; } = new List<BidItem>();
         public ICollection<Document> Documents { get; set; } = new List<Document>();
+        public BidBankGuarantee? BankGuarantee { get; set; }
     }
 }

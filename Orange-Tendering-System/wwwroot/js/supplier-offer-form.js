@@ -104,11 +104,15 @@
             var input = card.querySelector('[data-doc-input]');
             Array.prototype.forEach.call(input.files, function (f) {
                 count++; total += f.size;
-                if (card.dataset.key === 'ReferenceImage' ? !/\.(png|jpe?g)$/i.test(f.name) : !/\.(pdf|png|jpe?g)$/i.test(f.name))
+                if (card.dataset.key === 'BankGuarantee' && !/\.pdf$/i.test(f.name))
+                    problems.push(f.name + ': the bank guarantee must be a PDF.');
+                else if (card.dataset.key === 'ReferenceImage' ? !/\.(png|jpe?g)$/i.test(f.name) : !/\.(pdf|png|jpe?g)$/i.test(f.name))
                     problems.push(f.name + (card.dataset.key === 'ReferenceImage' ? ': only PNG or JPEG images.' : ': only PDF, PNG or JPEG.'));
                 if (f.size > MAX_FILE) problems.push(f.name + ': larger than 10 MB.');
             });
             var kept = card.querySelectorAll('[data-existing] input:not(:checked)').length;
+            if (card.dataset.key === 'BankGuarantee' && input.files.length + kept > 1)
+                problems.push('Remove the saved bank guarantee before replacing its PDF.');
             if (card.dataset.required === 'true' && input.files.length + kept + (card.dataset.key === 'ReferenceImage' ? imageCount + savedImageCount : 0) === 0) problems.push(card.querySelector('.soffer-doc-name strong').textContent + ' is required.');
         });
         if (count > MAX_FILES) problems.push('Attach at most ' + MAX_FILES + ' files.');

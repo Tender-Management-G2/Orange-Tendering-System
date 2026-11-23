@@ -90,8 +90,18 @@
                     <label class="tc-field"><span>Currency</span>
                         <select asp-for="Currency" required>@foreach (var c in currencies) { <option value="@c" selected="@(Model.Currency == c)">@c</option> }</select></label>
                     <fieldset class="tc-field tc-wide"><span>Documents every supplier must attach</span>
-                        <div class="tc-docs" style="display:flex;flex-wrap:wrap;gap:8px 16px">@foreach (var kind in Orange_Tendering_System.ViewModels.OfferDocumentTypes.All) { <label class="tc-doc"><input type="checkbox" name="RequiredDocuments" value="@kind.Key" @(kind.Key is "OfficialQuotation" or "TechnicalProposal" ? "checked" : null) /> @kind.Label</label> }</div>
+                        <div class="tc-docs" style="display:flex;flex-wrap:wrap;gap:8px 16px">@foreach (var kind in OfferDocumentTypes.All.Where(kind => kind.Key is not (OfferDocumentTypes.LegalGuarantee or OfferDocumentTypes.BankGuarantee))) { <label class="tc-doc"><input type="checkbox" name="RequiredDocuments" value="@kind.Key" @(kind.Key is "OfficialQuotation" or "TechnicalProposal" ? "checked" : null) /> @kind.Label</label> }</div>
                         <small>Suppliers see these as mandatory uploads; an offer without them cannot be submitted.</small></fieldset>
+                    <label class="tc-field tc-wide">
+                        <span>Legal guarantee validity (months)</span>
+                        <input asp-for="LegalGuaranteeMonths" type="number" min="1" step="1" aria-describedby="tc-legal-guarantee-hint" />
+                        <small id="tc-legal-guarantee-hint">Enter the minimum validity to require a legal guarantee with each offer. Leave blank if this tender does not need one.</small>
+                    </label>
+                    <label class="tc-field tc-wide">
+                        <span>Bank guarantee validity (months)</span>
+                        <input asp-for="BankGuaranteeMonths" type="number" min="1" step="1" aria-describedby="tc-bank-guarantee-hint" />
+                        <small id="tc-bank-guarantee-hint">Enter the minimum validity to require a bank guarantee with each offer. Leave blank if it is optional.</small>
+                    </label>
                     <label class="tc-switch tc-wide"><input asp-for="IsCritical" /><i aria-hidden="true"></i><span><strong>Critical procurement</strong><small>Used only by an explicitly configured final-approval policy.</small></span></label>
                 </div>
             </section>

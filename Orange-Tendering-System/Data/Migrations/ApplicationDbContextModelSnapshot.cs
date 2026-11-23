@@ -803,6 +803,35 @@ namespace Orange_Tendering_System.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.BidBankGuarantee", b =>
+                {
+                    b.Property<int>("BidId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(19, 3)
+                        .HasColumnType("decimal(19,3)");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateOnly?>("ExpiresOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Issuer")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Number")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("BidId");
+
+                    b.ToTable("BidBankGuarantees");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.BidItem", b =>
                 {
                     b.Property<int>("Id")
@@ -3304,6 +3333,17 @@ namespace Orange_Tendering_System.Data.Migrations
                     b.Navigation("TenderInvitation");
                 });
 
+            modelBuilder.Entity("Orange_Tendering_System.Models.Entities.BidBankGuarantee", b =>
+                {
+                    b.HasOne("Orange_Tendering_System.Models.Entities.Bid", "Bid")
+                        .WithOne("BankGuarantee")
+                        .HasForeignKey("Orange_Tendering_System.Models.Entities.BidBankGuarantee", "BidId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Bid");
+                });
+
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.BidItem", b =>
                 {
                     b.HasOne("Orange_Tendering_System.Models.Entities.Bid", "Bid")
@@ -4130,6 +4170,8 @@ namespace Orange_Tendering_System.Data.Migrations
 
             modelBuilder.Entity("Orange_Tendering_System.Models.Entities.Bid", b =>
                 {
+                    b.Navigation("BankGuarantee");
+
                     b.Navigation("Documents");
 
                     b.Navigation("Items");

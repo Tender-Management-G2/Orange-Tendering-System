@@ -300,10 +300,21 @@ public static class WorkflowRedesignChecks
 
         // ---- Tender preparation, weight revision and direct bidding ----
         int id = 0;
-        await Flow(async w => id = await w.Create(new RequirementsInput { PurchaseRequestId = prId, Title = pr.Title, Description = "Laptops and switch", TechnicalRequirements = "Meet item specifications",
+        var tenderInput = new RequirementsInput { PurchaseRequestId = prId, Title = pr.Title, Description = "Laptops and switch", TechnicalRequirements = "Meet item specifications",
             CommercialConditions = "Prices in JOD", DeliveryExpectations = "30 days", MandatoryCompliance = "Signed quotation", SourcingManagerId = manager.Id, DepartmentRepresentativeId = depRep.Id,
-            FinancialRepresentativeId = fin.Id, TechnicalRepresentativeId = tech.Id, EstimatedValue = 2000, Currency = "JOD", RequiredDocuments = ["OfficialQuotation", "ProductDatasheet"] }, P(officer)));
-        Check(await Read(d => d.TenderItems.Where(i => i.TenderId == id).AllAsync(i => i.CategoryId != null)) && await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.RequiredDocuments == "OfficialQuotation,ProductDatasheet")),
+            FinancialRepresentativeId = fin.Id, TechnicalRepresentativeId = tech.Id, EstimatedValue = 2000, Currency = "JOD", RequiredDocuments = ["OfficialQuotation", "ProductDatasheet"] };
+        using (var officerClient = await Login(officer))
+        {
+            var tenderForm = await officerClient.GetStringAsync($"/SourcingOfficer/Workflow?request={prId}");
+            Check(tenderForm.Contains("name=\"LegalGuaranteeMonths\"") && tenderForm.Contains("Legal guarantee validity (months)"),
+                "the tender creation form offers an optional legal guarantee duration");
+        }
+        tenderInput.LegalGuaranteeMonths = 0;
+        await Refuse(w => w.Create(tenderInput, P(officer)), "tender creation rejects an invalid legal guarantee duration", "positive");
+        tenderInput.LegalGuaranteeMonths = 6;
+        tenderInput.BankGuaranteeMonths = 3;
+        await Flow(async w => id = await w.Create(tenderInput, P(officer)));
+        Check(await Read(d => d.TenderItems.Where(i => i.TenderId == id).AllAsync(i => i.CategoryId != null)) && await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.RequiredDocuments == "OfficialQuotation,ProductDatasheet,LegalGuarantee,BankGuarantee")),
             "tender inherits item categories and stores the required offer documents");
         await Flow(w => w.RequestWeights(id, P(officer)));
         await Refuse(w => w.Propose(id, 40.5m, 59.5m, P(manager)), "weight proposals reject fractional percentages", "whole-number");
@@ -353,6 +364,8 @@ public static class WorkflowRedesignChecks
 
         // ---- Supplier offer: one-step submission, documents, precision, tax ----
         var firstInvitationId = await Read(d => d.TenderInvitations.Where(x => x.SupplierId == suppliers[0].Company.Id).Select(x => x.Id).SingleAsync());
+        await Refuse(w => w.SubmitBid(id, new BidInput { InvitationId = firstInvitationId }, P(suppliers[0].User)),
+            "the older direct submission cannot bypass the legal guarantee", "attach the required legal guarantee");
         using (var supplierClient = await Login(suppliers[0].User))
         {
             var offerPage = await supplierClient.GetStringAsync("/Supplier/Offers/Create/" + firstInvitationId);
@@ -361,6 +374,11 @@ public static class WorkflowRedesignChecks
                 && offerPage.Contains("data-save-draft") && offerPage.Contains("data-key=\"OfficialQuotation\"")
                 && !offerPage.Contains("data-key=\"ReferenceImage\"") && !offerPage.Contains("name=\"Input.TechnicalProposal\" rows=\"2\" maxlength=\"10000\" required"),
                 "supplier offer form is compact, shows only required attachments, and allows draft saving");
+            Check(offerPage.Contains("name=\"doc_LegalGuarantee\"") && offerPage.Contains("Minimum validity: 6 months"),
+                "the supplier sees the tender's minimum validity and the legal guarantee upload");
+            Check(offerPage.Contains("name=\"doc_BankGuarantee\"") && offerPage.Contains("Minimum validity: 3 months")
+                && offerPage.Contains("Input.BankGuarantee.Number"),
+                "the supplier sees the bank guarantee duration, details and PDF upload");
         }
         var pdf = "%PDF-1.4\n% redesign test document\n"u8.ToArray();
         SupplierOfferService.UploadedOfferFile File(string type) => SupplierOfferService.ReadUpload(type, type + ".pdf", pdf).File!;
@@ -368,7 +386,18 @@ public static class WorkflowRedesignChecks
         Check(SupplierOfferService.ReadUpload("ReferenceImage", "photo.pdf", pdf).Error != null, "product images reject PDF files");
         async Task<(int? Bid, List<string> Errors)> Submit(int index, Action<SupplierDraftOfferInputModel> edit, params string[] docs)
         {
-            return await SubmitForTender(id, index, edit, docs);
+            return await SubmitForTender(id, index, input =>
+            {
+                input.BankGuarantee = new BankGuaranteeInput
+                {
+                    Issuer = BankGuaranteeVerification.IssuerCode,
+                    Number = index == 1 ? "BG-DEMO-1002" : "BG-DEMO-1001",
+                    Amount = index == 2 ? 501m : 500m,
+                    Currency = "JOD",
+                    ExpiresOn = index == 1 ? new DateOnly(2025, 12, 31) : new DateOnly(2030, 12, 31)
+                };
+                edit(input);
+            }, docs);
         }
         async Task<(int? Bid, List<string> Errors)> SubmitForTender(int tenderId, int index, Action<SupplierDraftOfferInputModel> edit, params string[] docs)
         {
@@ -384,6 +413,13 @@ public static class WorkflowRedesignChecks
         }
         var missing = await Submit(0, _ => { }, "OfficialQuotation");
         Check(missing.Bid == null && missing.Errors.Any(e => e.Contains("Product datasheets")), "an offer without a document the tender requires is refused");
+        var missingGuarantee = await Submit(0, _ => { }, "OfficialQuotation", "ProductDatasheet");
+        Check(missingGuarantee.Bid == null && missingGuarantee.Errors.Any(e => e.Contains("Legal guarantee")),
+            "a tender that requires a legal guarantee refuses submission without it");
+        string[] guaranteeDocuments = ["OfficialQuotation", "ProductDatasheet", OfferDocumentTypes.LegalGuarantee, OfferDocumentTypes.BankGuarantee];
+        var missingBankDetails = await Submit(0, input => input.BankGuarantee.Number = null, guaranteeDocuments);
+        Check(missingBankDetails.Bid == null && missingBankDetails.Errors.Any(e => e.Contains("Complete the bank guarantee")),
+            "a PDF cannot replace the required bank guarantee details");
         var fils = await Submit(0, i => i.Items[0].UnitPrice = 500.1234m, "OfficialQuotation", "ProductDatasheet");
         Check(fils.Bid == null && fils.Errors.Any(e => e.Contains("3 decimal")), "JOD amounts with more than three decimals are refused, not rounded");
         var usd = await Submit(0, i => { i.CurrencyCode = "USD"; i.Items[0].UnitPrice = 500.125m; }, "OfficialQuotation", "ProductDatasheet");
@@ -432,9 +468,9 @@ public static class WorkflowRedesignChecks
                 "saved draft image appears in the product preview");
         }
         // Items: 2 × 500 + 1 × 500 = 1500. Shipping 50.
-        var a = await Submit(0, i => { i.Items[0].UnitPrice = 600; i.IncludeShipping = true; i.ShippingCost = 50; i.IncludeInstallation = false; i.InstallationCost = 999; }, "OfficialQuotation", "ProductDatasheet");
-        var b = await Submit(1, i => { i.IncludeShipping = true; i.ShippingCost = 50; i.TaxIncludesCharges = true; }, "OfficialQuotation", "ProductDatasheet");
-        var c3 = await Submit(2, i => { i.TaxMode = "Amount"; i.TaxAmount = 100.5m; i.TaxRate = 99; i.TechnicalProposal = null; }, "OfficialQuotation", "ProductDatasheet");
+        var a = await Submit(0, i => { i.Items[0].UnitPrice = 600; i.IncludeShipping = true; i.ShippingCost = 50; i.IncludeInstallation = false; i.InstallationCost = 999; }, guaranteeDocuments);
+        var b = await Submit(1, i => { i.IncludeShipping = true; i.ShippingCost = 50; i.TaxIncludesCharges = true; }, guaranteeDocuments);
+        var c3 = await Submit(2, i => { i.TaxMode = "Amount"; i.TaxAmount = 100.5m; i.TaxRate = 99; i.TechnicalProposal = null; }, guaranteeDocuments);
         Check(a.Bid != null && b.Bid != null && c3.Bid != null, "three complete offers submitted in one step (" + string.Join("; ", a.Errors.Concat(b.Errors).Concat(c3.Errors)) + ")");
         var bids = await Read(d => d.Bids.Include(x => x.Items).Include(x => x.Documents).Where(x => x.Status == BidStatus.Submitted).ToDictionaryAsync(x => x.Id));
         var bidA = bids[a.Bid!.Value]; var bidB = bids[b.Bid!.Value]; var bidC = bids[c3.Bid!.Value];
@@ -443,7 +479,7 @@ public static class WorkflowRedesignChecks
         Check(bidB.TaxAmount == 248m && OfferTotals.Of(bidB).GrandTotal == 1798m, "rate tax includes additional costs only when the supplier says so ((1500 + 50) × 16%)");
         Check(bidC.TaxAmount == 100.5m && bidC.TaxRate == null && OfferTotals.Of(bidC).GrandTotal == 1600.5m, "a stated tax amount is used as entered and never doubled with a rate");
         Check(bidC.TechnicalProposal == null, "additional notes are optional when submitting an offer");
-        Check(bidA.Documents.Select(x => x.DocumentType).OrderBy(x => x).SequenceEqual(["OfficialQuotation", "ProductDatasheet"]) && bidB.Documents.Count == 3 && bidA.SubmittedAt != null,
+        Check(bidA.Documents.Select(x => x.DocumentType).OrderBy(x => x).SequenceEqual(guaranteeDocuments.Order()) && bidB.Documents.Count == 5 && bidA.SubmittedAt != null,
             "attachments are stored privately with their document types and the submission time");
         var savedImageId = bidB.Documents.Single(d => d.DocumentType == "ReferenceImage").Id;
         using (var supplierClient = await Login(suppliers[1].User))
@@ -464,6 +500,28 @@ public static class WorkflowRedesignChecks
 
         // ---- Compliance, scheduling ----
         await Flow(w => w.CloseBidding(id, P(officer)));
+        using (var officerClient = await Login(officer))
+        using (var publicClient = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false }))
+        {
+            foreach (var (bid, expected) in new[]
+            {
+                (bidA, BankGuaranteeVerification.Status.Matched), (bidB, BankGuaranteeVerification.Status.Expired),
+                (bidC, BankGuaranteeVerification.Status.NoMatch)
+            })
+            {
+                var review = await officerClient.GetStringAsync($"/SourcingOfficer/Bids/Compliance/{bid.Id}");
+                var verificationLink = Regex.Match(review, "href=\"(/bank-verification/[^\"]+)\"").Groups[1].Value;
+                Check(verificationLink.Length > 0 && review.Contains("data:image/png;base64,") && review.Contains("Verify guarantee"),
+                    "the Officer's offer review provides a QR and a link for bank verification");
+                var portal = await publicClient.GetStringAsync(WebUtility.HtmlDecode(verificationLink));
+                Check(portal.Contains(BankGuaranteeVerification.IssuerName) && portal.Contains($"data-verification-state=\"{expected}\"")
+                    && portal.Contains("lang=\"ar\" dir=\"rtl\"") && !portal.Contains("Received Bids"),
+                    $"the standalone Arabic bank portal shows {expected}");
+            }
+            var invalid = await publicClient.GetAsync("/bank-verification/invalid-token");
+            Check(invalid.StatusCode == HttpStatusCode.NotFound && (await invalid.Content.ReadAsStringAsync()).Contains("data-verification-state=\"LinkUnavailable\""),
+                "the standalone bank portal rejects an invalid link");
+        }
         foreach (var bid in new[] { bidA, bidB, bidC }) await Flow(w => w.Compliance(id, bid.Id, ComplianceStatus.Compliant, "Documents complete", "", P(officer)));
         await Flow(w => w.Proceed(id, P(officer)));
         var roundId = await Read(d => d.TenderRounds.Where(r => r.TenderId == id).Select(r => r.Id).SingleAsync());

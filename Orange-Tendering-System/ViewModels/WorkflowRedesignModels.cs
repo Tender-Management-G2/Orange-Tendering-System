@@ -42,6 +42,8 @@ public class EvaluationWorkspaceModel
 // Offer document types a tender can require and a supplier can attach (stored on Document.DocumentType).
 public static class OfferDocumentTypes
 {
+    public const string LegalGuarantee = "LegalGuarantee";
+    public const string BankGuarantee = "BankGuarantee";
     public sealed record Kind(string Key, string Label, string Hint);
     public static readonly IReadOnlyList<Kind> All =
     [
@@ -49,6 +51,8 @@ public static class OfferDocumentTypes
         new("TechnicalProposal", "Technical proposal", "Solution, implementation approach and compliance (PDF)"),
         new("ProductDatasheet", "Product datasheets", "Manufacturer specifications for offered items (PDF)"),
         new("WarrantyDocument", "Warranty document", "Warranty and after-sales conditions (PDF)"),
+        new(LegalGuarantee, "Legal guarantee", "A copy of the legal guarantee (PDF or image)"),
+        new(BankGuarantee, "Bank guarantee", "The bank-issued guarantee (PDF)"),
         new("Certificate", "Certificates", "Quality, authorization or conformity certificates (PDF/image)"),
         new("ReferenceImage", "Product images", "Photos of the offered products (PNG/JPEG); shown as supplier-provided"),
         new("OtherDocument", "Other documents", "Any other supporting document (PDF/image)")
