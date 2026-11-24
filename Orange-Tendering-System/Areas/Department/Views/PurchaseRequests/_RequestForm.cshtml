@@ -1,5 +1,12 @@
 @model RequestForm
 @using Orange_Tendering_System.Models.Entities
+@{
+    // Requests created before the single-item design may hold several items: they keep the original multi-item editor.
+    var legacy = Model.Items.Count > 1;
+    var item = Model.Items.Count > 0 ? Model.Items[0] : new RequestItemForm();
+    var image = Model.ExistingItemImage;
+    var quantity = item.Quantity < 1 ? 1 : item.Quantity;
+}
 <input asp-for="Id" type="hidden" />
 <input asp-for="Version" type="hidden" />
 <div asp-validation-summary="All" class="pf-note pf-warn" role="alert"></div>
@@ -7,54 +14,99 @@
 {
     <aside class="pf-note pf-warn"><strong>Returned by the Sourcing Officer:</strong> @Model.ReturnComment</aside>
 }
-@* Filled in by the system: never typed by the employee. *@
-<section class="pr-department-strip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5l8-2v18M4 21h16V9l-8-2M2 21h20M8 8h1M8 12h1M8 16h1M15 12h1M15 16h1"/></svg><strong>Department:</strong><b>@Model.DepartmentName</b><small>ⓘ &nbsp;Department is assigned automatically</small>
-</section>
 
-<section class="ws-panel pg-panel pf-section pr-card">
-    <div class="pr-card-head"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg> Requested Items <em data-item-count>(@Model.Items.Count)</em></h2><button type="button" class="pr-add" id="department-add-item"><span aria-hidden="true">＋</span> Add Item</button></div>
-    <div class="pr-items-head" aria-hidden="true"><span>#</span><span>Item / Service Name *</span><span>Category *</span><span>Quantity *</span><span>Unit *</span><span>Specifications (Minimum Requirements) *</span><span>Action</span></div>
-    <div class="pf-items" id="department-items">
-    @for (var i = 0; i < Model.Items.Count; i++)
-    {
-        var item = Model.Items[i];
-        <div class="pf-item" data-item-row>
-            <span class="pf-item-n" data-item-number>@(i + 1)</span>
-            <div class="pf-item-grid">
-                <div class="pg-field"><label for="Items_@(i)__Name" class="pf-required">Item / service name</label><input id="Items_@(i)__Name" name="Items[@i].Name" value="@item.Name" maxlength="200" required placeholder="e.g. Laptop" data-item-name /></div>
-                <div class="pg-field"><label for="Items_@(i)__CategoryId" class="pf-required">Category</label>
-                    <select id="Items_@(i)__CategoryId" name="Items[@i].CategoryId" required><option value="">Choose…</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(item.CategoryId == c.Id)">@c.Name</option> }</select></div>
-                <div class="pg-field"><label for="Items_@(i)__Quantity" class="pf-required">Quantity</label><input id="Items_@(i)__Quantity" name="Items[@i].Quantity" value="@item.Quantity.ToString("0", System.Globalization.CultureInfo.InvariantCulture)" type="number" min="1" max="999999999999999" step="1" inputmode="numeric" required /></div>
-                <div class="pg-field"><label for="Items_@(i)__Unit" class="pf-required">Unit</label>
-                    <select id="Items_@(i)__Unit" name="Items[@i].Unit" required><option value="">Choose…</option>@foreach (var u in UnitsOfMeasure.All) { <option selected="@(item.Unit == u)">@u</option> }@if (!string.IsNullOrEmpty(item.Unit) && !UnitsOfMeasure.All.Contains(item.Unit)) { <option value="" disabled>@item.Unit (choose a listed unit)</option> }</select></div>
-                <div class="pg-field pf-spec"><label for="Items_@(i)__Specifications" class="pf-required">Specifications (Minimum Requirements)</label><input id="Items_@(i)__Specifications" name="Items[@i].Specifications" value="@item.Specifications" maxlength="10000" minlength="3" required placeholder="e.g. Intel Core i7, 16 GB RAM, 512 GB SSD" /></div>
-                <button type="button" class="pg-btn pf-item-remove" data-remove-item aria-label="Remove item"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
-            </div>
+
+<div data-dr-step="1" class="dr-step">
+    @* Request information: the department is filled in by the system and never typed by the employee. *@
+    <section class="dr-card">
+        <h2 class="dr-card-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg> Request Information</h2>
+        <div class="dr-grid dr-grid-3">
+            <div class="dr-field"><label asp-for="NeededBy">Needed by</label>
+                <div class="dr-input"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg><input asp-for="NeededBy" type="date" required min="@DateTime.UtcNow.ToString("yyyy-MM-dd")" /></div>
+                <span asp-validation-for="NeededBy"></span></div>
+            <div class="dr-field"><label asp-for="Priority">Priority</label>
+                <div class="dr-input"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h12l-2 4 2 4H5"/></svg><select asp-for="Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select></div></div>
+            <div class="dr-field"><label asp-for="EvaluationMethod">Evaluation Method <i>*</i></label>
+                <div class="dr-input"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></svg>
+                <select asp-for="EvaluationMethod"><option value="">Choose before sending</option><option value="Weighted">Best Value (Technical &amp; Commercial)</option><option value="LowestPrice">Lowest Price (100% financial)</option></select></div>
+                <span asp-validation-for="EvaluationMethod"></span></div>
+            <div class="dr-field dr-wide"><label asp-for="Justification">Business Justification</label>
+                <div class="dr-input dr-area"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4-1L19 8a2.8 2.8 0 0 0-4-4L4 15zM14 6l4 4"/></svg><textarea asp-for="Justification" rows="2" maxlength="10000" required placeholder="Why the department needs this item"></textarea></div>
+                <span asp-validation-for="Justification"></span></div>
         </div>
-    }
-    </div>
-    <span id="department-item-message" class="pg-hint" role="status" aria-live="polite"></span>
-</section>
+    </section>
 
-<section class="ws-panel pg-panel pf-section pr-card">
-    <div class="pr-card-head"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg> Request Details</h2></div>
-    <div class="pg-form-grid">
-        <div class="pg-field"><label asp-for="NeededBy" class="pf-required">Needed by</label><input asp-for="NeededBy" type="date" required min="@DateTime.UtcNow.ToString("yyyy-MM-dd")" /><span asp-validation-for="NeededBy"></span></div>
-        <div class="pg-field"><label asp-for="EvaluationMethod">Evaluation method</label>
-            <select asp-for="EvaluationMethod"><option value="">Choose before sending</option><option value="Weighted">Committee weight proposals</option><option value="LowestPrice">100% financial — lowest compliant price</option></select>
-            <span asp-validation-for="EvaluationMethod"></span></div>
-        <div class="pg-field"><label asp-for="Priority">Priority</label><select asp-for="Priority" asp-items="Html.GetEnumSelectList<RequestPriority>()"></select></div>
-        <div class="pg-field pg-field-wide"><label asp-for="Justification" class="pf-required">Business justification</label><textarea asp-for="Justification" rows="3" maxlength="10000" required placeholder="Why the department needs these items"></textarea><span asp-validation-for="Justification"></span></div>
-    </div>
-</section>
-
-<section class="ws-panel pg-panel pf-section pr-card pr-doc-card">
-    <div class="pr-doc-copy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 7-7a4 4 0 0 1 6 6l-9 9a6 6 0 0 1-9-9l9-9"/></svg><div><h2>Supporting Documents <small>(Optional)</small></h2><p>Technical documents, reference images or additional specifications.</p></div></div>
-    @if (Model.ExistingDocuments.Count > 0)
+    @if (legacy)
     {
-        <ul>@foreach (var document in Model.ExistingDocuments) { <li>@document.FileName <small class="pf-muted">(kept)</small></li> }</ul>
+        <partial name="_RequestItemsLegacy" model="Model" />
     }
-    <div class="pg-field pr-file-field"><label asp-for="Attachments">↥ &nbsp;Choose Files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" data-fv-max-mb="5" /><span asp-validation-for="Attachments"></span><small data-file-count></small></div>
-</section>
-<section class="pr-title-strip"><span aria-hidden="true">⚑</span><div>Request Title (Auto-generated)<strong data-title-preview data-department="@Model.DepartmentName">@(string.IsNullOrEmpty(Model.Title) ? "Generated from your items" : Model.Title)</strong></div></section>
-<div class="pr-form-actions"><button type="submit" name="intent" value="save" class="pg-btn" data-om="toast" data-om-working="Saving your draft">▣ &nbsp;@(Model.Id == 0 ? "Save Draft" : "Save Changes")</button><button type="submit" name="intent" value="submit" disabled="@(Model.EvaluationMethod == null)" class="pg-btn pg-btn-primary" data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">➤ &nbsp;@(Model.Id == 0 ? "Submit Request" : "Resubmit Request")</button></div>
+    else
+    {
+        <section class="dr-card" data-dr-item>
+            <h2 class="dr-card-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg> Requested Item</h2>
+            <div class="dr-item">
+                <div class="dr-image" data-dr-image data-has-image="@(image != null ? "true" : "false")">
+                    <label class="dr-label">Item Image <i>*</i></label>
+                    <div class="dr-image-box" data-dr-drop>
+                        <img data-dr-preview alt="Preview of the requested item" @(image == null ? "hidden" : null) src="@(image == null ? "" : Url.Action("ItemImage", new { id = image.Id }))" />
+                        <div class="dr-image-empty" data-dr-empty @(image == null ? null : "hidden")><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M9 9h.01"/></svg><span>Drop a picture here or choose one</span><small>PNG or JPEG, up to 3 MB</small></div>
+                        <span class="dr-image-tools" data-dr-tools @(image == null ? "hidden" : null)>
+                            <button type="button" class="dr-tool" data-dr-change title="Change image" aria-label="Change image"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4-1L19 8a2.8 2.8 0 0 0-4-4L4 15z"/></svg></button>
+                            <button type="button" class="dr-tool dr-tool-danger" data-dr-remove title="Remove image" aria-label="Remove image"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+                        </span>
+                    </div>
+                    <input type="file" name="ItemImage" id="ItemImage" accept=".png,.jpg,.jpeg,image/png,image/jpeg" hidden data-dr-file />
+                    <input type="hidden" name="RemoveItemImage" value="false" data-dr-removed />
+                    <button type="button" class="dr-outline" data-dr-change><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a5 5 0 0 1-.5-10 6 6 0 0 1 11.5 1.5A4 4 0 0 1 17.5 18M12 12v8M9 15l3-3 3 3"/></svg> <span data-dr-change-label>@(image == null ? "Upload Image" : "Change Image")</span></button>
+                    <span class="field-validation-error" data-dr-image-error asp-validation-for="ItemImage"></span>
+                </div>
+
+                <div class="dr-item-fields">
+                    <div class="dr-grid dr-grid-item">
+                        <div class="dr-field dr-name"><label for="Items_0__Name">Item / Service Name</label>
+                            <div class="dr-input"><input id="Items_0__Name" name="Items[0].Name" value="@item.Name" maxlength="200" required placeholder="e.g. Laptop" data-dr-name autocomplete="off" list="dr-name-suggestions" /></div>
+                            <datalist id="dr-name-suggestions"><option value="Laptop"></option><option value="Desktop Computer"></option><option value="Monitor"></option><option value="Printer"></option><option value="Network Switch"></option><option value="Server"></option></datalist></div>
+                        <div class="dr-field"><label for="Items_0__CategoryId">Category</label>
+                            <div class="dr-input"><select id="Items_0__CategoryId" name="Items[0].CategoryId" required data-dr-category><option value="">Choose…</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(item.CategoryId == c.Id)">@c.Name</option> }</select></div></div>
+                        <div class="dr-field"><label for="Items_0__Quantity">Quantity</label>
+                            <div class="dr-stepper"><button type="button" data-dr-qty="-1" aria-label="Decrease quantity">&minus;</button><input id="Items_0__Quantity" name="Items[0].Quantity" value="@quantity.ToString("0", System.Globalization.CultureInfo.InvariantCulture)" type="number" min="1" max="999999999999999" step="1" inputmode="numeric" required data-dr-quantity /><button type="button" data-dr-qty="1" aria-label="Increase quantity">+</button></div></div>
+                        <div class="dr-field"><label for="Items_0__Unit">Unit</label>
+                            <div class="dr-input"><select id="Items_0__Unit" name="Items[0].Unit" required data-dr-unit><option value="">Choose…</option>@foreach (var u in UnitsOfMeasure.All) { <option selected="@(item.Unit == u)">@u</option> }@if (!string.IsNullOrEmpty(item.Unit) && !UnitsOfMeasure.All.Contains(item.Unit)) { <option selected>@item.Unit</option> }</select></div></div>
+                    </div>
+
+                    <div class="dr-specs" data-dr-specs-box>
+                        <h3>Specifications <i>*</i> <small>(Select the required specifications)</small></h3>
+                        <div class="dr-spec-grid" data-dr-specs></div>
+                        <p class="dr-muted" data-dr-specs-hint>Choose a category and type the item name to see the matching specifications.</p>
+                        <details class="dr-extra-box"><summary>Add other specifications (optional)</summary><div class="dr-field dr-extra"><label for="dr-extra">Additional specifications</label>
+                            <div class="dr-input dr-area"><textarea id="dr-extra" rows="2" maxlength="2000" placeholder="Anything else the Sourcing Officer should know" data-dr-extra></textarea></div></div></details>
+                        <input type="hidden" name="Items[0].Specifications" id="Items_0__Specifications" value="@item.Specifications" maxlength="10000" data-dr-spec-value />
+                        <span class="field-validation-error" data-dr-spec-error role="alert" hidden>Select at least one specification or describe it below.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+
+    <section class="dr-card dr-docs">
+        <div class="dr-docs-copy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 7-7a4 4 0 0 1 6 6l-9 9a6 6 0 0 1-9-9l9-9"/></svg><div><h2>Supporting Documents <small>(Optional)</small></h2><p>Technical documents, reference images or additional specifications.</p></div></div>
+        @if (Model.ExistingDocuments.Count > 0)
+        {
+            <ul class="dr-doc-list">@foreach (var document in Model.ExistingDocuments) { <li>@document.FileName <small>(kept)</small></li> }</ul>
+        }
+        <div class="dr-file-field"><label for="Attachments" class="dr-outline">&#8613; Choose Files</label><input asp-for="Attachments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" data-fv-max-mb="5" data-fv-optional /><span asp-validation-for="Attachments"></span><small data-file-count></small></div>
+    </section>
+
+
+    <div class="dr-actions">
+        <button type="submit" name="intent" value="save" class="dr-btn" data-om="toast" data-om-working="Saving your draft" formnovalidate>&#9635; @(Model.Id == 0 ? "Save Draft" : "Save Changes")</button>
+        @if (legacy)
+        {
+            <button type="submit" name="intent" value="submit" disabled="@(Model.EvaluationMethod == null)" class="dr-btn dr-primary" data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">&#10148; @(Model.Id == 0 ? "Submit Request" : "Resubmit Request")</button>
+        }
+        else
+        {
+            <button type="submit" name="intent" value="submit" class="dr-btn dr-primary" data-dr-submit data-om="popup" data-om-working="Sending your request" data-om-working-description="Delivering your purchase request to the Sourcing Officer.">&#10148; @(Model.Id == 0 ? "Submit Request" : "Resubmit Request")</button>
+        }
+    </div>
+</div>

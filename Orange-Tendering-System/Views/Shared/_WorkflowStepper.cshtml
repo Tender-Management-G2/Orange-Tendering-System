@@ -13,15 +13,17 @@
     };
     var lowestPrice = Model.Tender.PurchaseRequest?.EvaluationMethod == TenderEvaluationMethod.LowestPrice;
     var done = status is TenderStatus.Awarded or TenderStatus.Rejected or TenderStatus.Cancelled;
+    var ar = Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
     var steps = new[]
     {
-        ("1", "Setup", lowestPrice ? "Requirements, bidding and compliance" : "Weights, bidding, meeting, AI analysis"),
-        ("2", "Committee evaluation", "Four members, one submission each"),
-        ("3", lowestPrice ? "Price comparison" : "Weighted results", "Ranking and report"),
-        ("4", "Approval & award", "Manager, Top Committee, award")
+        ("1", L("Setup", "الإعداد"), lowestPrice ? L("Requirements, bidding and compliance", "المتطلبات وتقديم العروض والامتثال") : L("Weights, bidding and meeting", "الأوزان وتقديم العروض والاجتماع")),
+        ("2", L("Committee evaluation", "تقييم اللجنة"), L("Signed committee evaluations", "تقييمات اللجنة الموقّعة")),
+        ("3", lowestPrice ? L("Price comparison", "مقارنة الأسعار") : L("Weighted results", "النتائج المرجّحة"), L("Ranking and report", "الترتيب والتقرير")),
+        ("4", L("Approval & award", "الاعتماد والترسية"), L("Manager, Top Committee, award", "المدير والإدارة العليا والترسية"))
     };
 }
-<ol class="wf-steps" aria-label="Tender cycle progress">
+<ol class="wf-steps" aria-label="@L("Tender cycle progress", "تقدم دورة المناقصة")">
     @for (var i = 0; i < steps.Length; i++)
     {
         var n = i + 1;

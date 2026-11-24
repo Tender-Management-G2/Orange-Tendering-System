@@ -37,12 +37,14 @@
 </section>
 <section class="ws-panel pg-panel">
     <h2>Requested items</h2>
+    @{ var itemPicture = request.Documents.FirstOrDefault(d => d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/")); }
+    @if (itemPicture != null) { <p><img src="@Url.Action("ItemImage", new { id = itemPicture.Id })" alt="Requested item" style="max-width:220px;max-height:220px;border:1px solid var(--ws-rule);border-radius:14px;background:#fff;object-fit:contain" /></p> }
     <partial name="_Items" model='request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm { Name = i.Name, CategoryId = i.CategoryId, CategoryName = i.Category?.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList()' />
 </section>
 <section class="ws-panel pg-panel">
     <h2>Supporting attachments</h2>
-    @if (request.Documents.Count == 0) { <p>No attachments.</p> }
-    <ul>@foreach (var file in request.Documents.OrderBy(d => d.UploadedAt))
+    @if (request.Documents.Count(d => !(d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/"))) == 0) { <p>No attachments.</p> }
+    <ul>@foreach (var file in request.Documents.Where(d => !(d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/"))).OrderBy(d => d.UploadedAt))
     {
         <li>@if (file.DocumentType == "DepartmentSupportingDocument") { <a asp-action="Download" asp-route-id="@file.Id">@file.FileName</a> } else { <span>@file.FileName — shared download integration pending</span> }
         <small>(@file.SizeBytes bytes · @RequestDisplay.Date(file.UploadedAt))</small></li>

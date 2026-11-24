@@ -33,6 +33,17 @@ public class PurchaseRequestsController(ApplicationDbContext db) : Controller
         return PhysicalFile(path, "application/octet-stream", document.FileName);
     }
 
+    // Inline picture of a requested item (the Department stores it as a supporting document with an image content type).
+    public async Task<IActionResult> ItemImage(int id, [FromServices] IWebHostEnvironment environment)
+    {
+        var document = await db.Documents.AsNoTracking().SingleOrDefaultAsync(d => d.Id == id && d.PurchaseRequestId != null && d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/"));
+        if (document == null || Path.GetFileName(document.StoragePath) != document.StoragePath) return NotFound();
+        var path = Path.Combine(environment.ContentRootPath, "Areas", "Department", "App_Data", "Uploads", document.StoragePath);
+        if (!System.IO.File.Exists(path)) return NotFound();
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return PhysicalFile(path, document.ContentType == "image/png" ? "image/png" : "image/jpeg");
+    }
+
     // Accepting leads straight to tender preparation for this request; a request that already has its tender opens that tender.
     // Used by the acceptance redirect, the Officer's task notification and the request list, so preparation can be resumed later.
     [HttpGet]

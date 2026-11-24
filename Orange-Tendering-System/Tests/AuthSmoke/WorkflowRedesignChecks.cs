@@ -296,15 +296,81 @@ public static class WorkflowRedesignChecks
         pr.Status = PurchaseRequestStatus.Accepted; await db.SaveChangesAsync();
 
         // ---- Tender preparation, weight revision and direct bidding ----
-        int id = 0;
-        await Flow(async w => id = await w.Create(new RequirementsInput { PurchaseRequestId = prId, Title = pr.Title, Description = "Laptops and switch", TechnicalRequirements = "Meet item specifications",
-            CommercialConditions = "Prices in JOD", DeliveryExpectations = "30 days", MandatoryCompliance = "Signed quotation", SourcingManagerId = manager.Id, DepartmentRepresentativeId = depRep.Id,
-            FinancialRepresentativeId = fin.Id, TechnicalRepresentativeId = tech.Id, EstimatedValue = 2000, Currency = "JOD", RequiredDocuments = ["OfficialQuotation", "ProductDatasheet"] }, P(officer)));
+        int id;
+        using (var creator = await Login(officer))
+        {
+            var page = await creator.GetStringAsync($"/SourcingOfficer/Workflow?request={prId}");
+            Check(page.Contains("Select Purchase Request") && page.Contains("Tender Requirements") && page.Contains("Evaluation Committee")
+                && page.Contains("Review &amp; Create") && !page.Contains("Additional technical requirements"), "the Officer list renders the four-step tender wizard");
+            using var arabicRequest = new HttpRequestMessage(HttpMethod.Get, $"/SourcingOfficer/Workflow?request={prId}");
+            arabicRequest.Headers.Add("Cookie", "orange-lang=ar");
+            using var arabic = await creator.SendAsync(arabicRequest);
+            var arabicPage = WebUtility.HtmlDecode(await arabic.Content.ReadAsStringAsync());
+            Check(arabic.IsSuccessStatusCode && arabicPage.Contains("dir=\"rtl\" lang=\"ar\"") && arabicPage.Contains("اختيار طلب الشراء"),
+                "the Officer wizard renders its Arabic labels in RTL");
+            var token = WebUtility.HtmlDecode(Regex.Match(page, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+            var values = new List<KeyValuePair<string, string>>
+            {
+                new("PurchaseRequestId", prId.ToString()), new("Title", "Client override"), new("Description", "Client override"),
+                new("TechnicalRequirements", "Client override"), new("CommercialConditions", "Prices in JOD"),
+                new("DeliveryExpectations", "30 days"), new("MandatoryCompliance", "Signed quotation"),
+                new("SourcingManagerId", manager.Id), new("DepartmentRepresentativeId", depRep.Id),
+                new("FinancialRepresentativeId", fin.Id), new("TechnicalRepresentativeId", tech.Id),
+                new("Currency", "JOD"), new("RequiredDocuments", "OfficialQuotation"), new("RequiredDocuments", "ProductDatasheet")
+            };
+            async Task<HttpResponseMessage> SubmitTender(string value)
+            {
+                using var post = new HttpRequestMessage(HttpMethod.Post, "/SourcingOfficer/Workflow/Create")
+                {
+                    Content = new FormUrlEncodedContent(values.Append(new("EstimatedValue", value)))
+                };
+                post.Headers.Add("RequestVerificationToken", token);
+                post.Headers.Add("X-Requested-With", "XMLHttpRequest");
+                return await creator.SendAsync(post);
+            }
+            using var invalid = await SubmitTender("0");
+            Check(invalid.StatusCode == HttpStatusCode.BadRequest && (await invalid.Content.ReadAsStringAsync()).Contains("EstimatedValue"),
+                "invalid tender value returns an inline validation key");
+            using var created = await SubmitTender("2000");
+            var result = await created.Content.ReadAsStringAsync();
+            if (!created.IsSuccessStatusCode) throw new InvalidOperationException(result);
+            using var tenderResponse = JsonDocument.Parse(result);
+            id = tenderResponse.RootElement.GetProperty("id").GetInt32();
+            using var duplicate = await SubmitTender("2000");
+            Check(duplicate.StatusCode == HttpStatusCode.BadRequest && (await duplicate.Content.ReadAsStringAsync()).Contains("PurchaseRequestId"),
+                "the same request cannot create a second tender");
+        }
+        Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.Title == pr.Title && t.Description == pr.Justification
+            && !t.Requirements!.Contains("TechnicalRequirements"))), "the server derives inherited fields and discards additional technical requirements");
         Check(await Read(d => d.TenderItems.Where(i => i.TenderId == id).AllAsync(i => i.CategoryId != null)) && await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.RequiredDocuments == "OfficialQuotation,ProductDatasheet")),
             "tender inherits item categories and stores the required offer documents");
+        async Task<string> WeightScreen(ApplicationUser person, string area, bool arabic = false)
+        {
+            using var client = await Login(person);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/{area}/Workflow/Details/{id}");
+            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            if (arabic) request.Headers.Add("Cookie", "orange-lang=ar");
+            using var response = await client.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
+        }
+        var sendScreen = await WeightScreen(officer, "SourcingOfficer");
+        Check(sendScreen.Contains("Send to Committee") && sendScreen.Contains("Assigned Committee") && sendScreen.Contains("/RequestWeights"),
+            "send-to-committee shows the assigned roster and existing action");
         await Flow(w => w.RequestWeights(id, P(officer)));
+        var voteScreen = await WeightScreen(fin, "EvaluationCommittee");
+        Check(voteScreen.Contains("Set Evaluation Weights") && voteScreen.Contains("data-weight-sliders") &&
+            voteScreen.Contains("id=\"ew-technical\" name=\"technical\" type=\"range\"") &&
+            voteScreen.Contains("id=\"ew-financial\" name=\"financial\" type=\"range\""), "assigned evaluators see both weight sliders");
+        var arabicVote = WebUtility.HtmlDecode(await WeightScreen(fin, "EvaluationCommittee", arabic: true));
+        Check(arabicVote.Contains("wf-weight-setup\" dir=\"rtl\"") && arabicVote.Contains("تحديد أوزان التقييم"),
+            "the evaluation weights form renders Arabic labels and RTL direction");
         await Refuse(w => w.Propose(id, 40.5m, 59.5m, P(manager)), "weight proposals reject fractional percentages", "whole-number");
-        foreach (var m in new[] { manager, depRep, fin, tech }) await Flow(w => w.Propose(id, 40, 60, P(m)));
+        await Flow(w => w.Propose(id, 40, 60, P(fin)));
+        var progressScreen = await WeightScreen(officer, "SourcingOfficer");
+        Check(progressScreen.Contains("Voting Progress") && progressScreen.Contains("1 of 4 voted")
+            && progressScreen.Contains("ew-success") && progressScreen.Contains("ew-pending"), "voting progress reflects the recorded proposal");
+        foreach (var m in new[] { manager, depRep, tech }) await Flow(w => w.Propose(id, 40, 60, P(m)));
         var departmentSeatId = await Read(d => d.CommitteeMembers.Where(c => c.TenderId == id && c.UserId == depRep.Id).Select(c => c.Id).SingleAsync());
         await Flow(w => w.ReturnWeights(id, [departmentSeatId], "Please revisit the technical weighting.", P(officer)));
         Check(await Read(d => d.Set<WeightRound>().Where(x => x.TenderId == id).Select(x => x.Proposals.Count).SingleAsync()) == 3,
@@ -325,6 +391,8 @@ public static class WorkflowRedesignChecks
             var html = await response.Content.ReadAsStringAsync();
             Check(response.IsSuccessStatusCode && html.Contains("data-technical-total") && html.Contains("criteria[3].Weight"),
                 "the Officer's approval form renders the interactive technical criteria table");
+            Check(html.Contains("Evaluation Weights (Average)") && html.Contains(">41.5%</dd>") && html.Contains(">58.5%</dd>"),
+                "result displays the actual average of revised proposals");
             Check(html.Contains("value=\"16 GB RAM\"") && html.Contains("value=\"512 GB SSD\"") && html.Contains("value=\"Processor (CPU)\""),
                 "technical weights offer tender specification details and laptop component suggestions");
         }
@@ -339,6 +407,9 @@ public static class WorkflowRedesignChecks
         await Refuse(w => w.ApproveWeights(id, P(officer), technicalCriteria), "98% cannot be approved", "Add 2%");
         technicalCriteria[3].Weight = 15;
         await Flow(w => w.ApproveWeights(id, P(officer), technicalCriteria));
+        var lockedScreen = await WeightScreen(officer, "SourcingOfficer");
+        Check(lockedScreen.Contains("Evaluation weights are approved and locked.") && lockedScreen.Contains("/OpenBidding"),
+            "approved weights expose the existing open-bidding action");
         await Refuse(w => w.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(90), P(officer)), "submission deadline cannot be after the department's needed-by date", "needs the items");
         await Flow(w => w.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(5), P(officer)));
         foreach (var s in suppliers) await Flow(w => w.Invite(id, s.Company.Id, P(officer)));
@@ -353,6 +424,14 @@ public static class WorkflowRedesignChecks
         using (var supplierClient = await Login(suppliers[0].User))
         {
             var offerPage = await supplierClient.GetStringAsync("/Supplier/Offers/Create/" + firstInvitationId);
+            Check(Regex.Matches(offerPage, @"data-offer-panel(?:\s|=)").Count == 5 &&
+                offerPage.Contains("data-offer-review") && offerPage.Contains("data-offer-next"), "supplier offer renders all five wizard steps in one form");
+            using var arabicRequest = new HttpRequestMessage(HttpMethod.Get, "/Supplier/Offers/Create/" + firstInvitationId);
+            arabicRequest.Headers.Add("Cookie", "orange-lang=ar");
+            using var arabicOffer = await supplierClient.SendAsync(arabicRequest);
+            var arabicHtml = WebUtility.HtmlDecode(await arabicOffer.Content.ReadAsStringAsync());
+            Check(arabicOffer.IsSuccessStatusCode && arabicHtml.Contains("lang=\"ar\" dir=\"rtl\"") && arabicHtml.Contains("المراجعة والإرسال"),
+                "supplier offer supports Arabic RTL wizard navigation");
             Check(!offerPage.Contains("Tender Requirements (Read-Only)") && offerPage.Contains("data-line-image")
                 && offerPage.Contains("data-sum=\"grand\"") && offerPage.Contains("Input.Items[0].Notes")
                 && offerPage.Contains("data-save-draft") && offerPage.Contains("data-key=\"OfficialQuotation\"")
@@ -429,7 +508,41 @@ public static class WorkflowRedesignChecks
                 "saved draft image appears in the product preview");
         }
         // Items: 2 × 500 + 1 × 500 = 1500. Shipping 50.
-        var a = await Submit(0, i => { i.Items[0].UnitPrice = 600; i.IncludeShipping = true; i.ShippingCost = 50; i.IncludeInstallation = false; i.InstallationCost = 999; }, "OfficialQuotation", "ProductDatasheet");
+        (int? Bid, List<string> Errors) a;
+        using (var supplierClient = await Login(suppliers[0].User))
+        {
+            var page = await supplierClient.GetStringAsync("/Supplier/Offers/Create/" + firstInvitationId);
+            var token = WebUtility.HtmlDecode(Regex.Match(page, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+            var items = await Read(d => d.TenderItems.Where(item => item.TenderId == id).OrderBy(item => item.Id).ToListAsync());
+            using var fields = new MultipartFormDataContent();
+            void Field(string name, string value) => fields.Add(new StringContent(value), name);
+            Field("__RequestVerificationToken", token);
+            Field("Input.CurrencyCode", "JOD");
+            Field("Input.ValidUntil", DateTime.UtcNow.Date.AddDays(90).ToString("yyyy-MM-dd"));
+            Field("Input.DeliveryDays", "20");
+            Field("Input.PaymentTerms", "Net 30 days after delivery");
+            Field("Input.IncludeShipping", "true");
+            Field("Input.ShippingCost", "50");
+            Field("Input.InstallationCost", "999");
+            Field("Input.TaxMode", "Rate");
+            Field("Input.TaxRate", "16");
+            for (var index = 0; index < items.Count; index++)
+            {
+                Field($"Input.Items[{index}].TenderItemId", items[index].Id.ToString());
+                Field($"Input.Items[{index}].Quantity", items[index].Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                Field($"Input.Items[{index}].OfferedProduct", "Product");
+                Field($"Input.Items[{index}].OfferedSpecifications", "As requested");
+                Field($"Input.Items[{index}].Notes", "12 months");
+                Field($"Input.Items[{index}].UnitPrice", index == 0 ? "600" : "500");
+            }
+            fields.Add(new ByteArrayContent(pdf), "doc_OfficialQuotation", "quote.pdf");
+            fields.Add(new ByteArrayContent(pdf), "doc_ProductDatasheet", "datasheet.pdf");
+            using var submitted = await supplierClient.PostAsync("/Supplier/Offers/Create/" + firstInvitationId, fields);
+            Check(submitted.StatusCode == HttpStatusCode.Redirect && submitted.Headers.Location?.ToString().Contains("/Details/") == true,
+                "the supplier wizard multipart post submits the draft through the existing endpoint");
+            a = (await Read(d => d.Bids.Where(bid => bid.TenderInvitationId == firstInvitationId && bid.Status == BidStatus.Submitted)
+                .Select(bid => (int?)bid.Id).SingleAsync()), []);
+        }
         var b = await Submit(1, i => { i.IncludeShipping = true; i.ShippingCost = 50; i.TaxIncludesCharges = true; }, "OfficialQuotation", "ProductDatasheet");
         var c3 = await Submit(2, i => { i.TaxMode = "Amount"; i.TaxAmount = 100.5m; i.TaxRate = 99; i.TechnicalProposal = null; }, "OfficialQuotation", "ProductDatasheet");
         Check(a.Bid != null && b.Bid != null && c3.Bid != null, "three complete offers submitted in one step (" + string.Join("; ", a.Errors.Concat(b.Errors).Concat(c3.Errors)) + ")");
@@ -506,7 +619,8 @@ public static class WorkflowRedesignChecks
             var popup = await popupResponse.Content.ReadAsStringAsync();
             Check(popupResponse.StatusCode == HttpStatusCode.OK && popup.Contains("class=\"wp-form wp-scores\"")
                 && !popup.Contains("name=\"recommendation.") && popup.Contains("data-pad")
-                && popup.Contains("maxlength=\"2\"") && popup.Contains("data-score-digits"), "Tariq5 popup scoring is available during the meeting with two-digit scores and a signature pad");
+                && popup.Contains("maxlength=\"2\"") && popup.Contains("data-score-digits") && popup.Contains("data-weighted-preview"),
+                "meeting popup keeps two-digit scores, weighted preview and mandatory signature");
         }
         await Refuse(w => w.SubmitEvaluation(id, Scores(89.95m, 90), P(fin), null), "a decimal score is refused", "whole-number");
         await Refuse(w => w.SubmitEvaluation(id, Scores(100, 90), P(fin), null), "a three-digit financial score is refused", "whole-number");
@@ -526,10 +640,17 @@ public static class WorkflowRedesignChecks
         Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.Status == TenderStatus.OfficerReview)), "four signed score submissions send the completed report directly to the Officer");
         Check(await Read(d => d.Set<ReportSignature>().CountAsync(r => r.TenderReportId == session.ReportId && r.Decision == "SubmittedEvaluation")) == 4,
             "the generated report records the four submitted evaluation signatures");
+        var officerResult = await WeightScreen(officer, "SourcingOfficer");
+        Check(officerResult.Contains("data-evaluation-ranking") && officerResult.Contains("data-calculated-recommendation")
+            && officerResult.Contains("Recommended winner · Alpha Tech") && officerResult.Contains("Send to Manager")
+            && !officerResult.Contains("name=\"recommendation."), "the Officer reviews the calculated winner and forwards without selecting a supplier");
         var handoff = await Chat(officer, SystemRoles.SourcingOfficer, $"Send the report to the Manager for T-{id}");
         Check(handoff.Kind == "agent-confirm", "officer chat previews forwarding the signed report");
         var forwarded = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", handoff.ConversationId);
         Check(forwarded.Reply.Contains("Report sent to the Sourcing Manager"), "officer chat forwards the signed report on confirmation");
+        var managerReview = await WeightScreen(manager, "SourcingManager");
+        Check(managerReview.Contains("Manager Review") && managerReview.Contains("Review and Send to Top Management")
+            && managerReview.Contains("Alpha has the longest warranty"), "the Manager sees the recommendation and the reviewed AI comparison");
 
         // ---- Manager executive summary ----
         var summary = new ExecutiveSummaryInput { BusinessNeed = "The IT team needs laptops and a switch.", KeyFindings = "Three compliant offers; Alpha ranks first.",
@@ -547,6 +668,10 @@ public static class WorkflowRedesignChecks
             && await Read(d => d.TenderReports.AnyAsync(r => r.ReportType == ReportType.ExecutiveSummary && r.Status == ReportStatus.Submitted)), "submitting the summary sends the report to the Top Committee");
         await Refuse(w => w.SaveExecutiveSummary(id, summary, P(manager)), "a submitted executive summary cannot be edited");
         Check(await Read(d => d.TenderReports.AnyAsync(r => r.Id == session.ReportId && r.PdfSha256 == session.Report.PdfSha256)), "the signed evaluation report itself was not changed");
+        var topReview = WebUtility.HtmlDecode(await WeightScreen(chiefs[0], "TopCommittee"));
+        Check(topReview.Contains("Top Management Review") && topReview.Contains("Accept & Award") &&
+            topReview.Contains("value=\"Reject\"") && topReview.Contains("value=\"Retender\"") && topReview.Contains("Signature required"),
+            "Top Management sees the three existing decisions with a signature");
 
         // Financial-only routing uses real submitted offers and the same signed Manager-to-Top approval path.
         form.EvaluationMethod = TenderEvaluationMethod.LowestPrice;
@@ -693,6 +818,22 @@ public static class WorkflowRedesignChecks
         using (var sc = factory.Services.CreateScope())
             await Scoped<InternalAwardReportDispatcher>(sc).DispatchPending(CancellationToken.None);
         Check(inbox.Messages.Count == mailBeforeAward + 2, "reprocessing a delivered award report does not send duplicate email");
+
+        for (var index = 0; index < chiefs.Length; index++)
+        {
+            using var sc = factory.Services.CreateScope();
+            var flow = Scoped<TenderWorkflowService>(sc);
+            var chief = P(chiefs[index]);
+            await flow.ReportPdf(session.ReportId!.Value, chief);
+            await flow.TopVote(id, VoteDecision.Approve, "", chief, session.Report.PdfSha256, true, evaluationSignature);
+            var state = await Read(d => d.Tenders.Where(tender => tender.Id == id).Select(tender => tender.Status).SingleAsync());
+            Check(state == (index == chiefs.Length - 1 ? TenderStatus.Awarded : TenderStatus.TopCommitteeReview),
+                $"weighted tender status after signed approval {index + 1}");
+        }
+        var awardScreen = await WeightScreen(officer, "SourcingOfficer");
+        Check(awardScreen.Contains("data-award-result") && awardScreen.Contains("Alpha Tech") && awardScreen.Contains("Award Notifications")
+            && await Read(d => d.Tenders.AnyAsync(tender => tender.Id == id && tender.AwardedBidId == bidA.Id)),
+            "the award screen shows the calculated winner and recorded notifications after unanimous signed approval");
 
         Console.WriteLine($"RESULT PASS={passes} FAIL=0 DATABASE=OrangeAuthCheck_Redesign_{suffix}. Real SQL Server; working database unchanged.");
 

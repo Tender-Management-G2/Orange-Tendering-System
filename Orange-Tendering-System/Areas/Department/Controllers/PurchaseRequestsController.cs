@@ -43,7 +43,7 @@ public class PurchaseRequestsController : Controller
     {
         var user = await DepartmentUser();
         if (user is null) return Forbid();
-        var query = service.Requests(user.DepartmentId!.Value).AsNoTracking();
+        var query = service.Requests(user.DepartmentId!.Value, user.Id).AsNoTracking();
         search = search?.Trim();
         if (!string.IsNullOrEmpty(search))
         {
@@ -80,7 +80,7 @@ public class PurchaseRequestsController : Controller
     {
         var user = await DepartmentUser();
         if (user is null) return Forbid();
-        var request = await service.Load(user.DepartmentId!.Value, id);
+        var request = await service.Load(user.DepartmentId!.Value, id, user.Id);
         if (request is null) return NotFound();
         return View(new RequestDetails
         {
@@ -96,12 +96,16 @@ public class PurchaseRequestsController : Controller
     {
         form.Categories = await db.ProcurementCategories.AsNoTracking().Where(c => c.IsActive || form.Items.Select(i => i.CategoryId).Contains(c.Id))
             .OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync();
-        form.DepartmentName = await db.Departments.Where(d => d.Id == user.DepartmentId).Select(d => d.Name).SingleAsync();
+        form.DepartmentId ??= user.DepartmentId;
+        form.Departments = await db.Departments.AsNoTracking().Where(d => d.IsActive || d.Id == form.DepartmentId).OrderBy(d => d.Name).ToListAsync();
+        form.DepartmentName = form.Departments.FirstOrDefault(d => d.Id == form.DepartmentId)?.Name ?? "";
         form.RequesterName = string.IsNullOrWhiteSpace(user.FullName) ? user.Email ?? "" : user.FullName;
         if (form.Id != 0)
         {
             var stored = await db.PurchaseRequests.AsNoTracking().Include(r => r.Tenders).SingleAsync(r => r.Id == form.Id);
             form.Status = RequestDisplay.Status(stored); form.CreatedAt = stored.CreatedAt; form.Title = stored.Title;
+            form.ExistingItemImage = await db.Documents.AsNoTracking().Where(d => d.PurchaseRequestId == form.Id && d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/")).FirstOrDefaultAsync();
+            form.ExistingDocuments = await db.Documents.AsNoTracking().Where(d => d.PurchaseRequestId == form.Id && !(d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/"))).ToListAsync();
         }
         return form;
     }
@@ -117,7 +121,7 @@ public class PurchaseRequestsController : Controller
     {
         var user = await DepartmentUser();
         if (user is null) return Forbid();
-        var request = await service.Load(user.DepartmentId!.Value, id);
+        var request = await service.Load(user.DepartmentId!.Value, id, user.Id);
         if (request is null) return NotFound();
         if (!RequestDisplay.Editable(request, user.Id)) return Forbid();
         return View(await Context(DepartmentRequestService.Form(request), user));
@@ -139,24 +143,33 @@ public class PurchaseRequestsController : Controller
         if (user is null) return Forbid();
         if ((!edit && form.Id != 0) || (edit && (id <= 0 || form.Id != id))) return BadRequest();
         if (intent is not ("save" or "submit")) return BadRequest();
-        var resubmission = false;
+        var resubmission = false; var hadImage = false;
         if (edit)
         {
-            var request = await service.Load(user.DepartmentId!.Value, id);
+            var request = await service.Load(user.DepartmentId!.Value, id, user.Id);
             if (request is null) return NotFound();
             if (!RequestDisplay.Editable(request, user.Id)) return Forbid();
             resubmission = request.SubmittedAt != null;
-            form.ExistingDocuments = request.Documents.ToList();
+            form.ExistingDocuments = request.Documents.Where(d => !DepartmentRequestService.IsItemImage(d)).ToList();
+            hadImage = request.Documents.Any(DepartmentRequestService.IsItemImage);
             form.ReturnComment = DepartmentRequestService.Form(request).ReturnComment;
             db.ChangeTracker.Clear();
         }
         form.Items ??= [];
         form.Attachments ??= [];
+        form.DepartmentId ??= user.DepartmentId;
+        if (!await db.Departments.AnyAsync(d => d.Id == form.DepartmentId && d.IsActive))
+            ModelState.AddModelError(nameof(form.DepartmentId), "Choose the department the request is for.");
         if (form.Items.Count is < 1 or > 100)
             ModelState.AddModelError("Items", "Add between 1 and 100 items.");
         for (var i = 0; i < form.Items.Count; i++)
             if (decimal.Round(form.Items[i].Quantity, 3) != form.Items[i].Quantity)
                 ModelState.AddModelError($"Items[{i}].Quantity", "Use at most three decimal places.");
+        // One item per request: new requests carry exactly one item; older multi-item requests keep the items they already have.
+        if (!edit && form.Items.Count > 1) ModelState.AddModelError("Items", "A request covers one item. Create another request for another item.");
+        if (form.ItemImage is { } picture) ValidateItemImage(picture);
+        if (intent == "submit" && form.ItemImage == null && (form.RemoveItemImage || !hadImage))
+            ModelState.AddModelError("ItemImage", "Upload a picture of the item before submitting.");
         if (form.NeededBy?.Date < DateTime.UtcNow.Date && intent == "submit")
             ModelState.AddModelError("NeededBy", "Choose today or a future needed-by date when submitting.");
         if (form.NeededBy?.Date > DateTime.UtcNow.Date.AddYears(3))
@@ -198,6 +211,33 @@ public class PurchaseRequestsController : Controller
         return View(edit ? "Edit" : "Create", await Context(form, user));
     }
 
+    private void ValidateItemImage(IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (file.Length is <= 0 or > 3 * 1024 * 1024 || extension is not (".png" or ".jpg" or ".jpeg"))
+        { ModelState.AddModelError("ItemImage", "Use a PNG or JPEG picture up to 3 MB."); return; }
+        using var stream = file.OpenReadStream();
+        var bytes = new byte[8];
+        var count = stream.ReadAtLeast(bytes, 8, throwOnEndOfStream: false);
+        var valid = extension == ".png" ? count == 8 && bytes.AsSpan().SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })
+            : count >= 3 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255;
+        if (!valid) ModelState.AddModelError("ItemImage", "The picture's content does not match its extension.");
+    }
+
+    // Inline preview of the item picture for the department that owns the request (private storage, never wwwroot).
+    public async Task<IActionResult> ItemImage(int id)
+    {
+        var user = await DepartmentUser();
+        if (user is null) return Forbid();
+        var document = await db.Documents.AsNoTracking().SingleOrDefaultAsync(d => d.Id == id && d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/") &&
+            d.PurchaseRequest != null && (d.PurchaseRequest.DepartmentId == user.DepartmentId || d.PurchaseRequest.CreatedByUserId == user.Id));
+        if (document is null || Path.GetFileName(document.StoragePath) != document.StoragePath) return NotFound();
+        var path = Path.Combine(storageRoot, document.StoragePath);
+        if (!System.IO.File.Exists(path)) return NotFound();
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return PhysicalFile(path, document.ContentType == "image/png" ? "image/png" : "image/jpeg");
+    }
+
     private async Task ValidateAttachments(List<IFormFile> files)
     {
         if (files.Count > 5 || files.Sum(f => f.Length) > 10 * 1024 * 1024)
@@ -234,7 +274,7 @@ public class PurchaseRequestsController : Controller
         var user = await DepartmentUser();
         if (user is null) return Forbid();
         var document = await db.Documents.AsNoTracking().SingleOrDefaultAsync(d => d.Id == id &&
-            d.PurchaseRequest != null && d.PurchaseRequest.DepartmentId == user.DepartmentId);
+            d.PurchaseRequest != null && (d.PurchaseRequest.DepartmentId == user.DepartmentId || d.PurchaseRequest.CreatedByUserId == user.Id));
         if (document is null) return NotFound();
         // Only files managed by this area are served; shared storage needs a team download contract.
         if (document.DocumentType != "DepartmentSupportingDocument" ||

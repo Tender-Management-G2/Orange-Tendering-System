@@ -23,7 +23,7 @@ public class DashboardController(ApplicationDbContext db, UserManager<Applicatio
             .SingleOrDefaultAsync(d => d.Id == user.DepartmentId && d.IsActive);
         if (department is null) return Forbid();
         var service = new DepartmentRequestService(db, users);
-        var query = service.Requests(department.Id).AsNoTracking();
+        var query = service.Requests(department.Id, user.Id).AsNoTracking();
         var groups = await query.Select(r => new
         {
             Status = r.Tenders.Any() ? PurchaseRequestStatus.ConvertedToTender :

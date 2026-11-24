@@ -15,7 +15,7 @@ public enum ReportFormat { None, Xlsx, Pdf, Docx, Pptx }
 
 // A structured, validated request. Built by deterministic parsing on the server, so the model can never choose what data is read.
 public sealed record AssistantIntent(AssistantTopic Topic, ReportFormat Format, string? Period, bool? OwnDepartment, bool CountOnly, bool WantsReport, bool Arabic, int? RecordId = null,
-    bool Navigate = false, string? SearchText = null, string? Title = null, decimal? Amount = null, string? Currency = null)
+    bool Navigate = false, string? SearchText = null, decimal? Amount = null, string? Currency = null)
 {
     public AssistantIntent Merge(AssistantIntent pending) => this with
     {
@@ -67,11 +67,12 @@ public static partial class AssistantIntentParser
         var latest = Any(t, "latest", "newest", " last ", "most recent", "احدث", " اخر ", "اجدد");
         var create = Any(t, "create", "new tender", "make a tender", "start a tender", "draft a tender", "انشي", "انشاء", "اعمل", "اعملي", "سوي", "سويلي", "جديد", "ابدا");
         var reference = TenderRef().Match(t);
-        string? title = null, searchText = null, currency = null; decimal? amount = null;
+        string? searchText = null, currency = null; decimal? amount = null;
         if (tender && create && format == ReportFormat.None && !Any(t, "how do", "how to", "how can", "كيف", "summary", "summar", "ملخص", "لخص", "تقرير", "report", "export", "list", "قائمه"))
         {
             topic = AssistantTopic.CreateTender;
-            if (TitleAfter().Match(Strip(message)) is { Success: true } named) title = named.Groups[1].Value.Trim(TrimChars);
+            var purchaseReference = Regex.Match(t, @"(?:\bpr[- ]|طلب شراء\s*(?:رقم\s*)?)\s*0*(\d{1,9})\b");
+            if (int.TryParse(purchaseReference.Groups[1].Value, out var requestId)) recordId = requestId;
             if (Budget().Match(t) is { Success: true } b && decimal.TryParse(b.Groups[1].Value.Replace(",", ""), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var value))
             {
                 amount = b.Groups[2].Success && b.Groups[2].Value.Length > 0 ? value * 1000 : value;
@@ -123,7 +124,7 @@ public static partial class AssistantIntentParser
         bool? own = Any(t, "my department", "our department", "only mine", "قسمي", "قسمنا", "ادارتي", "دائرتي", "فقط قسم") ? true
             : Any(t, "all departments", "every department", "all of them", "كل الاقسام", "جميع الاقسام", "كل الادارات", "الكل") ? false : null;
         return new AssistantIntent(topic, format, period, own, count, wantsReport, IsArabic(message), recordId,
-            open && topic is AssistantTopic.TenderDetail or AssistantTopic.LatestTender, searchText, title, amount, currency);
+            open && topic is AssistantTopic.TenderDetail or AssistantTopic.LatestTender, searchText, amount, currency);
     }
 
     [GeneratedRegex(@"\bt-0*(\d{1,7})\b|(?:tender|مناقصه|عطاء)\s*(?:#|رقم|no\.?)?\s*0*(\d{1,7})\b")]
@@ -134,9 +135,6 @@ public static partial class AssistantIntentParser
     [GeneratedRegex(@"^(?:hey|hi|ok|okay|يا|اهلا|مرحبا)?\s*(?:orange|اورنج|أورنج)\s*(?:ai)?\s*[,،:!.]?\s*", RegexOptions.IgnoreCase)]
     private static partial Regex WakeWord();
 
-    // Title of a new tender: the words after "named/called/titled/باسم/بعنوان", up to a budget phrase or the end.
-    [GeneratedRegex(@"(?:named|called|titled|title|باسم|بإسم|بأسم|اسمه|اسمها|بعنوان|عنوانه)\s*[:""'«]?\s*(.+?)\s*(?:(?:with|and|at|for)?\s*(?:a\s+)?(?:budget|value|worth|estimated)|بميزاني|بقيم|وميزاني|وقيمت|قيمته|[.؟?!]|$)", RegexOptions.IgnoreCase)]
-    private static partial Regex TitleAfter();
     [GeneratedRegex(@"(?:budget|value|worth|estimated|ميزانيه|ميزانيتها|ميزانيته|بقيمه|قيمته|قيمتها|بمبلغ)\D{0,25}?(\d[\d,]*(?:\.\d+)?)\s*(k|الف|thousand)?\s*([a-z]{3}\b|دينار|دولار|يورو|ريال|درهم)?")]
     private static partial Regex Budget();
     public static string? CurrencyCode(string? text) => Normalize(text ?? "").Trim() switch

@@ -362,7 +362,7 @@ public static class UnifiedTenderChecks
             Check(afterMeeting.Contains("Open the evaluation workspace") && afterMeeting.Contains("AI analysis for this meeting"), "the popup leads the member to the evaluation workspace");
             var workspace = await lateClient.GetStringAsync("/EvaluationCommittee/Workflow/Meeting/" + id);
             Check(workspace.Contains("data-evaluation-form") && workspace.Contains("step=\"0.1\"") && workspace.Contains("Approved evaluation model"), "financial and technical score inputs (one decimal) remain available after the meeting ends");
-            Check(workspace.Contains("Sign and submit my evaluation") && workspace.Contains("data-report-signature") && !workspace.Contains("recommendation.RecommendedBidId"), "one submission carries scores and signature");
+            Check(workspace.Contains("Sign and submit evaluation") && workspace.Contains("data-report-signature") && !workspace.Contains("recommendation.RecommendedBidId"), "one submission carries scores and signature");
             Check(workspace.Contains("Download the AI analysis (PDF)") && workspace.Contains("advisory"), "AI analysis travels with the meeting and is marked advisory");
             var aiPdf = await lateClient.GetAsync("/EvaluationCommittee/Workflow/AiAnalysisPdf/" + id);
             var aiBytes = await aiPdf.Content.ReadAsByteArrayAsync();

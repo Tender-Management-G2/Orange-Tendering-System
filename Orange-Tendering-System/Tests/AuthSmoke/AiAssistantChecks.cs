@@ -23,6 +23,7 @@ using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Services.Assistant;
+using Orange_Tendering_System.ViewModels;
 
 // Orange AI assistant: role isolation of the data tools, real Excel/PDF/Word/PowerPoint output, authorized downloads, upload
 // validation, once-per-login welcome, clarification workflow and (with --live-model) real gemma3 answers.
@@ -173,7 +174,7 @@ public static class AiAssistantChecks
             Check(Orange_Tendering_System.Services.ExecutiveNavigationService.MatchLoose("explain my role", "Supplier", supplierPages).State == "Unrecognized", "loose match: unrelated words do not navigate");
         }
         Check(P("Open tender T-0003") is { Topic: AssistantTopic.TenderDetail, RecordId: 3, Navigate: true } && P("Summarize tender T-0003").Navigate == false, "parser: open by ID navigates, summary does not");
-        Check(P("اعمل عطاء باسم توريد أجهزة كمبيوتر") is { Topic: AssistantTopic.CreateTender, Title: "توريد أجهزة كمبيوتر" }, "parser: Arabic create with title");
+        Check(P("اعمل عطاء من طلب شراء رقم ٤٢") is { Topic: AssistantTopic.CreateTender, RecordId: 42 }, "parser: Arabic tender creation with a purchase request reference");
         Check(P("Create a tender with a budget of 50,000 JOD") is { Topic: AssistantTopic.CreateTender, Amount: 50000m, Currency: "JOD" }, "parser: create with budget");
         Check(P("أنشئلي عطاء جديد").Topic == AssistantTopic.CreateTender && P("How do I create a tender?").Topic == AssistantTopic.None, "parser: create vs how-to");
         Check(P("ابحث عن عطاء أجهزة") is { Topic: AssistantTopic.SearchTenders, SearchText: "أجهزة" }, "parser: tender search term");
@@ -473,13 +474,14 @@ public static class AiAssistantChecks
         var refused = await Send(dept1Client, "أنشئلي عطاء جديد");
         Check(refused.GetProperty("kind").GetString() == "text" && refused.GetProperty("reply").GetString()!.Contains("مسؤول التوريد"), "unauthorized role: tender creation refused with explanation");
         await Task.Delay(TimeSpan.FromSeconds(61));   // per-minute chat rate limit before the officer's draft conversation
-        var start =await Send(officerClient, "Create a tender named Computer Equipment Supply with a budget of 50,000 JOD");
+        var start = await Send(officerClient, $"Create a tender from PR-{pr5:0000} with a budget of 50,000 JOD");
         Check(start.GetProperty("kind").GetString() == "tender-draft" && start.GetProperty("reply").GetString()!.Contains($"PR-{pr5:0000}") && start.GetProperty("reply").GetString()!.Contains("commercial conditions"), "creation starts from the only eligible request and asks the next missing field");
         var draftConversation = start.GetProperty("conversationId").GetInt32();
         Check((await Send(officerClient, "Prices valid 90 days, payment 30 days after delivery", draftConversation)).GetProperty("reply").GetString()!.Contains("delivery expectations"), "draft asks for delivery");
-        Check((await Send(officerClient, "Within 30 days to the Amman head office", draftConversation)).GetProperty("reply").GetString()!.Contains("Which mandatory documents"), "draft asks for mandatory compliance");
-        var summary2 = await Send(officerClient, "Commercial registration and tax certificate", draftConversation);
-        Check(summary2.GetProperty("kind").GetString() == "tender-confirm" && summary2.GetProperty("reply").GetString()!.Contains("50,000.00 JOD") && summary2.GetProperty("reply").GetString()!.Contains("Rami Representative"), "summary shown with real values and the auto-selected department representative");
+        Check((await Send(officerClient, "Within 30 days to the Amman head office", draftConversation)).GetProperty("reply").GetString()!.Contains("mandatory compliance"), "draft asks for mandatory compliance");
+        Check((await Send(officerClient, "Commercial registration and tax certificate", draftConversation)).GetProperty("reply").GetString()!.Contains("required supplier documents"), "draft collects the supported supplier document types");
+        var summary2 = await Send(officerClient, "1 and 2", draftConversation);
+        Check(summary2.GetProperty("kind").GetString() == "tender-confirm" && summary2.GetProperty("reply").GetString()!.Contains("50,000.00 JOD") && summary2.GetProperty("reply").GetString()!.Contains("Rami Representative") && summary2.GetProperty("reply").GetString()!.Contains("Computers for finance team"), "summary uses inherited request details, actual documents and eligible assignments");
         using (var scope = app.Services.CreateScope())
             Check(!await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Tenders.AnyAsync(t => t.PurchaseRequestId == pr5), "nothing is saved before explicit confirmation");
         var notYet = await Send(officerClient, "hmm, maybe", draftConversation);
@@ -491,7 +493,9 @@ public static class AiAssistantChecks
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var row = await db.Tenders.AsNoTracking().SingleAsync(t => t.PurchaseRequestId == pr5);
             createdId = row.Id;
-            Check(row.Status == TenderStatus.Draft && row.Title == "Computer Equipment Supply" && row.EstimatedValue == 50000m && row.CreatedByUserId == ids["officer"], "confirmed draft saved in SQL Server as Draft through the existing workflow");
+            Check(row.Status == TenderStatus.Draft && row.Title == "Computers for finance team" && row.Description == "Replace ten end-of-life desktop computers." && row.EstimatedValue == 50000m && row.CreatedByUserId == ids["officer"], "confirmed draft inherits the title and description through the existing workflow");
+            Check(OfferDocumentTypes.Parse(row.RequiredDocuments).SequenceEqual(["OfficialQuotation", "TechnicalProposal"]) &&
+                !row.Requirements!.Contains("TechnicalRequirements"), "required documents are saved and additional technical requirements are absent");
             Check(await db.CommitteeMembers.CountAsync(m => m.TenderId == createdId) == 4 && await db.TenderRounds.AnyAsync(r => r.TenderId == createdId) && await db.AuditLogs.AnyAsync(a => a.Action == "RequirementsCreated" && a.EntityId == createdId.ToString()), "workflow side effects: four committee seats, round 1, workflow audit");
             Check(await db.AuditLogs.AnyAsync(a => a.Action == "AiTenderDraftCreated" && a.EntityId == createdId.ToString()) && await db.AuditLogs.AnyAsync(a => a.Action == "AiActionRejected"), "successful and rejected actions are audited");
         }
@@ -501,7 +505,7 @@ public static class AiAssistantChecks
         using (var scope = app.Services.CreateScope())
             Check(await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Tenders.CountAsync(t => t.PurchaseRequestId == pr5) == 1 && again.GetProperty("reply").GetString()!.Contains("already saved") && again.GetProperty("navigate").ValueKind == JsonValueKind.Null, "repeated confirmation does not create a duplicate tender");
         var list = await (await officerClient.Client.GetAsync("/SourcingOfficer/Workflow")).Content.ReadAsStringAsync();
-        Check(WebUtility.HtmlDecode(list).Contains("Computer Equipment Supply"), "the new draft appears in the normal tender list");
+        Check(WebUtility.HtmlDecode(list).Contains("Computers for finance team"), "the new draft appears in the normal tender list");
         var cancelStart = await Send(officerClient, "أنشئلي عطاء جديد");
         Check(cancelStart.GetProperty("reply").GetString()!.Contains("لا يوجد طلب شراء مقبول"), "no remaining accepted request: creation explains why nothing can be created");
         var drafts = await Send(officerClient, "Show my draft tenders");

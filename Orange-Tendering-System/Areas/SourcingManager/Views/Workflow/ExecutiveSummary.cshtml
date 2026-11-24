@@ -2,67 +2,115 @@
 @using Orange_Tendering_System.Models.Entities
 @{
     var f = Model.Facts; var r = Model.Review; var tenderId = r.Tender.Id;
-    ViewData["Title"] = "Executive summary"; ViewData["WorkspaceSection"] = "Tender";
-    ViewData["Description"] = "Summarize the signed evaluation report for the Top Committee. The committee's scores, votes and signatures are not changed here.";
+    var ar = Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
+    ViewData["Title"] = L("Review & Forward to Top Committee", "مراجعة وإرسال إلى اللجنة العليا"); ViewData["WorkspaceSection"] = "Tender";
+    ViewData["Description"] = $"{f.Reference} · {f.Title}";
     var submitted = Model.Submitted != null;
     var evalSigned = r.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null);
+    var best = f.Ranking.FirstOrDefault(x => x.Rank == 1);
+    // The executive assessment is a required field of the summary: pre-fill a neutral sentence so the Manager only has to review, sign and send.
+    if (Model.CanEdit && !submitted && (Model.Input.ManagerAssessment ?? "").Trim().Length < 20)
+        Model.Input.ManagerAssessment = "The Sourcing Manager reviewed the signed evaluation report and forwards it to the Top Committee for a decision.";
+    var pdfUrl = Url.Action("Pdf", "Reports", new { area = "SourcingManager", id = r.Report.Id });
+    var downloadUrl = Url.Action("Pdf", "Reports", new { area = "SourcingManager", id = r.Report.Id, download = true });
 }
-@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /> }
+@section Styles {
+    <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/evaluation-scores.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/manager-forward.css" asp-append-version="true" />
+}
+@section Scripts { <script src="~/js/manager-forward.js" asp-append-version="true"></script> }
 <partial name="_PageHeader" />
-<div class="pf-page">
-    <section class="ws-panel pg-panel pf-section">
-        <div class="pf-section-head"><span class="pf-step">i</span><div><h2>@f.Title</h2><p>@f.Reference · PR-@f.RequestId · @f.Department</p></div></div>
-        <dl class="pf-facts">
-            <div><dt>Recommended supplier</dt><dd>@(f.Recommended ?? "No single offer (tie)")</dd></div>
-            <div><dt>Recommended offer total</dt><dd class="pf-num">@(f.RecommendedTotal is decimal total ? CurrencyRules.Format(total, f.Currency) : "—")</dd></div>
-            <div><dt>Approved weights</dt><dd>Financial @f.FinancialWeight?.ToString("0.##")% · Technical @f.TechnicalWeight?.ToString("0.##")%</dd></div>
-            <div><dt>Offers</dt><dd>@f.ReceivedOffers received · @f.EligibleOffers evaluated</dd></div>
-            <div><dt>Committee signatures</dt><dd>@evalSigned of 4 on version @f.ReportVersion</dd></div>
-        </dl>
-        @if (f.Ranking.Count > 0)
-        {
-            <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Rank</th><th>Supplier</th><th class="pf-right">Final weighted score</th></tr></thead><tbody>
-            @foreach (var row in f.Ranking) { <tr class="@(row.Rank == 1 ? "pf-best" : null)"><td>@row.Rank</td><td>@row.Supplier</td><td class="pf-right pf-num">@row.Score.ToString("0.0")</td></tr> }
-            </tbody></table></div>
-        }
-        <details class="pf-more"><summary>Read the signed evaluation report (PDF)</summary>
-            <p class="pg-hint">Opening it is recorded; signing requires that you opened this exact version (SHA-256 @r.Report.PdfSha256?[..12]…).</p>
-            <iframe title="Signed evaluation report" src="@Url.Action("Pdf", "Reports", new { area = "SourcingManager", id = r.Report.Id })" style="width:100%;height:70vh;border:1px solid var(--ws-rule);border-radius:12px"></iframe>
-            <p><a class="pg-btn" asp-area="SourcingManager" asp-controller="Reports" asp-action="Pdf" asp-route-id="@r.Report.Id" asp-route-download="true">Download the report (PDF)</a></p>
-        </details>
-    </section>
-
+<div class="mf-page" dir="@(ar ? "rtl" : "ltr")">
     @if (ViewData["SummaryError"] is string error) { <p class="pf-note pf-warn" role="alert">@error</p> }
 
-    <form method="post" asp-action="ExecutiveSummary" asp-route-id="@tenderId" class="pg-form ws-panel pg-panel pf-section">
-        <div class="pf-section-head"><span class="pf-step">1</span><div><h2>Executive summary for the Top Committee</h2><p>Pre-filled from the recorded request, ranking and committee recommendations. Correct and complete it in your own words.</p></div></div>
-        <fieldset @(Model.CanEdit && !submitted ? null : "disabled")>
-            <div class="pg-form-grid">
-                <div class="pg-field pg-field-wide"><label asp-for="Input.BusinessNeed" class="pf-required">Business need</label><textarea asp-for="Input.BusinessNeed" rows="3" maxlength="4000"></textarea></div>
-                <div class="pg-field pg-field-wide"><label asp-for="Input.KeyFindings" class="pf-required">Key financial and technical findings</label><textarea asp-for="Input.KeyFindings" rows="4" maxlength="4000"></textarea></div>
-                <div class="pg-field pg-field-wide"><label asp-for="Input.RecommendationReasons" class="pf-required">Main reasons for the recommendation</label><textarea asp-for="Input.RecommendationReasons" rows="4" maxlength="4000"></textarea></div>
-                <div class="pg-field pg-field-wide"><label asp-for="Input.Risks">Important risks and observations</label><textarea asp-for="Input.Risks" rows="3" maxlength="4000"></textarea></div>
-                <div class="pg-field pg-field-wide"><label asp-for="Input.ManagerAssessment" class="pf-required">Your executive assessment</label><textarea asp-for="Input.ManagerAssessment" rows="4" maxlength="4000" placeholder="Your conclusion for the Top Committee"></textarea></div>
-            </div>
-            @if (Model.CanEdit && !submitted)
-            {
-                <div class="pf-section-head" style="margin-top:18px"><span class="pf-step">2</span><div><h2>Submit to the Top Committee</h2><p>Submitting signs your Manager section of the evaluation report and opens the Top Committee decision. You cannot edit the summary afterwards.</p></div></div>
-                <input type="hidden" name="documentHash" value="@r.Report.PdfSha256" />
-                <partial name="_ReportSignaturePad" />
-                <label class="pg-check"><input type="checkbox" name="confirmed" value="true" /> I reviewed the signed evaluation report (version @f.ReportVersion) and submit this summary.</label>
-                <div class="pg-actions">
-                    <button type="submit" name="intent" value="save" class="pg-btn" formnovalidate>Save draft</button>
-                    <button type="submit" name="intent" value="submit" class="pg-btn pg-btn-primary" data-confirm="Submit the executive summary to the Top Committee? It will be locked and your Manager signature recorded.">Submit Executive Summary to Top Committee</button>
-                    <a class="pg-btn" asp-action="Index" asp-route-open="@tenderId">Back to the tender</a>
-                </div>
-                <p class="pg-hint">To send the report back for a correction, or to reject it, use the tender page (both require a written reason).</p>
-            }
-            else
-            {
-                <p class="pf-note">@(submitted ? $"Submitted on {Model.Submitted!.SubmittedAt?.ToJordan("d MMM yyyy HH:mm")}. The Top Committee decides from here." : "This report is not awaiting your executive summary.")</p>
-                <div class="pg-actions"><a class="pg-btn" asp-action="Index" asp-route-open="@tenderId">Back to the tender</a></div>
-            }
-        </fieldset>
-    </form>
-</div>
+    @if (submitted)
+    {
+        <section class="mf-card mf-done" aria-live="polite">
+            <span class="mf-done-icon" aria-hidden="true">&#10003;</span>
+            <h2>@L("Sent to Top Committee", "تم الإرسال إلى اللجنة العليا")</h2>
+            <p>@L("The tender has been signed and forwarded to the Top Committee for review and decision.", "تم توقيع المناقصة وإرسالها إلى اللجنة العليا للمراجعة واتخاذ القرار.")</p>
+        </section>
+        <section class="mf-card">
+            <h3 class="mf-card-title">@L("Tender Information", "معلومات المناقصة")</h3>
+            <dl class="mf-facts">
+                <div><dt>@L("Tender No.", "رقم المناقصة")</dt><dd>@f.Reference</dd></div>
+                <div><dt>@L("Title", "العنوان")</dt><dd>@f.Title</dd></div>
+                <div><dt>@L("Recommended Supplier", "المورد الموصى به")</dt><dd class="mf-accent">@(f.Recommended ?? "—")</dd></div>
+                <div><dt>@L("Status", "الحالة")</dt><dd><span class="mf-pill">@L("Awaiting Top Committee Decision", "بانتظار قرار اللجنة العليا")</span></dd></div>
+            </dl>
+            <p class="mf-muted">@L("Submitted on", "تم الإرسال في") @Model.Submitted!.SubmittedAt?.ToJordan("d MMM yyyy HH:mm")</p>
+            <div class="mf-actions mf-center"><a class="mf-btn" asp-action="Index" asp-route-open="@tenderId">@L("View Details", "عرض التفاصيل")</a></div>
+        </section>
+    }
+    else if (!Model.CanEdit)
+    {
+        <section class="mf-card"><p class="pf-note">@L("This report is not awaiting your review.", "هذا التقرير لا ينتظر مراجعتك.")</p>
+            <div class="mf-actions"><a class="mf-btn" asp-action="Index" asp-route-open="@tenderId">@L("Back", "رجوع")</a></div></section>
+    }
+    else
+    {
+        <form method="post" asp-action="ExecutiveSummary" asp-route-id="@tenderId" class="mf-form" data-mf-form>
+            <input type="hidden" name="documentHash" value="@r.Report.PdfSha256" />
 
+            <section class="mf-card">
+                <h3 class="mf-card-title">@L("Tender Information", "معلومات المناقصة")</h3>
+                <dl class="mf-facts">
+                    <div><dt>@L("Tender No.", "رقم المناقصة")</dt><dd>@f.Reference</dd></div>
+                    <div><dt>@L("Title", "العنوان")</dt><dd>@f.Title</dd></div>
+                    <div><dt>@L("Recommended Supplier", "المورد الموصى به")</dt><dd class="mf-accent">@(f.Recommended ?? L("No single offer (tie)", "لا يوجد عرض منفرد (تعادل)"))</dd></div>
+                    <div><dt>@L("Total Score", "الدرجة الإجمالية")</dt><dd>@(best.Supplier != null ? best.Score.ToString("0.0") : "—")</dd></div>
+                    <div><dt>@L("Total Cost", "إجمالي التكلفة")</dt><dd>@(f.RecommendedTotal is decimal total ? CurrencyRules.Format(total, f.Currency) : "—")</dd></div>
+                    <div><dt>@L("Committee signatures", "تواقيع اللجنة")</dt><dd>@evalSigned / 4</dd></div>
+                </dl>
+            </section>
+
+            <section class="mf-card">
+                <h3 class="mf-card-title">@L("Officer Report", "تقرير المسؤول")</h3>
+                <div class="mf-file">
+                    <span class="mf-file-icon" aria-hidden="true">PDF</span>
+                    <span class="mf-file-name">Evaluation_Report_v@(f.ReportVersion).pdf</span>
+                    <button type="button" class="mf-ghost" data-mf-preview="@pdfUrl">@L("View", "عرض")</button>
+                    <a class="mf-icon-btn" href="@downloadUrl" download title="@L("Download the report (PDF)", "تنزيل التقرير (PDF)")" aria-label="@L("Download the report (PDF)", "تنزيل التقرير (PDF)")">&#11015;</a>
+                </div>
+                <div class="mf-preview" data-mf-preview-box hidden></div>
+                <p class="mf-muted">@L("Opening the report is recorded; signing requires that you opened this exact version.", "فتح التقرير يُسجَّل؛ والتوقيع يتطلب أنك فتحت هذه النسخة بالذات.") SHA-256 @r.Report.PdfSha256?[..12]…</p>
+            </section>
+
+            <details class="mf-card mf-summary">
+                <summary>@L("Executive summary for the Top Committee (pre-filled, editable)", "الملخص التنفيذي للجنة العليا (معبّأ مسبقاً وقابل للتعديل)")</summary>
+                <div class="mf-fields">
+                    <div class="pg-field"><label asp-for="Input.BusinessNeed">@L("Business need", "حاجة العمل")</label><textarea asp-for="Input.BusinessNeed" rows="3" maxlength="4000"></textarea></div>
+                    <div class="pg-field"><label asp-for="Input.KeyFindings">@L("Key financial and technical findings", "النتائج المالية والفنية الرئيسية")</label><textarea asp-for="Input.KeyFindings" rows="3" maxlength="4000"></textarea></div>
+                    <div class="pg-field"><label asp-for="Input.RecommendationReasons">@L("Reasons for the recommendation", "أسباب التوصية")</label><textarea asp-for="Input.RecommendationReasons" rows="3" maxlength="4000"></textarea></div>
+                    <div class="pg-field"><label asp-for="Input.Risks">@L("Risks and observations", "المخاطر والملاحظات")</label><textarea asp-for="Input.Risks" rows="2" maxlength="4000"></textarea></div>
+                    <div class="pg-field"><label asp-for="Input.ManagerAssessment">@L("Executive assessment", "التقييم التنفيذي")</label><textarea asp-for="Input.ManagerAssessment" rows="3" maxlength="4000"></textarea></div>
+                    <button type="submit" name="intent" value="save" class="mf-ghost" formnovalidate>@L("Save draft", "حفظ المسودة")</button>
+                </div>
+            </details>
+
+            <section class="mf-card">
+                <h3 class="mf-card-title">@L("Manager Remarks", "ملاحظات المدير") <small>(@L("Optional", "اختياري"))</small></h3>
+                <textarea name="remarks" rows="3" maxlength="1500" placeholder="@L("Add remarks...", "أضف ملاحظاتك...")"></textarea>
+            </section>
+
+            <div class="mf-actions">
+                <a class="mf-btn" asp-action="Index" asp-route-open="@tenderId">&larr; @L("Back", "رجوع")</a>
+                <button type="button" class="mf-primary" data-mf-open>@L("Sign & Send to Top Committee", "توقيع وإرسال إلى اللجنة العليا") <span aria-hidden="true">&rarr;</span></button>
+            </div>
+            <p class="mf-muted">@L("To send the report back for a correction, or to reject it, use the tender page (both require a written reason).", "لإعادة التقرير للتصحيح أو رفضه استخدم صفحة المناقصة (كلاهما يتطلب سبباً مكتوباً).")</p>
+
+            <dialog class="mf-modal" data-mf-dialog aria-labelledby="mf-sign-title">
+                <div class="mf-modal-head"><h2 id="mf-sign-title">&#9998; @L("Manager Signature", "توقيع المدير")</h2><button type="button" class="mf-x" data-mf-cancel aria-label="@L("Cancel", "إلغاء")">&times;</button></div>
+                <p>@L("Please sign to confirm and send the tender to the Top Committee.", "يرجى التوقيع للتأكيد وإرسال المناقصة إلى اللجنة العليا.")</p>
+                <partial name="_ReportSignaturePad" />
+                <label class="mf-check"><input type="checkbox" name="confirmed" value="true" required /> @L("I reviewed the signed evaluation report.", "راجعت تقرير التقييم الموقّع.")</label>
+                <div class="mf-modal-actions">
+                    <button type="button" class="mf-btn" data-mf-cancel>@L("Cancel", "إلغاء")</button>
+                    <button type="submit" name="intent" value="submit" class="mf-primary" data-mf-send>@L("Sign & Send", "توقيع وإرسال") <span aria-hidden="true">&#10148;</span></button>
+                </div>
+            </dialog>
+        </form>
+    }
+</div>

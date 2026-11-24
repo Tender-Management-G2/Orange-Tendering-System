@@ -259,8 +259,8 @@ public static class TopDecisionChecks
    Check(n.Status==FinalDecisionStatus.SuppliersNotified&&n.TopApprovals==4&&n.ManagerAcknowledgedAt==null,"no Sourcing Manager approval after the unanimous Top decision");
    Check(await db.Set<SupplierResultDelivery>().CountAsync(x=>x.TenderId==approve.Tender&&(x.Outcome=="Won"||x.Outcome=="Unsuccessful"))==3,"each supplier gets its own result automatically");
    var link="/Workflow/Details/"+approve.Tender;
-   Check(await db.Notifications.CountAsync(x=>x.UserId==requester&&x.Title=="Purchase request awarded"&&x.Message.Contains("Approval preserved"))==1&&await db.Notifications.CountAsync(x=>x.UserId==officer&&x.Title=="Tender awarded"&&x.Link==link)==1
-     &&await db.Notifications.CountAsync(x=>x.UserId==manager&&x.Title=="Tender awarded"&&x.Link==link)==1&&await db.Notifications.CountAsync(x=>x.UserId==tops[0]&&x.Title=="Tender awarded"&&x.Link==link)==1,"department, Officer, Manager and Top members notified once");
+   Check(await db.Notifications.CountAsync(x=>x.UserId==requester&&x.Title=="Purchase request awarded"&&x.Message.Contains("Approval preserved"))==1&&await db.Notifications.CountAsync(x=>x.UserId==officer&&x.Title=="Tender award report"&&x.Link==link)==1
+     &&await db.Notifications.CountAsync(x=>x.UserId==manager&&x.Title=="Tender award report"&&x.Link==link)==1&&await db.Notifications.CountAsync(x=>x.UserId==tops[0]&&x.Title=="Tender awarded"&&x.Link==link)==0,"department, Officer and Manager notified once; committee members are not notified");
    var supplierMessages=await db.Notifications.Where(x=>x.Title=="Tender result").Select(x=>x.Message).ToListAsync();
    Check(supplierMessages.All(m=>!m.Contains("score")&&!m.Contains("vote")&&!m.Contains("JOD")),"supplier messages reveal no competitor, score, vote or price");
   });

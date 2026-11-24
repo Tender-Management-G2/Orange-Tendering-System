@@ -8,5 +8,5 @@
 <form asp-action="Create" method="post" enctype="multipart/form-data" class="pg-form department-form" data-om="popup">
     <partial name="_RequestForm" model="Model" />
 </form>
-@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /><link rel="stylesheet" href="~/css/department-request-create.css" asp-append-version="true" /> }
-@section Scripts { <partial name="_FormScripts" /> }
+@section Styles { <link rel="stylesheet" href="~/css/procurement-forms.css" asp-append-version="true" /><link rel="stylesheet" href="~/css/department-request-create.css" asp-append-version="true" /><link rel="stylesheet" href="~/css/department-request-redesign.css" asp-append-version="true" /> }
+@section Scripts { @if (Model.Items.Count > 1) { <partial name="_FormScripts" /> } else { <script src="~/js/department-request-form.js" asp-append-version="true"></script> } }

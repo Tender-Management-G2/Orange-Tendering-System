@@ -1,8 +1,7 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
@@ -23,13 +22,16 @@ public sealed record TenderDraft
     public int? PurchaseRequestId { get; init; }
     public string? Title { get; init; }
     public string? Description { get; init; }
-    public string? TechnicalRequirements { get; init; }
+    public string? RequestedItems { get; init; }
+    public bool LowestPrice { get; init; }
+    public int? DepartmentId { get; init; }
+    public List<string> RequiredDocuments { get; init; } = [];
+    public Dictionary<string, string> Assignments { get; init; } = [];
     public string? CommercialConditions { get; init; }
     public string? DeliveryExpectations { get; init; }
     public string? MandatoryCompliance { get; init; }
     public decimal? EstimatedValue { get; init; }
     public string Currency { get; init; } = "JOD";
-    public string? DepartmentRepresentativeId { get; init; }
     public string? Asking { get; init; }
     public int? CreatedTenderId { get; init; }
     public string State { get; init; } = "Collecting";   // Collecting | Confirming | Created | Cancelled
@@ -38,10 +40,10 @@ public sealed record TenderDraft
 // Controlled action layer of Orange AI. Every action is a fixed server method: it resolves records through AssistantAccess scopes,
 // builds URLs from fixed route templates only, and creates tenders only through TenderWorkflowService.Create after an explicit
 // confirmation. The model is never involved in choosing, authorizing or executing an action.
-public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess access, TenderWorkflowService workflow, UserManager<ApplicationUser> users, TimeProvider clock, ILogger<AssistantActions> logger)
+public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess access, TenderWorkflowService workflow, TimeProvider clock, ILogger<AssistantActions> logger)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    public static readonly string[] Currencies = ["JOD", "USD", "EUR", "SAR", "AED", "EGP"];
+    public static readonly IReadOnlyList<string> Currencies = CurrencyRules.Tender;
 
     // ---------------- navigation ----------------
 
@@ -343,29 +345,36 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
 
     // ---------------- tender draft creation ----------------
 
-    private sealed record Candidate(int Id, string Title, string Department, int DepartmentId, string Justification, string Items);
+    private sealed record Candidate(int Id, string Title, string Department, int DepartmentId, string Justification, string Items, bool LowestPrice);
 
-    private async Task<List<Candidate>> Candidates(CancellationToken ct) =>
+    private async Task<List<Candidate>> Candidates(CancellationToken ct, int? id = null) =>
         (await db.PurchaseRequests.AsNoTracking().Where(r => r.Status == PurchaseRequestStatus.Accepted && !r.Tenders.Any() && r.Items.Any())
+            .Where(r => id == null || r.Id == id)
             .OrderByDescending(r => r.Id).Take(10)
-            .Select(r => new { r.Id, r.Title, Department = r.Department.Name, r.DepartmentId, r.Justification, Items = r.Items.OrderBy(i => i.Id).Select(i => new { i.Name, i.Quantity, i.Unit, i.Specifications }).ToList() })
+            .Select(r => new { r.Id, r.Title, Department = r.Department.Name, r.DepartmentId, r.Justification, r.EvaluationMethod, Items = r.Items.OrderBy(i => i.Id).Select(i => new { i.Name, i.Quantity, i.Unit, i.Specifications }).ToList() })
             .ToListAsync(ct))
         .Select(r => new Candidate(r.Id, r.Title, r.Department, r.DepartmentId, r.Justification,
-            string.Join("\n", r.Items.Select(i => $"- {i.Name}: {i.Quantity:0.##} {i.Unit}{(string.IsNullOrWhiteSpace(i.Specifications) ? "" : " — " + i.Specifications)}")))).ToList();
+            string.Join("\n", r.Items.Select(i => $"- {i.Name}: {i.Quantity:0.###} {i.Unit}{(string.IsNullOrWhiteSpace(i.Specifications) ? "" : " — " + i.Specifications)}")),
+            r.EvaluationMethod == TenderEvaluationMethod.LowestPrice)).ToList();
 
-    // Eligible department representatives, same rule as the New Tender form: active, the full role set, not Admin/Supplier/Officer.
-    private async Task<List<(string Id, string Name)>> Representatives(int departmentId)
+    private static IEnumerable<string> RequiredRoles(bool lowestPrice) =>
+        lowestPrice ? TenderWorkflowService.TenderSeatRoles.Take(1) : TenderWorkflowService.TenderSeatRoles;
+
+    private static string RoleLabel(string role, bool ar) => role switch
     {
-        var result = new List<(string, string)>();
-        foreach (var person in (await users.GetUsersInRoleAsync(SystemRoles.DepartmentRepresentative)).Where(u => u.IsActive && u.DepartmentId == departmentId).OrderBy(u => u.FullName))
-        {
-            var roles = await users.GetRolesAsync(person);
-            if (roles.Contains(SystemRoles.Admin) || roles.Contains(SystemRoles.Supplier) || roles.Contains(SystemRoles.SourcingOfficer) ||
-                SystemRoles.AccountRoles(SystemRoles.DepartmentRepresentative).Any(r => !roles.Contains(r))) continue;
-            result.Add((person.Id, string.IsNullOrWhiteSpace(person.FullName) ? person.Email ?? person.Id : person.FullName));
-        }
-        return result;
-    }
+        SystemRoles.SourcingManager => ar ? "مدير التوريد" : "Sourcing Manager",
+        SystemRoles.DepartmentRepresentative => ar ? "ممثل القسم الطالب" : "Requesting Department Representative",
+        SystemRoles.Finance => ar ? "الممثل المالي" : "Financial Representative",
+        _ => ar ? "الممثل الفني" : "Technical Representative"
+    };
+
+    private async Task<List<ApplicationUser>> AssignmentOptions(string role, Candidate request, TenderDraft draft) =>
+        (await workflow.TenderSeatCandidates(role))
+        .Where(person => (role != SystemRoles.DepartmentRepresentative || person.DepartmentId == request.DepartmentId)
+            && !draft.Assignments.Any(pair => pair.Key != role && pair.Value == person.Id)).ToList();
+
+    private static string EmployeeName(ApplicationUser person) =>
+        string.IsNullOrWhiteSpace(person.FullName) ? person.Email ?? person.Id : person.FullName;
 
     public async Task<ActionOutcome> StartTenderAsync(AssistantUser user, AssistantIntent intent, CancellationToken ct)
     {
@@ -381,31 +390,31 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
         }
         var draft = new TenderDraft
         {
-            Arabic = ar, Title = Clean(intent.Title, 200),
+            Arabic = ar,
             EstimatedValue = intent.Amount is > 0 ? intent.Amount : null, Currency = intent.Currency ?? "JOD"
         };
         var candidates = await Candidates(ct);
         if (candidates.Count == 0)
             return new(ar ? "لا يوجد طلب شراء مقبول بدون مناقصة. المناقصة في هذا النظام تبدأ دائمًا من طلب شراء مقبول، لذلك لم يتم إنشاء أي شيء." : "There is no accepted purchase request without a tender. In this system a tender always starts from an accepted purchase request, so nothing was created.",
                 ar ? "ما في طلب شراء مقبول جاهز لمناقصة." : "There's no accepted purchase request ready for a tender.");
-        if (candidates.Count == 1) draft = await ApplyRequest(draft, candidates[0], ct);
-        return await Next(user, draft, ct, intro: candidates.Count == 1
-            ? (ar ? $"تمام، رح نجهز مسودة مناقصة من طلب الشراء **PR-{candidates[0].Id:0000} – {candidates[0].Title}** ({candidates[0].Department}).\n\n" : $"Great — I'll prepare a tender draft from purchase request **PR-{candidates[0].Id:0000} – {candidates[0].Title}** ({candidates[0].Department}).\n\n")
+        var chosen = intent.RecordId is int id ? (await Candidates(ct, id)).SingleOrDefault() : candidates.Count == 1 ? candidates[0] : null;
+        if (chosen != null) draft = ApplyRequest(draft, chosen);
+        return await Next(user, draft, ct, intro: chosen != null
+            ? $"**PR-{chosen.Id:0000} · {chosen.Title}** ({chosen.Department})\n\n"
             : "");
     }
 
-    private async Task<TenderDraft> ApplyRequest(TenderDraft draft, Candidate pr, CancellationToken ct)
-    {
-        var reps = await Representatives(pr.DepartmentId);
-        return draft with
+    private static TenderDraft ApplyRequest(TenderDraft draft, Candidate pr) =>
+        draft with
         {
             PurchaseRequestId = pr.Id,
-            Title = draft.Title ?? null,
-            Description = pr.Justification.Length > 10000 ? pr.Justification[..10000] : pr.Justification,
-            TechnicalRequirements = pr.Items.Length > 10000 ? pr.Items[..10000] : pr.Items,
-            DepartmentRepresentativeId = reps.Count == 1 ? reps[0].Id : null
+            Title = pr.Title,
+            Description = pr.Justification,
+            RequestedItems = pr.Items,
+            LowestPrice = pr.LowestPrice,
+            DepartmentId = pr.DepartmentId,
+            Assignments = []
         };
-    }
 
     // Continues the conversation from the last server-written draft. Returns null when the message is not about the draft.
     public async Task<ActionOutcome> ContinueTenderAsync(ClaimsPrincipal principal, AssistantUser user, TenderDraft draft, string message, CancellationToken ct)
@@ -426,9 +435,9 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
         }
         if (draft.State == "Confirming")
         {
-            if (Regex.IsMatch(t, @"\s(confirm|confirmed|yes,? create|create it|go ahead|save it|نعم|اه|ايوه|ايوا|اكد|اكيد|تاكيد|موافق|انشيها|انشيه|احفظ|احفظها|اعتمد)\s?"))
+            if (Regex.IsMatch(t.Trim(), @"^(confirm|confirmed|yes,? create|create it|go ahead|save it|نعم|ايوه|ايوا|اكد|تاكيد|موافق|انشيها|انشيه|احفظ|احفظها)[.!؟]*$"))
                 return await CreateAsync(principal, user, draft, ct);
-            return Summary(draft, await RepresentativeName(draft), ar ? "لم أحفظ شيئًا بعد. " : "Nothing has been saved yet. ");
+            return await Next(user, draft, ct, intro: ar ? "لم أحفظ شيئًا بعد. " : "Nothing has been saved yet. ");
         }
         var answer = message.Trim();
         string? problem = null;
@@ -438,25 +447,46 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
                 var candidates = await Candidates(ct);
                 var m = Regex.Match(AssistantIntentParser.Normalize(answer), @"(\d+)");
                 // A small number is the list position ("2", "الثاني رقم 2"); a larger one is the PR number ("PR-0012").
-                var pick = !m.Success ? null : int.Parse(m.Value) is var n && n >= 1 && n <= candidates.Count && !AssistantIntentParser.Normalize(answer).Contains("pr") ? candidates[n - 1] : candidates.FirstOrDefault(c => c.Id == n);
+                var explicitReference = AssistantIntentParser.Normalize(answer).Contains("pr");
+                var pick = !int.TryParse(m.Value, out var n) ? null
+                    : n >= 1 && n <= candidates.Count && !explicitReference ? candidates[n - 1]
+                    : (await Candidates(ct, n)).SingleOrDefault();
                 if (pick == null) problem = ar ? "لم أتعرف على الطلب. اختر رقمًا من القائمة." : "I didn't recognize that request. Choose a number from the list.";
-                else draft = await ApplyRequest(draft, pick, ct);
+                else draft = ApplyRequest(draft, pick);
                 break;
-            case "title": draft = draft with { Title = Clean(answer, 200) }; if (draft.Title == null) problem = ar ? "اكتب اسمًا للمناقصة (حتى 200 حرف)." : "Give the tender a name (up to 200 characters)."; break;
             case "value":
                 var (value, currency) = Money(answer);
-                if (value is not > 0) problem = ar ? "اكتب القيمة التقديرية كرقم، مثل 50000 أو 50 ألف دينار." : "Give the estimated value as a number, e.g. 50000 or 50,000 JOD.";
+                if (!ValidValue(value)) problem = ar ? "أدخل قيمة تقديرية موجبة بمنزلتين عشريتين على الأكثر." : "Enter a positive estimated value with up to two decimal places.";
                 else draft = draft with { EstimatedValue = value, Currency = currency ?? draft.Currency };
+                break;
+            case "currency":
+                var allowed = draft.LowestPrice ? CurrencyRules.Offer : CurrencyRules.Tender;
+                var code = allowed.FirstOrDefault(c => string.Equals(c, answer, StringComparison.OrdinalIgnoreCase));
+                if (code != null) draft = draft with { Currency = code };
+                else problem = ar ? "اختر رمزًا من العملات المتاحة." : "Choose one of the listed currency codes.";
                 break;
             case "commercial": draft = draft with { CommercialConditions = Clean(answer, 10000) }; break;
             case "delivery": draft = draft with { DeliveryExpectations = Clean(answer, 4000) }; break;
             case "compliance": draft = draft with { MandatoryCompliance = Clean(answer, 4000) }; break;
-            case "representative":
-                var reps = draft.PurchaseRequestId is { } prId ? await Representatives((await db.PurchaseRequests.AsNoTracking().SingleAsync(r => r.Id == prId, ct)).DepartmentId) : [];
-                var r = Regex.Match(AssistantIntentParser.Normalize(answer), @"(\d+)");
-                var chosen = r.Success && int.Parse(r.Value) is var k && k >= 1 && k <= reps.Count ? reps[k - 1] : reps.FirstOrDefault(x => AssistantIntentParser.Normalize(x.Name).Contains(AssistantIntentParser.Normalize(answer).Trim()));
-                if (chosen.Id == null) problem = ar ? "اختر رقم ممثل القسم من القائمة." : "Choose the department representative's number from the list.";
-                else draft = draft with { DepartmentRepresentativeId = chosen.Id };
+            case "documents":
+                var documents = OfferDocumentTypes.All.ToArray();
+                var selected = Regex.Matches(AssistantIntentParser.Normalize(answer), @"\d+").Select(m => m.Value).ToList();
+                if (selected.Count > 0 && selected.All(s => int.TryParse(s, out var index) && index >= 1 && index <= documents.Length))
+                    draft = draft with { RequiredDocuments = selected.Select(s => documents[int.Parse(s) - 1].Key).Distinct().ToList() };
+                else problem = ar ? "اختر أرقام الوثائق المطلوبة من القائمة." : "Choose the required document numbers from the list.";
+                break;
+            default:
+                if (draft.Asking is { } role && RequiredRoles(draft.LowestPrice).Contains(role) &&
+                    draft.PurchaseRequestId is int prId && (await Candidates(ct, prId)).SingleOrDefault() is { } request)
+                {
+                    var pool = await AssignmentOptions(role, request, draft);
+                    var normalized = AssistantIntentParser.Normalize(answer).Trim();
+                    var matches = pool.Where(p => AssistantIntentParser.Normalize(EmployeeName(p)).Equals(normalized)).ToArray();
+                    var chosen = int.TryParse(normalized, out var index) && index >= 1 && index <= pool.Count
+                        ? pool[index - 1] : matches.Length == 1 ? matches[0] : null;
+                    if (chosen == null) problem = ar ? "اختر رقم موظف مؤهل من القائمة." : "Choose an eligible employee by number.";
+                    else draft.Assignments[role] = chosen.Id;
+                }
                 break;
         }
         return await Next(user, draft, ct, problem: problem);
@@ -465,64 +495,88 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
     private async Task<ActionOutcome> Next(AssistantUser user, TenderDraft draft, CancellationToken ct, string intro = "", string? problem = null)
     {
         var ar = draft.Arabic;
-        string asking, question, speech;
+        string L(string en, string arabic) => ar ? arabic : en;
+        ActionOutcome Ask(string key, string question, IEnumerable<string>? choices = null)
+        {
+            var speech = (problem == null ? "" : problem + " ") + question;
+            var list = choices == null ? "" : "\n" + string.Join("\n", choices.Select((label, i) => $"{i + 1}. {label}"));
+            return new(intro + speech + list, speech, "tender-draft",
+                JsonSerializer.Serialize(draft with { Asking = key, State = "Collecting" }, Json));
+        }
+
         if (draft.PurchaseRequestId == null)
         {
-            var list = await Candidates(ct);
-            asking = "request";
-            question = (ar ? "من أي طلب شراء مقبول تريد إنشاء المناقصة؟ اختر رقمًا:\n" : "Which accepted purchase request should the tender start from? Choose a number:\n")
-                + string.Join("\n", list.Select((c, i) => $"{i + 1}. PR-{c.Id:0000} – {c.Title} ({c.Department})"));
-            speech = ar ? "من أي طلب شراء بدك المناقصة؟ اختار رقم من القائمة." : "Which purchase request should the tender start from? Choose a number from the list.";
+            var candidates = await Candidates(ct);
+            return Ask("request", L("Choose an accepted purchase request.", "اختر طلب شراء مقبولًا."),
+                candidates.Select(c => $"PR-{c.Id:0000} · {c.Title} ({c.Department})"));
         }
-        else if (draft.Title == null) { asking = "title"; question = ar ? "تمام، شو اسم العطاء؟" : "Okay, what is the tender's name?"; speech = question; }
-        else if (draft.EstimatedValue == null) { asking = "value"; question = ar ? "ممتاز. كم القيمة التقديرية للمشتريات؟ (مثال: 50 ألف دينار)" : "Great. What is the estimated procurement value? (e.g. 50,000 JOD)"; speech = ar ? "ممتاز. كم القيمة التقديرية؟" : "Great. What is the estimated value?"; }
-        else if (draft.CommercialConditions == null) { asking = "commercial"; question = ar ? "ما الشروط التجارية؟ (مدة صلاحية الأسعار، شروط الدفع، الضرائب)" : "What are the commercial conditions? (price validity, payment terms, taxes)"; speech = ar ? "شو الشروط التجارية؟" : "What are the commercial conditions?"; }
-        else if (draft.DeliveryExpectations == null) { asking = "delivery"; question = ar ? "ما متطلبات التسليم؟ (المدة والموقع)" : "What are the delivery expectations? (lead time and location)"; speech = ar ? "شو متطلبات التسليم؟" : "What are the delivery expectations?"; }
-        else if (draft.MandatoryCompliance == null) { asking = "compliance"; question = ar ? "ما الوثائق الإلزامية التي يجب أن يرفقها كل مورد مع عرضه؟" : "Which mandatory documents must every offer include?"; speech = ar ? "شو الوثائق الإلزامية المطلوبة من الموردين؟" : "Which mandatory documents must suppliers include?"; }
-        else if (draft.DepartmentRepresentativeId == null)
+        var request = (await Candidates(ct, draft.PurchaseRequestId)).SingleOrDefault();
+        if (request == null) return Reject(user, draft, L("The purchase request is no longer eligible.", "طلب الشراء لم يعد مؤهلًا."));
+        if (draft.Title != request.Title || draft.Description != request.Justification ||
+            draft.RequestedItems != request.Items || draft.LowestPrice != request.LowestPrice || draft.DepartmentId != request.DepartmentId)
+            draft = ApplyRequest(draft, request);
+
+        var currencies = request.LowestPrice ? CurrencyRules.Offer : CurrencyRules.Tender;
+        if (!ValidValue(draft.EstimatedValue)) return Ask("value", L("What is the estimated procurement value? Include the currency.", "كم القيمة التقديرية للمشتريات؟ اذكر العملة معها."));
+        if (!currencies.Contains(draft.Currency)) return Ask("currency", L("Choose a currency.", "اختر العملة.") + " " + string.Join(", ", currencies));
+        if (draft.CommercialConditions == null) return Ask("commercial", L("What are the commercial conditions?", "ما الشروط التجارية؟"));
+        if (draft.DeliveryExpectations == null) return Ask("delivery", L("What are the delivery expectations?", "ما متطلبات التسليم؟"));
+        if (draft.MandatoryCompliance == null) return Ask("compliance", L("What mandatory compliance conditions must suppliers meet?", "ما شروط الامتثال الإلزامية للموردين؟"));
+        if (draft.RequiredDocuments.Count == 0) return Ask("documents", L("Choose the numbers of the required supplier documents.", "اختر أرقام وثائق المورد المطلوبة من القائمة."),
+            OfferDocumentTypes.All.Select(doc => OfferDocumentTypes.Label(doc.Key, ar)));
+
+        var assignments = new List<string>();
+        var defaults = await workflow.StandingEvaluationDefaults();
+        foreach (var role in RequiredRoles(request.LowestPrice))
         {
-            var departmentId = (await db.PurchaseRequests.AsNoTracking().SingleAsync(r => r.Id == draft.PurchaseRequestId, ct)).DepartmentId;
-            var reps = await Representatives(departmentId);
-            if (reps.Count == 0)
-                return new(ar ? "لا يوجد ممثل قسم نشط مؤهل في القسم الطالب، لذلك لا يمكن إنشاء المناقصة. اطلب من مدير النظام تعيين ممثل للقسم." : "The requesting department has no eligible active Department Representative, so the tender cannot be created. Ask the Admin to assign one.",
-                    ar ? "ما في ممثل قسم مؤهل، لازم مدير النظام يعيّن واحد." : "There's no eligible department representative; the Admin must assign one.", "tender-draft", JsonSerializer.Serialize(draft with { State = "Cancelled" }, Json));
-            asking = "representative";
-            question = (ar ? "اختر ممثل القسم في لجنة التقييم:\n" : "Choose the department representative for the evaluation committee:\n") + string.Join("\n", reps.Select((p, i) => $"{i + 1}. {p.Name}"));
-            speech = ar ? "اختار ممثل القسم من القائمة." : "Choose the department representative from the list.";
+            var pool = await AssignmentOptions(role, request, draft);
+            var key = role switch
+            {
+                SystemRoles.SourcingManager => "evaluation-manager",
+                SystemRoles.Finance => "evaluation-financial",
+                SystemRoles.Technical => "evaluation-technical-1",
+                _ => ""
+            };
+            var preferred = draft.Assignments.GetValueOrDefault(role) ?? defaults.GetValueOrDefault(key);
+            var selected = pool.FirstOrDefault(person => person.Id == preferred) ?? (pool.Count == 1 ? pool[0] : null);
+            if (selected != null)
+            {
+                draft.Assignments[role] = selected.Id;
+                assignments.Add(RoleLabel(role, ar) + ": " + EmployeeName(selected));
+                continue;
+            }
+            draft.Assignments.Remove(role);
+            if (pool.Count == 0) return Reject(user, draft, L("No eligible employee for ", "لا يوجد موظف مؤهل للدور ") + RoleLabel(role, ar));
+            return Ask(role, L("Choose an employee for ", "اختر موظفًا لدور ") + RoleLabel(role, ar), pool.Select(EmployeeName));
         }
-        else
-        {
-            var confirming = draft with { Asking = null, State = "Confirming" };
-            return Summary(confirming, await RepresentativeName(confirming), intro);
-        }
-        var text = intro + (problem != null ? problem + "\n\n" : "") + question;
-        return new(text, (problem != null ? problem + " " : "") + speech, "tender-draft", JsonSerializer.Serialize(draft with { Asking = asking, State = "Collecting" }, Json));
+        return Summary(draft, request, assignments, intro);
     }
 
-    private async Task<string?> RepresentativeName(TenderDraft d) =>
-        d.DepartmentRepresentativeId == null ? null : await db.Users.AsNoTracking().Where(u => u.Id == d.DepartmentRepresentativeId).Select(u => u.FullName).SingleOrDefaultAsync();
+    private static bool ValidValue(decimal? value) =>
+        value is >= 0.01m and <= 9999999999999999.99m && decimal.Round(value.Value, 2) == value;
 
-    private ActionOutcome Summary(TenderDraft d, string? representative, string intro = "")
+    private static ActionOutcome Summary(TenderDraft draft, Candidate request, List<string> assignments, string intro)
     {
-        var ar = d.Arabic;
-        string Short(string? s) => s == null ? "—" : (s.Length > 220 ? s[..219] + "…" : s).Replace("\n", " · ");
-        var lines = ar ? new[]
+        var ar = draft.Arabic;
+        string L(string en, string arabic) => ar ? arabic : en;
+        var method = request.LowestPrice ? L("Lowest compliant price", "أقل سعر مطابق") : L("Committee weighting", "أوزان لجنة التقييم");
+        var documents = string.Join(", ", draft.RequiredDocuments.Select(key => OfferDocumentTypes.Label(key, ar)));
+        var lines = new[]
         {
-            $"- **طلب الشراء:** PR-{d.PurchaseRequestId:0000}", $"- **الاسم:** {d.Title}", $"- **القيمة التقديرية:** {d.EstimatedValue:N2} {d.Currency}",
-            $"- **الوصف:** {Short(d.Description)}", $"- **المتطلبات الفنية:** {Short(d.TechnicalRequirements)}", $"- **الشروط التجارية:** {Short(d.CommercialConditions)}",
-            $"- **التسليم:** {Short(d.DeliveryExpectations)}", $"- **الوثائق الإلزامية:** {Short(d.MandatoryCompliance)}",
-            $"- **لجنة التقييم:** اللجنة الدائمة (المدير، المالي، الفني) + ممثل القسم {representative}"
-        } : new[]
-        {
-            $"- **Purchase request:** PR-{d.PurchaseRequestId:0000}", $"- **Name:** {d.Title}", $"- **Estimated value:** {d.EstimatedValue:N2} {d.Currency}",
-            $"- **Description:** {Short(d.Description)}", $"- **Technical requirements:** {Short(d.TechnicalRequirements)}", $"- **Commercial conditions:** {Short(d.CommercialConditions)}",
-            $"- **Delivery:** {Short(d.DeliveryExpectations)}", $"- **Mandatory compliance:** {Short(d.MandatoryCompliance)}",
-            $"- **Evaluation committee:** standing committee (Manager, Financial, Technical) + department representative {representative}"
+            L("Purchase request", "طلب الشراء") + $": PR-{request.Id:0000} · {request.Title} · {request.Department}",
+            L("Description", "الوصف") + ": " + request.Justification,
+            L("Evaluation method", "طريقة التقييم") + ": " + method,
+            L("Estimated value", "القيمة التقديرية") + $": {draft.EstimatedValue:N2} {draft.Currency}",
+            L("Commercial conditions", "الشروط التجارية") + ": " + draft.CommercialConditions,
+            L("Delivery", "التسليم") + ": " + draft.DeliveryExpectations,
+            L("Mandatory compliance", "شروط الامتثال") + ": " + draft.MandatoryCompliance,
+            L("Required supplier documents", "وثائق المورد المطلوبة") + ": " + documents,
+            L("Assignments", "التعيينات") + ": " + string.Join(" · ", assignments)
         };
-        var text = intro + (ar ? "### ملخص مسودة المناقصة\n" : "### Tender draft summary\n") + string.Join("\n", lines)
-            + (ar ? "\n\nستُحفظ كمسودة (Draft) فقط، ولن تُفتح للتقديم ولن تُرسل أي دعوات. قل **«أكّد»** للحفظ أو **«إلغاء»**." : "\n\nIt will be saved as a **Draft** only — not opened for bidding, no invitations sent. Say **\"confirm\"** to save or **\"cancel\"**.");
-        var speech = ar ? $"هذا ملخص مسودة {d.Title} بقيمة {d.EstimatedValue:0.##} {d.Currency}. بدك أأكد الحفظ؟ قول أكّد أو إلغاء." : $"Here is the draft summary for {d.Title}, valued at {d.EstimatedValue:0.##} {d.Currency}. Should I save it? Say confirm or cancel.";
-        return new(text, speech, "tender-confirm", JsonSerializer.Serialize(d with { State = "Confirming", Asking = null }, Json));
+        var prompt = L("Say or type “confirm” to create this tender as a draft, or “cancel”.", "اكتب أو قل «أكّد» لإنشاء مسودة المناقصة أو «إلغاء».");
+        var text = intro + L("### Tender draft summary", "### ملخص مسودة المناقصة") + "\n" + string.Join("\n", lines.Select(line => "- " + line))
+            + "\n\n**" + L("Requested items", "البنود المطلوبة") + "**\n" + request.Items + "\n\n" + prompt;
+        return new(text, prompt, "tender-confirm", JsonSerializer.Serialize(draft with { State = "Confirming", Asking = null }, Json));
     }
 
     // Executes the confirmed draft through the existing TenderWorkflowService.Create (its validation, committee rules and transaction).
@@ -530,36 +584,46 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
     {
         var ar = d.Arabic;
         if (d.CreatedTenderId is { } done) return Created(user, d, done, duplicate: true);
-        var defaults = await workflow.StandingEvaluationDefaults();
+        var request = d.PurchaseRequestId is int prId ? (await Candidates(ct, prId)).SingleOrDefault() : null;
+        if (request != null && (d.Title != request.Title || d.Description != request.Justification ||
+            d.RequestedItems != request.Items || d.LowestPrice != request.LowestPrice || d.DepartmentId != request.DepartmentId))
+            return await Next(user, ApplyRequest(d, request), ct, ar ? "تغيّر طلب الشراء. راجع البيانات المحدثة.\n\n" : "The purchase request changed. Review the updated details.\n\n");
+        if (d.RequiredDocuments.Count == 0 || RequiredRoles(d.LowestPrice).Any(role => !d.Assignments.ContainsKey(role)))
+            return await Next(user, d, ct);
         var input = new RequirementsInput
         {
-            PurchaseRequestId = d.PurchaseRequestId ?? 0, Title = d.Title ?? "", Description = d.Description ?? "", TechnicalRequirements = d.TechnicalRequirements ?? "",
+            PurchaseRequestId = d.PurchaseRequestId ?? 0,
             CommercialConditions = d.CommercialConditions ?? "", DeliveryExpectations = d.DeliveryExpectations ?? "", MandatoryCompliance = d.MandatoryCompliance ?? "",
             EstimatedValue = d.EstimatedValue ?? 0, Currency = d.Currency, IsCritical = false,
-            SourcingManagerId = defaults.GetValueOrDefault("evaluation-manager") ?? "", FinancialRepresentativeId = defaults.GetValueOrDefault("evaluation-financial") ?? "",
-            TechnicalRepresentativeId = defaults.GetValueOrDefault("evaluation-technical-1") ?? "", DepartmentRepresentativeId = d.DepartmentRepresentativeId ?? ""
+            SourcingManagerId = d.Assignments.GetValueOrDefault(SystemRoles.SourcingManager) ?? "",
+            FinancialRepresentativeId = d.Assignments.GetValueOrDefault(SystemRoles.Finance),
+            TechnicalRepresentativeId = d.Assignments.GetValueOrDefault(SystemRoles.Technical),
+            DepartmentRepresentativeId = d.Assignments.GetValueOrDefault(SystemRoles.DepartmentRepresentative),
+            RequiredDocuments = d.RequiredDocuments
         };
         var errors = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
         if (!System.ComponentModel.DataAnnotations.Validator.TryValidateObject(input, new(input), errors, true) || !Currencies.Contains(input.Currency))
             return Reject(user, d, string.Join(" ", errors.Select(e => e.ErrorMessage)).Trim() is { Length: > 0 } msg ? msg : "Invalid currency.");
-        if (string.IsNullOrEmpty(input.SourcingManagerId) || string.IsNullOrEmpty(input.FinancialRepresentativeId) || string.IsNullOrEmpty(input.TechnicalRepresentativeId))
-            return Reject(user, d, ar ? "اللجنة الدائمة للتقييم غير مكتملة. يجب على مدير النظام تعيينها أولًا." : "The standing evaluation committee is incomplete. The Admin must configure it first.");
         try
         {
-            var id = await workflow.Create(input, principal);
-            Audit(user, "AiTenderDraftCreated", id.ToString(), new { d.DraftId, d.PurchaseRequestId, TenderId = id });
-            await db.SaveChangesAsync(ct);
+            var id = await workflow.Create(input, principal, d.DraftId);
+            if (!await db.Tenders.AsNoTracking().AnyAsync(t => t.Id == id && t.PurchaseRequestId == input.PurchaseRequestId && t.CreatedByUserId == user.Id, ct))
+                return Reject(user, d, ar ? "تعذّر التحقق من حفظ المناقصة." : "Could not verify the saved tender.");
             return Created(user, d with { CreatedTenderId = id, State = "Created" }, id, duplicate: false);
         }
         catch (WorkflowException e)
         {
             db.ChangeTracker.Clear();
             // A retried confirmation can lose the race to its first copy: that request now has the tender this officer just created.
-            var existing = await db.Tenders.AsNoTracking().Where(x => x.PurchaseRequestId == input.PurchaseRequestId && x.CreatedByUserId == user.Id && x.Title == input.Title && x.CreatedAt > clock.GetUtcNow().UtcDateTime.AddMinutes(-30))
-                .Select(x => (int?)x.Id).FirstOrDefaultAsync(ct);
+            var draftId = d.DraftId.ToString();
+            var existing = await db.Tenders.AsNoTracking()
+                .Where(tender => tender.PurchaseRequestId == input.PurchaseRequestId && tender.CreatedByUserId == user.Id &&
+                    db.AuditLogs.Any(log => log.Action == "AiTenderDraftCreated" && log.UserId == user.Id &&
+                        log.EntityId == tender.Id.ToString() && log.NewValues != null && log.NewValues.Contains(draftId)))
+                .Select(tender => (int?)tender.Id).FirstOrDefaultAsync(ct);
             if (existing is { } same) return Created(user, d with { CreatedTenderId = same, State = "Created" }, same, duplicate: true);
             logger.LogInformation("AI tender draft rejected by the workflow: {Message}", e.Message);
-            return Reject(user, d, e.Message);
+            return Reject(user, d, ar && e is TenderCreationFieldException field ? field.ArabicMessage : e.Message);
         }
     }
 
@@ -567,9 +631,12 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
     {
         var ar = d.Arabic;
         var url = TenderUrl(user, id, d.PurchaseRequestId ?? 0);
+        var next = d.LowestPrice
+            ? (ar ? "تابع المراجعة المالية." : "Continue to the financial review.")
+            : (ar ? "اطلب مقترحات الأوزان من اللجنة." : "Request weight proposals from the committee.");
         var text = ar
-            ? $"✅ {(duplicate ? "المسودة محفوظة مسبقًا" : "تم حفظ مسودة المناقصة")}: **T-{id:0000} – {d.Title}** (الحالة: مسودة).\n\nالخطوة التالية في النظام: طلب مقترحات الأوزان من اللجنة. جارٍ فتح صفحة المناقصة {url}"
-            : $"✅ {(duplicate ? "This draft was already saved" : "Tender draft saved")}: **T-{id:0000} – {d.Title}** (status: Draft).\n\nNext step in the workflow: request the committee's weight proposals. Opening {url}";
+            ? $"✅ {(duplicate ? "المسودة محفوظة مسبقًا" : "تم حفظ مسودة المناقصة")}: **T-{id:0000} – {d.Title}**. {next}"
+            : $"✅ {(duplicate ? "This draft was already saved" : "Tender draft saved")}: **T-{id:0000} – {d.Title}**. {next}";
         var speech = ar ? $"تم. حفظت المسودة {d.Title} برقم {id}. رح أفتحلك صفحتها." : $"Done. I saved the draft {d.Title} as tender {id}. Opening it now.";
         return new(text, speech, "tender-created", JsonSerializer.Serialize(new { url, tenderId = id, draft = d with { CreatedTenderId = id, State = "Created" } }, Json), url);
     }
@@ -579,7 +646,7 @@ public sealed class AssistantActions(ApplicationDbContext db, AssistantAccess ac
         Audit(user, "AiActionRejected", d.DraftId.ToString(), new { Action = "create_tender_draft", d.PurchaseRequestId, Reason = reason });
         db.SaveChanges();
         var ar = d.Arabic;
-        return new(ar ? $"لم يتم إنشاء المناقصة: {reason}\n\nلم يُحفظ أي شيء. يمكنك تعديل البيانات بالبدء من جديد أو استخدام نموذج «New Tender»." : $"The tender was not created: {reason}\n\nNothing was saved. You can start again or use the New Tender form.",
+        return new(ar ? $"تعذّر إنشاء المناقصة: {reason}\n\nيمكنك البدء من جديد أو استخدام نموذج «إنشاء مناقصة»." : $"The tender could not be created: {reason}\n\nStart again or use the Create Tender wizard.",
             ar ? "ما قدرت أنشئ المناقصة. شوف السبب بالشات." : "I couldn't create the tender. The reason is in the chat.", "tender-draft", JsonSerializer.Serialize(d with { State = "Cancelled" }, Json));
     }
 

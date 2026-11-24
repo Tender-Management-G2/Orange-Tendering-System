@@ -24,10 +24,13 @@
     var officerArabic = area == "SourcingOfficer" && Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
 }
 <link rel="stylesheet" href="~/css/workflow-cycle.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/workflow-wizard.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/evaluation-weights.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/evaluation-scores.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/tender-passport.css" asp-append-version="true" />
 <script src="~/js/technical-evaluation.js" asp-append-version="true"></script>
 <script src="~/js/tender-passport.js" asp-append-version="true" defer></script>
+<script src="~/js/workflow-wizard.js" asp-append-version="true"></script>
 <div class="dash-board @(area == "Supplier" ? "dash-supplier" : "dash-internal") wfl">
     <section class="dash-welcome wfl-hero" aria-labelledby="wfl-title">
         <div class="dash-welcome-photo" aria-hidden="true"></div>
@@ -61,7 +64,7 @@
                 <span class="wfl-count" id="wfl-count" role="status" aria-live="polite">@Model.Count @(Model.Count == 1 ? "tender" : "tenders")</span>
                 @if (area == "SourcingOfficer")
                 {
-                    <button type="button" class="wfl-new" data-open-tender title="Prepare a tender from an accepted purchase request" aria-label="Prepare tender from an accepted request"><span aria-hidden="true">+</span> Prepare tender</button>
+                    <button type="button" class="wfl-new" data-open-tender><span aria-hidden="true">+</span> @(officerArabic ? "إنشاء مناقصة" : "Create Tender")</button>
                 }
             </div>
         </div>
@@ -156,8 +159,22 @@
     }
     function wire() {
         OrangeTechnicalEvaluation.wire(body);
-        var sl = body.querySelector('#wp-fin');
-        if (sl) { var tl = body.querySelector('#wp-tech'), fl = body.querySelector('#wp-fin-label'), tt = body.querySelector('#wp-tech-label'); var sync = function () { var v = Number(sl.value); tl.value = 100 - v; fl.textContent = v + '%'; tt.textContent = (100 - v) + '%'; sl.style.setProperty('--p', v + '%'); }; sl.addEventListener('input', sync); sync(); }
+        body.querySelectorAll('[data-refresh-weight-progress]').forEach(function (b) { b.addEventListener('click', refreshView); });
+        body.querySelector('[data-cancel-weight-vote]')?.addEventListener('click', closeDlg);
+        body.querySelectorAll('[data-weight-sliders]').forEach(function (form) {
+            var sliders = Array.from(form.querySelectorAll('input[type=range]'));
+            sliders.forEach(function (slider) {
+                slider.addEventListener('input', function () {
+                    sliders.forEach(function (field) {
+                        if (field !== slider) field.value = Number(field.max) - Number(slider.value);
+                        var percentage = field.value + '%';
+                        field.style.setProperty('--ew-fill', percentage);
+                        field.setAttribute('aria-valuetext', percentage);
+                        field.closest('label').querySelector('output').value = percentage;
+                    });
+                });
+            });
+        });
         var f = body.querySelector('#financial-weight'), t = body.querySelector('#technical-weight');
         if (f && t) { f.addEventListener('input', function () { t.value = 100 - Number(f.value); }); t.addEventListener('input', function () { f.value = 100 - Number(t.value); }); }
         body.querySelectorAll('time[data-local]').forEach(function (el) { var d = new Date(el.dataset.local); if (!isNaN(d)) el.textContent = d.toLocaleString('en-GB', { timeZone: 'Asia/Amman', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' (Jordan)'; });
@@ -235,8 +252,10 @@
         body.querySelectorAll('[data-preview]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var box = btn.closest('.wp-report').querySelector('.wp-preview');
-                if (!box.hidden) { box.hidden = true; box.textContent = ''; btn.textContent = 'Preview it here'; return; }
-                var fr = document.createElement('iframe'); fr.title = 'Report PDF'; fr.src = btn.dataset.preview; box.appendChild(fr); box.hidden = false; btn.textContent = 'Hide the preview';
+                var original = btn.dataset.previewLabel || (btn.dataset.previewLabel = btn.textContent);
+                var arabic = document.documentElement.lang === 'ar';
+                if (!box.hidden) { box.hidden = true; box.textContent = ''; btn.textContent = original; return; }
+                var fr = document.createElement('iframe'); fr.title = arabic ? 'التقرير بصيغة PDF' : 'Report PDF'; fr.src = btn.dataset.preview; box.appendChild(fr); box.hidden = false; btn.textContent = arabic ? 'إخفاء المعاينة' : 'Hide the preview';
             });
         });
         // The server only accepts a signature after this person opened the exact PDF version: open it here and unlock signing once it has loaded.
@@ -266,7 +285,12 @@
         body.querySelectorAll('form[data-evaluator-scores]').forEach(function (form) {
             function updateTechnicalResults() {
                 form.querySelectorAll('[data-score-row]').forEach(function (row) {
-                    OrangeTechnicalEvaluation.score(row, '[data-score="technical"]');
+                    var technical = OrangeTechnicalEvaluation.score(row, '[data-score="technical"]');
+                    var financial = row.querySelector('[data-score="financial"]');
+                    var result = row.querySelector('[data-weighted-preview]');
+                    var fw = form.dataset.financialWeight, tw = form.dataset.technicalWeight;
+                    result.value = technical !== null && financial.value !== '' && financial.checkValidity() && fw && tw
+                        ? ((Number(financial.value) * Number(fw) + technical * Number(tw)) / 100).toFixed(1) : '—';
                 });
             }
             form.addEventListener('input', updateTechnicalResults);

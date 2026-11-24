@@ -1,247 +1,226 @@
 @model Orange_Tendering_System.ViewModels.RequirementsInput
-@inject Microsoft.AspNetCore.Identity.UserManager<Orange_Tendering_System.Models.Entities.ApplicationUser> People
-@inject Orange_Tendering_System.Services.TenderWorkflowService CommitteeConfiguration
+@inject Orange_Tendering_System.Services.TenderWorkflowService Workflow
 @inject Orange_Tendering_System.Data.ApplicationDbContext Records
 @using Microsoft.EntityFrameworkCore
+@using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.Services
+@using Orange_Tendering_System.ViewModels
 @{
-    // Show only accounts eligible for the seat; Create validates the selection again.
-    async Task<List<(string Id, string Label, int? Dept)>> Pool(string role)
-    {
-        var result = new List<(string Id, string Label, int? Dept)>();
-        foreach (var person in (await People.GetUsersInRoleAsync(role)).Where(u => u.IsActive))
-        {
-            var roles = await People.GetRolesAsync(person);
-            if (roles.Contains(Orange_Tendering_System.Models.SystemRoles.Admin) ||
-                roles.Contains(Orange_Tendering_System.Models.SystemRoles.Supplier) ||
-                roles.Contains(Orange_Tendering_System.Models.SystemRoles.SourcingOfficer) ||
-                Orange_Tendering_System.Models.SystemRoles.AccountRoles(role).Any(required => !roles.Contains(required))) continue;
-            result.Add((person.Id, (string.IsNullOrWhiteSpace(person.FullName) ? person.Email : person.FullName + " (" + person.Email + ")")!, person.DepartmentId));
-        }
-        return result.OrderBy(u => u.Label).ToList();
-    }
-    var fixedEvaluation = await CommitteeConfiguration.StandingEvaluationDefaults();
-    Model.SourcingManagerId = fixedEvaluation.GetValueOrDefault("evaluation-manager") ?? "";
-    Model.FinancialRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-financial") ?? "";
-    Model.TechnicalRepresentativeId = fixedEvaluation.GetValueOrDefault("evaluation-technical-1") ?? "";
-    var managers = await Pool(Orange_Tendering_System.Models.SystemRoles.SourcingManager);
-    var financialRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.Finance);
-    var technicalRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.Technical);
-    var departmentRepresentatives = await Pool(Orange_Tendering_System.Models.SystemRoles.DepartmentRepresentative);
-    var requests = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Status == Orange_Tendering_System.Models.Entities.PurchaseRequestStatus.Accepted && !r.Tenders.Any()).OrderByDescending(r => r.Id)
-        .Select(r => new
-        {
-            id = r.Id, deptId = r.DepartmentId, title = r.Title, dept = r.Department.Name, why = r.Justification, priority = r.Priority.ToString(), lowestPrice = r.EvaluationMethod == Orange_Tendering_System.Models.Entities.TenderEvaluationMethod.LowestPrice,
-            needed = r.NeededBy.HasValue ? r.NeededBy.Value.ToString("d MMM yyyy") : null,
-            files = r.Documents.Count,
-            items = r.Items.OrderBy(i => i.Id).Select(i => new { name = i.Name, cat = i.Category != null ? i.Category.Name : null, qty = i.Quantity, unit = i.Unit, spec = i.Specifications }).ToList()
-        }).ToListAsync();
-    var requestJson = System.Text.Json.JsonSerializer.Serialize(requests);
-    var currencies = new[] { "JOD", "USD", "EUR", "SAR", "AED", "EGP" };
-    var seats = new (string Field, string Title, string Hint, string Icon, List<(string Id, string Label, int? Dept)> Pool, string? Value)[]
-    {
-        ("SourcingManagerId", "Sourcing Manager", "Reviews the signed report: approve, reject or return", "M", managers, Model.SourcingManagerId),
-        ("DepartmentRepresentativeId", "Department Representative", "Scores for the requesting department", "D", departmentRepresentatives, Model.DepartmentRepresentativeId),
-        ("FinancialRepresentativeId", "Financial Representative", "Scores the financial side", "F", financialRepresentatives, Model.FinancialRepresentativeId),
-        ("TechnicalRepresentativeId", "Technical Representative", "Scores the technical side", "T", technicalRepresentatives, Model.TechnicalRepresentativeId)
+    var ar = UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
+    string Icon(string name) => name switch {
+        "building" => "M4 22V3h12v19M16 10h4v12M2 22h20M8 7h1m3 0h1M8 11h1m3 0h1M8 15h1m3 0h1",
+        "coins" => "M2 7a6.5 3 0 1 0 13 0 6.5 3 0 1 0-13 0zm0 0v10c0 4 13 4 13 0V7M2 12c0 4 13 4 13 0m3-8c2 .4 4 1.5 4 3v9c0 1.6-2 2.6-4 3m0-5c2-.4 4-1.4 4-3",
+        "code" => "m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18",
+        "truck" => "M2 5h13v12H2zm13 4h4l3 4v4h-7M8 19a2 2 0 1 0-4 0 2 2 0 0 0 4 0zm12 0a2 2 0 1 0-4 0 2 2 0 0 0 4 0z",
+        "paperclip" => "m8 13 7-7a3 3 0 0 1 4 4l-9 9a5 5 0 0 1-7-7l9-9m-2 12 7-7",
+        "users" or "user-check" => "M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm9 2 2 2 3-4",
+        "lock" => "M6 11h12v10H6zm2 0V7a4 4 0 0 1 8 0v4m-4 4v2",
+        _ => "M5 2h9l5 5v15H5zm9 0v6h5M8 12h8m-8 4h8"
     };
+    var rows = await Records.PurchaseRequests.AsNoTracking()
+        .Where(r => r.Status == PurchaseRequestStatus.Accepted && r.Items.Any() && !r.Tenders.Any())
+        .OrderByDescending(r => r.Id)
+        .Select(r => new { r.Id, r.Title, r.Justification, r.DepartmentId, department = r.Department.Name,
+            r.Priority, r.Status, r.NeededBy, r.EvaluationMethod,
+            items = r.Items.OrderBy(i => i.Id).Select(i => new { name = i.Name, quantity = i.Quantity, unit = i.Unit, specifications = i.Specifications }).ToList() })
+        .ToListAsync();
+    var requests = rows.Select(r => new {
+        id = r.Id, number = $"PR-{r.Id:0000}", title = r.Title, description = r.Justification,
+        departmentId = r.DepartmentId, r.department, status = L(r.Status.ToString(), "مقبول"),
+        priority = L(r.Priority.ToString(), r.Priority switch { RequestPriority.Low => "منخفضة", RequestPriority.High => "عالية", RequestPriority.Urgent => "عاجلة", _ => "عادية" }),
+        needed = r.NeededBy?.ToString("d MMM yyyy", System.Globalization.CultureInfo.GetCultureInfo(ar ? "ar-JO" : "en")),
+        lowestPrice = r.EvaluationMethod == TenderEvaluationMethod.LowestPrice,
+        method = r.EvaluationMethod == TenderEvaluationMethod.LowestPrice ? L("Lowest compliant price", "أقل سعر مطابق") : L("Committee weighting", "أوزان لجنة التقييم"),
+        r.items, total = r.items.Select(i => i.unit).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1 ? (decimal?)r.items.Sum(i => i.quantity) : null
+    });
+    var defaults = await Workflow.StandingEvaluationDefaults();
+    var departments = await Records.Departments.AsNoTracking().ToDictionaryAsync(d => d.Id, d => d.Name);
+    var steps = new[] { L("Request", "طلب الشراء"), L("Requirements", "المتطلبات"), L("Committee", "اللجنة"), L("Review", "المراجعة") };
+    (string Field, string Title, string Key, string Icon)[] seats = [
+        (Field: "SourcingManagerId", Title: L("Sourcing Manager", "مدير التوريد"), Key: "evaluation-manager", Icon: "user-check"),
+        (Field: "DepartmentRepresentativeId", Title: L("Department Representative", "ممثل القسم الطالب"), Key: "evaluation-department", Icon: "building"),
+        (Field: "FinancialRepresentativeId", Title: L("Financial Representative", "الممثل المالي"), Key: "evaluation-financial", Icon: "coins"),
+        (Field: "TechnicalRepresentativeId", Title: L("Technical Representative", "الممثل الفني"), Key: "evaluation-technical-1", Icon: "code")
+    ];
+    var payload = System.Text.Json.JsonSerializer.Serialize(new {
+        requests, offerCurrencies = CurrencyRules.Offer,
+        strings = new {
+            assigned = L("Assigned", "تم التعيين"), missing = L("Pending", "قيد الانتظار"),
+            complete = L("Complete", "مكتمل"),
+            count = L("{0} of {1} completed", "اكتمل {0} من {1}"),
+            step = L("Step {0} of {1}", "الخطوة {0} من {1}"),
+            invalid = L("Enter a valid value for this field.", "أدخل قيمة صحيحة لهذا الحقل."),
+            chooseRequest = L("Select an eligible purchase request.", "اختر طلب شراء مؤهلًا."),
+            enterAmount = L("Enter a positive value with up to two decimal places.", "أدخل قيمة موجبة بمنزلتين عشريتين على الأكثر."),
+            chooseCurrency = L("Select a supported currency.", "اختر عملة مدعومة."),
+            chooseDocuments = L("Select at least one required supplier document.", "اختر وثيقة واحدة على الأقل من وثائق المورد المطلوبة."),
+            chooseEmployee = L("Select an eligible employee for this role.", "اختر موظفًا مؤهلًا لهذا الدور."),
+            missingSource = L("Choose a purchase request with a title and description.", "اختر طلب شراء يتضمن عنوانًا ووصفًا."),
+            failed = L("The tender could not be created. Check the form and try again.", "تعذّر إنشاء المناقصة. راجع النموذج وحاول مرة أخرى."),
+            network = L("The server could not be reached. Try again.", "تعذّر الاتصال بالخادم. حاول مرة أخرى."),
+            discard = L("Discard changes to this tender?", "هل تريد تجاهل تغييرات المناقصة؟"),
+            removeDocument = L("Remove {0}", "إزالة {0}"),
+            from = L("From {0}", "من {0}")
+        }
+    });
 }
-<dialog id="tc-dialog" class="tc-dialog" aria-labelledby="tc-title">
-    <div class="tc-dialog-head">
-        <div><span class="tc-eyebrow">NEW TENDER</span><h2 id="tc-title">Prepare a new tender</h2><p>Pick an accepted request and prepare the tender according to its evaluation method.</p></div>
-        <button type="button" class="tc-x" data-tc-close aria-label="Close">&times;</button>
-    </div>
-    <div class="tc-dialog-body tc">
-    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create" method="post" id="tc-form" data-list-url="@Url.Action("Index", "Workflow", new { area = "SourcingOfficer" })" class="tc-layout" novalidate data-tender-form>
-        <div class="tc-main">
-            <div asp-validation-summary="All" class="tc-alert" role="alert"></div>
-
-            <section class="tc-card" aria-labelledby="tc-s1">
-                <header><span class="tc-num">1</span><div><h2 id="tc-s1">Choose the purchase request</h2><p>Only accepted requests are listed. Its items are copied into the tender.</p></div></header>
-                <label class="tc-field"><span>Accepted purchase request</span>
-                    <select asp-for="PurchaseRequestId" required id="tc-pr">
-                        <option value="">Select an accepted request</option>
-                        @foreach (var r in requests) { <option value="@r.id" selected="@(Model.PurchaseRequestId == r.id)">PR-@r.id.ToString("0000") · @r.title (@r.dept)</option> }
-                    </select>
-                </label>
-                @if (requests.Count == 0) { <p class="tc-note">There are no accepted purchase requests yet. Accept a request first, then come back.</p> }
-                <div class="tc-preview" id="tc-preview" hidden>
-                    <div class="tc-preview-head"><strong id="tc-pv-title"></strong><span class="tc-chip" id="tc-pv-dept"></span><span class="tc-chip tc-chip-warm" id="tc-pv-priority"></span><span class="tc-chip" id="tc-pv-needed"></span></div>
-                    <p id="tc-pv-method"></p><p id="tc-pv-why"></p>
-                    <ul class="tc-items" id="tc-pv-items"></ul>
-                </div>
-            </section>
-
-            <section class="tc-card" aria-labelledby="tc-s2">
-                <header><span class="tc-num">2</span><div><h2 id="tc-s2">Official tender requirements</h2><p>The department's items above are copied to the tender unchanged. Here you add the official conditions suppliers must meet.</p></div></header>
-                <div class="tc-grid">
-                    <label class="tc-field tc-wide"><span>Title</span><input asp-for="Title" required maxlength="200" placeholder="e.g. Network switches for the data center" /></label>
-                    <label class="tc-field tc-wide"><span>Description</span><textarea asp-for="Description" required rows="3" placeholder="What is being bought and why"></textarea></label>
-                    <div class="tc-field tc-wide"><span>Additional technical requirements</span><textarea asp-for="TechnicalRequirements" required rows="3" placeholder="Standards, compatibility, certifications or quality levels beyond the item specifications"></textarea></div>
-                    <div class="tc-field tc-wide"><span>Financial and commercial conditions</span>
-                        <select class="tc-template" data-target="CommercialConditions" aria-label="Commercial conditions template"><option value="">Quick pick…</option><option>price in the tender currency, valid for 90 days. Payment within 30 days of delivery and acceptance.</option><option>price, valid for 60 days. 30% advance payment, 70% on delivery and acceptance.</option><option>Unit prices, valid for 120 days. Payment in three milestones tied to delivery stages.</option></select>
-                        <textarea asp-for="CommercialConditions" required rows="3" placeholder="Pricing validity, payment terms, taxes"></textarea></div>
-                    <div class="tc-field"><span>Delivery expectations</span>
-                        <select class="tc-template" data-target="DeliveryExpectations" aria-label="Delivery template"><option value="">Quick pick…</option><option>Delivery within 30 days of the purchase order.</option><option>Delivery within 60 days of the purchase order.</option><option>Phased delivery over 90 days according to a schedule agreed with the requesting department.</option></select>
-                        <textarea asp-for="DeliveryExpectations" required rows="3" placeholder="Lead time and delivery location"></textarea></div>
-                    <div class="tc-field"><span>Mandatory compliance and documents</span>
-                        <select class="tc-template" data-target="MandatoryCompliance" aria-label="Compliance template"><option value="">Quick pick…</option><option>Valid company registration, tax certificate and a signed offer.</option><option>Valid company registration, tax certificate, signed offer and product datasheets for every item.</option><option>Company registration, signed offer, datasheets and two references from similar projects.</option></select>
-                        <textarea asp-for="MandatoryCompliance" required rows="3" placeholder="Documents every offer must include"></textarea></div>
-                    <label class="tc-field"><span>Estimated procurement value</span><input asp-for="EstimatedValue" type="number" min="0.01" step="0.01" required placeholder="0.00" /></label>
-                    <label class="tc-field"><span>Currency</span>
-                        <select asp-for="Currency" required>@foreach (var c in currencies) { <option value="@c" selected="@(Model.Currency == c)">@c</option> }</select></label>
-                    <fieldset class="tc-field tc-wide"><span>Documents every supplier must attach</span>
-                        <div class="tc-docs" style="display:flex;flex-wrap:wrap;gap:8px 16px">@foreach (var kind in Orange_Tendering_System.ViewModels.OfferDocumentTypes.All) { <label class="tc-doc"><input type="checkbox" name="RequiredDocuments" value="@kind.Key" @(kind.Key is "OfficialQuotation" or "TechnicalProposal" ? "checked" : null) /> @kind.Label</label> }</div>
-                        <small>Suppliers see these as mandatory uploads; an offer without them cannot be submitted.</small></fieldset>
-                    <label class="tc-switch tc-wide"><input asp-for="IsCritical" /><i aria-hidden="true"></i><span><strong>Critical procurement</strong><small>Used only by an explicitly configured final-approval policy.</small></span></label>
-                </div>
-            </section>
-
-            <section class="tc-card" aria-labelledby="tc-s3">
-                <header><span class="tc-num">3</span><div><h2 id="tc-s3">Choose the evaluation committee</h2><p id="tc-s3-hint">Choose active users assigned to each role by Admin.</p></div></header>
-                <div class="tc-seats">
-                    @foreach (var s in seats)
-                    {
-                        <label class="tc-seat" data-seat="@s.Field">
-                            <span class="tc-avatar" aria-hidden="true">@s.Icon</span>
-                            <span class="tc-seat-body"><strong>@s.Title</strong><small>@s.Hint</small>
-                                <select name="@s.Field" id="@s.Field" required class="tc-seat-select">
-                                    <option value="">Select a person</option>
-                                    @foreach (var u in s.Pool) { <option value="@u.Id" data-dept="@u.Dept" selected="@(s.Value == u.Id)">@u.Label</option> }
-                                </select></span>
-                        </label>
-                    }
-                </div>
-            </section>
-
-            <div class="tc-actions">
-                <button type="button" class="tc-cancel" data-tc-close>Cancel</button>
-                <button type="submit" class="tc-submit" id="tc-submit">Create tender <span aria-hidden="true">&rarr;</span></button>
+<link rel="stylesheet" href="~/css/tender-wizard.css" asp-append-version="true" />
+<dialog id="tc-dialog" class="tw-dialog" aria-labelledby="tc-title" dir="@(ar ? "rtl" : "ltr")" lang="@(ar ? "ar" : "en")">
+<form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Create" method="post" id="tc-form"
+      data-list-url="@Url.Action("Index", "Workflow", new { area = "SourcingOfficer" })" novalidate data-fv-skip data-tender-form>
+    <header class="tw-header">
+        <span class="tw-hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6m-8 3v7m-3.5-3.5h7"/></svg></span>
+        <div><h2 id="tc-title">@L("Create Tender", "إنشاء مناقصة")</h2><p id="tw-subtitle" hidden></p></div>
+        <button type="button" class="tw-close" data-tc-close aria-label="@L("Close", "إغلاق")">×</button>
+    </header>
+    <nav class="tw-steps" aria-label="@L("Tender creation steps", "خطوات إنشاء المناقصة")">
+        @for (var i = 0; i < steps.Length; i++)
+        {
+            <button type="button" data-tw-step="@i"><span class="tw-step-number">@(i + 1)</span><span>@steps[i]</span></button>
+        }
+    </nav>
+    <div class="tw-body">
+        <div class="tw-error" id="tw-error" role="alert" tabindex="-1" hidden></div>
+        <section data-tw-panel aria-labelledby="tw-request-heading">
+            <h3 id="tw-request-heading" tabindex="-1">@L("Select Purchase Request", "اختيار طلب الشراء")</h3>
+            <label class="tw-field"><span>@L("Accepted purchase request", "طلب شراء مقبول")</span>
+                <select id="tc-pr" name="PurchaseRequestId" required>
+                    <option value="">@L("Select an accepted request", "اختر طلبًا مقبولًا")</option>
+                    @foreach (var r in requests) { <option value="@r.id">@r.number · @r.title</option> }
+                </select>
+            </label>
+            @if (rows.Count == 0) { <p>@L("No eligible purchase requests are available.", "لا توجد طلبات شراء مؤهلة.")</p> }
+            <div id="tw-request-details" hidden>
+                <article class="tw-card tw-request-card">
+                    <header><div><strong data-pr="number"></strong><p data-pr="title"></p></div>
+                        <div class="tw-badges"><span class="tw-chip tw-positive" data-pr="status"></span><span class="tw-chip" data-pr="department"></span><span class="tw-chip tw-warm" data-pr="priority"></span></div></header>
+                    <dl class="tw-facts">
+                        <div data-tw-optional><dt>@L("Required by", "تاريخ التسليم المطلوب")</dt><dd data-pr="needed"></dd></div>
+                        <div><dt>@L("Items", "البنود")</dt><dd data-pr="itemCount"></dd></div>
+                        <div data-tw-optional><dt>@L("Total quantity", "الكمية الإجمالية")</dt><dd data-pr="total"></dd></div>
+                        <div><dt>@L("Evaluation method", "طريقة التقييم")</dt><dd data-pr="method"></dd></div>
+                    </dl>
+                </article>
+                <article class="tw-card">
+                    <h4>@L("Requested items", "البنود المطلوبة")</h4>
+                    <table class="tw-items"><thead><tr><th scope="col">@L("Item", "البند")</th><th scope="col">@L("Quantity", "الكمية")</th><th scope="col">@L("Original specifications", "المواصفات الأصلية")</th></tr></thead><tbody id="tw-request-items"></tbody></table>
+                </article>
             </div>
-        </div>
-
-        <aside class="tc-side" aria-label="Tender summary">
-            <div class="tc-side-card">
-                <h3>Ready to create?</h3>
-                <div class="tc-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="tc-meter"><i></i></div>
-                <p class="tc-meter-text" id="tc-meter-text">0 of 13 required fields done</p>
-                <ul class="tc-checks" id="tc-checks">
-                    <li data-check="request"><b></b>Purchase request chosen</li>
-                    <li data-check="details"><b></b>Tender described</li>
-                    <li data-check="value"><b></b>Value entered</li>
-                    <li data-check="committee"><b></b>Required reviewers assigned</li>
-                </ul>
-                <dl class="tc-sum">
-                    <div><dt>Request</dt><dd id="tc-sum-pr">Not chosen</dd></div>
-                    <div><dt>Value</dt><dd id="tc-sum-value">&mdash;</dd></div>
-                    <div><dt>Committee</dt><dd id="tc-sum-committee">0 of 4 seats</dd></div>
-                </dl>
+        </section>
+        <section data-tw-panel aria-labelledby="tw-requirements-heading" hidden>
+            <h3 id="tw-requirements-heading" class="tw-heading" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("file-text")" /></svg>@L("Tender Requirements", "متطلبات المناقصة")</h3>
+            <article class="tw-card">
+                <header><h4 class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("file-text")" /></svg>@L("General Information", "المعلومات العامة")</h4><span class="tw-chip tw-source" id="tw-source"></span></header>
+                <div class="tw-two">
+                    <label class="tw-field"><span>@L("Tender Title", "عنوان المناقصة")</span><textarea id="Title" rows="2" readonly></textarea></label>
+                    <label class="tw-field"><span>@L("Description", "الوصف")</span><textarea id="Description" rows="2" readonly></textarea></label>
+                </div>
+            </article>
+            <article class="tw-card">
+                <h4 class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("coins")" /></svg>@L("Financial & Commercial", "المالية والشروط التجارية")</h4>
+                <div class="tw-financial">
+                    <label class="tw-field"><span>@L("Estimated Procurement Value", "القيمة التقديرية للمشتريات")</span><input id="EstimatedValue" name="EstimatedValue" type="number" min="0.01" max="9999999999999999.99" step="0.01" required /></label>
+                    <label class="tw-field"><span>@L("Currency", "العملة")</span><select asp-for="Currency" required><option value="">@L("Select currency", "اختر العملة")</option>@foreach (var c in CurrencyRules.Tender) { <option value="@c">@c</option> }</select></label>
+                    <label class="tw-field"><span>@L("Commercial Conditions", "الشروط التجارية")</span><textarea asp-for="CommercialConditions" rows="2" maxlength="10000" required></textarea></label>
+                </div>
+            </article>
+            <div class="tw-two">
+                <article class="tw-card">
+                    <h4 class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("truck")" /></svg>@L("Delivery", "التسليم")</h4>
+                    <label class="tw-field"><span>@L("Delivery template", "قالب التسليم")</span>
+                        <select id="tw-delivery-template">
+                            <option value="">@L("Choose a template", "اختر قالبًا")</option>
+                            <option value="@L("Delivery within 30 days of the purchase order.", "التسليم خلال ٣٠ يومًا من أمر الشراء.")">@L("Within 30 days of purchase order", "خلال ٣٠ يومًا من أمر الشراء")</option>
+                            <option value="@L("Delivery within 60 days of the purchase order.", "التسليم خلال ٦٠ يومًا من أمر الشراء.")">@L("Within 60 days of purchase order", "خلال ٦٠ يومًا من أمر الشراء")</option>
+                            <option value="@L("Phased delivery over 90 days according to a schedule agreed with the requesting department.", "التسليم على مراحل خلال ٩٠ يومًا وفق جدول يُتفق عليه مع القسم الطالب.")">@L("Phased delivery over 90 days", "تسليم على مراحل خلال ٩٠ يومًا")</option>
+                        </select>
+                    </label>
+                    <label class="tw-field"><span>@L("Delivery Expectations", "متطلبات التسليم")</span><textarea asp-for="DeliveryExpectations" rows="2" maxlength="4000" required></textarea></label>
+                    <p class="tw-caption" data-tw-optional>@L("Purchase request required by", "تاريخ التسليم المطلوب في طلب الشراء") <strong data-pr="needed"></strong></p>
+                </article>
+                <article class="tw-card">
+                    <h4 id="tw-documents-label" class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("paperclip")" /></svg>@L("Required Supplier Documents", "وثائق المورد المطلوبة")</h4>
+                    <div class="tw-doc-picker" id="tw-documents" role="group" aria-labelledby="tw-documents-label">
+                        <div class="tw-chips" id="tw-selected-documents"></div>
+                        <details><summary>@L("Select documents", "اختر الوثائق")</summary>
+                            <div class="tw-doc-options">
+                            @foreach (var kind in OfferDocumentTypes.All)
+                            {
+                                var name = OfferDocumentTypes.Label(kind.Key, ar);
+                                <label><input type="checkbox" name="RequiredDocuments" value="@kind.Key" data-label="@name" /> @name</label>
+                            }
+                            </div>
+                        </details>
+                    </div>
+                    <label class="tw-field"><span>@L("Mandatory Compliance", "شروط الامتثال الإلزامية")</span><textarea asp-for="MandatoryCompliance" rows="2" maxlength="4000" required></textarea></label>
+                </article>
             </div>
-        </aside>
-    </form>
-    </div>
-</dialog>
-<script>
-(function () {
-    var requests = @Html.Raw(requestJson.Replace("<", "\\u003c"));
-    var form = document.getElementById('tc-form'), pr = document.getElementById('tc-pr');
-    function $(id) { return document.getElementById(id); }
-    var fields = ['Title', 'Description', 'TechnicalRequirements'].map($);
-    var auto = {};
-    function setAuto(el, value) { if (!el.value.trim() || auto[el.id] === el.value) { el.value = value; auto[el.id] = value; } }
-    function showRequest() {
-        var r = requests.filter(function (x) { return String(x.id) === pr.value; })[0], box = $('tc-preview');
-        if (!r) { box.hidden = true; return; }
-        $('tc-pv-method').textContent = r.lowestPrice ? "100% financial — lowest compliant price" : "Committee weight proposals";
-        box.hidden = false; $('tc-pv-title').textContent = 'PR-' + ('0000' + r.id).slice(-4) + ' · ' + r.title;
-        $('tc-pv-dept').textContent = r.dept; $('tc-pv-priority').textContent = r.priority + ' priority'; $('tc-pv-needed').textContent = r.needed ? 'Needed by ' + r.needed : 'No date';
-        $('tc-pv-why').textContent = r.why;
-        var ul = $('tc-pv-items'); ul.textContent = '';
-        r.items.forEach(function (i) { var li = document.createElement('li'); li.innerHTML = '<b></b><span></span><em></em>'; li.children[0].textContent = i.name + (i.cat ? ' \u00b7 ' + i.cat : ''); li.children[1].textContent = i.qty + (i.unit ? ' ' + i.unit : ''); li.children[2].textContent = i.spec || ''; ul.appendChild(li); });
-        if (r.files) { var fl = document.createElement('li'); fl.textContent = r.files + ' department attachment(s), available to you and the committees from the request.'; ul.appendChild(fl); }
-        setAuto($('Title'), r.title);
-        setAuto($('Description'), r.why);
-        setAuto($('TechnicalRequirements'), 'Offers must meet the specifications of every requested item. Equivalent or better products are acceptable when declared as deviations.');
-    }
-    document.querySelectorAll('.tc-template').forEach(function (sel) {
-        sel.addEventListener('change', function () { if (!sel.value) return; var t = $(sel.dataset.target); t.value = sel.value; t.dispatchEvent(new Event('input', { bubbles: true })); sel.value = ''; t.focus(); });
-    });
-    var seatSelects = Array.prototype.slice.call(document.querySelectorAll('.tc-seat-select'));
-    function seats() {
-        var rq = requests.filter(function (x) { return String(x.id) === pr.value; })[0];
-        const currency = $("Currency");
-        [...currency.options].forEach(option => { option.disabled = !!rq?.lowestPrice && !["JOD", "USD", "EUR"].includes(option.value); });
-        if (currency.selectedOptions[0]?.disabled) currency.value = "JOD";
-        $('tc-s3').textContent = rq?.lowestPrice ? "Assign the Sourcing Manager" : "Choose the evaluation committee";
-        $('tc-s3-hint').textContent = rq?.lowestPrice ? "The Manager will review the financial recommendation." : "The department representative must belong to the requesting department.";
-        seatSelects.forEach(function (s) {
-            s.disabled = !!rq?.lowestPrice && s.id !== "SourcingManagerId";
-            s.closest(".tc-seat").hidden = s.disabled;
-        });
-        var chosen = seatSelects.map(s => s.disabled ? "" : s.value);
-        seatSelects.forEach(function (s, i) {
-            var deptOnly = s.id === 'DepartmentRepresentativeId' && rq;
-            Array.prototype.forEach.call(s.options, function (o) { o.disabled = !!o.value && (chosen.some(function (c, j) { return j !== i && c === o.value; }) || (deptOnly && o.dataset.dept !== String(rq.deptId))); });
-            if (s.value && s.options[s.selectedIndex].disabled) { s.value = ''; }
-            if (deptOnly) { var hint = s.closest('.tc-seat').querySelector('small'); var n = Array.prototype.filter.call(s.options, function (o) { return o.value && !o.disabled; }).length; hint.textContent = n ? 'Only members of ' + rq.dept + ' are listed' : 'No committee member belongs to ' + rq.dept + '. Add one in Admin first.'; }
-            var seat = s.closest('.tc-seat'); seat.classList.toggle('is-set', !!s.value);
-            var av = seat.querySelector('.tc-avatar');
-            if (s.value) { var label = s.options[s.selectedIndex].text; av.textContent = (label.match(/[A-Za-z]/) || ['?'])[0].toUpperCase(); } else { av.textContent = av.dataset.icon; }
-        });
-    }
-    seatSelects.forEach(function (s) { var av = s.closest('.tc-seat').querySelector('.tc-avatar'); av.dataset.icon = av.textContent; });
-    var requiredIds = ['tc-pr', 'Title', 'Description', 'TechnicalRequirements', 'CommercialConditions', 'DeliveryExpectations', 'MandatoryCompliance', 'EstimatedValue', 'Currency', 'SourcingManagerId', 'DepartmentRepresentativeId', 'FinancialRepresentativeId', 'TechnicalRepresentativeId'];
-    function progress() {
-        var activeIds = requiredIds.filter(id => !$(id).disabled);
-        var done = activeIds.filter(function (id) { var e = $(id); return e && e.value && e.value.trim(); }).length;
-        var pct = Math.round(done * 100 / activeIds.length);
-        $('tc-meter').setAttribute('aria-valuenow', pct); $('tc-meter').firstElementChild.style.width = pct + '%';
-        $('tc-meter-text').textContent = done + ' of ' + activeIds.length + ' required fields done';
-        function ok(name, v) { var li = document.querySelector('[data-check=' + name + ']'); li.classList.toggle('is-ok', !!v); }
-        var has = function (ids) { return ids.every(function (id) { return $(id).value && $(id).value.trim(); }); };
-        var activeSeats = seatSelects.filter(s => !s.disabled);
-        var vals = activeSeats.map(s => s.value).filter(Boolean);
-        var distinct = vals.length === activeSeats.length && new Set(vals).size === activeSeats.length;
-        ok('request', has(['tc-pr'])); ok('details', has(['Title', 'Description', 'TechnicalRequirements', 'CommercialConditions', 'DeliveryExpectations', 'MandatoryCompliance'])); ok('value', has(['EstimatedValue'])); ok('committee', distinct);
-        var opt = pr.options[pr.selectedIndex]; $('tc-sum-pr').textContent = pr.value ? opt.text.split(' · ')[0] + ' · ' + (opt.text.split(' · ')[1] || '').split(' (')[0] : 'Not chosen';
-        var v = parseFloat($('EstimatedValue').value); $('tc-sum-value').textContent = isFinite(v) && v > 0 ? v.toLocaleString(undefined, { minimumFractionDigits: 2 }) + ' ' + $('Currency').value : '—';
-        $('tc-sum-committee').textContent = vals.length + ' of ' + activeSeats.length + ' assigned';
-    }
-    pr.addEventListener('change', function () { showRequest(); progress(); });
-    form.addEventListener('input', function () { seats(); progress(); }); form.addEventListener('change', function () { seats(); progress(); });
-    var alertBox = form.querySelector('.tc-alert');
-    function showErrors(list) { alertBox.textContent = ''; var ul = document.createElement('ul'); list.forEach(function (m) { var li = document.createElement('li'); li.textContent = m; ul.appendChild(li); }); alertBox.appendChild(ul); alertBox.hidden = false; alertBox.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-    form.addEventListener('submit', function (e) {
-        e.preventDefault(); alertBox.hidden = true;
-        if (!form.checkValidity()) { form.reportValidity(); return; }
-        var vals = seatSelects.filter(s => !s.disabled).map(s => s.value);
-        if (new Set(vals).size !== vals.length) { showErrors(['Choose four different people for the four committee seats.']); return; }
-        var b = $('tc-submit'); b.disabled = true; b.firstChild.textContent = 'Creating… ';
-        var motion = window.OrangeMotion ? OrangeMotion.begin({ mode: 'popup', title: 'Creating the tender', description: 'Saving the requirements and committee seats.' }) : null;
-        fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
-            .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
-            .then(function (x) {
-                if (x.ok && x.d && x.d.id) {
-                    var go = function () { window.location.href = form.dataset.listUrl + '?created=' + x.d.id + '&open=' + x.d.id; };
-                    if (motion && x.d.feedback) motion.finish(x.d.feedback).then(go, go); else go();
-                    return;
+            @if (Workflow.CriticalTenderEnabled)
+            {
+                <label class="tw-critical"><input asp-for="IsCritical" /> <span>@L("Critical procurement — requires Top Committee review before award.", "مشتريات حرجة — تتطلب مراجعة اللجنة العليا قبل الإرساء.")</span></label>
+            }
+        </section>
+        <section data-tw-panel aria-labelledby="tw-committee-heading" hidden>
+            <h3 id="tw-committee-heading" class="tw-heading" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("users")" /></svg>@L("Evaluation Committee", "لجنة التقييم")</h3>
+            @foreach (var seat in seats)
+            {
+                var pool = await Workflow.TenderSeatCandidates(TenderWorkflowService.TenderSeatRoles[Array.IndexOf(seats, seat)]);
+                <article class="tw-card tw-seat" data-seat="@seat.Field" data-label="@seat.Title">
+                    <span class="tw-role-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="@Icon(seat.Icon)" /></svg></span>
+                    <div><small>@(seat.Field == "SourcingManagerId" ? L("Required reviewer", "المراجع المطلوب") : L("Committee role", "دور اللجنة"))</small><strong>@seat.Title</strong></div>
+                    <label class="tw-field"><span>@L("Employee", "الموظف")</span>
+                        <select id="@seat.Field" name="@seat.Field" required>
+                            <option value="">@L("Select an employee", "اختر موظفًا")</option>
+                            @foreach (var person in pool)
+                            {
+                                <option value="@person.Id" data-dept="@person.DepartmentId" data-dept-name="@(person.DepartmentId is int dep ? departments.GetValueOrDefault(dep) : null)"
+                                        selected="@(defaults.GetValueOrDefault(seat.Key) == person.Id)">@(string.IsNullOrWhiteSpace(person.FullName) ? person.Email : person.FullName)</option>
+                            }
+                        </select>
+                    </label>
+                    <div><small>@L("Department", "القسم")</small><span data-seat-department></span></div>
+                    <span class="tw-chip" data-seat-status></span>
+                </article>
+            }
+        </section>
+        <section data-tw-panel aria-labelledby="tw-review-heading" hidden>
+            <h3 id="tw-review-heading" class="tw-heading" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("file-text")" /></svg>@L("Review & Create", "المراجعة والإنشاء")</h3>
+            <div id="tw-review">
+                @foreach (var card in new[] {
+                    (Key: "request", Step: 0, Icon: "file-text", Title: L("Purchase Request", "طلب الشراء")),
+                    (Key: "general", Step: 0, Icon: "lock", Title: L("General Information", "المعلومات العامة")),
+                    (Key: "financial", Step: 1, Icon: "coins", Title: L("Financial & Commercial", "المالية والشروط التجارية")),
+                    (Key: "delivery", Step: 1, Icon: "truck", Title: L("Delivery", "التسليم")),
+                    (Key: "documents", Step: 1, Icon: "paperclip", Title: L("Required Supplier Documents", "وثائق المورد المطلوبة")),
+                    (Key: "committee", Step: 2, Icon: "users", Title: L("Evaluation Committee", "لجنة التقييم"))
+                })
+                {
+                    <article class="tw-card tw-review-card">
+                        <span class="tw-role-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="@Icon(card.Icon)" /></svg></span>
+                        <div><h4>@card.Title</h4><div data-review="@card.Key"></div></div>
+                        <button type="button" class="tw-secondary" data-tw-edit="@card.Step" aria-label="@L("Edit", "تعديل") @card.Title">@L("Edit", "تعديل")</button>
+                    </article>
                 }
-                if (motion) motion.cancel();
-                b.disabled = false; b.firstChild.textContent = 'Create tender ';
-                showErrors((x.d && x.d.errors && x.d.errors.length) ? x.d.errors : ['The tender could not be created. Check the form and try again.']);
-            })
-            .catch(function () { if (motion) motion.cancel(); b.disabled = false; b.firstChild.textContent = 'Create tender '; showErrors(['The server could not be reached. Try again.']); });
-    });
-    // Dialog open / close, and ?request=ID opens it with that purchase request chosen.
-    var dlg = $('tc-dialog');
-    function openDlg(prId) { if (prId) { pr.value = String(prId); if (pr.value !== String(prId)) pr.value = ''; showRequest(); seats(); progress(); } if (!dlg.open) dlg.showModal(); }
-    document.querySelectorAll('[data-open-tender]').forEach(function (b) { b.addEventListener('click', function () { openDlg(); }); });
-    dlg.querySelectorAll('[data-tc-close]').forEach(function (b) { b.addEventListener('click', function () { dlg.close(); }); });
-    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
-    var q = new URLSearchParams(window.location.search);
-    if (q.get('request') || q.get('new')) { openDlg(q.get('request')); }
-    // ?title= comes from the Executive Agent hand-off; it only pre-fills the field, the user still reviews and submits.
-    var askedTitle = (q.get('title') || '').trim().slice(0, 200);
-    if (askedTitle) { $('Title').value = askedTitle; auto['Title'] = undefined; }
-    showRequest(); seats(); progress();
-})();
-</script>
+            </div>
+        </section>
+        <aside class="tw-readiness" id="tw-readiness" hidden>
+            <h3 class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span id="tw-readiness-title" data-review-title="@L("Tender Readiness", "جاهزية المناقصة")">@L("Readiness", "الجاهزية")</span></h3>
+            <progress id="tw-progress" value="0" max="1" aria-labelledby="tw-readiness-title"></progress>
+            <p id="tw-count" aria-live="polite"></p>
+            <ul id="tw-checklist"></ul>
+        </aside>
+    </div>
+    <footer class="tw-footer">
+        <span id="tw-step-count"></span>
+        <div>
+            <button type="button" class="tw-secondary" data-tc-close>@L("Cancel", "إلغاء")</button>
+            <button type="button" class="tw-secondary" id="tw-back" hidden>@L("Back", "رجوع")</button>
+            <button type="button" class="tw-primary" id="tw-next">@L("Continue", "متابعة") <span class="tw-arrow" aria-hidden="true">→</span></button>
+            <button type="submit" class="tw-primary" id="tc-submit" hidden disabled>@L("Create Tender", "إنشاء المناقصة") <span aria-hidden="true">✓</span></button>
+        </div>
+    </footer>
+</form>
+<script type="application/json" id="tw-data">@Html.Raw(payload)</script>
+</dialog>
+<script src="~/js/tender-wizard.js" asp-append-version="true" defer></script>

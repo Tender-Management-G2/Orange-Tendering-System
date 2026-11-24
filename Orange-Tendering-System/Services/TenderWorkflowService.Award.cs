@@ -83,10 +83,11 @@ public partial class TenderWorkflowService
                 OfficerNotification = AwardNotification(officerId), ManagerNotification = AwardNotification(managerId)
             });
         }
-        var internalUsers = (await Members(t.Id, CommitteeType.Evaluation)).Select(x => x.UserId).Concat(members.Select(x => x.UserId))
-            .Append(officerId).Distinct().Where(userId => managerId == null || userId != officerId && userId != managerId).ToList();
-        foreach (var userId in internalUsers)
-            Notify(userId, t.Id, "Tender awarded", $"The Top Committee approved the recommendation unanimously (4 of 4). The tender is awarded to {winner} and closed. Suppliers were notified of their own result.");
+        // Award notifications: only the Sourcing Officer and the Sourcing Manager receive the internal award report (above), the winner gets the
+        // congratulation and each losing supplier its own regret message (suppliers loop above). Committee members are not notified.
+        // Fallback only when no Manager is assigned: the Officer still gets the award notice.
+        if (managerId == null)
+            Notify(officerId, t.Id, "Tender awarded", $"The Top Committee approved the recommendation unanimously (4 of 4). The tender is awarded to {winner} and closed.");
         var pr = await db.PurchaseRequests.AsNoTracking().SingleAsync(x => x.Id == t.PurchaseRequestId);
         var departmentUsers = (await users.GetUsersInRoleAsync(SystemRoles.RequestingDepartment)).Where(u => u.IsActive && u.DepartmentId == pr.DepartmentId)
             .Select(u => u.Id).Append(pr.CreatedByUserId).Distinct().ToList();

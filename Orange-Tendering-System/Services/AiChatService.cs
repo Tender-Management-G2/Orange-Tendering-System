@@ -259,6 +259,7 @@ public sealed class AiChatService(ApplicationDbContext db, OllamaChatClient olla
             output.TotalCount = output.Rows.Count;
             return await SaveReport(user, conversation, intent, output, ct, source: "user-content");
         }
+        if (intent.Topic == AssistantTopic.CreateTender) return From(await actions.StartTenderAsync(user, intent with { Arabic = ar }, ct));
         // Business tools (departments, users, purchase requests, multi-step plans): registered tools, confirmed before execution.
         if (intent.Format == ReportFormat.None && AgentTools.Detect(message) is { } toolIds) return From(await engine.StartAsync(user, toolIds, message, ar, ct, conversation.Id));
         if (intent.Format == ReportFormat.None && AgentTools.IsCreationFollowUp(message))
@@ -276,7 +277,7 @@ public sealed class AiChatService(ApplicationDbContext db, OllamaChatClient olla
         }
         // Workflow actions (sign, approve, vote, forward, request weights, notify suppliers) go to the existing Executive Agent, which
         // only PREPARES them; execution needs the explicit review + passkey/password confirmation in the chat card.
-        if (intent.Format == ReportFormat.None && intent.Topic is not (AssistantTopic.CreateTender) && (IsWorkflowAction(message) || user.Is(SystemRoles.TopCommittee) && TopApprovalCommand(message))) return await AgentAction(principal, user, message, ar, ct);
+        if (intent.Format == ReportFormat.None && (IsWorkflowAction(message) || user.Is(SystemRoles.TopCommittee) && TopApprovalCommand(message))) return await AgentAction(principal, user, message, ar, ct);
         // "Which tender needs my signature?" / "a tender needs weights from me": find it and act (sign opens the page; weights is a confirmed conversation).
         if (intent.Format == ReportFormat.None && AssistantActions.IsSignatureLookup(message)) return From(await actions.OpenSignatureAsync(user, ar, ct));
         if (intent.Format == ReportFormat.None && AssistantActions.IsWeightsRequest(message) && user.Role is SystemRoles.EvaluationCommittee or SystemRoles.SourcingManager) return From(await actions.StartWeightsAsync(user, ar, ct));
@@ -286,7 +287,6 @@ public sealed class AiChatService(ApplicationDbContext db, OllamaChatClient olla
         if (intent.Format == ReportFormat.None && intent.Topic is not (AssistantTopic.TenderDetail or AssistantTopic.LatestTender or AssistantTopic.CreateTender) && HasNavigationVerb(message)
             && await PageNavigation(principal, user, message, page, ar, ct) is { } go) return go;
         // Actions: creating a tender explains the restriction itself; navigation resolves only authorized records to fixed routes.
-        if (intent.Topic == AssistantTopic.CreateTender) return From(await actions.StartTenderAsync(user, intent, ct));
         if (intent.Topic == AssistantTopic.LatestTender && intent.Format == ReportFormat.None) return From(await actions.OpenLatestAsync(user, ar, ct));
         if (intent.Topic == AssistantTopic.TenderDetail && intent.Navigate && intent.Format == ReportFormat.None && intent.RecordId is { } openId && AssistantDataTools.Allowed(user).Contains(AssistantTopic.LatestTender))
             return From(await actions.OpenTenderAsync(user, openId, ar, ct));

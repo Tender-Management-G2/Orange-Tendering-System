@@ -1,7 +1,11 @@
+@{
+    var ar = Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
+}
 <div data-report-signature style="margin:16px 0">
-    <label>Draw your signature</label>
-    <canvas width="640" height="200" aria-label="Draw your signature" style="display:block;width:100%;max-width:640px;height:160px;border:1px solid #bbb;border-radius:8px;background:white;touch-action:none"></canvas>
+    <label>@L("Draw your signature", "ارسم توقيعك")</label>
+    <canvas width="640" height="200" aria-label="@L("Draw your signature", "ارسم توقيعك")" style="display:block;width:100%;max-width:640px;height:136px;border:1px solid var(--ws-rule);border-radius:10px;background:white;touch-action:none"></canvas>
     <input type="hidden" name="signatureImage" />
-    <button type="button" data-signature-clear>Clear signature</button>
-    <p data-signature-error role="alert" hidden>Draw your signature before submitting.</p>
+    <button type="button" data-signature-clear>@L("Clear signature", "مسح التوقيع")</button>
+    <p data-signature-error role="alert" hidden>@L("Draw your signature before submitting.", "ارسم توقيعك قبل الإرسال.")</p>
 </div>

@@ -55,6 +55,13 @@ public static class OfferDocumentTypes
     ];
     public static Kind? Find(string? key) => All.FirstOrDefault(x => x.Key == key);
     public static string Label(string? key) => Find(key)?.Label ?? (string.IsNullOrWhiteSpace(key) || key == "OfferAttachment" ? "Attachment" : key);
+    public static string Label(string key, bool arabic) => !arabic ? Label(key) : key switch
+    {
+        "OfficialQuotation" => "عرض السعر الرسمي", "TechnicalProposal" => "العرض الفني",
+        "ProductDatasheet" => "أوراق بيانات المنتجات", "WarrantyDocument" => "وثيقة الضمان",
+        "Certificate" => "الشهادات", "ReferenceImage" => "صور المنتجات", "OtherDocument" => "وثائق أخرى",
+        _ => Label(key)
+    };
     public static string[] Parse(string? stored) => (stored ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(k => Find(k) != null).Distinct().ToArray();
 }
 
@@ -62,6 +69,7 @@ public static class OfferDocumentTypes
 public static class CurrencyRules
 {
     public static readonly IReadOnlyList<string> Offer = ["JOD", "USD", "EUR"];
+    public static readonly IReadOnlyList<string> Tender = ["JOD", "USD", "EUR", "SAR", "AED", "EGP"];
     public static int Decimals(string? currency) => currency == "JOD" ? 3 : 2;
     public static string Format(decimal value, string? currency) => value.ToString(Decimals(currency) == 3 ? "#,##0.000" : "#,##0.00", System.Globalization.CultureInfo.InvariantCulture) + " " + currency;
 }

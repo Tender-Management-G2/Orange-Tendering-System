@@ -14,10 +14,11 @@ namespace Orange_Tendering_System.Areas.Department.Services;
 // Department-local service, explicitly constructed by the controllers so no shared DI setup is changed.
 public sealed class DepartmentRequestService(ApplicationDbContext db, UserManager<ApplicationUser> users)
 {
-    public IQueryable<PurchaseRequest> Requests(int departmentId) => db.PurchaseRequests
-        .Where(r => r.DepartmentId == departmentId).Include(r => r.Tenders);
+    // A department sees its own requests; the person who created a request for another department keeps seeing it too.
+    public IQueryable<PurchaseRequest> Requests(int departmentId, string? userId = null) => db.PurchaseRequests
+        .Where(r => r.DepartmentId == departmentId || (userId != null && r.CreatedByUserId == userId)).Include(r => r.Tenders);
 
-    public Task<PurchaseRequest?> Load(int departmentId, int id) => Requests(departmentId)
+    public Task<PurchaseRequest?> Load(int departmentId, int id, string? userId = null) => Requests(departmentId, userId)
         .Include(r => r.Items).ThenInclude(i => i.Category).Include(r => r.Documents).Include(r => r.Reviews)
         .ThenInclude(r => r.ReviewedByUser).Include(r => r.Department).Include(r => r.CreatedByUser)
         .AsSplitQuery().SingleOrDefaultAsync(r => r.Id == id);
@@ -27,6 +28,9 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
         request.Items.OrderBy(i => i.Id).Select(i => new RequestItemForm
         { Name = i.Name, CategoryId = i.CategoryId, CategoryName = i.Category?.Name, Specifications = i.Specifications, Quantity = i.Quantity, Unit = i.Unit }).ToList(),
         request.Documents.OrderBy(d => d.Id).Select(d => d.FileName).ToList(), request.EvaluationMethod);
+
+    // The item picture is a Document with an image content type; regular supporting files are always stored as octet-stream.
+    public static bool IsItemImage(Document d) => d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/", StringComparison.Ordinal);
 
     public static string Version(PurchaseRequest request) => Convert.ToHexString(SHA256.HashData(
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
@@ -38,9 +42,9 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
 
     public static RequestForm Form(PurchaseRequest request) => new()
     {
-        Id = request.Id, Version = Version(request), Title = request.Title,
+        Id = request.Id, Version = Version(request), Title = request.Title, DepartmentId = request.DepartmentId,
         Justification = request.Justification, Priority = request.Priority, EvaluationMethod = request.EvaluationMethod, NeededBy = request.NeededBy,
-        Items = Snapshot(request).Items, ExistingDocuments = request.Documents.ToList(),
+        Items = Snapshot(request).Items, ExistingDocuments = request.Documents.Where(d => !IsItemImage(d)).ToList(), ExistingItemImage = request.Documents.FirstOrDefault(IsItemImage),
         ReturnComment = request.Status == PurchaseRequestStatus.Returned
             ? request.Reviews.OrderByDescending(r => r.SubmissionNumber).FirstOrDefault()?.Comment : null
     };
@@ -67,9 +71,9 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
         {
             var request = form.Id == 0 ? new PurchaseRequest
             {
-                DepartmentId = user.DepartmentId!.Value, CreatedByUserId = user.Id,
+                DepartmentId = form.DepartmentId ?? user.DepartmentId!.Value, CreatedByUserId = user.Id,
                 CreatedAt = DateTime.UtcNow
-            } : await Load(user.DepartmentId!.Value, form.Id)
+            } : await Load(user.DepartmentId!.Value, form.Id, user.Id)
                 ?? throw new InvalidOperationException("The request is no longer available.");
             if (form.Id != 0 && (!RequestDisplay.Editable(request, user.Id) || Version(request) != form.Version))
                 throw new InvalidOperationException("This request changed or can no longer be edited. Reload it before saving.");
@@ -77,6 +81,7 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
             var oldSnapshot = form.Id == 0 ? null : JsonSerializer.Serialize(Snapshot(request));
             if (form.Id == 0) db.PurchaseRequests.Add(request);
             else db.PurchaseRequestItems.RemoveRange(request.Items);
+            request.DepartmentId = form.DepartmentId ?? request.DepartmentId;
             var department = await db.Departments.Where(d => d.Id == request.DepartmentId).Select(d => d.Name).SingleAsync();
             await db.ProcurementCategories.LoadAsync(); // category names for the stored snapshot
             request.Title = GenerateTitle(form.Items.Select(i => i.Name.Trim()).ToList(), department);
@@ -90,6 +95,31 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
                 Category = i.CategoryId is int c ? db.ProcurementCategories.Local.FirstOrDefault(x => x.Id == c) : null,
                 Quantity = i.Quantity, Unit = i.Unit.Trim()
             }).ToList();
+
+            // Item picture: removing or replacing deletes the stored one; the files are deleted only after the transaction commits.
+            var obsolete = new List<string>();
+            var currentImage = request.Documents.FirstOrDefault(IsItemImage);
+            if (currentImage != null && (form.RemoveItemImage || form.ItemImage != null))
+            {
+                obsolete.Add(Path.Combine(storageRoot, currentImage.StoragePath));
+                request.Documents.Remove(currentImage); db.Documents.Remove(currentImage);
+            }
+            if (form.ItemImage != null)
+            {
+                Directory.CreateDirectory(storageRoot);
+                var extension = Path.GetExtension(form.ItemImage.FileName).ToLowerInvariant();
+                var imageName = Guid.NewGuid().ToString("N") + extension;
+                var imagePath = Path.Combine(storageRoot, imageName);
+                written.Add(imagePath);
+                await using (var output = new FileStream(imagePath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    await form.ItemImage.CopyToAsync(output);
+                request.Documents.Add(new Document
+                {
+                    FileName = "Item image - " + Path.GetFileName(form.ItemImage.FileName), StoragePath = imageName,
+                    ContentType = extension == ".png" ? "image/png" : "image/jpeg", SizeBytes = form.ItemImage.Length,
+                    DocumentType = "DepartmentSupportingDocument", UploadedAt = DateTime.UtcNow, UploadedByUserId = user.Id
+                });
+            }
 
             foreach (var file in form.Attachments)
             {
@@ -141,6 +171,7 @@ public sealed class DepartmentRequestService(ApplicationDbContext db, UserManage
             });
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
+            foreach (var path in obsolete) { try { File.Delete(path); } catch (IOException) { /* an orphaned file is harmless; the record is gone */ } }
             return request.Id;
         }
         catch

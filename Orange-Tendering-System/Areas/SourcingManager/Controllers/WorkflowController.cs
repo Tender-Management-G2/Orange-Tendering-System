@@ -22,16 +22,18 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
     }
 
     [HttpPost]
-    public async Task<IActionResult> ExecutiveSummary(int id, [Bind(Prefix = "Input")] ExecutiveSummaryInput input, string intent, string? documentHash, bool confirmed, string? signatureImage)
+    public async Task<IActionResult> ExecutiveSummary(int id, [Bind(Prefix = "Input")] ExecutiveSummaryInput input, string intent, string? documentHash, bool confirmed, string? signatureImage, string? remarks = null)
     {
         try
         {
             if (!ModelState.IsValid) throw new WorkflowException(string.Join(" ", ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).Distinct()));
             if (intent == "submit")
             {
+                // Optional free-text remarks from the review page travel with the Manager assessment that the Top Committee reads.
+                if (!string.IsNullOrWhiteSpace(remarks)) input.ManagerAssessment = input.ManagerAssessment.TrimEnd() + Environment.NewLine + Environment.NewLine + "Manager remarks: " + remarks.Trim();
                 await Workflow.SubmitExecutiveSummary(id, input, User, documentHash ?? "", confirmed, string.IsNullOrWhiteSpace(signatureImage) ? null : ReportControllerBase.ReadSignature(signatureImage));
                 TempData.Orange(OrangeFeedback.Popup("Executive summary submitted!", "The Top Committee was notified. Four approvals award the tender automatically.", OrangeVariant.Send));
-                return RedirectToAction(nameof(Index), new { open = id });
+                return RedirectToAction(nameof(ExecutiveSummary), new { id });
             }
             await Workflow.SaveExecutiveSummary(id, input, User);
             TempData.Orange(OrangeFeedback.Toast("Draft saved", "Your executive summary draft is saved. You can keep editing it until you submit."));

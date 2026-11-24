@@ -7,9 +7,9 @@ namespace Orange_Tendering_System.ViewModels;
 public class RequirementsInput
 {
     public int PurchaseRequestId { get; set; }
-    [Required, MaxLength(200)] public string Title { get; set; } = "";
-    [Required, MaxLength(10000)] public string Description { get; set; } = "";
-    [Required, MaxLength(10000)] public string TechnicalRequirements { get; set; } = "";
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+    public string? TechnicalRequirements { get; set; }
     [Required, MaxLength(10000)] public string CommercialConditions { get; set; } = "";
     [Required, MaxLength(4000)] public string DeliveryExpectations { get; set; } = "";
     [Required, MaxLength(4000)] public string MandatoryCompliance { get; set; } = "";

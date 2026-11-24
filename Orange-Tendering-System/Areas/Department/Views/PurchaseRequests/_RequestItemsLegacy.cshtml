@@ -1,0 +1,27 @@
+@model RequestForm
+@using Orange_Tendering_System.Models.Entities
+@* Requests created before the single-item design may hold several items: they keep the original multi-item editor. *@
+<section class="ws-panel pg-panel pf-section pr-card">
+    <div class="pr-card-head"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg> Requested Items <em data-item-count>(@Model.Items.Count)</em></h2><button type="button" class="pr-add" id="department-add-item"><span aria-hidden="true">＋</span> Add Item</button></div>
+    <div class="pr-items-head" aria-hidden="true"><span>#</span><span>Item / Service Name *</span><span>Category *</span><span>Quantity *</span><span>Unit *</span><span>Specifications (Minimum Requirements) *</span><span>Action</span></div>
+    <div class="pf-items" id="department-items">
+    @for (var i = 0; i < Model.Items.Count; i++)
+    {
+        var item = Model.Items[i];
+        <div class="pf-item" data-item-row>
+            <span class="pf-item-n" data-item-number>@(i + 1)</span>
+            <div class="pf-item-grid">
+                <div class="pg-field"><label for="Items_@(i)__Name" class="pf-required">Item / service name</label><input id="Items_@(i)__Name" name="Items[@i].Name" value="@item.Name" maxlength="200" required placeholder="e.g. Laptop" data-item-name /></div>
+                <div class="pg-field"><label for="Items_@(i)__CategoryId" class="pf-required">Category</label>
+                    <select id="Items_@(i)__CategoryId" name="Items[@i].CategoryId" required><option value="">Choose…</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(item.CategoryId == c.Id)">@c.Name</option> }</select></div>
+                <div class="pg-field"><label for="Items_@(i)__Quantity" class="pf-required">Quantity</label><input id="Items_@(i)__Quantity" name="Items[@i].Quantity" value="@item.Quantity.ToString("0", System.Globalization.CultureInfo.InvariantCulture)" type="number" min="1" max="999999999999999" step="1" inputmode="numeric" required /></div>
+                <div class="pg-field"><label for="Items_@(i)__Unit" class="pf-required">Unit</label>
+                    <select id="Items_@(i)__Unit" name="Items[@i].Unit" required><option value="">Choose…</option>@foreach (var u in UnitsOfMeasure.All) { <option selected="@(item.Unit == u)">@u</option> }@if (!string.IsNullOrEmpty(item.Unit) && !UnitsOfMeasure.All.Contains(item.Unit)) { <option value="" disabled>@item.Unit (choose a listed unit)</option> }</select></div>
+                <div class="pg-field pf-spec"><label for="Items_@(i)__Specifications" class="pf-required">Specifications (Minimum Requirements)</label><input id="Items_@(i)__Specifications" name="Items[@i].Specifications" value="@item.Specifications" maxlength="10000" minlength="3" required placeholder="e.g. Intel Core i7, 16 GB RAM, 512 GB SSD" /></div>
+                <button type="button" class="pg-btn pf-item-remove" data-remove-item aria-label="Remove item"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+            </div>
+        </div>
+    }
+    </div>
+    <span id="department-item-message" class="pg-hint" role="status" aria-live="polite"></span>
+</section>

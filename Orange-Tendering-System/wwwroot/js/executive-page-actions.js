@@ -7,10 +7,10 @@
     const raw=String(text||'').trim();
     if(/^(?:شو|ايش|ما هي|اعرض|ورجيني|list|show)\s+(?:هي\s+)?(?:الازرار|الأزرار|الكبسات|الازرار المتاحه|buttons|page buttons|available buttons)[؟?!.\s]*$/i.test(raw))return {list:true};
     const m=raw.match(/^(?:اكبس|إكبس|اضغط|إضغط|انقر|كبس|click|press|tap)\s+(?:(?:على|علي|ع|on|the)\s+)*(?:(?:زر|الزر|كبسه|كبسة|الكبسه|الكبسة|button)\s+)?(.+?)[.!؟?]*$/i);
-    return m?{name:normalize(m[1])}:null;
+    return m?{name:normalize(m[1].replace(/\s+button$/i,''))}:null;
   }
   const reviewed = [
-    ['[data-open-tender]', ['انشاء عطاء','عطاء جديد','جهز عطاء','تجهيز عطاء','prepare tender','new tender','create tender'], '#tc-dialog'],
+    ['[data-open-tender]', ['انشاء عطاء','إنشاء مناقصة','عطاء جديد','جهز عطاء','تجهيز عطاء','prepare tender','new tender','create tender'], '#tc-dialog'],
     ['[data-open-workflow]', ['افتح سير العمل','سير العمل','open workflow'], '#wf-dialog'],
     ['[data-tender-details]', ['تفاصيل العطاء','details','tender details'], '#supplier-tender-dialog'],
     ['[data-tc-close]', ['اغلاق نموذج العطاء','اغلاق','close','cancel'], null],

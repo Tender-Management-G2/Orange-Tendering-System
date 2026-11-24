@@ -173,7 +173,7 @@ public static class ExecutiveAgentChecks
             var svc=scope.ServiceProvider.GetRequiredService<ExecutiveAgentService>();var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();var run=new ExecutiveAgentRun{Id=Guid.NewGuid(),UserId=ids[SystemRoles.EvaluationCommittee],CreatedAt=DateTime.UtcNow};db.Add(run);await db.SaveChangesAsync();
             try{await svc.Dispatch(run.Id,1,"prepare_action",Args(tenderAr,"request_weights"),Principal(run.UserId,[SystemRoles.EvaluationCommittee]));throw new Exception("Expected permission denial");}catch(AgentException e){Check(e.Status==403,"assigned evaluator cannot perform officer action");}
             try{await svc.Dispatch(run.Id,2,"execute_sql",JsonSerializer.SerializeToElement(new{sql="DROP TABLE Tenders"}),Principal(run.UserId,[SystemRoles.EvaluationCommittee]));throw new Exception("Expected unknown tool denial");}catch(AgentException e){Check(e.Status==403,"unlisted tool never dispatched");}
-            var draftArgs=JsonSerializer.SerializeToElement(new{purchaseRequestId=0,title="طارق"});
+            var draftArgs=JsonSerializer.SerializeToElement(new{purchaseRequestId=0});
             try{await svc.Dispatch(run.Id,3,"draft_tender",draftArgs,Principal(run.UserId,[SystemRoles.EvaluationCommittee]));throw new Exception("Expected draft denial");}catch(AgentException e){Check(e.Status==403,"draft_tender denied to non-officer");}
         }
         // draft_tender is a read-only hand-off to the existing New Tender form; it must never create a tender.
@@ -190,7 +190,7 @@ public static class ExecutiveAgentChecks
             var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var draftStep=await db.AuditLogs.Where(x=>x.EntityId==draftId.ToString()&&x.Action=="AgentToolSucceeded"&&x.NewValues!.Contains("draft_tender")).Select(x=>x.NewValues).FirstOrDefaultAsync();
             Check(draft.IsSuccessStatusCode&&draftStep!=null,"real Qwen Arabic 'create tender' dispatched draft_tender");
-            Check(draftStep!.Contains("FormReady")&&draftStep.Contains($"/SourcingOfficer/Workflow?request={draftPr}")&&draftStep.Contains("title="),"draft_tender opened the existing form for the only eligible request with the title");
+            Check(draftStep!.Contains("FormReady")&&draftStep.Contains($"/SourcingOfficer/Workflow?request={draftPr}")&&!draftStep.Contains("title="),"draft_tender opens the wizard for the eligible purchase request");
             Check(await db.Tenders.CountAsync()==tendersBefore&&!await db.ExecutiveAgentActions.AnyAsync(x=>x.RunId==draftId),"draft_tender created no tender and no pending action");
         }
         // Local speech adapter availability must be honest when no runtime/model has been configured.

@@ -1,10 +1,24 @@
 @model SupplierDraftOfferViewModel
 @using Orange_Tendering_System.Services
 @{
-    ViewData["Title"] = "Submit Supplier Offer";
+    var ar = UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
+    ViewData["Title"] = L("Submit Supplier Offer", "تقديم عرض المورد");
+    var steps = new[] { L("Item Quotation", "تسعير البنود"), L("Commercial Terms", "الشروط التجارية"),
+        L("Additional Costs", "التكاليف الإضافية"), L("Documents", "المستندات"), L("Review & Submit", "المراجعة والإرسال") };
     ViewData["WorkspaceSection"] = "My Offers";
     ViewData["BodyClass"] = "supplier-offer-page";
     var i = Model.Input;
+    string PaymentLabel(string option) => L(option, option switch
+    {
+        "100% on delivery and acceptance" => "١٠٠٪ عند التسليم والقبول",
+        "Net 30 days after delivery" => "الدفع بعد ٣٠ يومًا من التسليم",
+        "Net 60 days after delivery" => "الدفع بعد ٦٠ يومًا من التسليم",
+        "30% advance, 70% on delivery" => "٣٠٪ مقدمًا و٧٠٪ عند التسليم",
+        "50% advance, 50% on delivery" => "٥٠٪ مقدمًا و٥٠٪ عند التسليم",
+        "Milestone payments (describe in the technical proposal)" => "دفعات على مراحل (وضّحها في الملاحظات)",
+        _ => option
+    });
     var customTerms = !string.IsNullOrEmpty(i.PaymentTerms) && !SupplierOfferService.PaymentTermOptions.Contains(i.PaymentTerms);
     var taxRate = i.TaxRate ?? 16m;
     var reference = TenderPassportService.Reference(Model.TenderId);
@@ -15,37 +29,53 @@
 }
 
 <div class="soffer-heading">
-    <nav class="soffer-breadcrumb" aria-label="Breadcrumb"><a asp-controller="Invitations" asp-action="Index">⌂</a><span>›</span><a asp-controller="Invitations" asp-action="Index">My Tenders</a><span>›</span><span>Tender @reference</span><span>›</span><strong>Submit Offer</strong></nav>
-    <div class="soffer-title-row"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 4h22l8 8v28H8zM30 4v9h8M15 21h16M15 28h12M15 35h8"/><path d="m30 37 9-9 4 4-9 9-6 2z"/></svg><div><h1>Submit Supplier Offer</h1><p>Provide your quotation and supporting documents for the tender.</p></div><span class="soffer-open"><i></i> Open</span></div>
+    <nav class="soffer-breadcrumb" aria-label="@L("Breadcrumb", "مسار التنقل")"><a asp-controller="Invitations" asp-action="Index">@L("My Tenders", "مناقصاتي")</a><span aria-hidden="true">›</span><bdi>@reference</bdi><span aria-hidden="true">›</span><strong>@L("Submit Offer", "تقديم العرض")</strong></nav>
+    <div class="soffer-title-row">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 4h22l8 8v28H8zM30 4v9h8M15 21h16M15 28h12M15 35h8"/><path d="m30 37 9-9 4 4-9 9-6 2z"/></svg>
+        <div><h1>@ViewData["Title"]</h1><p>@L("Provide your quotation and required information for the tender.", "قدّم تسعيرك والمعلومات المطلوبة للمناقصة.")</p></div>
+        <span class="soffer-open"><i></i> @L("Open", "مفتوحة")</span>
+    </div>
 </div>
-
-<form asp-action="Create" asp-route-id="@Model.InvitationId" method="post" enctype="multipart/form-data" class="soffer" data-offer-form data-currency-decimals="@CurrencyRules.Decimals(i.CurrencyCode)">
+<form asp-action="Create" asp-route-id="@Model.InvitationId" method="post" enctype="multipart/form-data" class="soffer" data-offer-form data-fv-skip>
     @if (TempData["OfferDraftSaved"] is string savedMessage)
     {
-        <p class="soffer-saved-message" role="status">@savedMessage</p>
+        <p class="soffer-saved-message" role="status">@L(savedMessage, "حُفظت المسودة. يمكنك إكمالها قبل الموعد النهائي للتقديم.")</p>
     }
     @if (Model.Errors.Count > 0)
     {
-        <div class="pf-note pf-warn" role="alert"><strong>The offer was not submitted. Please correct:</strong><ul>@foreach (var error in Model.Errors) { <li>@error</li> }</ul><small>Choose the attachment files again before resubmitting.</small></div>
+        <div class="pf-note pf-warn" role="alert" tabindex="-1" data-offer-server-error><strong>@L("The offer was not submitted. Please correct:", "تعذّر إرسال العرض. راجع الأخطاء التالية.")</strong><ul>@foreach (var error in Model.Errors) { <li>@error</li> }</ul><small>@L("Choose the attachment files again before resubmitting.", "أعد اختيار المرفقات قبل إعادة الإرسال.")</small></div>
     }
 
-    <section class="soffer-facts" aria-label="Tender information">
-        <div class="soffer-fact-icon" aria-hidden="true">▤</div>
-        <div><small>Tender ID</small><strong>@reference</strong></div>
-        <div><small>Title</small><strong>@Model.TenderTitle</strong></div>
-        <div><small>Supplier</small><strong>@Model.CompanyName</strong></div>
-        <div><small>Submission Deadline</small><strong>@(Model.Deadline?.ToJordan("d MMM yyyy") ?? "—")</strong></div>
-        <div><small>Required Delivery Date</small><strong>@(Model.NeededBy?.ToString("d MMM yyyy") ?? "Not specified")</strong></div>
-        <div><small>Requested Items</small><strong>@Model.ItemContext.Count item@(Model.ItemContext.Count == 1 ? "" : "s")</strong></div>
+    <section class="soffer-facts" aria-label="@L("Tender information", "معلومات المناقصة")">
+        <div class="soffer-fact-primary"><span class="soffer-fact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6zm8 0v5h4M9 12h6m-6 4h6"/></svg></span><div><bdi>@reference</bdi><strong>@Model.TenderTitle</strong></div></div>
+        <div class="soffer-fact-meta"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></svg><div><small>@L("Submission Deadline", "الموعد النهائي للتقديم")</small><strong><bdi>@(Model.Deadline?.ToJordan("d MMM yyyy") ?? "—")</bdi></strong></div></div>
+        <div class="soffer-fact-meta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7zm0 20V12m-9-5 9 5 9-5"/></svg><div><small>@L("Items", "البنود")</small><strong>@Model.ItemContext.Count</strong></div></div>
+        <div class="soffer-fact-meta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22V3h12v19m0-11h4v11M2 22h20M8 7h1m3 0h1M8 11h1m3 0h1M8 15h1m3 0h1"/></svg><div><small>@L("Supplier", "المورد")</small><strong>@Model.CompanyName</strong></div></div>
     </section>
-
-    @if (Model.Requirements.Count > 0)
+    @if (Model.Requirements.Count > 0 || Model.NeededBy.HasValue)
     {
-        <details class="soffer-tender-requirements"><summary>Read the full tender requirements</summary><dl class="pg-dl">@foreach (var requirement in Model.Requirements) { <div><dt>@requirement.Label</dt><dd style="white-space:pre-line">@requirement.Value</dd></div> }</dl></details>
+        <details class="soffer-tender-requirements">
+            <summary>@L("Tender requirements", "متطلبات المناقصة")</summary>
+            <dl class="pg-dl">
+                @if (Model.NeededBy is DateTime needed)
+                {
+                    <div><dt>@L("Required Delivery Date", "تاريخ التسليم المطلوب")</dt><dd>@needed.ToString("d MMM yyyy")</dd></div>
+                }
+                @foreach (var requirement in Model.Requirements) { <div><dt>@requirement.Label</dt><dd class="soffer-verbatim">@requirement.Value</dd></div> }
+            </dl>
+        </details>
     }
 
-    <section class="soffer-section" aria-labelledby="soffer-items-title">
-        <header class="soffer-section-head"><span class="soffer-step">1</span><div><h2 id="soffer-items-title">Item Quotation</h2><p>Provide your offer for each requested item, including product details, specifications, warranty, and unit price.</p></div></header>
+    <div class="soffer-wizard">
+        <nav class="soffer-steps" aria-label="@L("Offer steps", "خطوات العرض")">
+            @for (var step = 0; step < steps.Length; step++)
+            {
+                <button type="button" data-offer-step="@step" aria-controls="soffer-panel-@step"><span class="soffer-step">@(step + 1)</span><span>@steps[step]</span></button>
+            }
+        </nav>
+        <div class="soffer-panels">
+    <section id="soffer-panel-0" class="soffer-section" data-offer-panel aria-labelledby="soffer-items-title">
+        <header class="soffer-section-head"><div><h2 id="soffer-items-title" tabindex="-1">@steps[0]</h2><p>@L("Provide details and price for each item.", "أدخل تفاصيل كل بند وسعره.")</p></div></header>
         <div class="soffer-items">
             @for (var n = 0; n < Model.ItemContext.Count; n++)
             {
@@ -53,65 +83,86 @@
                 var line = i.Items.FirstOrDefault(x => x.TenderItemId == c.TenderItemId) ?? new();
                 var priorImage = Model.ExistingDocuments.FirstOrDefault(d => d.DocumentType == "ReferenceImage" && d.FileName.StartsWith($"Item-{c.TenderItemId}-", StringComparison.Ordinal));
                 var warranties = new[] { "Not applicable", "3 months", "6 months", "12 months", "18 months", "24 months", "36 months", "48 months", "60 months" };
-                <article class="soffer-item" data-line>
-                    <div class="soffer-item-title"><span>@(n + 1)</span><h3>@c.Name</h3><small>@c.Quantity.ToString("0.###") @c.Unit</small></div>
+                <details class="soffer-item" data-line open="@(Model.ItemContext.Count == 1)">
+                    <summary class="soffer-item-title">
+                        <span class="soffer-item-thumb" aria-hidden="true" data-item-thumb>
+                            @if (priorImage != null) { <img src="@Url.Action("Preview", "Documents", new { area = "Supplier", id = priorImage.Id })" alt="" /> }
+                            <svg viewBox="0 0 32 32"><path d="M4 8h24v17H4zM5 22l7-7 5 5 4-5 7 7"/><circle cx="11" cy="12" r="1"/></svg>
+                        </span>
+                        <span class="soffer-item-caption"><strong data-item-name>@c.Name</strong><small>@L("Qty", "الكمية") · @c.Quantity.ToString("0.###") @c.Unit</small></span>
+                        <span class="soffer-chevron" aria-hidden="true"></span>
+                    </summary>
                     <input type="hidden" name="Input.Items[@n].TenderItemId" value="@c.TenderItemId" />
-                    <input type="hidden" name="Input.Items[@n].Quantity" value="@c.Quantity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)" data-qty />
+                    <input type="hidden" name="Input.Items[@n].Quantity" value="@c.Quantity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)" data-qty data-unit="@c.Unit" />
                     <div class="soffer-item-entry">
                         <div class="soffer-image-box">
-                            <div class="soffer-image-preview" data-image-preview><div data-image-empty @(priorImage != null ? "hidden" : null)><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="13" width="48" height="38" rx="4"/><circle cx="23" cy="26" r="4"/><path d="m10 47 14-13 9 8 10-12 12 14"/></svg><span>Product image</span></div>@if (priorImage != null) { <img src="@Url.Action("Preview", "Documents", new { area = "Supplier", id = priorImage.Id })" alt="Saved image for @c.Name" /> }</div>
-                            <div class="soffer-image-tools"><label>Choose image<input type="file" name="doc_ReferenceImage_@c.TenderItemId" accept=".png,.jpg,.jpeg" data-line-image aria-label="Choose image for @c.Name" /></label><button type="button" data-clear-image aria-label="Remove image for @c.Name" title="Remove selected image">&times;</button></div>
-                            @if (priorImage != null) { <input type="checkbox" name="Input.RemoveDocumentIds" value="@priorImage.Id" data-remove-saved-image hidden /><a asp-controller="Documents" asp-action="Download" asp-route-id="@priorImage.Id" class="soffer-saved-image" data-saved-image>Saved: @priorImage.FileName</a> }
+                            <div class="soffer-image-preview" data-image-preview><div data-image-empty @(priorImage != null ? "hidden" : null)><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="13" width="48" height="38" rx="4"/><circle cx="23" cy="26" r="4"/><path d="m10 47 14-13 9 8 10-12 12 14"/></svg><span>@L("Product image", "صورة المنتج")</span></div>@if (priorImage != null) { <img src="@Url.Action("Preview", "Documents", new { area = "Supplier", id = priorImage.Id })" alt="Saved image for @c.Name" /> }</div>
+                            <div class="soffer-image-tools"><label>@L("Choose image", "اختر صورة")<input type="file" name="doc_ReferenceImage_@c.TenderItemId" accept=".png,.jpg,.jpeg" data-line-image aria-label="@L("Choose image for", "اختر صورة للبند") @c.Name" /></label><button type="button" data-clear-image aria-label="@L("Remove image for", "إزالة صورة البند") @c.Name">&times;</button></div>
+                            @if (priorImage != null) { <input type="checkbox" name="Input.RemoveDocumentIds" value="@priorImage.Id" data-remove-saved-image hidden /><a asp-controller="Documents" asp-action="Download" asp-route-id="@priorImage.Id" class="soffer-saved-image" data-saved-image="@priorImage.FileName">@L("Saved", "محفوظ") · @priorImage.FileName</a> }
                         </div>
                         <div class="soffer-item-fields">
+                            @if (!string.IsNullOrWhiteSpace(c.Specifications))
+                            {
+                                <details class="soffer-item-spec"><summary>@L("Requested specifications", "المواصفات المطلوبة")</summary><p class="soffer-verbatim">@c.Specifications</p></details>
+                            }
                             <div class="soffer-item-pair">
-                                <label><span class="soffer-label">Brand / Model <em>*</em></span><input name="Input.Items[@n].OfferedProduct" value="@line.OfferedProduct" maxlength="300" required placeholder="Brand and model" /></label>
-                                <label><span class="soffer-label">Warranty <em>*</em></span><select name="Input.Items[@n].Notes" required><option value="">Select warranty</option>@foreach (var warranty in warranties) { <option selected="@(line.Notes == warranty)">@warranty</option> }@if (!string.IsNullOrWhiteSpace(line.Notes) && !warranties.Contains(line.Notes)) { <option selected>@line.Notes</option> }</select></label>
+                                <label><span class="soffer-label">@L("Brand / Model", "العلامة التجارية / الطراز") <em>*</em></span><input name="Input.Items[@n].OfferedProduct" value="@line.OfferedProduct" maxlength="300" required placeholder="@L("Brand and model", "العلامة التجارية والطراز")" /></label>
+                                <label><span class="soffer-label">@L("Warranty", "الضمان") <em>*</em></span><select name="Input.Items[@n].Notes" required><option value="">@L("Select warranty", "اختر الضمان")</option>@foreach (var warranty in warranties) { <option value="@warranty" selected="@(line.Notes == warranty)">@(warranty == "Not applicable" ? L(warranty, "لا ينطبق") : ar ? warranty.Replace("months", "أشهر") : warranty)</option> }@if (!string.IsNullOrWhiteSpace(line.Notes) && !warranties.Contains(line.Notes)) { <option selected>@line.Notes</option> }</select></label>
                             </div>
-                            <label><span class="soffer-label">Offered Specifications <em>*</em></span><textarea name="Input.Items[@n].OfferedSpecifications" rows="3" maxlength="4000" required placeholder="Describe the offered item">@line.OfferedSpecifications</textarea></label>
-                            <div class="soffer-price-row"><label><span class="soffer-label">Unit Price (Excl. Tax) <em>*</em></span><span class="soffer-money-input"><input name="Input.Items[@n].UnitPrice" type="number" min="0.001" step="0.001" inputmode="decimal" required value="@(line.UnitPrice > 0 ? line.UnitPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" data-price /><b data-currency-label>@i.CurrencyCode</b></span></label><div class="soffer-line-total"><small>Line Total</small><output data-line-total>—</output></div></div>
+                            <label><span class="soffer-label">@L("Offered Specifications", "المواصفات المعروضة") <em>*</em></span><textarea name="Input.Items[@n].OfferedSpecifications" rows="3" maxlength="4000" required placeholder="@L("Describe the offered item", "صف البند المعروض")">@line.OfferedSpecifications</textarea></label>
+                            <div class="soffer-price-row"><label><span class="soffer-label">@L("Unit Price (Excl. Tax)", "سعر الوحدة دون الضريبة") <em>*</em></span><span class="soffer-money-input"><input name="Input.Items[@n].UnitPrice" type="number" min="0.001" step="0.001" inputmode="decimal" required value="@(line.UnitPrice > 0 ? line.UnitPrice.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" data-price /><b data-currency-label>@i.CurrencyCode</b></span></label><div class="soffer-line-total"><small>@L("Line Total", "إجمالي البند")</small><output data-line-total>—</output></div></div>
                         </div>
                     </div>
-                </article>
+                </details>
             }
         </div>
     </section>
 
-    <section class="soffer-section" aria-labelledby="soffer-terms-title"><header class="soffer-section-head"><span class="soffer-step">2</span><div><h2 id="soffer-terms-title">Commercial Terms</h2><p>Key commercial conditions for your offer.</p></div></header>
-        <div class="soffer-terms-grid"><label><span class="soffer-label">Delivery Lead Time (Days) <em>*</em></span><input name="Input.DeliveryDays" type="number" min="1" max="3650" step="1" required value="@i.DeliveryDays" /></label><label><span class="soffer-label">Offer Valid Until <em>*</em></span><input name="Input.ValidUntil" type="date" required value="@i.ValidUntil?.ToString("yyyy-MM-dd")" min="@Model.Deadline?.ToString("yyyy-MM-dd")" /></label><label><span class="soffer-label">Payment Terms <em>*</em></span><select data-terms-pick>@foreach (var option in SupplierOfferService.PaymentTermOptions) { <option selected="@(i.PaymentTerms == option)">@option</option> }<option value="__custom" selected="@customTerms">Other (describe)…</option></select><input name="Input.PaymentTerms" value="@i.PaymentTerms" maxlength="1000" data-terms-value @(customTerms ? null : "hidden") placeholder="Describe your payment terms" /></label><label><span class="soffer-label">Currency <em>*</em></span><select name="Input.CurrencyCode" data-currency>@foreach (var currency in CurrencyRules.Offer.Where(currency => Model.RequiredCurrency == null || Model.RequiredCurrency == currency)) { <option selected="@(i.CurrencyCode == currency)">@currency</option> }</select></label></div>
+    <section id="soffer-panel-1" class="soffer-section" data-offer-panel aria-labelledby="soffer-terms-title"><header class="soffer-section-head"><h2 id="soffer-terms-title" tabindex="-1">@steps[1]</h2></header>
+        <div class="soffer-terms-grid"><label><span class="soffer-label">@L("Delivery Lead Time (Days)", "مدة التسليم بالأيام") <em>*</em></span><input name="Input.DeliveryDays" type="number" min="1" max="3650" step="1" required value="@i.DeliveryDays" /></label><label><span class="soffer-label">@L("Offer Valid Until", "العرض صالح حتى") <em>*</em></span><input name="Input.ValidUntil" type="date" required value="@i.ValidUntil?.ToString("yyyy-MM-dd")" min="@Model.Deadline?.ToString("yyyy-MM-dd")" /></label><label><span class="soffer-label">@L("Payment Terms", "شروط الدفع") <em>*</em></span><select data-terms-pick aria-label="@L("Payment Terms", "شروط الدفع")">@foreach (var option in SupplierOfferService.PaymentTermOptions) { <option value="@option" selected="@(i.PaymentTerms == option)">@PaymentLabel(option)</option> }<option value="__custom" selected="@customTerms">@L("Other (describe)…", "أخرى (اذكر التفاصيل)…")</option></select><input aria-label="@L("Custom payment terms", "شروط الدفع المخصصة")" name="Input.PaymentTerms" value="@i.PaymentTerms" maxlength="1000" data-terms-value @(customTerms ? null : "hidden") placeholder="@L("Describe your payment terms", "اذكر شروط الدفع")" /></label><label><span class="soffer-label">@L("Currency", "العملة") <em>*</em></span><select name="Input.CurrencyCode" data-currency>@foreach (var currency in CurrencyRules.Offer.Where(currency => Model.RequiredCurrency == null || Model.RequiredCurrency == currency)) { <option selected="@(i.CurrencyCode == currency)">@currency</option> }</select></label></div>
     </section>
 
-    <section class="soffer-section" aria-labelledby="soffer-costs-title"><header class="soffer-section-head"><span class="soffer-step">3</span><div><h2 id="soffer-costs-title">Additional Costs</h2><p>Only enter costs not already included in the item prices.</p></div></header>
-        <div class="soffer-costs">@foreach (var (key, label, on, amount) in new[] { ("Shipping", "Shipping Cost", i.IncludeShipping, i.ShippingCost), ("Installation", "Installation Cost", i.IncludeInstallation, i.InstallationCost), ("Maintenance", "Maintenance Cost", i.IncludeMaintenance, i.MaintenanceCost), ("Other", "Other Costs", i.IncludeOther, i.OtherCost) }) { var field = key == "Other" ? "OtherCost" : key + "Cost"; <div class="soffer-cost" data-cost data-on="@(on ? "true" : "false")"><label class="soffer-cost-check"><input type="checkbox" name="Input.Include@(key)" value="true" @(on ? "checked" : null) data-cost-toggle /><span>@label</span></label><div class="soffer-cost-value"><input name="Input.@field" type="number" min="0" step="0.001" inputmode="decimal" value="@(amount > 0 ? amount.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" aria-label="@label amount" data-cost-amount /><span data-currency-label>@i.CurrencyCode</span></div>@if (key == "Maintenance") { <input class="soffer-cost-description" name="Input.MaintenanceDescription" value="@i.MaintenanceDescription" maxlength="1000" placeholder="Coverage and duration" data-cost-required /> }@if (key == "Other") { <input class="soffer-cost-description" name="Input.OtherCostDescription" value="@i.OtherCostDescription" maxlength="500" placeholder="Description of other costs" data-cost-required /> }</div> }</div>
+    <section id="soffer-panel-2" class="soffer-section" data-offer-panel aria-labelledby="soffer-costs-title"><header class="soffer-section-head"><h2 id="soffer-costs-title" tabindex="-1">@steps[2]</h2></header>
+        <div class="soffer-costs">@foreach (var (key, label, on, amount) in new[] { ("Shipping", L("Shipping Cost", "تكلفة الشحن"), i.IncludeShipping, i.ShippingCost), ("Installation", L("Installation Cost", "تكلفة التركيب"), i.IncludeInstallation, i.InstallationCost), ("Maintenance", L("Maintenance Cost", "تكلفة الصيانة"), i.IncludeMaintenance, i.MaintenanceCost), ("Other", L("Other Costs", "تكاليف أخرى"), i.IncludeOther, i.OtherCost) }) { var field = key == "Other" ? "OtherCost" : key + "Cost"; <div class="soffer-cost" data-cost data-on="@(on ? "true" : "false")"><label class="soffer-cost-check"><input type="checkbox" name="Input.Include@(key)" value="true" @(on ? "checked" : null) data-cost-toggle /><span>@label</span></label><div class="soffer-cost-value"><input name="Input.@field" type="number" min="0" step="0.001" inputmode="decimal" value="@(amount > 0 ? amount.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" aria-label="@label" data-cost-amount /><span data-currency-label>@i.CurrencyCode</span></div>@if (key == "Maintenance") { <input class="soffer-cost-description" aria-label="@L("Maintenance coverage and duration", "تغطية الصيانة ومدتها")" name="Input.MaintenanceDescription" value="@i.MaintenanceDescription" maxlength="1000" placeholder="@L("Coverage and duration", "التغطية والمدة")" data-cost-required /> }@if (key == "Other") { <input class="soffer-cost-description" aria-label="@L("Description of other costs", "وصف التكاليف الأخرى")" name="Input.OtherCostDescription" value="@i.OtherCostDescription" maxlength="500" placeholder="@L("Description of other costs", "وصف التكاليف الأخرى")" data-cost-required /> }</div> }</div>
+    <details class="soffer-tax-settings"><summary>@L("Tax settings and exemptions", "إعدادات الضريبة والإعفاءات")</summary><div class="soffer-tax-grid"><label><input type="radio" name="Input.TaxMode" value="Rate" @(i.TaxMode != "Amount" ? "checked" : null) data-tax-mode />@L("Percentage rate", "نسبة مئوية")</label><div data-tax-rate><input name="Input.TaxRate" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="@taxRate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" aria-label="@L("Tax rate in percent", "نسبة الضريبة")" /><label><input type="checkbox" name="Input.TaxIncludesCharges" value="true" @(i.TaxIncludesCharges ? "checked" : null) />@L("Apply rate to additional costs too", "تطبيق النسبة على التكاليف الإضافية أيضًا")</label></div><label><input type="radio" name="Input.TaxMode" value="Amount" @(i.TaxMode == "Amount" ? "checked" : null) data-tax-mode />@L("Stated tax amount", "مبلغ ضريبة محدد")</label><div data-tax-amount><input name="Input.TaxAmount" type="number" min="0" step="0.001" inputmode="decimal" value="@(i.TaxMode == "Amount" ? i.TaxAmount.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" aria-label="@L("Total tax amount", "مبلغ الضريبة الكلي")" /></div></div></details>
     </section>
 
-    <section class="soffer-section soffer-summary" aria-labelledby="soffer-summary-title"><header class="soffer-section-head"><span class="soffer-step">4</span><div><h2 id="soffer-summary-title">Offer Summary</h2></div></header><div class="soffer-summary-body"><div class="soffer-summary-values" aria-live="polite"><div><span>Items Subtotal</span><strong data-sum="items">—</strong></div><div><span>Additional Costs</span><strong data-sum="charges">—</strong></div><div class="soffer-before"><span>Total Before Tax</span><strong data-sum="before">—</strong></div><div><span data-sum-tax-label>Sales Tax</span><strong data-sum="tax">—</strong></div><div class="soffer-grand"><span>Grand Total</span><strong data-sum="grand">—</strong></div></div><aside class="soffer-tax-note"><strong>ⓘ</strong><p>All prices are exclusive of sales tax. Tax is calculated automatically from the settings below.</p></aside></div>
-        <details class="soffer-tax-settings"><summary>Tax settings and exemptions</summary><div class="soffer-tax-grid"><label><input type="radio" name="Input.TaxMode" value="Rate" @(i.TaxMode != "Amount" ? "checked" : null) data-tax-mode /> Percentage rate</label><div data-tax-rate><input name="Input.TaxRate" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="@taxRate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" aria-label="Tax rate in percent" /><label><input type="checkbox" name="Input.TaxIncludesCharges" value="true" @(i.TaxIncludesCharges ? "checked" : null) /> Apply rate to additional costs too</label></div><label><input type="radio" name="Input.TaxMode" value="Amount" @(i.TaxMode == "Amount" ? "checked" : null) data-tax-mode /> Stated tax amount</label><div data-tax-amount><input name="Input.TaxAmount" type="number" min="0" step="0.001" inputmode="decimal" value="@(i.TaxMode == "Amount" ? i.TaxAmount.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "")" aria-label="Total tax amount" /></div></div></details>
-    </section>
-
-    <section class="soffer-section" aria-labelledby="soffer-docs-title">
-        <header class="soffer-section-head"><span class="soffer-step">5</span><div><h2 id="soffer-docs-title">Supporting Documents</h2><p>Only the documents required for this tender are listed. PDF, PNG or JPEG, up to 10 MB each.</p></div></header>
+    <section id="soffer-panel-3" class="soffer-section" data-offer-panel aria-labelledby="soffer-docs-title"><header class="soffer-section-head"><div><h2 id="soffer-docs-title" tabindex="-1">@steps[3]</h2><p>@L("PDF, PNG or JPEG, up to 10 MB each.", "ملفات PDF أو PNG أو JPEG حتى ١٠ ميغابايت لكل ملف.")</p></div></header>
         @if (Model.RequiredDocuments.Length == 0)
         {
-            <p class="soffer-no-docs">No supporting documents are required for this tender.</p>
+            <p class="soffer-no-docs">@L("No supporting documents are required for this tender.", "لا توجد مستندات داعمة مطلوبة لهذه المناقصة.")</p>
         }
         <div class="soffer-docs">
             @foreach (var kind in OfferDocumentTypes.All.Where(kind => Model.RequiredDocuments.Contains(kind.Key)))
             {
                 var existing = Model.ExistingDocuments.Where(d => d.DocumentType == kind.Key && (kind.Key != "ReferenceImage" || !d.FileName.StartsWith("Item-", StringComparison.Ordinal))).ToList();
                 <div class="soffer-doc" data-doc data-required="true" data-key="@kind.Key">
-                    <div class="soffer-doc-name"><span aria-hidden="true">▤</span><strong>@kind.Label</strong><em>Required</em></div>
-                    <ul data-doc-list>@foreach (var document in existing) { <li data-existing><span>@document.FileName <small>(@((document.SizeBytes / 1024.0).ToString("0")) KB, saved)</small></span><label><input type="checkbox" name="Input.RemoveDocumentIds" value="@document.Id" /> remove</label></li> }</ul>
-                    <label class="soffer-file-button">Choose File<input type="file" name="doc_@kind.Key" multiple accept="@(kind.Key == "ReferenceImage" ? ".png,.jpg,.jpeg" : ".pdf,.png,.jpg,.jpeg")" data-doc-input /></label>
+                    <div class="soffer-doc-name"><span aria-hidden="true">▤</span><strong>@OfferDocumentTypes.Label(kind.Key, ar)</strong><em>@L("Required", "مطلوب")</em></div>
+                    <ul data-doc-list>@foreach (var document in existing) { <li data-existing="@document.FileName"><span>@document.FileName <small>(@((document.SizeBytes / 1024.0).ToString("0")) @L("KB, saved", "كيلوبايت، محفوظ"))</small></span><label><input type="checkbox" name="Input.RemoveDocumentIds" value="@document.Id" /> @L("Remove", "إزالة")</label></li> }</ul>
+                    <label class="soffer-file-button">@L("Choose File", "اختر ملفًا")<input type="file" name="doc_@kind.Key" multiple accept="@(kind.Key == "ReferenceImage" ? ".png,.jpg,.jpeg" : ".pdf,.png,.jpg,.jpeg")" data-doc-input aria-label="@OfferDocumentTypes.Label(kind.Key, ar)" /></label>
                 </div>
             }
         </div>
-        <p class="pf-error" data-doc-error role="alert" hidden></p>
+        <p class="pf-error" data-doc-error role="alert" tabindex="-1" hidden></p>
+    <div class="soffer-notes"><h3>@L("Additional Notes (Optional)", "ملاحظات إضافية (اختياري)")</h3><label class="soffer-proposal-label"><span class="ws-sr-only">@L("Additional notes", "ملاحظات إضافية")</span><textarea name="Input.TechnicalProposal" rows="2" maxlength="10000" placeholder="@L("Add any clarifications about your offer (optional)", "أضف توضيحات حول العرض (اختياري)")">@i.TechnicalProposal</textarea></label><details class="soffer-optional"><summary>@L("Other optional terms", "شروط اختيارية أخرى")</summary><div class="soffer-optional-grid"><label>@L("Overall warranty period", "مدة الضمان الإجمالية")<select name="Input.WarrantyMonths"><option value="">@L("Not applicable", "لا ينطبق")</option>@foreach (var months in new[] { 3, 6, 12, 18, 24, 36, 48, 60 }) { <option value="@months" selected="@(i.WarrantyMonths == months)">@months @L("months", "أشهر")</option> }</select></label><label>@L("Warranty type", "نوع الضمان")<select name="Input.WarrantyType"><option value="">@L("Not applicable", "لا ينطبق")</option>@foreach (var type in new[] { "Manufacturer warranty", "Supplier warranty", "Manufacturer and supplier", "On-site warranty" }) { <option selected="@(i.WarrantyType == type)">@type</option> }</select></label><label>@L("Warranty conditions", "شروط الضمان")<textarea name="Input.WarrantyTerms" rows="2" maxlength="2000">@i.WarrantyTerms</textarea></label><label>@L("Deviations / clarifications", "الاختلافات والتوضيحات")<textarea name="Input.Deviations" rows="2" maxlength="4000">@i.Deviations</textarea></label><label>@L("After-sales support", "دعم ما بعد البيع")<textarea name="Input.AfterSalesSupport" rows="2" maxlength="2000">@i.AfterSalesSupport</textarea></label></div></details></div></section>
+
+    <section id="soffer-panel-4" class="soffer-section" data-offer-panel aria-labelledby="soffer-review-title">
+        <header class="soffer-section-head"><h2 id="soffer-review-title" tabindex="-1">@steps[4]</h2></header>
+        <div class="soffer-review" data-offer-review></div>
+        <h3>@L("Offer Totals", "إجماليات العرض")</h3>
+        <div class="soffer-summary-values" aria-live="polite"><div><span>@L("Items Subtotal", "إجمالي البنود")</span><strong data-sum="items">—</strong></div><div><span>@L("Additional Costs", "التكاليف الإضافية")</span><strong data-sum="charges">—</strong></div><div class="soffer-before"><span>@L("Total Before Tax", "الإجمالي قبل الضريبة")</span><strong data-sum="before">—</strong></div><div><span data-sum-tax-label>@L("Sales Tax", "ضريبة المبيعات")</span><strong data-sum="tax">—</strong></div><div class="soffer-grand"><span>@L("Grand Total", "الإجمالي الكلي")</span><strong data-sum="grand">—</strong></div></div>
     </section>
+        </div>
+    </div>
 
-    <section class="soffer-section soffer-notes" aria-labelledby="soffer-notes-title"><header class="soffer-section-head"><span class="soffer-step">6</span><div><h2 id="soffer-notes-title">Additional Notes <small>(Optional)</small></h2></div></header><label class="soffer-proposal-label"><span class="ws-sr-only">Additional notes</span><textarea name="Input.TechnicalProposal" rows="2" maxlength="10000" placeholder="Add any clarifications about your offer (optional)">@i.TechnicalProposal</textarea></label><details class="soffer-optional"><summary>Other optional terms</summary><div class="soffer-optional-grid"><label>Overall warranty period<select name="Input.WarrantyMonths"><option value="">Not applicable</option>@foreach (var months in new[] { 3, 6, 12, 18, 24, 36, 48, 60 }) { <option value="@months" selected="@(i.WarrantyMonths == months)">@months months</option> }</select></label><label>Warranty type<select name="Input.WarrantyType"><option value="">Not applicable</option>@foreach (var type in new[] { "Manufacturer warranty", "Supplier warranty", "Manufacturer and supplier", "On-site warranty" }) { <option selected="@(i.WarrantyType == type)">@type</option> }</select></label><label>Warranty conditions<textarea name="Input.WarrantyTerms" rows="2" maxlength="2000">@i.WarrantyTerms</textarea></label><label>Deviations / clarifications<textarea name="Input.Deviations" rows="2" maxlength="4000">@i.Deviations</textarea></label><label>After-sales support<textarea name="Input.AfterSalesSupport" rows="2" maxlength="2000">@i.AfterSalesSupport</textarea></label></div></details></section>
-
-    <footer class="soffer-submit"><p><span>ⓘ</span> Submission is final and sends the offer to the Sourcing Officer.</p><div class="soffer-submit-actions"><button type="submit" class="soffer-save-draft" formaction="@Url.Action("SaveDraft", "Offers", new { area = "Supplier", id = Model.InvitationId })" formnovalidate data-save-draft>Save Draft</button><button type="button" class="soffer-submit-final" data-submit-offer>➤ &nbsp;Submit Offer</button></div></footer>
-    <dialog class="pf-confirm" data-confirm-offer aria-labelledby="confirm-title"><h2 id="confirm-title">Submit this offer?</h2><p>Your offer and supporting documents will be sent to the Sourcing Officer. This submitted version cannot be edited directly.</p><p class="pf-muted" data-confirm-total></p><div class="pg-actions"><button type="button" class="pg-btn" data-cancel>Cancel</button><button type="button" class="pg-btn pg-btn-primary" data-ok>Confirm Submission</button></div></dialog>
+    <footer class="soffer-submit">
+        <button type="submit" class="soffer-save-draft" formaction="@Url.Action("SaveDraft", "Offers", new { area = "Supplier", id = Model.InvitationId })" formnovalidate data-save-draft>@L("Save as Draft", "حفظ كمسودة")</button>
+        <div class="soffer-submit-actions">
+            <button type="button" class="soffer-back" data-offer-back hidden>@L("Back", "رجوع")</button>
+            <button type="button" class="soffer-submit-final" data-offer-next>@L("Continue", "متابعة") <span class="soffer-arrow" aria-hidden="true">→</span></button>
+            <button type="button" class="soffer-submit-final" data-submit-offer hidden>@L("Submit Offer", "إرسال العرض")</button>
+        </div>
+    </footer>
+    <dialog class="pf-confirm" data-confirm-offer aria-labelledby="confirm-title"><h2 id="confirm-title">@L("Submit this offer?", "هل تريد إرسال هذا العرض؟")</h2><p>@L("Your offer and supporting documents will be sent to the Sourcing Officer. This submitted version cannot be edited directly.", "سيُرسل عرضك والمستندات الداعمة إلى مسؤول التوريد. لا يمكن تعديل هذه النسخة مباشرة بعد الإرسال.")</p><p class="pf-muted" data-confirm-total></p><div class="pg-actions"><button type="button" class="pg-btn" data-cancel>@L("Cancel", "إلغاء")</button><button type="button" class="pg-btn pg-btn-primary" data-ok>@L("Confirm Submission", "تأكيد الإرسال")</button></div></dialog>
 </form>
 @section Scripts { <script src="~/js/supplier-offer-form.js" asp-append-version="true"></script> }

@@ -19,18 +19,25 @@ public class WorkflowController(TenderWorkflowService workflow, ProtectedDocumen
     [HttpPost] public async Task<IActionResult> Create(RequirementsInput input)
     {
         var ajax = string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+        var ar = UiLanguage.IsArabic(HttpContext);
         if (!ModelState.IsValid)
         {
             if (!ajax) return RedirectToAction(nameof(Index), new { request = (int?)(input.PurchaseRequestId > 0 ? input.PurchaseRequestId : null) });
-            return BadRequest(new { errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "A field has an invalid value." : e.ErrorMessage).Distinct().ToArray() });
+            return BadRequest(new { fields = ModelState.Where(entry => entry.Value is { Errors.Count: > 0 }).ToDictionary(entry => entry.Key,
+                entry => entry.Value!.Errors.Select(e => ar ? "أدخل قيمة صحيحة لهذا الحقل."
+                    : string.IsNullOrWhiteSpace(e.ErrorMessage) ? "A field has an invalid value." : e.ErrorMessage).Distinct().ToArray()) });
         }
         try
         {
             var id = await Workflow.Create(input, User);
-            var created = OrangeFeedback.Popup("Tender created!", $"T-{id:0000} is ready. Open it to request the committee weights.", OrangeVariant.Save);
+            var created = OrangeFeedback.Popup(ar ? "تم إنشاء المناقصة" : "Tender created", $"T-{id:0000}", OrangeVariant.Save);
             if (ajax) return Json(new { ok = true, id, feedback = created.ToJsonElement() });
             TempData.Orange(created);
             return RedirectToAction(nameof(Index), new { created = id, open = id });
+        }
+        catch (TenderCreationFieldException e) when (ajax)
+        {
+            return BadRequest(new { fields = new Dictionary<string, string[]> { [e.Field] = [ar ? e.ArabicMessage : e.Message] } });
         }
         catch (WorkflowException e) when (ajax) { return BadRequest(new { errors = new[] { e.Message } }); }
     }

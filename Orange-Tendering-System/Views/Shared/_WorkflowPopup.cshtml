@@ -35,6 +35,24 @@
     string Role(CommitteeResponsibility? r) => r switch { CommitteeResponsibility.SourcingManager => "Sourcing Manager", CommitteeResponsibility.DepartmentRepresentative => "Department", CommitteeResponsibility.FinancialRepresentative => "Financial", CommitteeResponsibility.TechnicalRepresentative => "Technical 1", CommitteeResponsibility.TechnicalRepresentative2 => "Technical 2", CommitteeResponsibility.ChiefExecutiveOfficer => "CEO", _ => "Member" };
 
     var evalMembers = Model.Tender.CommitteeMembers.Where(x => x.CommitteeType == CommitteeType.Evaluation).OrderBy(x => x.Responsibility).ToList();
+    var ar = Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
+    string WeightRole(CommitteeResponsibility? role) => role switch
+    {
+        CommitteeResponsibility.SourcingManager => L("Sourcing Manager", "مدير التوريد"),
+        CommitteeResponsibility.DepartmentRepresentative => L("Requesting Department Representative", "ممثل القسم الطالب"),
+        CommitteeResponsibility.FinancialRepresentative => L("Financial Representative", "الممثل المالي"),
+        CommitteeResponsibility.TechnicalRepresentative => L("Technical Representative", "الممثل الفني"),
+        CommitteeResponsibility.TechnicalRepresentative2 => L("Second Technical Representative", "الممثل الفني الثاني"),
+        _ => L(Role(role), "عضو اللجنة")
+    };
+    var weightSetup = !Model.IsSupplier && !lowestPrice && status == TenderStatus.Draft && (w != null || Model.IsOfficer);
+    var canVoteWeights = Model.IsEvaluator && w?.State == WeightState.Proposals && w.Proposals.All(p => p.MemberUserId != Model.UserId);
+    var votedMembers = evalMembers.Count(m => w?.Proposals.Any(p => p.MemberUserId == m.UserId) == true);
+    var weightHeading = w == null ? L("Send to Committee", "إرسال إلى اللجنة")
+        : canVoteWeights ? L("Set Evaluation Weights", "تحديد أوزان التقييم")
+        : w.State == WeightState.Proposals ? L("Voting Progress", "تقدّم التصويت")
+        : L("Evaluation Weights (Average)", "متوسط أوزان التقييم");
     var matrixBids = (s?.EligibleBids.Select(x => x.BidId) ?? Model.Scores.Select(x => x.BidId)).Distinct().ToList();
     decimal? Cell(int memberId, int bidId, CriterionType t) => Model.Scores.FirstOrDefault(x => x.CommitteeMemberId == memberId && x.BidId == bidId && x.EvaluationCriterion.Type == t)?.Score;
     decimal? Weighted(int memberId, int bidId)
@@ -140,7 +158,7 @@
             return mine ? (revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true
                     ? ("Revise your weights", "Review the Officer's note, adjust your proposal and send it back.", "action")
                     : ("Propose the weights", "Choose the Financial / Technical split. Together they must total 100%.", "action"))
-                : ($"Waiting for weight proposals ({w.Proposals.Count} of 4)", "The average of the four proposals becomes the weights.", "wait");
+                : ($"Waiting for weight proposals ({votedMembers} of {evalMembers.Count})", "The proposals are averaged after voting closes.", "wait");
         }
         if (w != null && w.State == WeightState.AwaitingApproval)
             return Model.CanApproveWeights ? ("Approve the weights", $"Average of the four proposals: Financial {w.FinancialAverage:0.##}% / Technical {w.TechnicalAverage:0.##}%. Approving locks them.", "action") : ("Waiting for weight approval", "The Sourcing Officer approves the average of the four proposals.", "wait");
@@ -216,8 +234,360 @@
     };
     string Initial(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[0].ToString().ToUpperInvariant();
     var stepIndex = status switch { TenderStatus.Draft or TenderStatus.Bidding => 1, TenderStatus.Evaluation => s?.State == SessionState.ReportDraft ? 3 : 2, TenderStatus.OfficerReview => 3, _ => 4 };
+    var reviewStage = rv != null && (Model.IsOfficer || Model.IsManager || Model.IsTop)
+        && status is TenderStatus.OfficerReview or TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded;
+    var evaluationStage = !Model.IsSupplier && (reviewStage || status == TenderStatus.Evaluation || (Model.IsOfficer && closedRound && !lowestPrice));
+    var ranked = reviewStage ? Model.Ranking.OrderBy(row => row.Rank).ToList() : [];
+    var recommended = rv?.Report.RecommendedBidId is int recommendation ? ranked.FirstOrDefault(row => row.BidId == recommendation) : null;
+    var award = reviewStage && status == TenderStatus.Awarded;
+    var awardNotice = award && notice != null ? await Records.InternalAwardReports.AsNoTracking()
+        .Where(report => report.FinalDecisionNoticeId == notice.Id)
+        .Select(report => new { report.OfficerNotificationId, report.ManagerNotificationId }).SingleOrDefaultAsync() : null;
+    var winnerNotified = award && notice != null && await Records.SupplierResultDeliveries.AsNoTracking()
+        .AnyAsync(delivery => delivery.FinalDecisionNoticeId == notice.Id && delivery.Outcome == "Won" && delivery.InAppStatus == "Delivered");
+    var reviewTitle = award ? L("Tender Awarded", "تمت ترسية المناقصة")
+        : status == TenderStatus.ManagerReview ? L("Manager Review", "مراجعة مدير التوريد")
+        : status == TenderStatus.TopCommitteeReview ? L("Top Management Review", "مراجعة الإدارة العليا")
+        : L("Committee Evaluation", "تقييم اللجنة");
+    string Mean(int bidId, CriterionType criterion) => Model.Scores
+        .Where(score => score.BidId == bidId && score.EvaluationCriterion.Type == criterion)
+        .Select(score => (decimal?)score.Score).Average()?.ToString("0.0") ?? "—";
 }
-<div class="wf wf-pop" data-tender="@id">
+@{
+    // ---------- Wizard (Officer: eight stages; Manager and Top Management: their own decision stage). Real data only; locked stages open as their requirements are met. ----------
+    var wzManager = Model.IsManager && status is TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded && !Model.IsOfficer;
+    var wzTop = Model.IsTop && status is TenderStatus.TopCommitteeReview or TenderStatus.Awarded && !Model.IsOfficer;
+    var wz = Model.IsOfficer || wzManager || wzTop;
+    var wzItem = Model.Tender.Items.OrderBy(x => x.Id).FirstOrDefault();
+    var wzPr = Model.Tender.PurchaseRequestId;
+    var wzImage = wz ? await Records.Documents.AsNoTracking().Where(d => d.PurchaseRequestId == wzPr && d.DocumentType == "DepartmentSupportingDocument" && d.ContentType.StartsWith("image/")).Select(d => (int?)d.Id).FirstOrDefaultAsync() : null;
+    var wzDept = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Id == wzPr).Select(r => r.Department.Name).FirstOrDefaultAsync() ?? "";
+    var wzApproved = w?.State == WeightState.Approved || lowestPrice;
+    var wzPublished = status != TenderStatus.Draft;
+    var wzClosed = closedRound || s != null || status is TenderStatus.Evaluation or TenderStatus.OfficerReview or TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded;
+    var wzResults = Model.Ranking.Count > 0 && (s != null && (s.State is SessionState.ReportDraft or SessionState.Finalized or SessionState.ManagerApproved or SessionState.Awarded) || status is TenderStatus.OfficerReview or TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded);
+    var wzSent = status is TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded;
+    var wzDone = new[] { false, true, true, wzApproved, wzPublished, wzClosed && (s != null || status != TenderStatus.Bidding), wzResults, wzResults && status is not TenderStatus.Evaluation, wzSent };
+    var wzOpen = new[] { false, true, true, true, wzApproved, wzPublished, wzClosed, wzResults, wzResults };
+    var wzCurrent = 8; for (var n = 3; n <= 8; n++) if (!wzDone[n]) { wzCurrent = n; break; }
+    if (!wzOpen[wzCurrent]) wzCurrent = Enumerable.Range(1, 8).Where(n => wzOpen[n]).Max();
+    var wzTitles = new[] { "", L("Requirements", "المتطلبات"), L("Committee", "اللجنة"), L("Tender Settings", "إعدادات المناقصة"), L("Publish", "النشر"), L("Bids", "العروض"), L("Evaluation", "التقييم"), L("Results", "النتائج"), L("Send to Manager", "إرسال للمدير") };
+    var wzClosing = round?.Deadline;
+    var wzSpecs = (wzItem?.Specifications ?? "").Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+    var wzTop1 = Model.Ranking.OrderBy(x => x.Rank).FirstOrDefault();
+    var wzWinner = rv?.Report.RecommendedBidId is int wzBid ? Model.Ranking.FirstOrDefault(x => x.BidId == wzBid) : wzTop1;
+    var wzSignatures = rv?.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null) ?? 0;
+    var wzFw = finW; var wzTw = tecW;
+    var wzReasons = new[] { "", "", "", "", L("Approve the evaluation weights first.", "اعتمد أوزان التقييم أولاً."), L("Publish the tender first.", "انشر المناقصة أولاً."), L("Close bidding and send the offers to the committee first.", "أغلق العروض وأرسلها إلى اللجنة أولاً."), L("Wait until the committee finishes the evaluation.", "انتظر حتى تنهي اللجنة التقييم."), L("Wait until the committee signs the report.", "انتظر حتى توقّع اللجنة على التقرير.") };
+    string WzTime(DateTime? t) => t == null ? "—" : t.Value.ToJordan("d MMM yyyy, HH:mm");
+}
+@if (wz)
+{
+<div class="wf wf-pop wz" data-tender="@id" data-wz data-wz-current="@wzCurrent" data-wz-total="@(wzManager || wzTop ? 1 : 8)" dir="@(ar ? "rtl" : null)">
+    <header class="wz-head">
+        <div class="wz-head-main"><span class="wz-kicker">T-@id.ToString("0000") &middot; @wzDept &middot; PR #@wzPr</span><h2 id="wf-dialog-title">@Model.Tender.Title</h2>
+            <div class="wz-chips"><span class="wz-chip wz-chip-status">@Words(status.ToString())</span>@if (wzManager) { <span class="wz-chip wz-chip-role">@L("Manager", "المدير")</span> } @if (wzTop) { <span class="wz-chip wz-chip-role">@L("Top Management", "الإدارة العليا")</span> }</div></div>
+        @if (!Model.IsSupplier) { @await Component.InvokeAsync("TenderPassport", new { details = Model, trailUrl = Url.Action("Passport", ViewContext.RouteData.Values["controller"]?.ToString(), new { area, id }) }) }
+        @if (!(wzManager || wzTop))
+        {
+        <ol class="wz-steps" aria-label="@L("Tender stages", "مراحل المناقصة")">
+            @for (var n = 1; n <= 8; n++)
+            {
+                <li><button type="button" class="wz-step@(wzDone[n] ? " is-done" : "")@(n == wzCurrent ? " is-current" : "")" data-wz-go="@n" disabled="@(!wzOpen[n])" data-wz-reason="@(wzOpen[n] ? null : wzReasons[n])" aria-current="@(n == wzCurrent ? "step" : null)" title="@(wzOpen[n] ? null : L("Complete the earlier stages to unlock this one", "أكمل المراحل السابقة لفتح هذه المرحلة"))"><b>@(wzDone[n] && n != wzCurrent ? "✓" : n.ToString())</b><span>@wzTitles[n]</span>@if (!wzOpen[n]) { <i aria-hidden="true">&#128274;</i> }</button></li>
+            }
+        </ol>
+        }
+    </header>
+    @if (TempData["WorkflowMessage"] is string wzMessage) { <div class="wf-flash" role="status"><b aria-hidden="true">&#10003;</b>@wzMessage</div> }
+    <div class="wf-error" role="alert" hidden></div>
+
+    @if (wzManager || wzTop)
+    {
+        <div class="wz-body wz-single">
+            <section class="wz-panel is-current">
+                <div class="wz-art-side" aria-hidden="true"><span>@(status == TenderStatus.Awarded ? "\U0001F3C6" : wzTop ? "\U0001F3C5" : "✍")</span></div>
+                <div class="wz-main">
+                    <h3>@(status == TenderStatus.Awarded ? L("Tender Awarded!", "تمت ترسية المناقصة!") : wzTop ? L("Final Approval & Award", "الاعتماد النهائي والترسية") : L("Review & Sign Recommendation", "مراجعة وتوقيع التوصية"))</h3>
+                    <p class="wz-lead">@(status == TenderStatus.Awarded ? L($"T-{id:0000} has been awarded to {(wzWinner != null ? BidSupplier(wzWinner.BidId) : "the winning supplier")}.", $"تمت ترسية المناقصة T-{id:0000} على {(wzWinner != null ? BidSupplier(wzWinner.BidId) : "المورد الفائز")}.") : wzTop ? L("Review the recommendation, approve the award, and finalize the tender.", "راجع التوصية واعتمد الترسية وأنهِ المناقصة.") : L("Review the committee result and sign to forward it to Top Management.", "راجع نتيجة اللجنة ووقّع لإرسالها إلى الإدارة العليا."))</p>
+                    <dl class="wz-rows">
+                        <div><dt>@L("Recommended Supplier", "المورد الموصى به")</dt><dd class="wz-strong">@(wzWinner != null ? BidSupplier(wzWinner.BidId) : "—")</dd></div>
+                        <div><dt>@L("Total Score", "الدرجة الإجمالية")</dt><dd><span class="wz-score">@(wzWinner != null ? wzWinner.Score.ToString("0.0") : "—")</span></dd></div>
+                        <div><dt>@L("Committee Result", "نتيجة اللجنة")</dt><dd>@Model.Ranking.Count @L("suppliers evaluated", "موردين تم تقييمهم") · @wzSignatures/4 @L("signatures", "توقيعات")</dd></div>
+                        @if (status == TenderStatus.Awarded) { <div><dt>@L("Award Date", "تاريخ الترسية")</dt><dd>@WzTime(Model.Tender.AwardedAt)</dd></div><div><dt>@L("Award Reference", "مرجع الترسية")</dt><dd>AWD-@id.ToString("0000")</dd></div> }
+                        @if (rv != null) { <div><dt>@L("Evaluation Report", "تقرير التقييم")</dt><dd><a class="wz-ghost wz-link" data-no-modal href="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id })" target="_blank" rel="noopener">&#128065; @L("View Report", "عرض التقرير")</a></dd></div> }
+                    </dl>
+                    <div class="wz-actions">
+                        @if (wzManager && status == TenderStatus.ManagerReview) { <a class="wz-primary wz-link" data-no-modal asp-area="SourcingManager" asp-controller="Workflow" asp-action="ExecutiveSummary" asp-route-id="@id">@L("Review & Sign", "مراجعة وتوقيع") <span aria-hidden="true">&rarr;</span></a> }
+                        @if (wzManager && status != TenderStatus.ManagerReview) { <span class="wz-note">@L("Signed and forwarded to Top Management.", "تم التوقيع والإرسال إلى الإدارة العليا.")</span> }
+                        @if (wzTop && status == TenderStatus.TopCommitteeReview && rv != null) { <a class="wz-primary wz-link" data-no-modal asp-area="TopCommittee" asp-controller="SignedReports" asp-action="Review" asp-route-id="@rv.Report.Id">@L("Open the decision", "فتح القرار") <span aria-hidden="true">&rarr;</span></a> }
+                    </div>
+                </div>
+            </section>
+        </div>
+    }
+    else
+    {
+    <div class="wz-body">
+        @* 1 — Requirements *@
+        <section class="wz-panel" data-wz-panel="1">
+            <div class="wz-art-side">@if (wzImage != null) { <img src="@Url.Action("ItemImage", "PurchaseRequests", new { area = "SourcingOfficer", id = wzImage })" alt="@wzItem?.Name" loading="lazy" /> } else { <span aria-hidden="true">&#128230;</span> }</div>
+            <div class="wz-main"><h3>@L("Request Details", "تفاصيل الطلب")</h3><p class="wz-lead">@L("Review the requested item and specifications.", "راجع المادة المطلوبة ومواصفاتها.")</p>
+                <div class="wz-item"><strong>@(wzItem?.Name ?? "—")</strong><small>@(wzItem?.Category?.Name)</small><span class="wz-qty">@L("Quantity", "الكمية") <b>@(wzItem?.Quantity.ToString("0.###") ?? "—") @wzItem?.Unit</b></span></div>
+                <h4>@L("Specifications", "المواصفات")</h4>
+                <div class="wz-specs">@foreach (var line in wzSpecs.Take(8)) { var cut = line.IndexOf(':'); <span><small>@(cut > 0 ? line[..cut] : "")</small><b>@(cut > 0 ? line[(cut + 1)..].Trim() : line)</b></span> }@if (wzSpecs.Count == 0) { <span><b>—</b></span> }</div>
+            </div></section>
+        @* 2 — Committee *@
+        <section class="wz-panel" data-wz-panel="2">
+            <div class="wz-art-side" aria-hidden="true"><span>&#128101;</span></div>
+            <div class="wz-main"><h3>@L("Evaluation Committee", "لجنة التقييم")</h3><p class="wz-lead">@(w != null && !lowestPrice ? L("The committee members and their weight proposals.", "أعضاء اللجنة ومقترحات الأوزان الخاصة بهم.") : L("The committee members assigned to evaluate the suppliers.", "أعضاء اللجنة المعيّنون لتقييم الموردين."))</p>
+                @if (w != null && !lowestPrice)
+                {
+                    <div class="wz-voting" aria-label="@L("Voting Progress", "تقدّم التصويت")">
+                        <div class="wz-voting-bar"><progress value="@votedMembers" max="@evalMembers.Count" aria-label="@L("Submitted proposals", "المقترحات المقدّمة")"></progress><span class="wz-tag is-warm">@(ar ? $"صوّت {votedMembers} من {evalMembers.Count}" : $"{votedMembers} of {evalMembers.Count} voted")</span><button type="button" class="wz-ghost wz-small" data-refresh-weight-progress>@L("Refresh", "تحديث")</button></div>
+                        <ul class="wz-people wz-compact">@foreach (var m in evalMembers) { var voted = w.Proposals.Any(p => p.MemberUserId == m.UserId); <li><span class="wz-avatar">@Initial(Who(m.UserId))</span><div><strong>@Who(m.UserId)</strong><small>@WeightRole(m.Responsibility)</small></div><span class="wz-tag @(voted ? "is-good" : "")">@(voted ? L("✓ Voted", "✓ صوّت") : L("Pending", "بانتظار التصويت"))</span></li> }</ul>
+                    </div>
+                }
+                else { <ul class="wz-people">@foreach (var m in evalMembers) { <li><span class="wz-avatar">@Initial(Who(m.UserId))</span><div><strong>@Who(m.UserId)</strong><small>@WeightRole(m.Responsibility)</small></div><i aria-hidden="true">&#10003;</i></li> }</ul> }</div></section>
+        @* 3 — Tender settings: weights and closing date *@
+        <section class="wz-panel" data-wz-panel="3">
+            <div class="wz-art-side"><div class="wz-ring" style="--a:@((wzFw ?? 0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%"><b>@(wzFw != null ? "100%" : "—")</b><small>@L("Total Weight", "إجمالي الوزن")</small></div></div>
+            <div class="wz-main"><h3>@L("Evaluation Weights & Closing Date", "أوزان التقييم وموعد الإغلاق")</h3>
+                @if (lowestPrice) { <p class="wz-lead">@L("This tender is evaluated 100% on the lowest compliant price: no committee weights are needed.", "تُقيَّم هذه المناقصة بنسبة ١٠٠٪ على أقل سعر مطابق: لا حاجة لأوزان اللجنة.")</p> }
+                else
+                {
+                    <p class="wz-lead">@(w == null ? L("Send the tender to the committee: each member proposes the split and the average becomes the official weights.", "أرسل المناقصة إلى اللجنة: يقترح كل عضو التوزيع ويصبح المتوسط هو الوزن الرسمي.") : w.State == WeightState.Proposals ? L($"Waiting for weight proposals ({votedMembers} of {evalMembers.Count}).", $"بانتظار مقترحات الأوزان ({votedMembers} من {evalMembers.Count}).") : w.State == WeightState.AwaitingApproval ? L("All proposals are in. Review the average and approve it.", "اكتملت المقترحات. راجع المتوسط واعتمده.") : L("The weights are approved and locked.", "تم اعتماد الأوزان وقفلها."))</p>
+                    @if (w != null && w.State == WeightState.Proposals)
+                    {
+                        <div class="wz-voting" aria-label="@L("Voting Progress", "تقدّم التصويت")">
+                            <div class="wz-voting-bar"><progress value="@votedMembers" max="@evalMembers.Count" aria-label="@L("Submitted proposals", "المقترحات المقدّمة")"></progress><span class="wz-tag is-warm">@(ar ? $"صوّت {votedMembers} من {evalMembers.Count}" : $"{votedMembers} of {evalMembers.Count} voted")</span><button type="button" class="wz-ghost wz-small" data-refresh-weight-progress>@L("Refresh", "تحديث")</button></div>
+                            <ul class="wz-people wz-compact">@foreach (var member in evalMembers) { var voted = w.Proposals.Any(p => p.MemberUserId == member.UserId); <li><span class="wz-avatar">@Initial(Who(member.UserId))</span><div><strong>@Who(member.UserId)</strong><small>@WeightRole(member.Responsibility)</small></div><span class="wz-tag @(voted ? "is-good" : "")">@(voted ? L("✓ Voted", "✓ صوّت") : L("Pending", "بانتظار التصويت"))</span></li> }</ul>
+                        </div>
+                    }
+                    else
+                    {
+                                        <dl class="wz-rows wz-weights">
+                            <div><dt>@L("Technical Evaluation", "التقييم الفني")</dt><dd><span class="wz-pct">@(wzTw?.ToString("0.##") ?? "—")%</span></dd></div>
+                            <div><dt>@L("Financial Evaluation", "التقييم المالي")</dt><dd><span class="wz-pct">@(wzFw?.ToString("0.##") ?? "—")%</span></dd></div>
+                        </dl>
+                    }
+                }
+                <h4>@L("Tender Closing Date & Time", "تاريخ ووقت إغلاق المناقصة")</h4>
+                @if (status == TenderStatus.Draft)
+                {
+                    <div class="wz-deadline"><select class="wz-select" data-wz-preset aria-label="@L("Days from now", "عدد الأيام من الآن")"><option value="">@L("Choose number of days…", "اختر عدد الأيام…")</option><option value="1">@L("In 1 day", "خلال يوم")</option><option value="2">@L("In 2 days", "خلال يومين")</option><option value="3">@L("In 3 days", "خلال ٣ أيام")</option><option value="5">@L("In 5 days", "خلال ٥ أيام")</option><option value="7">@L("In 1 week", "خلال أسبوع")</option><option value="14">@L("In 2 weeks", "خلال أسبوعين")</option><option value="21">@L("In 3 weeks", "خلال ٣ أسابيع")</option><option value="30">@L("In 1 month", "خلال شهر")</option></select>
+                        <input type="datetime-local" class="wz-select" data-wz-deadline aria-label="@L("Bidding deadline", "الموعد النهائي")" @(Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeeded && wzNeeded.Date > Model.UtcNow.AddHours(3).Date ? Html.Raw("max=\"" + wzNeeded.ToString("yyyy-MM-dd") + "T23:59\"") : null) /></div>
+                    @if (Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeededBy) { <p class="wz-muted">@(wzNeededBy.Date > Model.UtcNow.AddHours(3).Date ? L("The department needs the items by", "تحتاج الجهة الطالبة المواد بحلول") + " " + wzNeededBy.ToString("d MMM yyyy") + ". " + L("The closing date cannot be later.", "ولا يمكن أن يكون موعد الإغلاق بعد ذلك.") : L("The department's needed-by date", "تاريخ حاجة الجهة الطالبة") + " (" + wzNeededBy.ToString("d MMM yyyy") + ") " + L("is today or has passed, so you can choose any closing date.", "هو اليوم أو انتهى، فيمكنك اختيار أي موعد إغلاق."))</p> }
+                }
+                else { <p class="wz-strong">@WzTime(wzClosing)</p> }
+                @if (!lowestPrice)
+                {
+                    @if (!wzApproved && status == TenderStatus.Draft && !(Model.CanApproveWeights && w?.State == WeightState.AwaitingApproval)) { <p class="wz-callout" role="status"><b aria-hidden="true">&#9203;</b> @(w == null ? L("Next step: send the tender to the committee so each member proposes the weights.", "الخطوة التالية: أرسل المناقصة إلى اللجنة ليقترح كل عضو الأوزان.") : w.State == WeightState.Proposals ? L($"Next step: the committee proposes the weights ({votedMembers} of {evalMembers.Count} so far). \"Continue\" opens when the weights are approved.", $"الخطوة التالية: تقترح اللجنة الأوزان ({votedMembers} من {evalMembers.Count} حتى الآن). يُفتح \"متابعة\" عند اعتماد الأوزان.") : L("Next step: approve the average of the proposals to unlock \"Continue\".", "الخطوة التالية: اعتمد متوسط المقترحات لفتح \"متابعة\".")) </p> }
+                    <div class="wz-actions wz-inline wz-approve">
+                        @if (w == null && status == TenderStatus.Draft) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RequestWeights" asp-route-id="@id" method="post" class="wp-form"><button class="wz-primary">@L("Send to Committee", "إرسال إلى اللجنة") <span aria-hidden="true">&rarr;</span></button></form> }
+                        @if (Model.CanApproveWeights && w != null && w.State == WeightState.AwaitingApproval) { <partial name="_ApproveTechnicalWeights" model='(w!, Model.Tender.Items.AsEnumerable())' />
+                <details class="wp-opt"><summary>@L("Return selected proposals for revision", "إعادة مقترحات محددة للمراجعة")</summary>
+                    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ReturnWeights" asp-route-id="@id" method="post" class="wp-form">
+                        @foreach (var member in evalMembers) { <label class="wp-check"><input type="checkbox" name="memberIds" value="@member.Id" /><span>@Who(member.UserId) · @WeightRole(member.Responsibility)</span></label> }
+                        <label>@L("Reason and what to revise", "السبب والمطلوب مراجعته")<textarea name="note" minlength="10" maxlength="2000" rows="3" required></textarea></label>
+                        <button class="wp-ghost">@L("Return selected proposals", "إعادة المقترحات المحددة")</button>
+                    </form>
+                </details> }
+                    </div>
+                }
+            </div></section>
+        @* 4 — Publish *@
+        <section class="wz-panel" data-wz-panel="4">
+            <div class="wz-art-side" aria-hidden="true"><span>&#128227;</span></div>
+            <div class="wz-main" data-wz-publish-main><h3>@L("Publish Tender", "نشر المناقصة")</h3><div data-wz-summary><p class="wz-lead">@L("Send the tender to registered suppliers.", "أرسل المناقصة إلى الموردين المسجّلين.")</p>
+                <dl class="wz-rows">
+                    <div><dt>@L("Tender", "المناقصة")</dt><dd>T-@id.ToString("0000")</dd></div>
+                    <div><dt>@L("Item", "المادة")</dt><dd>@(wzItem?.Name) × @(wzItem?.Quantity.ToString("0.###"))</dd></div>
+                    <div><dt>@L("Closing Date", "تاريخ الإغلاق")</dt><dd data-wz-deadline-echo>@(status == TenderStatus.Draft ? "—" : WzTime(wzClosing))</dd></div>
+                    <div><dt>@L("Evaluation Weights", "أوزان التقييم")</dt><dd>@(lowestPrice ? L("100% financial", "١٠٠٪ مالي") : $"{L("Technical", "فني")} {wzTw?.ToString("0.##")}% · {L("Financial", "مالي")} {wzFw?.ToString("0.##")}%")</dd></div>
+                    <div><dt>@L("Invited Suppliers", "الموردون المدعوون")</dt><dd>@(round?.Invitations.Count ?? 0)</dd></div>
+                </dl>
+                <div class="wz-actions">
+                    @if (status == TenderStatus.Draft && wzApproved) { <form id="wz-open-form" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="deadline" data-wz-deadline-utc /><button class="wz-primary" data-wz-publish>&#128227; @L("Publish to Suppliers", "نشر للموردين")</button><small data-wz-publish-hint>@L("Choose the closing date in the Tender Settings stage first.", "اختر تاريخ الإغلاق في مرحلة إعدادات المناقصة أولاً.")</small><small class="wz-bad" data-wz-deadline-error hidden>@L("The closing time must be at least one hour from now.", "يجب أن يكون وقت الإغلاق بعد ساعة على الأقل من الآن.")</small></form> }
+                    @if (status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open && inviteable is { Count: > 0 })
+                    {
+                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form">@foreach (var sp in inviteable) { <input type="hidden" name="supplierIds" value="@sp.Id" /> }<button class="wz-primary" data-confirm="@L("Send tender invitations to all eligible suppliers?", "هل تريد إرسال دعوات المناقصة لجميع الموردين المؤهلين؟")">@L($"Invite {inviteable.Count} eligible supplier(s)", $"دعوة {inviteable.Count} من الموردين المؤهلين")</button></form>
+                        <button type="button" class="wz-ghost" data-wz-picker-open>@L("Choose suppliers manually", "اختيار الموردين يدوياً")</button>
+                    }
+                </div></div>
+                <div class="wz-picker" data-wz-picker hidden><p><button type="button" class="wz-ghost wz-small" data-wz-picker-close>&larr; @L("Back to the summary", "العودة إلى الملخص")</button></p>
+        @if (Model.IsOfficer && status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open && w?.State == WeightState.Approved)
+        {
+            <div class="wp-actions">
+                @if (approvedSuppliers is { Count: > 0 })
+                {
+                    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form wp-picker" data-picker>
+                        <div class="wp-cols">
+                            <label>Search suppliers<input type="search" data-supplier-search placeholder="Company name" /></label>
+                            <label>Category<select data-supplier-category><option value="">All categories (@approvedSuppliers.Count)</option>@foreach (var category in SupplierCategories.All) { <option value="@category">@category (@approvedSuppliers.Count(x => x.Category == category))@(tenderCategories.Contains(category) ? " · in this tender" : "")</option> }</select></label>
+                            <label>Documents<select data-supplier-docs><option value="">Any</option><option value="verified">Verified, not expired</option><option value="clean">No expired or pending documents</option></select></label>
+                            <label>History<select data-supplier-history><option value="">Any</option><option value="offers">Has submitted offers before</option><option value="awards">Has won a tender before</option><option value="new">No earlier offers</option></select></label>
+                        </div>
+                        <p class="wp-hint">Only approved suppliers with an active, verified account are listed.@(tenderCategories.Count > 0 ? " Tender item categories: " + string.Join(", ", tenderCategories) + "." : "") <button type="button" class="wp-ghost" data-supplier-reset>Clear filters</button></p>
+                        @if (inviteable is { Count: 0 }) { <p class="wp-empty">All eligible suppliers have already been invited to this round.</p> }
+                        <div class="wp-pick-head"><label class="wp-check"><input type="checkbox" data-select-all @(inviteable is { Count: > 0 } ? null : "disabled") /> Select all</label><span class="wp-pick-count" data-count>0 selected</span></div>
+                        <ul class="wp-pick" data-fv-group-required data-fv-label="suppliers" data-fv-msg="Please select at least one supplier to invite." data-fv-msg-ar="يرجى اختيار مورد واحد على الأقل لدعوته.">@foreach (var sp in approvedSuppliers) { var done = invitedIds.Contains(sp.Id); <li class="@(done ? "is-invited" : null)" data-supplier-name="@sp.CompanyName.ToLowerInvariant()" data-supplier-category="@sp.Category" data-verified="@sp.Verified" data-issues="@(sp.Expired + sp.Pending)" data-offers="@sp.Offers" data-awards="@sp.Awards"><label class="wp-check"><input type="checkbox" name="supplierIds" value="@sp.Id" @(done ? "checked disabled" : null) /><span>@sp.CompanyName <small>@sp.Category · @sp.Verified verified doc(s)@(sp.Expired > 0 ? $" · {sp.Expired} expired" : "")@(sp.Pending > 0 ? $" · {sp.Pending} pending review" : "") · @sp.Offers earlier offer(s) · @sp.Awards award(s)</small></span>@if (done) { <em>Invited</em> }</label></li> }</ul>
+                        <p class="wp-empty" role="status" data-supplier-empty hidden>No eligible suppliers match these filters. Clear the filters to see all eligible suppliers.</p>
+                        <button class="wp-primary" data-pick-btn disabled data-confirm="Send tender invitations to the selected suppliers? Each one is notified and can accept or decline.">Invite selected</button>
+                        <small>Each invited supplier gets a notification, accepts, and sends an offer from their own portal.</small>
+                    </form>
+                }
+                else
+                {
+                    <p class="wp-empty">No eligible suppliers are available. Suppliers can be selected once their company is approved and they have an active account with a verified email address.</p>
+                }
+                <details class="wp-opt"><summary>Invite a company that is not registered</summary>
+                    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteExternal" asp-route-id="@id" method="post" class="wp-form"><div class="wp-cols"><label>Company<input name="companyName" maxlength="200" required data-fv-label="Company name" /></label><label>Email<input name="email" type="email" maxlength="256" required /></label><label>Phone (optional)<input name="phone" type="tel" maxlength="40" /></label></div><button>Send invitation</button><small>They receive a registration invitation first; an offer still needs an approved registration.</small></form></details>
+            </div>
+        }
+
+                </div></section>
+        @* 5 — Bids *@
+        <section class="wz-panel" data-wz-panel="5">
+            <div class="wz-art-side" aria-hidden="true"><span>&#128203;</span></div>
+            <div class="wz-main">@if (wzClosed && s == null)
+                {
+                <h3>@L("Send Offers to the Committee", "إرسال العروض إلى اللجنة")</h3>
+        @if (Model.IsOfficer && closedRound && lowestPrice)
+        {
+            <partial name="_FinancialOfferReview" model="Model" />
+        }
+        else if (Model.IsOfficer && closedRound)
+        {
+            var cur = !proceeded ? 1 : reviewedAi.Count == 0 ? 2 : 3;
+            <div class="wp-wizard" data-wizard data-current="@cur">
+                <ol class="wp-wsteps" aria-label="Preparation steps">
+                    <li class="@(cur > 1 ? "is-done" : "is-now")"><button type="button" data-goto="1"><b>@(cur > 1 ? "✓" : "1")</b><span>Continue</span></button></li>
+                    <li class="@(cur > 2 ? "is-done" : cur == 2 ? "is-now" : "")"><button type="button" data-goto="2" @(cur < 2 ? "disabled" : null)><b>@(cur > 2 ? "✓" : "2")</b><span>AI analysis</span></button></li>
+                    <li class="@(cur == 3 ? "is-now" : "")"><button type="button" data-goto="3" @(cur < 3 ? "disabled" : null)><b>3</b><span>Schedule</span></button></li>
+                </ol>
+                <section class="wp-wpanel" data-step="1" @(cur == 1 ? null : "hidden")>
+                    <h4>Continue with this round</h4>
+                                        <small>@Model.DistinctOffers supplier(s) sent offers. The normal minimum is @Model.MinimumOffers.</small>
+                    @if (proceeded) { <p class="wp-hint">Recorded: you are continuing with this round.</p> }
+                    else if (enoughOffers || approvedException != null) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Proceed" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Next <span aria-hidden="true">&rarr;</span></button></form> }
+                    else if (pendingRequest != null) { <p class="wp-hint">Waiting for the Sourcing Manager to approve continuing with fewer suppliers.</p> }
+                    else if (Model.DistinctOffers >= 1) { <details class="wp-opt" open><summary>Fewer offers than the minimum</summary><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RequestProceed" asp-route-id="@id" method="post" class="wp-form"><label>Why continue with @Model.DistinctOffers supplier(s)?<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>The market has only a few qualified suppliers.</option><option>The offers received meet all requirements.</option><option>Re-tendering would delay a critical purchase.</option></select><textarea name="justification" maxlength="2000" required rows="2" data-fv-label="Justification"></textarea></label><button>Ask the Manager to approve</button></form></details> }
+                    else { <p class="wp-hint">No offers were received, so re-tender is the only option.</p> }
+                    @if (round!.RoundNumber < Model.MaxRounds)
+                    {
+                        <details class="wp-opt"><summary>Or re-tender (new round)</summary><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Retender" asp-route-id="@id" method="post" class="wp-form"><label>Reason<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>Not enough compliant offers were received.</option><option>The offers do not meet the requirements.</option><option>The requirements were updated.</option><option>The prices are far above the estimate.</option></select><textarea name="reason" maxlength="2000" required rows="2" data-fv-label="Re-tender reason" data-fv-label-ar="سبب إعادة الطرح"></textarea></label><label class="wp-check"><input type="checkbox" required /> These offers will not be evaluated.</label><button class="wp-ghost">Create round @(round.RoundNumber + 1)</button></form></details>
+                    }
+                    else { <p class="wp-hint">This was the last permitted round.</p> }
+                </section>
+                <section class="wp-wpanel" data-step="2" @(cur == 2 ? null : "hidden")>
+                    <h4>AI analysis</h4>
+                                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Analyze" asp-route-id="@id" method="post" class="wp-form wp-inline"><button class="wp-ghost">Run the AI analysis</button><small>Advisory only. It never changes scores or decisions.</small></form>
+                    @foreach (var ai in Model.Analyses)
+                    {
+                        <details class="wp-opt" @(ai.ReviewedAt == null ? "open" : null)><summary>Analysis #@ai.Id &middot; @ai.Status @(ai.ReviewedAt != null ? "· reviewed" : "")</summary>@{ var fr = FindingRows(ai.Findings); }@if (fr.Count > 0) { <dl class="wp-ai">@foreach (var row in fr) { <div><dt>@row.Label</dt><dd>@row.Value</dd></div> }</dl> } else { <div class="wp-text">@ai.Findings</div> }
+                            @if (ai.Status == "Completed" && ai.ReviewedAt == null) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ReviewAi" asp-route-id="@id" method="post" class="wp-form"><input name="analysisId" type="hidden" value="@ai.Id" /><button class="wp-primary">I reviewed it, next &rarr;</button></form> }</details>
+                    }
+                </section>
+                <section class="wp-wpanel" data-step="3" @(cur == 3 ? null : "hidden")>
+                    <h4>@L("Evaluation Meeting", "اجتماع التقييم")</h4>
+                                        @if (reviewedAi.Count == 0) { <p class="wp-hint">Run and review the AI analysis first.</p> }
+                    else
+                    {
+                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Setup" asp-route-id="@id" method="post" class="wp-form">
+                            <div class="wp-cols"><label class="wp-schedule-ai">@L("Reviewed AI supplier comparison", "مقارنة الموردين المراجعة")<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">@L("Analysis", "التحليل") #@ai.Id</option> }</select></label></div><div class="wp-cols"><label>@L("Starts", "البدء")<input name="StartsAt" type="datetime-local" data-utc required data-fv-future data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label><label>@L("Ends", "الانتهاء")<input name="EndsAt" type="datetime-local" data-utc required data-fv-after="StartsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label></div>
+                            <label class="wp-check"><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> @L("Create the video meeting automatically", "إنشاء اجتماع الفيديو تلقائيًا")</label>
+                            <details class="wp-opt"><summary>@L("Use an existing Zoom link", "استخدام رابط Zoom موجود")</summary><label>@L("Zoom link", "رابط Zoom")<input name="MeetingUrl" type="url" placeholder="https://zoom.us/j/..." data-fv-optional /></label></details>
+                            <button class="wp-primary">@L("Schedule and Invite Committee", "جدولة الاجتماع ودعوة اللجنة")</button></form>
+                    }
+                </section>
+                <div class="wp-wnav"><button type="button" class="wp-ghost" data-wback>&larr; Back</button><span class="wp-wnote" data-wnote></span><button type="button" class="wp-primary" data-wnext>Next <span aria-hidden="true">&rarr;</span></button></div>
+            </div>
+        }
+
+                }
+                else
+                {
+                <h3>@L("Track Supplier Bids", "متابعة عروض الموردين")</h3><p class="wz-lead">@L("View the suppliers who submitted their offers.", "اعرض الموردين الذين قدّموا عروضهم.")</p>
+                <div class="wz-table"><table><thead><tr><th>#</th><th>@L("Supplier", "المورد")</th><th>@L("Offer Amount", "قيمة العرض")</th><th>@L("Submission Time", "وقت التقديم")</th><th>@L("Status", "الحالة")</th></tr></thead><tbody>
+                @{ var wzRows = (round?.Invitations ?? []).Select(inv => new { Inv = inv, Bid = Model.Bids.Where(b => b.TenderInvitationId == inv.Id && b.Status == BidStatus.Submitted).OrderByDescending(b => b.Id).FirstOrDefault() }).ToList(); var rowNo = 0; }
+                @foreach (var r in wzRows.Take(6)) { rowNo++; <tr><td>@rowNo</td><td>@SupplierName(r.Inv.SupplierId)</td><td>@(r.Bid != null ? Price(r.Bid).ToString("N0") + " " + r.Bid.CurrencyCode : "—")</td><td>@WzTime(r.Bid?.SubmittedAt)</td><td><span class="wz-tag @(r.Bid != null ? "is-good" : r.Inv.Status == InvitationStatus.Declined ? "is-bad" : "")">@(r.Bid != null ? L("Submitted", "تم التقديم") : r.Inv.Status == InvitationStatus.Declined ? L("Declined", "اعتذر") : L("Pending", "قيد الانتظار"))</span></td></tr> }
+                @if (wzRows.Count > 6) { <tr><td colspan="5" class="wz-muted">+ @(wzRows.Count - 6) @L("more suppliers (see the classic view for the full list)", "موردين آخرين (القائمة الكاملة في العرض التقليدي)")</td></tr> }
+                @if (wzRows.Count == 0) { <tr><td colspan="5" class="wz-empty">@L("No suppliers have been invited yet.", "لم تتم دعوة أي مورد بعد.")</td></tr> }
+                </tbody></table></div>
+                <p class="wz-muted">@submittedSupplierCount @L("offer(s) received", "عرض/عروض مستلمة") · @L("closing", "الإغلاق") @WzTime(wzClosing)</p>
+                <div class="wz-actions">
+                    @if (round?.Status == TenderRoundStatus.Open && status == TenderStatus.Bidding)
+                    {
+                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post" class="wp-form" data-close-bidding><button class="wz-primary" disabled="@(!canCloseBidding)">@L("Close bidding & continue", "إغلاق العروض والمتابعة") <span aria-hidden="true">&rarr;</span></button>@if (!canCloseBidding) { <small>@L("Available when 3 suppliers submit, everyone answers, or the deadline passes.", "متاح عند تقديم 3 موردين أو رد الجميع أو انتهاء الموعد.")</small> }</form>
+                    }
+                </div>
+                }
+            </div></section>
+        @* 6 — Committee evaluation *@
+        <section class="wz-panel" data-wz-panel="6">
+            <div class="wz-art-side" aria-hidden="true"><span>&#128101;</span></div>
+            <div class="wz-main"><h3>@L("Committee Evaluation", "تقييم اللجنة")</h3><p class="wz-lead">@L("The committee evaluates the suppliers based on the weights.", "تقيّم اللجنة الموردين بحسب الأوزان.")</p>
+                @if (s != null)
+                {
+                    <dl class="wz-rows"><div><dt>@L("Meeting & scoring", "الاجتماع والتقييم")</dt><dd>@WzTime(s.StartsAt) → @WzTime(s.EndsAt)</dd></div><div><dt>@L("Submitted", "تم التقديم")</dt><dd>@s.Submissions.Count / @evalMembers.Count</dd></div></dl>
+                    <ul class="wz-people wz-compact">@foreach (var m in evalMembers) { var done = s.Submissions.Any(x => x.CommitteeMemberId == m.Id); <li><span class="wz-avatar">@Initial(Who(m.UserId))</span><div><strong>@Who(m.UserId)</strong><small>@WeightRole(m.Responsibility)</small></div><span class="wz-tag @(done ? "is-good" : "")">@(done ? L("Submitted", "تم") : L("Pending", "قيد الانتظار"))</span></li> }</ul>
+                    @if (s.State == SessionState.Scheduled && s.Submissions.Count == 4) { <div class="wz-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="EndEvaluation" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="reason" value="All four committee evaluations were submitted." /><label class="wp-check"><input name="confirmed" type="checkbox" value="true" required /> @L("I confirm that all four evaluations are final.", "أؤكد أن التقييمات الأربعة نهائية.")</label><button class="wz-primary">@L("Generate the report now", "إنشاء التقرير الآن")</button></form></div> }
+                    @if (s.MeetingUrl != null && s.State == SessionState.Scheduled) { <p class="wz-muted"><a class="wz-link" data-no-modal href="/Meetings/Join/@id">&#127909; @L("Join the meeting", "الانضمام إلى الاجتماع")</a></p> }
+                }
+                else { <p class="wz-empty">@L("The evaluation starts after the offers are sent to the committee.", "يبدأ التقييم بعد إرسال العروض إلى اللجنة.")</p> }
+            </div></section>
+        @* 7 — Results *@
+        <section class="wz-panel" data-wz-panel="7">
+            <div class="wz-art-side" aria-hidden="true"><span>&#128202;</span></div>
+            <div class="wz-main"><h3>@L("Weighted Results", "النتائج المرجّحة")</h3><p class="wz-lead">@L("Final evaluation results from the committee.", "النتائج النهائية لتقييم اللجنة.")</p>
+                <div class="wz-table"><table><thead><tr><th>@L("Rank", "الترتيب")</th><th>@L("Supplier", "المورد")</th><th>@L("Total Score", "الدرجة الإجمالية")</th></tr></thead><tbody>
+                @foreach (var row in Model.Ranking.OrderBy(x => x.Rank).Take(6)) { <tr class="@(row.Rank == 1 ? "is-top" : null)"><td><span class="wz-rank">@row.Rank</span></td><td>@BidSupplier(row.BidId)</td><td><span class="wz-score@(row.Rank == 1 ? " is-win" : "")">@row.Score.ToString("0.0")</span></td></tr> }
+                @if (Model.Ranking.Count == 0) { <tr><td colspan="3" class="wz-empty">@L("Results appear when the evaluation ends.", "تظهر النتائج عند انتهاء التقييم.")</td></tr> }
+                </tbody></table></div>
+            </div></section>
+        @* 8 — Send to Manager *@
+        <section class="wz-panel" data-wz-panel="8">
+            <div class="wz-art-side" aria-hidden="true"><span>@(wzSent ? "✅" : "\U0001F4E4")</span></div>
+            <div class="wz-main">
+                @if (wzSent)
+                {
+                    @if (rejected)
+                    {
+                        <h3>@L("Returned by Top Management", "أُعيدت من الإدارة العليا")</h3><p class="wz-lead">@reasonText</p>
+                        <div class="wz-actions"><a class="wz-primary wz-link" data-no-modal asp-area="SourcingOfficer" asp-controller="FinalDecisions" asp-action="Index">@L("Open Final Decisions", "فتح القرارات النهائية") <span aria-hidden="true">&rarr;</span></a></div>
+                    }
+                    else {
+                    <h3>@L("Result Sent to Manager!", "تم إرسال النتيجة إلى المدير!")</h3><p class="wz-lead">@L("The evaluation result and recommendation have been sent to the Manager for review and signature.", "تم إرسال نتيجة التقييم والتوصية إلى المدير للمراجعة والتوقيع.")</p>
+                    <p><span class="wz-chip wz-chip-status">@(status == TenderStatus.ManagerReview ? L("Awaiting Manager Review", "بانتظار مراجعة المدير") : status == TenderStatus.TopCommitteeReview ? L("Awaiting Top Management Decision", "بانتظار قرار الإدارة العليا") : L("Awarded", "تمت الترسية"))</span></p>
+                    }
+                }
+                else
+                {
+                    <h3>@L("Send Recommendation to Manager", "إرسال التوصية إلى المدير")</h3><p class="wz-lead">@L("Submit the committee result and recommend the winning supplier.", "قدّم نتيجة اللجنة ورشّح المورد الفائز.")</p>
+                    <dl class="wz-rows"><div><dt>@L("Recommended Supplier", "المورد الموصى به")</dt><dd class="wz-strong">@(wzWinner != null ? BidSupplier(wzWinner.BidId) : "—")</dd></div><div><dt>@L("Total Score", "الدرجة الإجمالية")</dt><dd><span class="wz-score is-win">@(wzWinner != null ? wzWinner.Score.ToString("0.0") : "—")</span></dd></div><div><dt>@L("Committee signatures", "تواقيع اللجنة")</dt><dd>@wzSignatures / 4</dd></div></dl>
+                    <div class="wz-actions">
+                        @if (rv != null) { <a class="wz-ghost wz-link" data-no-modal href="@Url.Action("Pdf", "Reports", new { area, id = rv.Report.Id })" target="_blank" rel="noopener">&#128065; @L("View Report", "عرض التقرير")</a> }
+                        @if (rv != null && rv.CanForward) { <form asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Forward" asp-route-id="@rv.Report.Id" method="post" class="wp-form"><button class="wz-primary" data-confirm="@L("Send the signed report to the Sourcing Manager?", "هل تريد إرسال التقرير الموقّع إلى مدير التوريد؟")">@L("Send to Manager", "إرسال إلى المدير") <span aria-hidden="true">&rarr;</span></button></form> }
+                        else { <small class="wz-note">@(status == TenderStatus.Evaluation ? L("Available when all four members have signed the report.", "متاح عند توقيع الأعضاء الأربعة على التقرير.") : "")</small> }
+                    </div>
+                }
+            </div></section>
+    </div>
+    <footer class="wz-foot">
+        <button type="button" class="wz-ghost" data-wz-back>&larr; @L("Back", "رجوع")</button>
+        <div class="wz-dots" aria-hidden="true">@for (var n = 1; n <= 8; n++) { <i class="@(n <= wzCurrent ? "is-on" : null)"></i> }</div>
+        <span class="wz-lockhint" data-wz-lockhint role="status"></span>
+        <span class="wz-stepno" data-wz-stepno>@L("Step", "الخطوة") @wzCurrent @L("of", "من") 8</span>
+        <button type="button" class="wz-primary" data-wz-next>@L("Continue", "متابعة") <span aria-hidden="true">&rarr;</span></button>
+    </footer>
+    }
+</div>
+}
+
+@if (!wz)
+{
+<div data-wz-classic-box>
+<div class="wf wf-pop@(weightSetup ? " wf-weight-setup" : "")@(evaluationStage ? " wf-evaluation-stage" : "")" dir="@((weightSetup || evaluationStage) ? (ar ? "rtl" : "ltr") : null)" data-tender="@id">
     <header class="wf-pop-head@(Model.IsSupplier ? "" : " has-passport")">
         <div class="wf-pop-title"><span class="wf-eyebrow">T-@id.ToString("0000")</span><h2 id="wf-dialog-title">@Model.Tender.Title</h2>
             <div class="wf-chips"><span class="wf-chip wf-chip-status">@Words(status.ToString())</span>@if (w?.State == WeightState.Approved) { <span class="wf-chip wf-chip-good">Weights @w.ApprovedFinancial!.Value.ToString("0.##")% financial / @w.ApprovedTechnical!.Value.ToString("0.##")% technical</span> }</div></div>
@@ -229,10 +599,151 @@
     <div class="wf-error" role="alert" hidden></div>
     <div class="wp-layout"><div class="wp-main" data-view="@(stepIndex == 4 ? "approval" : "journey")">
     <section class="wp-now wp-now-@tone" aria-live="polite">
+        @if (reviewStage)
+        {
+            <div class="ew-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v6a4 4 0 0 1-8 0zm0 1H4v3a4 4 0 0 0 4 4m8-7h4v3a4 4 0 0 1-4 4m-4 2v6m-5 2h10"/></svg><h3>@reviewTitle</h3></div>
+            @if (award)
+            {
+                <div class="wf-award-card" data-award-result>
+                    <strong>@BidSupplier(Model.Tender.AwardedBidId ?? 0)</strong>
+                    @if (Model.Tender.AwardedAt is DateTime awardedAt) { <span>@awardedAt.ToJordan("d MMM yyyy HH:mm")</span> }
+                    @if (notice?.TopApprovals > 0) { <span>@notice.TopApprovals @L("signed approvals", "موافقات موقّعة")</span> }
+                    @if (notice?.TopApprovals > 0)
+                    {
+                        <ol class="wf-award-milestones" aria-label="@L("Completed award stages", "مراحل الترسية المكتملة")">
+                            <li>@(lowestPrice ? L("Financial Review", "المراجعة المالية") : L("Committee Evaluation", "تقييم اللجنة"))</li>
+                            <li>@L("Manager Review", "مراجعة المدير")</li>
+                            <li>@L("Top Management Approval", "اعتماد الإدارة العليا")</li>
+                            <li>@L("Awarded", "تمت الترسية")</li>
+                        </ol>
+                    }
+                </div>
+                @if (awardNotice != null || winnerNotified)
+                {
+                    <section class="wf-evidence-card"><h4>@L("Award Notifications", "إشعارات الترسية")</h4>
+                        <ul class="wf-deliveries">
+                            @if (winnerNotified) { <li><strong>@BidSupplier(Model.Tender.AwardedBidId ?? 0)</strong><span>@L("✓ Delivered in app", "✓ تم التسليم داخل النظام")</span></li> }
+                            @if (awardNotice?.OfficerNotificationId > 0) { <li><strong>@L("Sourcing Officer", "مسؤول التوريد")</strong><span>@L("✓ Delivered in app", "✓ تم التسليم داخل النظام")</span></li> }
+                            @if (awardNotice?.ManagerNotificationId > 0) { <li><strong>@L("Sourcing Manager", "مدير التوريد")</strong><span>@L("✓ Delivered in app", "✓ تم التسليم داخل النظام")</span></li> }
+                        </ul>
+                        <a class="wp-ghost wp-link" data-no-modal asp-area="" asp-controller="Notifications" asp-action="Index">@L("View Notifications", "عرض الإشعارات")</a>
+                    </section>
+                }
+            }
+            else
+            {
+                @if (!lowestPrice && s?.WeightRound is { } lockedWeights)
+                {
+                    <dl class="wf-locked-weights">
+                        <div><dt>@L("Technical weight", "الوزن الفني")</dt><dd>@lockedWeights.ApprovedTechnical?.ToString("0.##")%</dd></div>
+                        <div><dt>@L("Financial weight", "الوزن المالي")</dt><dd>@lockedWeights.ApprovedFinancial?.ToString("0.##")%</dd></div>
+                    </dl>
+                }
+                @if (ranked.Count > 0)
+                {
+                    <div class="wp-table wf-result-table" data-evaluation-ranking>
+                        <table><thead><tr><th scope="col">#</th><th scope="col">@L("Supplier", "المورد")</th>
+                            @if (!lowestPrice) { <th scope="col">@L("Technical", "الفني")</th><th scope="col">@L("Financial", "المالي")</th> }
+                            <th scope="col">@(lowestPrice ? L("Offer total", "إجمالي العرض") : L("Weighted score", "الدرجة المرجّحة"))</th>
+                        </tr></thead><tbody>
+                            @foreach (var row in ranked)
+                            {
+                                <tr class="@(row.BidId == recommended?.BidId ? "wf-recommended-row" : null)">
+                                    <td>@row.Rank</td><th scope="row">@BidSupplier(row.BidId) @if (row.Tied) { <small>@L("Tie", "تعادل")</small> }</th>
+                                    @if (!lowestPrice) { <td>@Mean(row.BidId, CriterionType.Technical)</td><td>@Mean(row.BidId, CriterionType.Financial)</td> }
+                                    <td><b>@(lowestPrice ? CurrencyRules.Format(row.Score, Model.Tender.Currency) : row.Score.ToString("0.0"))</b></td>
+                                </tr>
+                            }
+                        </tbody></table>
+                    </div>
+                }
+                @if (recommended != null)
+                {
+                    var winnerOffer = Model.Bids.FirstOrDefault(bid => bid.Id == recommended.BidId);
+                    <div class="wf-award-card" data-calculated-recommendation>
+                        <strong>@L("Recommended winner", "الفائز الموصى به") · @BidSupplier(recommended.BidId)</strong>
+                        @if (!lowestPrice) { <span>@L("Highest weighted score", "أعلى درجة مرجّحة") <b>@recommended.Score.ToString("0.0")</b></span> }
+                        @if (winnerOffer != null) { <span>@L("Offer total", "إجمالي العرض") <b>@CurrencyRules.Format(Price(winnerOffer), winnerOffer.CurrencyCode)</b></span> }
+                    </div>
+                }
+                else if (rv!.Report.RecommendedBidId == null)
+                {
+                    <p class="wp-hint wp-warn">@L("There is no unique recommended offer.", "لا يوجد عرض موصى به بشكل منفرد.")</p>
+                }
+                @if ((status == TenderStatus.TopCommitteeReview || status == TenderStatus.ManagerReview)
+                    && reviewedAi.FirstOrDefault(analysis => analysis.Id == s?.AiAnalysisId) is { } comparison)
+                {
+                    <details class="wp-opt wf-evidence-card"><summary>@L("AI Supplier Comparison · Advisory", "مقارنة الموردين بالذكاء الاصطناعي · استرشادي")</summary>
+                        @{ var findings = FindingRows(comparison.Findings); }
+                        @if (findings.Count > 0)
+                        {
+                            <dl class="wp-rows">@foreach (var finding in findings) { <div><dt>@finding.Label</dt><dd style="white-space:pre-line">@finding.Value</dd></div> }</dl>
+                        }
+                        else { <p class="wp-text">@comparison.Findings</p> }
+                        <p><a data-no-modal asp-action="AiAnalysisPdf" asp-route-id="@id">@L("View comparison evidence (PDF)", "عرض أدلة المقارنة (PDF)")</a></p>
+                    </details>
+                }
+            }
+        }
+        else if (weightSetup)
+        {
+            <div class="ew-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="6" r="3"/><path d="M6 21v-3a6 6 0 0 1 12 0v3zM4 8a2 2 0 0 0 0 4m16-4a2 2 0 0 1 0 4M2 19v-2a4 4 0 0 1 2-3m18 5v-2a4 4 0 0 0-2-3"/></svg><h3>@weightHeading</h3></div>
+            @if (w == null || (w.State == WeightState.Proposals && !canVoteWeights))
+            {
+                <div class="ew-overview">
+                    @if (w == null)
+                    {
+                        <div class="ew-summary"><span class="ew-badge" dir="ltr">T-@id.ToString("0000")</span><h4>@Model.Tender.Title</h4>
+                            <dl><div><dt>@L("Items", "البنود")</dt><dd>@Model.Tender.Items.Count</dd></div>
+                                @if (Model.Tender.Items.Count > 0 && Model.Tender.Items.Select(item => item.Unit).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1)
+                                { <div><dt>@L("Quantity", "الكمية")</dt><dd>@Model.Tender.Items.Sum(item => item.Quantity).ToString("0.###") @Model.Tender.Items.First().Unit</dd></div> }
+                                @if (Model.Tender.PurchaseRequest?.NeededBy is DateTime needed)
+                                { <div><dt>@L("Required by", "التسليم المطلوب")</dt><dd>@needed.ToString("d MMM yyyy", System.Globalization.CultureInfo.GetCultureInfo(ar ? "ar-JO" : "en"))</dd></div> }
+                            </dl>
+                        </div>
+                    }
+                    <div class="ew-roster">
+                        @if (w != null)
+                        {
+                            <div class="ew-progress" aria-label="@L("Voting Progress", "تقدّم التصويت")">
+                                @if (evalMembers.Count > 0) { <progress value="@votedMembers" max="@evalMembers.Count" aria-label="@L("Submitted proposals", "المقترحات المقدّمة")"></progress> }
+                                <span class="ew-badge">@(ar ? $"صوّت {votedMembers} من {evalMembers.Count}" : $"{votedMembers} of {evalMembers.Count} voted")</span>
+                                <button class="wp-ghost" type="button" data-refresh-weight-progress>@L("Refresh", "تحديث")</button>
+                            </div>
+                        }
+                        else { <h4>@L("Assigned Committee", "اللجنة المعيّنة")</h4> }
+                        <ul class="ew-members">
+                            @foreach (var member in evalMembers)
+                            {
+                                var voted = w?.Proposals.Any(p => p.MemberUserId == member.UserId) == true;
+                                <li><span class="ew-avatar" aria-hidden="true">@Initial(Who(member.UserId))</span>
+                                    <span class="ew-member"><strong>@Who(member.UserId)</strong><span>@WeightRole(member.Responsibility)</span></span>
+                                    @if (w != null) { <span class="ew-badge @(voted ? "ew-success" : "ew-pending")">@(voted ? L("✓ Voted", "✓ صوّت") : L("Pending", "بانتظار التصويت"))</span> }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+            else if (finW is decimal financialWeight && tecW is decimal technicalWeight)
+            {
+                <dl class="ew-results">
+                    <div><dt>@L("Technical Evaluation", "التقييم الفني")</dt><dd dir="ltr">@technicalWeight.ToString("0.######")%</dd></div>
+                    <div><dt>@L("Financial Evaluation", "التقييم المالي")</dt><dd dir="ltr">@financialWeight.ToString("0.######")%</dd></div>
+                </dl>
+                <p class="ew-result-status @(w.State == WeightState.Approved ? "ew-success" : "ew-pending")">
+                    @(w.State == WeightState.Approved ? L("✓ Evaluation weights are approved and locked.", "✓ تم اعتماد أوزان التقييم وتثبيتها.")
+                        : L("Awaiting weight approval.", "بانتظار اعتماد الأوزان."))
+                </p>
+            }
+        }
+        else
+        {
         <div class="wp-now-top">
             <span class="wp-now-icon" aria-hidden="true">@(tone == "action" ? "!" : tone == "good" ? "✓" : tone == "wait" ? "⏳" : "•")</span>
             <div><small>@(tone == "action" ? "YOUR TURN" : tone == "good" ? "DONE" : "WAITING")</small><h3>@next.Title</h3><p>@next.Text</p></div>
         </div>
+        }
 
         @* ============ ACTIONS: only what this person can do right now ============ *@
         @if (Model.IsOfficer && status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open)
@@ -270,39 +781,41 @@
         @if (Model.IsOfficer && status == TenderStatus.Draft && w == null)
         {
             <div class="wp-actions">
-                <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RequestWeights" asp-route-id="@id" method="post" class="wp-form"><button class="wp-primary">Send to the committee <span aria-hidden="true">&rarr;</span></button><small>This locks the requirements so everyone scores the same thing.</small></form>
-                <details class="wp-opt"><summary>Attach a supporting document (optional)</summary>
-                    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Upload" asp-route-id="@id" method="post" enctype="multipart/form-data" class="wp-form wp-inline"><input type="file" name="file" accept=".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg" required /><button>Upload</button></form></details>
+                <details class="wp-opt"><summary>@L("Attach a supporting document (optional)", "إرفاق مستند داعم (اختياري)")</summary>
+                    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Upload" asp-route-id="@id" method="post" enctype="multipart/form-data" class="wp-form wp-inline"><input type="file" name="file" aria-label="@L("Supporting document", "مستند داعم")" accept=".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg" required /><button>@L("Upload", "رفع")</button></form></details>
+                <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RequestWeights" asp-route-id="@id" method="post" class="wp-form ew-action"><small>@L("Sending freezes the current requirements and documents.", "الإرسال يثبّت المتطلبات والمستندات الحالية.")</small><button class="wp-primary">@L("Send to Committee", "إرسال إلى اللجنة")</button></form>
             </div>
         }
-        @if (Model.IsEvaluator && w != null && w.State == WeightState.Proposals && w.Proposals.All(x => x.MemberUserId != Model.UserId))
+        @if (canVoteWeights)
         {
             var priorFinancial = revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true && revision.PriorFinancial.TryGetValue(mySeat!.Id, out var prior) ? decimal.Round(prior, 0, MidpointRounding.AwayFromZero) : 50m;
             <div class="wp-actions">
-                <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post" class="wp-form wp-weights">
-                    @if (revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true) { <p class="wp-hint wp-warn"><strong>Officer's revision note:</strong> @revision.Note</p> }
-                    <div class="wp-split"><div><small>Financial</small><b id="wp-fin-label">@priorFinancial.ToString("0.##")%</b></div><input id="wp-fin" name="financial" type="range" min="0" max="100" step="1" value="@priorFinancial.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" aria-label="Financial weight percent" /><div><small>Technical</small><b id="wp-tech-label">@((100m-priorFinancial).ToString("0.##"))%</b></div></div>
-                    <input id="wp-tech" name="technical" type="hidden" value="@((100m-priorFinancial).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" />
-                    <button class="wp-primary">@(revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true ? "Send revised proposal" : "Submit my proposal")</button>
+                <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Propose" asp-route-id="@id" method="post" class="wp-form ew-sliders" data-weight-sliders>
+                    @if (revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true) { <p class="wp-hint wp-warn"><strong>@L("Officer’s revision note", "ملاحظة مسؤول التوريد")</strong> · @revision.Note</p> }
+                    @foreach (var slider in new[] { (Key: "technical", Label: L("Technical Evaluation", "التقييم الفني"), Value: 100m - priorFinancial), (Key: "financial", Label: L("Financial Evaluation", "التقييم المالي"), Value: priorFinancial) })
+                    {
+                        var value = slider.Value.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+                        <label class="ew-slider"><span>@slider.Label</span><input id="ew-@slider.Key" name="@slider.Key" type="range" min="0" max="100" step="1" value="@value" style="--ew-fill:@(value)%" aria-valuetext="@(value)%" /><output for="ew-@slider.Key" dir="ltr">@(value)%</output></label>
+                    }
+                    <div class="ew-action"><small>@L("Total 100%", "المجموع ١٠٠٪")</small><button type="button" class="wp-ghost" data-cancel-weight-vote>@L("Cancel", "إلغاء")</button><button class="wp-primary">@(revision?.CommitteeMemberIds.Contains(mySeat?.Id ?? 0) == true ? L("Submit Revised Vote", "إرسال التصويت المعدّل") : L("Submit Vote", "إرسال التصويت"))</button></div>
                 </form>
             </div>
         }
         @if (Model.CanApproveWeights && w != null && w.State == WeightState.AwaitingApproval)
         {
             <div class="wp-actions"><partial name="_ApproveTechnicalWeights" model='(w!, Model.Tender.Items.AsEnumerable())' />
-                <details class="wp-opt"><summary>Return weights to selected members for revision</summary>
+                <details class="wp-opt"><summary>@L("Return selected proposals for revision", "إعادة مقترحات محددة للمراجعة")</summary>
                     <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="ReturnWeights" asp-route-id="@id" method="post" class="wp-form">
-                        <p class="wp-hint">Select one or more members. Their previous proposals are kept in the audit history; their forms reopen with the earlier values.</p>
-                        @foreach (var member in evalMembers) { <label class="wp-check"><input type="checkbox" name="memberIds" value="@member.Id" /><span>@Who(member.UserId) · @Role(member.Responsibility)</span></label> }
-                        <label>Reason and what to revise<textarea name="note" minlength="10" maxlength="2000" rows="3" required></textarea></label>
-                        <button class="wp-ghost">Return selected proposals</button>
+                        @foreach (var member in evalMembers) { <label class="wp-check"><input type="checkbox" name="memberIds" value="@member.Id" /><span>@Who(member.UserId) · @WeightRole(member.Responsibility)</span></label> }
+                        <label>@L("Reason and what to revise", "السبب والمطلوب مراجعته")<textarea name="note" minlength="10" maxlength="2000" rows="3" required></textarea></label>
+                        <button class="wp-ghost">@L("Return selected proposals", "إعادة المقترحات المحددة")</button>
                     </form>
                 </details>
             </div>
         }
         @if (Model.IsOfficer && status == TenderStatus.Draft && w?.State == WeightState.Approved)
         {
-            <div class="wp-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post" class="wp-form wp-inline"><label>Quick pick<select class="wp-preset" data-preset="deadline"><option value="">Choose&hellip;</option><option value="3">In 3 days</option><option value="7">In 1 week</option><option value="14">In 2 weeks</option><option value="30">In 1 month</option></select></label><label>Bidding deadline<input type="datetime-local" data-utc name="deadline" required data-fv-future data-fv-label="Bidding deadline" data-fv-label-ar="الموعد النهائي لتقديم العروض" /></label><button class="wp-primary">Open bidding</button></form></div>
+            <div class="wp-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post" class="wp-form wp-inline"><label>@L("Quick pick", "اختيار سريع")<select class="wp-preset" data-preset="deadline"><option value="">@L("Choose…", "اختر…")</option><option value="3">@L("In 3 days", "خلال ٣ أيام")</option><option value="7">@L("In 1 week", "خلال أسبوع")</option><option value="14">@L("In 2 weeks", "خلال أسبوعين")</option><option value="30">@L("In 1 month", "خلال شهر")</option></select></label><label>@L("Bidding deadline", "الموعد النهائي لتقديم العروض")<input type="datetime-local" data-utc name="deadline" required data-fv-future data-fv-label="Bidding deadline" data-fv-label-ar="الموعد النهائي لتقديم العروض" /></label><button class="wp-primary">@L("Open bidding", "فتح باب تقديم العروض")</button></form></div>
         }
         @if (Model.IsOfficer && status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open && w?.State == WeightState.Approved)
         {
@@ -390,15 +903,15 @@
                     }
                 </section>
                 <section class="wp-wpanel" data-step="3" @(cur == 3 ? null : "hidden")>
-                    <h4>Schedule the evaluation</h4>
+                    <h4>@L("Evaluation Meeting", "اجتماع التقييم")</h4>
                                         @if (reviewedAi.Count == 0) { <p class="wp-hint">Run and review the AI analysis first.</p> }
                     else
                     {
                         <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Setup" asp-route-id="@id" method="post" class="wp-form">
-                            <div class="wp-cols"><label class="wp-schedule-ai">AI analysis<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">Analysis #@ai.Id</option> }</select></label></div><div class="wp-cols"><label>Starts<input name="StartsAt" type="datetime-local" data-utc required data-fv-future data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label><label>Ends<input name="EndsAt" type="datetime-local" data-utc required data-fv-after="StartsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label></div>
-                            <label class="wp-check"><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> Create the video meeting automatically</label>
-                            <details class="wp-opt"><summary>Use my own Zoom link instead</summary><label>Zoom link<input name="MeetingUrl" type="url" placeholder="https://zoom.us/j/..." data-fv-optional /></label></details>
-                            <button class="wp-primary">Schedule and invite the committee</button><small>The times schedule the meeting. Scoring stays available afterwards until each member submits. The four members get the invitation, the meeting link and the offers.</small></form>
+                            <div class="wp-cols"><label class="wp-schedule-ai">@L("Reviewed AI supplier comparison", "مقارنة الموردين المراجعة")<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">@L("Analysis", "التحليل") #@ai.Id</option> }</select></label></div><div class="wp-cols"><label>@L("Starts", "البدء")<input name="StartsAt" type="datetime-local" data-utc required data-fv-future data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label><label>@L("Ends", "الانتهاء")<input name="EndsAt" type="datetime-local" data-utc required data-fv-after="StartsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label></div>
+                            <label class="wp-check"><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> @L("Create the video meeting automatically", "إنشاء اجتماع الفيديو تلقائيًا")</label>
+                            <details class="wp-opt"><summary>@L("Use an existing Zoom link", "استخدام رابط Zoom موجود")</summary><label>@L("Zoom link", "رابط Zoom")<input name="MeetingUrl" type="url" placeholder="https://zoom.us/j/..." data-fv-optional /></label></details>
+                            <button class="wp-primary">@L("Schedule and Invite Committee", "جدولة الاجتماع ودعوة اللجنة")</button></form>
                     }
                 </section>
                 <div class="wp-wnav"><button type="button" class="wp-ghost" data-wback>&larr; Back</button><span class="wp-wnote" data-wnote></span><button type="button" class="wp-primary" data-wnext>Next <span aria-hidden="true">&rarr;</span></button></div>
@@ -412,21 +925,25 @@
         {
             var scoreIndex = 0;
             <div class="wp-actions">
-                <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post" class="wp-form wp-scores" data-evaluator-scores>
+                <form asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="SubmitEvaluation" asp-route-id="@id" method="post" class="wp-form wp-scores" data-evaluator-scores
+                      data-financial-weight="@s.WeightRound.ApprovedFinancial?.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                      data-technical-weight="@s.WeightRound.ApprovedTechnical?.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                     @foreach (var eligible in s.EligibleBids)
                     {
                         <fieldset data-score-row data-bid="@eligible.BidId"><legend>@BidSupplier(eligible.BidId)</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" />
                             <div class="evaluation-score-line">
-                                <label for="financial-score-@scoreIndex">Financial score <small>/ 100</small></label>
+                                <label for="financial-score-@scoreIndex">@L("Financial score", "الدرجة المالية") <small>/ 100</small></label>
                                 <input id="financial-score-@scoreIndex" name="scores[@scoreIndex].Financial" data-score="financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required data-fv-label="Financial score" data-fv-label-ar="الدرجة المالية" />
                             </div>
                             <partial name="_TechnicalScoreInputs" model='(s!.WeightRound.ReadTechnicalCriteria(), scoreIndex, "technical")' />
-                            <label>Score justification<select class="wp-quick" aria-label="Quick text"><option value="">Use a suggested justification (optional)</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label></fieldset>
+                            <label>@L("Score justification", "مبرر الدرجات")<select class="wp-quick" aria-label="@L("Quick text", "نص سريع")"><option value="">@L("Use a suggested justification (optional)", "استخدم مبررًا مقترحًا (اختياري)")</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label>
+                            <span class="wf-weighted-preview">@L("Weighted score preview", "معاينة الدرجة المرجّحة") <output data-weighted-preview>—</output></span>
+                        </fieldset>
                         scoreIndex++;
                     }
-                    <h5 class="wp-sub">Your signature <small>required after scoring every supplier</small></h5>
-                    <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
-                    <button class="wp-primary">Sign and submit my final evaluation</button><small>Sign once for all suppliers. Your signature is recorded with your scores and included in the generated report.</small>
+                    <h5 class="wp-sub">@L("Required signature", "التوقيع المطلوب")</h5>
+                    <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="@L("Draw your signature", "ارسم توقيعك")"></canvas><div class="wp-pad-bar"><span>@L("Sign here", "وقّع هنا")</span><button type="button" class="wp-ghost" data-pad-clear>@L("Clear", "مسح")</button></div></div>
+                    <button class="wp-primary">@L("Sign and submit my final evaluation", "توقيع تقييمي النهائي وإرساله")</button>
                 </form>
                 <a class="wp-ghost wp-link" data-no-modal asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Meeting" asp-route-id="@id">Open the detailed evaluation workspace</a>
             </div>
@@ -466,7 +983,7 @@
                 && x.UserId == rv.UserId && x.Action == "ProtectedReportViewed" && x.NewValues != null && x.NewValues.Contains(rv.Report.PdfSha256));
             <div class="wp-actions wp-report" data-needs-view="@(viewedReport ? null : "1")">
                 @if (!viewedReport) { <p class="wp-hint" data-view-note>Read the report below first. Signing unlocks as soon as the PDF has opened.</p> }
-                <div class="wp-reportbar"><a class="wp-primary wp-link" data-no-modal download href="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id, download = true })">&#11015; Download the report (PDF)</a><button type="button" class="wp-ghost" data-preview="@pdfUrl">Preview it here</button></div>
+                <div class="wp-reportbar"><button type="button" class="wp-ghost" data-preview="@pdfUrl">@L("View Committee Report", "عرض تقرير اللجنة")</button><a class="wp-ghost wp-link" data-no-modal download href="@Url.Action("Pdf", area == "TopCommittee" ? "SignedReports" : "Reports", new { area, id = rv.Report.Id, download = true })">@L("Download PDF", "تنزيل PDF")</a></div>
                 <div class="wp-preview" hidden></div>
                 @if (s?.State == SessionState.ReportDraft)
                 {
@@ -493,8 +1010,7 @@
                     {
                         <p class="wp-hint wp-warn" role="alert">The Top Committee is not set up yet, so approving will be refused. Ask the Admin to save the four Chiefs (CEO, CFO, CTO, COO) in Admin &rarr; Committees &rarr; Top Committee, then approve. Rejecting still works.</p>
                     }
-                    <a class="wp-primary wp-link" data-no-modal asp-area="SourcingManager" asp-controller="Workflow" asp-action="ExecutiveSummary" asp-route-id="@id">Prepare the executive summary for the Top Committee <span aria-hidden="true">&rarr;</span></a>
-                    <small>Pre-filled from the signed report; you edit it, save drafts and submit it once.</small>
+                    <a class="wp-primary wp-link" data-no-modal asp-area="SourcingManager" asp-controller="Workflow" asp-action="ExecutiveSummary" asp-route-id="@id">@L("Review and Send to Top Management", "مراجعة وإرسال إلى الإدارة العليا")</a>
                     <details class="wp-opt"><summary>Reject the report</summary>
                     <form asp-area="SourcingManager" asp-controller="Reports" asp-action="Decision" asp-route-id="@rv.Report.Id" method="post" class="wp-form"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" /><input type="hidden" name="decision" value="Reject" />
                         <label>Reason for rejecting (required)<textarea name="comment" maxlength="2000" minlength="10" rows="2" required data-fv-label="Reason"></textarea></label>
@@ -518,17 +1034,16 @@
                 }
                 @if (rv.CanVoteTop && !mySigned)
                 {
-                    <form asp-area="TopCommittee" asp-controller="SignedReports" asp-action="Vote" asp-route-id="@rv.Report.Id" method="post" class="wp-form wp-sign"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" />
-                        <fieldset class="wp-decide"><legend>Your decision</legend>
-                            <label class="wp-check"><input type="radio" name="decision" value="Approve" required checked /> <span><b>Approve</b> <small>Accept the recommended award.</small></span></label>
-                            <label class="wp-check"><input type="radio" name="decision" value="Reject" /> <span><b>Reject</b> <small>The company no longer needs this tender. It is cancelled.</small></span></label>
-                            <label class="wp-check"><input type="radio" name="decision" value="Retender" @(round != null && round.RoundNumber >= Model.MaxRounds ? "disabled" : null) /> <span><b>Re-Tender</b> <small>@(round != null && round.RoundNumber >= Model.MaxRounds ? $"Not available: round {round.RoundNumber} is the last permitted round ({Model.MaxRounds})." : "No offer is acceptable. The Officer reissues the tender as a new bidding round.")</small></span></label>
+                    <form asp-area="TopCommittee" asp-controller="SignedReports" asp-action="Vote" asp-route-id="@rv.Report.Id" method="post" class="wp-form wp-sign wf-award-decision"><input type="hidden" name="documentHash" value="@rv.Report.PdfSha256" />
+                        <fieldset class="wp-decide"><legend>@L("Award Decision", "قرار الترسية")</legend>
+                            <label class="wp-check"><input type="radio" name="decision" value="Approve" required /> <span><b>@L("Accept & Award", "قبول وترسية")</b></span></label>
+                            <label class="wp-check"><input type="radio" name="decision" value="Reject" /> <span><b>@L("Reject", "رفض")</b><small>@L("Tender no longer needed.", "لم تعد المناقصة مطلوبة.")</small></span></label>
+                            <label class="wp-check"><input type="radio" name="decision" value="Retender" @(round != null && round.RoundNumber >= Model.MaxRounds ? "disabled" : null) /> <span><b>@L("Re-tender", "إعادة الطرح")</b><small>@(round != null && round.RoundNumber >= Model.MaxRounds ? L("Final permitted round", "آخر جولة مسموحة") : L("No acceptable offer.", "لا يوجد عرض مقبول."))</small></span></label>
                         </fieldset>
-                        <label data-reason-box hidden>Reason / justification (required for Reject and Re-Tender)<textarea name="comment" maxlength="2000" minlength="10" rows="2" data-reason-input disabled></textarea></label>
-                        <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="Signature pad: draw your signature"></canvas><div class="wp-pad-bar"><span>&#9998; Sign here with your mouse or finger</span><button type="button" class="wp-ghost" data-pad-clear>Clear</button></div></div>
-                        <label class="wp-check"><input type="checkbox" name="confirmed" value="true" required /> I reviewed the report. My vote is my signature.</label>
-                        <small class="wp-hint">Four approvals award the tender automatically. One Reject or Re-Tender from any member stops the approval for everyone and sends the reason to the Sourcing Officer.</small>
-                        <button class="wp-primary">Submit my vote</button></form>
+                        <label data-reason-box hidden>@L("Decision reason (required)", "سبب القرار (مطلوب)")<textarea name="comment" maxlength="2000" minlength="10" rows="2" data-reason-input disabled></textarea></label>
+                        <div class="wp-pad" data-pad><canvas width="640" height="200" aria-label="@L("Draw your signature", "ارسم توقيعك")"></canvas><div class="wp-pad-bar"><span>@L("Signature required", "التوقيع مطلوب")</span><button type="button" class="wp-ghost" data-pad-clear>@L("Clear", "مسح")</button></div></div>
+                        <label class="wp-check"><input type="checkbox" name="confirmed" value="true" required /> @L("I reviewed the report and sign this decision.", "راجعت التقرير وأوقّع على هذا القرار.")</label>
+                        <button class="wp-primary">@L("Confirm Decision", "تأكيد القرار")</button></form>
                 }
                 @if (Model.IsTop) { <p class="wp-hint"><a data-no-modal asp-area="TopCommittee" asp-controller="Rejections" asp-action="Details" asp-route-id="@rv.Report.Id">Top Committee decision and rejection reason agreement</a></p> }
                 @if (rv.CanReturn && (rv.CanReviewManager || rv.CanVoteTop))
@@ -546,8 +1061,7 @@
                 }
                 @if (rv.CanForward)
                 {
-                    <div class="wp-received"><strong>Completed and signed evaluation report received</strong><span>Version @rv.Report.VersionNumber &middot; signed by all four members &middot; recommended: @(rv.Report.RecommendedBidId is int rb ? BidSupplier(rb) : "no single offer (tie)")</span></div>
-                    <form asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Forward" asp-route-id="@rv.Report.Id" method="post" class="wp-form"><button class="wp-primary" data-confirm="Forward the signed report to the Sourcing Manager? The signed report itself cannot be changed.">Forward to Sourcing Manager <span aria-hidden="true">&rarr;</span></button><small>The system re-checks all four committee signatures on this exact version first.</small></form>
+                    <form asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Forward" asp-route-id="@rv.Report.Id" method="post" class="wp-form wf-review-action"><button class="wp-primary" data-confirm="@L("Send the signed report to the Sourcing Manager?", "هل تريد إرسال التقرير الموقّع إلى مدير التوريد؟")">@L("Send to Manager", "إرسال إلى المدير")</button></form>
                 }
             </div>
         }
@@ -578,14 +1092,17 @@
             <article class="wp-stage st-@StageState(2)" data-ph="1">
                 <span class="wp-dot">@(StageState(2) == "done" ? "\u2713" : "2")</span>
                 <div class="wp-stage-body">
-                    <header><h4>Weights</h4><span class="wp-sum">@(w == null ? "Not requested yet" : w.State == WeightState.Approved ? $"{finW:0.##}% / {tecW:0.##}% locked" : $"{w.Proposals.Count} of 4 proposals")</span></header>
+                    <header><h4>@L("Weights", "الأوزان")</h4><span class="wp-sum">@(w == null ? L("Not requested yet", "لم تُطلب بعد") : w.State == WeightState.Approved ? $"{finW:0.##}% / {tecW:0.##}% · {L("Locked", "مثبّتة")}" : L($"{votedMembers} of {evalMembers.Count} proposals", $"{votedMembers} من {evalMembers.Count} مقترحات"))</span></header>
                     @if (w == null) { <p class="wp-empty">When the Officer sends the tender, each committee member proposes the Financial / Technical split.</p> }
                     else
                     {
+                        @if (!weightSetup)
+                        {
                         <div class="wp-split-view">
                             @if (finW != null && tecW != null) { <div class="wp-donut" style="--p:@finW.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%" role="img" aria-label="Financial @finW.Value.ToString("0.##") percent, technical @tecW.Value.ToString("0.##") percent"><b>@finW.Value.ToString("0.#")%</b><small>financial</small></div><div class="wp-legend"><span><i class="wp-k1"></i><b>@finW.Value.ToString("0.##")%</b> Financial</span><span><i class="wp-k2"></i><b>@tecW.Value.ToString("0.##")%</b> Technical</span><small>@(w.State == WeightState.Approved ? "Approved and locked" : "Average of the proposals, waiting for approval")</small></div> }
-                            else { <div class="wp-legend"><small>The average appears when all four members have proposed.</small></div> }
+                            else { <div class="wp-legend"><small>@L("The average appears after all members submit.", "يظهر المتوسط بعد تقديم جميع الأعضاء لمقترحاتهم.")</small></div> }
                         </div>
+                        }
                         @if (w.ReadTechnicalCriteria() is { Count: > 0 } criteria)
                         {
                             <h5>Technical criteria</h5>
@@ -760,7 +1277,7 @@
                     </div>
                 }
                 <p class="wp-empty">@(lowestPrice ? (sentToManager ? "The system sent the lowest compliant price to the Manager." : "Confirm screening to send the financial recommendation.") : sentToManager ? "The Officer sent the fully signed report to the Manager." : evalSigned.Count >= 4 ? "All four members signed. Send the report to the Sourcing Manager for review." : $"{evalSigned.Count} of 4 members signed. The report can be sent as soon as all four have signed.")</p>
-                @if (!lowestPrice && !sentToManager && rv != null && Model.IsOfficer)
+                @if (!reviewStage && !lowestPrice && !sentToManager && rv != null && Model.IsOfficer)
                 {
                     <form asp-area="SourcingOfficer" asp-controller="Reports" asp-action="Forward" asp-route-id="@rv.Report.Id" method="post" class="wp-form"><button class="wp-primary" @(rv.CanForward ? null : "disabled")>Send to the Sourcing Manager <span aria-hidden="true">&rarr;</span></button>@if (!rv.CanForward) { <small>Enabled when all four committee members have signed (@evalSigned.Count of 4).</small> }</form>
                 }
@@ -851,7 +1368,7 @@
                 <div><dt>Purchase request</dt><dd>#@Model.Tender.PurchaseRequestId</dd></div>
             </dl>
         </div>
-        @if (!Model.IsSupplier && evalMembers.Count > 0)
+        @if (!Model.IsSupplier && !weightSetup && evalMembers.Count > 0)
         {
             <div class="wp-side-card">
                 <h4>Committee</h4>
@@ -878,3 +1395,5 @@
             <ul>@foreach (var entry in Model.History) { <li><time>@entry.CreatedAt.ToJordan("d MMM yyyy HH:mm")</time><span>@Words(entry.Action)</span></li> }</ul></details>
     }
 </div>
+</div>
+}

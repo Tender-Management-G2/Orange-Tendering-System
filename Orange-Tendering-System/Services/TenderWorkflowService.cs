@@ -105,36 +105,81 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         session.State = session.Submissions.Count == 4 ? SessionState.Closed : SessionState.Incomplete;
     }
 
-    public async Task<int> Create(RequirementsInput input, ClaimsPrincipal principal)
+    public bool CriticalTenderEnabled => Policy.FinalConfigured && Policy.TopCommitteeRequirement == "ThresholdOrCritical";
+
+    internal static readonly string[] TenderSeatRoles = [SystemRoles.SourcingManager, SystemRoles.DepartmentRepresentative, SystemRoles.Finance, SystemRoles.Technical];
+    internal static readonly string[] TenderSeatFields = [nameof(RequirementsInput.SourcingManagerId), nameof(RequirementsInput.DepartmentRepresentativeId),
+        nameof(RequirementsInput.FinancialRepresentativeId), nameof(RequirementsInput.TechnicalRepresentativeId)];
+
+    private static void RequireCreationField([DoesNotReturnIf(false)] bool valid, string field, string message, string arabicMessage)
+    {
+        if (!valid) throw new TenderCreationFieldException(field, message, arabicMessage);
+    }
+
+    public async Task<List<ApplicationUser>> TenderSeatCandidates(string role)
+    {
+        var eligible = new List<ApplicationUser>();
+        foreach (var person in (await users.GetUsersInRoleAsync(role)).Where(u => u.IsActive))
+        {
+            var roles = await users.GetRolesAsync(person);
+            var manager = role == SystemRoles.SourcingManager;
+            if (SystemRoles.AccountRoles(role).All(roles.Contains)
+                && !roles.Intersect(new[] { SystemRoles.Admin, SystemRoles.Supplier, SystemRoles.SourcingOfficer }).Any()
+                && roles.Contains(manager ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee)
+                && !roles.Contains(manager ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager))
+                eligible.Add(person);
+        }
+        return eligible.OrderBy(p => p.FullName ?? p.Email).ToList();
+    }
+
+    public async Task<int> Create(RequirementsInput input, ClaimsPrincipal principal, Guid? assistantDraftId = null)
     {
         var actor = await Actor(principal);
         Require(await IsOfficer(actor), "Exactly one active Sourcing Officer must be configured.");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var pr = await db.PurchaseRequests.FromSqlInterpolated($"SELECT * FROM PurchaseRequests WITH (UPDLOCK,HOLDLOCK) WHERE Id={input.PurchaseRequestId}").Include(x => x.Items).SingleOrDefaultAsync();
-        Require(pr?.Status == PurchaseRequestStatus.Accepted && pr.Items.Count > 0, "An accepted Purchase Request with line items is required.");
-        Require(!await db.Tenders.AnyAsync(t => t.PurchaseRequestId == input.PurchaseRequestId), "This request already has a tender. Continue that tender or create a new round instead.");
+        RequireCreationField(pr?.Status == PurchaseRequestStatus.Accepted && pr.Items.Count > 0, nameof(input.PurchaseRequestId), "An accepted purchase request with line items is required.", "اختر طلب شراء مقبولًا يحتوي على بنود.");
+        RequireCreationField(!await db.Tenders.AnyAsync(t => t.PurchaseRequestId == input.PurchaseRequestId), nameof(input.PurchaseRequestId), "This purchase request already has a tender.", "أُنشئت مناقصة لطلب الشراء هذا مسبقًا.");
         var ids = new[] { input.SourcingManagerId, input.DepartmentRepresentativeId ?? "", input.FinancialRepresentativeId ?? "", input.TechnicalRepresentativeId ?? "" };
         var lowestPrice = pr!.EvaluationMethod == TenderEvaluationMethod.LowestPrice;
+        RequireCreationField(!string.IsNullOrWhiteSpace(pr.Title) && !string.IsNullOrWhiteSpace(pr.Justification), nameof(input.PurchaseRequestId), "The purchase request must have a title and description.", "يجب أن يتضمن طلب الشراء عنوانًا ووصفًا.");
+        RequireCreationField(input.EstimatedValue is >= 0.01m and <= 9999999999999999.99m && decimal.Round(input.EstimatedValue, 2) == input.EstimatedValue, nameof(input.EstimatedValue), "Enter a valid procurement value with up to two decimal places.", "أدخل قيمة تقديرية موجبة بمنزلتين عشريتين على الأكثر.");
+        RequireCreationField((lowestPrice ? CurrencyRules.Offer : CurrencyRules.Tender).Contains(input.Currency), nameof(input.Currency), "Choose a supported tender currency.", "اختر عملة مدعومة للمناقصة.");
+        RequireCreationField(!string.IsNullOrWhiteSpace(input.CommercialConditions) && input.CommercialConditions.Length <= 10000, nameof(input.CommercialConditions), "Enter commercial conditions (up to 10,000 characters).", "أدخل الشروط التجارية بما لا يتجاوز ١٠٬٠٠٠ حرف.");
+        RequireCreationField(!string.IsNullOrWhiteSpace(input.DeliveryExpectations) && input.DeliveryExpectations.Length <= 4000, nameof(input.DeliveryExpectations), "Enter delivery expectations (up to 4,000 characters).", "أدخل متطلبات التسليم بما لا يتجاوز ٤٬٠٠٠ حرف.");
+        RequireCreationField(!string.IsNullOrWhiteSpace(input.MandatoryCompliance) && input.MandatoryCompliance.Length <= 4000, nameof(input.MandatoryCompliance), "Enter mandatory compliance conditions (up to 4,000 characters).", "أدخل شروط الامتثال الإلزامية بما لا يتجاوز ٤٬٠٠٠ حرف.");
         if (lowestPrice)
         {
-            Require(CurrencyRules.Offer.Contains(input.Currency), "Choose a supported supplier offer currency for financial-only tenders.");
             ids = [input.SourcingManagerId];
         }
-        Require(ids.All(x => !string.IsNullOrWhiteSpace(x)) && ids.Distinct().Count() == ids.Length && !ids.Contains(actor.Id), "Assign four distinct committee members, separate from the officer.");
-        var seatRoles = new[] { SystemRoles.SourcingManager, SystemRoles.DepartmentRepresentative, SystemRoles.Finance, SystemRoles.Technical };
         for (var i = 0; i < ids.Length; i++)
         {
-            await ValidateStandingPerson(ids[i], seatRoles[i]);
-            var person = await users.FindByIdAsync(ids[i]);
-            Require(person is { IsActive: true }, "Committee account missing or inactive.");
-            Require(await Role(person!, i == 0 ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee), "Each member must have the appropriate Identity role.");
-            Require(!await Role(person!, i == 0 ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager), i == 0 ? "The Sourcing Manager seat is only for a dedicated Sourcing Manager, not an Evaluation Committee member." : "A Sourcing Manager cannot take a committee member seat.");
-            if (i == 1) Require(person!.DepartmentId == pr!.DepartmentId, "Department representative must belong to the requesting department.");
+            var userId = ids[i];
+            var field = TenderSeatFields[i];
+            RequireCreationField(!string.IsNullOrWhiteSpace(userId) && userId != actor.Id && ids.Count(id => id == userId) == 1,
+                field, "Assign a different eligible employee to each required role.", "عيّن موظفًا مؤهلًا مختلفًا لكل دور مطلوب.");
+            try
+            {
+                await ValidateStandingPerson(userId, TenderSeatRoles[i]);
+                var person = await users.FindByIdAsync(userId);
+                Require(person is { IsActive: true }, "Committee account missing or inactive.");
+                Require(await Role(person, i == 0 ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee), "Each member must have the appropriate Identity role.");
+                Require(!await Role(person, i == 0 ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager), i == 0 ? "The Sourcing Manager seat is only for a dedicated Sourcing Manager." : "A Sourcing Manager cannot take a committee member seat.");
+                if (i == 1) RequireCreationField(person.DepartmentId == pr.DepartmentId, field, "Department representative must belong to the requesting department.", "يجب أن يكون ممثل القسم من القسم الطالب.");
+            }
+            catch (WorkflowException error) when (error is not TenderCreationFieldException)
+            {
+                throw new TenderCreationFieldException(field, error.Message, "اختر موظفًا نشطًا ومؤهلًا لهذا الدور.");
+            }
         }
-        var requirements = JsonSerializer.Serialize(new { input.TechnicalRequirements, input.CommercialConditions, input.DeliveryExpectations, input.MandatoryCompliance });
+        input.Title = pr.Title;
+        input.Description = pr.Justification;
+        input.TechnicalRequirements = null;
+        input.IsCritical = CriticalTenderEnabled && input.IsCritical;
+        var requirements = JsonSerializer.Serialize(new { input.CommercialConditions, input.DeliveryExpectations, input.MandatoryCompliance });
         var requiredDocuments = (input.RequiredDocuments ?? []).Distinct().ToList();
-        Require(requiredDocuments.All(k => OfferDocumentTypes.Find(k) != null), "Choose required documents from the list.");
-        Require(requiredDocuments.Count > 0, "Choose at least one document every supplier must attach (for example the official quotation).");
+        RequireCreationField(requiredDocuments.All(k => OfferDocumentTypes.Find(k) != null), nameof(input.RequiredDocuments), "Choose required documents from the list.", "اختر الوثائق المطلوبة من القائمة.");
+        RequireCreationField(requiredDocuments.Count > 0, nameof(input.RequiredDocuments), "Choose at least one required supplier document.", "اختر وثيقة واحدة على الأقل من وثائق المورد المطلوبة.");
         // The accepted request's items (with category, quantity, unit and specifications) become the official tender items unchanged.
         var tender = new Tender { PurchaseRequestId = pr!.Id, Title = input.Title, Description = input.Description, Requirements = requirements,
             RequiredDocuments = string.Join(",", requiredDocuments),
@@ -153,6 +198,8 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         }
         else Audit(actor, tender.Id, "EvaluationCommitteeAssigned", new { Members = ids });
         Audit(actor, tender.Id, "RequirementsCreated", input);
+        if (assistantDraftId is Guid draftId)
+            Audit(actor, tender.Id, "AiTenderDraftCreated", new { DraftId = draftId, input.PurchaseRequestId, TenderId = tender.Id });
         await db.SaveChangesAsync(); await tx.CommitAsync(); return tender.Id;
     }
     public Task RequestWeights(int id, ClaimsPrincipal principal) => Change(id, principal, "WeightRequestSent", async (t, a) =>
@@ -227,7 +274,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         Require(t.Status == TenderStatus.Draft && round.Status == TenderRoundStatus.Draft && w.State == WeightState.Approved, "Approved locked weights are required before bidding opens.");
         Require(deadline.UtcDateTime > Now.AddHours(1) && deadline.UtcDateTime <= Now.AddYears(1), "The submission deadline must be at least one hour from now and within one year.");
         var neededBy = await db.PurchaseRequests.Where(x => x.Id == t.PurchaseRequestId).Select(x => x.NeededBy).SingleAsync();
-        Require(neededBy == null || deadline.UtcDateTime.Date <= neededBy.Value.Date, "The submission deadline cannot be after the date the department needs the items.");
+        // The deadline may not pass the date the department needs the items, but only while that date is still ahead of today (Jordan time, UTC+3).
+        // A needed-by date that is today or already over cannot leave room for a valid deadline (at least one hour from now), so it does not bind it.
+        Require(neededBy == null || neededBy.Value.Date <= Now.AddHours(3).Date || deadline.UtcDateTime.AddHours(3).Date <= neededBy.Value.Date, "The submission deadline cannot be after the date the department needs the items.");
         round.OpensAt = Now; round.Deadline = deadline.UtcDateTime; round.Status = TenderRoundStatus.Open; t.Status = TenderStatus.Bidding;
         if (round.RoundNumber > 1) await CarryForwardSuppliers(t, a, round);
     });

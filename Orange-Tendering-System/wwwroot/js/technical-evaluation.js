@@ -26,6 +26,40 @@
     }
 
     function wire(root) {
+        root.querySelectorAll("[data-score-row] input[data-score-digits]").forEach(input => {
+            if (input.closest(".evaluation-score-control")) return;
+            const group = document.createElement("span");
+            group.className = "evaluation-score-control";
+            const slider = document.createElement("input");
+            slider.type = "range";
+            slider.min = "0";
+            slider.max = "99";
+            slider.step = "1";
+            slider.setAttribute("aria-label", input.getAttribute("aria-label") || input.labels?.[0]?.textContent.trim()
+                || (document.documentElement.lang === "ar" ? "الدرجة" : "Score"));
+            input.before(group);
+            group.append(slider, input);
+            function sync() {
+                const entered = input.value !== "" && input.validity.valid;
+                slider.value = entered ? input.value : "0";
+                slider.style.setProperty("--score-fill", (Number(slider.value) / Number(slider.max) * 100) + "%");
+                const empty = document.documentElement.lang === "ar" ? "لم تُحدد الدرجة" : "No score entered";
+                slider.setAttribute("aria-valuetext", entered ? input.value : empty);
+            }
+            slider.addEventListener("input", () => {
+                input.value = slider.value;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            });
+            // An explicit click or keyboard change at zero is a scored zero, while untouched items stay blank.
+            slider.addEventListener("click", () => {
+                if (input.value === "") {
+                    input.value = slider.value;
+                    input.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+            });
+            input.addEventListener("input", sync);
+            sync();
+        });
         root.querySelectorAll("[data-approve-weights]").forEach(form => {
             const rows = form.querySelector("[data-technical-rows]");
             if (!rows) return;

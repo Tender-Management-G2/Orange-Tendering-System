@@ -1,8 +1,12 @@
 @model (IReadOnlyList<Orange_Tendering_System.Models.Entities.TechnicalCriterionWeight> Criteria, int Index, string LegacySelector)
+@{
+    var ar = Orange_Tendering_System.ViewModels.UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
+}
 @if (Model.Criteria.Count == 0)
 {
     <div class="evaluation-score-line">
-        <label for="technical-score-@Model.Index">Technical score <small>/ 100</small></label>
+        <label for="technical-score-@Model.Index">@L("Technical score", "الدرجة الفنية") <small>/ 100</small></label>
         <input id="technical-score-@Model.Index" name="scores[@Model.Index].Technical" data-score="@Model.LegacySelector"
                type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required />
     </div>
@@ -10,7 +14,7 @@
 else
 {
     <table class="evaluation-criteria" data-technical-scores>
-        <thead><tr><th scope="col">Technical criterion</th><th scope="col">Weight</th><th scope="col">Score / 100</th></tr></thead>
+        <thead><tr><th scope="col">@L("Technical criterion", "المعيار الفني")</th><th scope="col">@L("Weight", "الوزن")</th><th scope="col">@L("Score / 100", "الدرجة / ١٠٠")</th></tr></thead>
         <tbody>
             @for (var index = 0; index < Model.Criteria.Count; index++)
             {
@@ -18,12 +22,12 @@ else
                 <tr>
                     <th scope="row">@criterion.Name</th>
                     <td>@criterion.Weight.ToString("0.##")%</td>
-                    <td><input name="scores[@Model.Index].TechnicalScores[@index]" aria-label="@criterion.Name score out of 100"
+                    <td><input name="scores[@Model.Index].TechnicalScores[@index]" aria-label="@criterion.Name · @L("Score", "الدرجة")"
                         data-technical-weight="@criterion.Weight.ToString(System.Globalization.CultureInfo.InvariantCulture)"
                         type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required /></td>
                 </tr>
             }
         </tbody>
-        <tfoot><tr><th scope="row" colspan="2">Technical result</th><td><output data-technical-result>—</output> / 100</td></tr></tfoot>
+        <tfoot><tr><th scope="row" colspan="2">@L("Technical result", "النتيجة الفنية")</th><td><output data-technical-result>—</output> / 100</td></tr></tfoot>
     </table>
 }

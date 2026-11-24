@@ -55,6 +55,11 @@ public static class WeightedCalculation
 }
 public record RankedBid(int BidId, decimal Score, int Rank, bool Tied);
 public class WorkflowException(string message) : Exception(message);
+public sealed class TenderCreationFieldException(string field, string message, string arabicMessage) : WorkflowException(message)
+{
+    public string Field { get; } = field;
+    public string ArabicMessage { get; } = arabicMessage;
+}
 
 // Explicit deployment configuration, never inferred from the user's management role.
 public class TenderApprovalPolicy
