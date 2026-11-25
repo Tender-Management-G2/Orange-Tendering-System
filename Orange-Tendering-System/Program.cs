@@ -139,21 +139,14 @@ builder.Services.AddSingleton<IExternalInvitationChannel, SmtpInvitationChannel>
 builder.Services.AddScoped<ExternalInvitationDispatcher>();
 builder.Services.AddScoped<SupplierReviewService>();
 builder.Services.AddHostedService<EvaluationDeadlineWorker>();
-// ORANGE RADAR - Sourcing Officer market intelligence (docs/ORANGE_RADAR.md). Local Ollama, Whisper.net and Piper only.
+// ORANGE INTELLIGENCE - market analytics (docs/ORANGE_RADAR.md) and the Gemini AI Studio (IntelligenceAiService).
 builder.Services.AddMemoryCache();
 builder.Services.Configure<Orange_Tendering_System.Services.Radar.RadarOptions>(builder.Configuration.GetSection("OrangeRadar"));
-builder.Services.AddHttpClient<Orange_Tendering_System.Services.Radar.RadarOllamaClient>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarDataService>();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarDocumentDna>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarService>();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarAnalystService>();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarBriefingService>();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarReportService>();
 builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarExportService>();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarIntentRouter>();
-builder.Services.AddSingleton<Orange_Tendering_System.Services.Radar.RadarSpeechRecognizer>();
-builder.Services.AddSingleton<Orange_Tendering_System.Services.Radar.RadarSpeechSynthesizer>();
+builder.Services.AddHttpClient<Orange_Tendering_System.Services.Radar.IntelligenceAiService>();
 
 
 var app = builder.Build();

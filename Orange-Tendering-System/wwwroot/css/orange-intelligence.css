@@ -32,12 +32,7 @@
 /* ---------- shell: brand · tabs · find ---------- */
 .oi-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px 24px; padding: 4px 0 16px; }
 /* The AI companion lives in the bar (never floating over content); it stands in for the voice stage on tabs without it. */
-.radar.oi .rd-dock { position: static; z-index: auto; max-width: none; width: auto; padding: 5px 6px; border-radius: 99px; background: var(--oi-tab-bg); border-color: var(--oi-glass-line); box-shadow: none; transform: none; transition: opacity 240ms; }
-.radar.oi .rd-dock[data-dock-hidden="true"] { visibility: hidden; transform: none; }
-.radar.oi .rd-dock-orb { width: 46px; height: 46px; }
-.radar.oi .rd-dock-text { max-width: 190px; }
-.radar.oi .rd-dock-text span { max-width: 190px; }
-@media (max-width: 1760px) { .radar.oi .rd-dock-text { display: none; } }
+
 @media (max-width: 1400px) {
   .oi-bar { grid-template-columns: minmax(0, 1fr) auto; }
   .oi-tabs { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
@@ -315,34 +310,9 @@
 .oi-net2d-head h3 { font-size: 20px; } .oi-net2d-head p { font-size: 14.5px; color: var(--rd-muted); margin-top: 4px; }
 
 /* ---------- the voice stage (one element; moves between the Suppliers bar and AI Studio) ---------- */
-.oi-voice-bar { margin-top: 18px; }
-.rd-voice-stage.is-bar { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; grid-template-areas: "orb caption controls"; align-items: center; justify-items: start; gap: 0 22px; min-height: 0; height: 150px; padding-block: 0; padding-inline: 12px 96px;
-  border-radius: 26px; border: 1px solid color-mix(in srgb, var(--rd-orange-strong) 30%, var(--oi-glass-line));
-  background: linear-gradient(90deg, color-mix(in srgb, var(--rd-orange-strong) 10%, var(--rd-surface)) 0%, var(--rd-surface) 40%); }
-:root[data-theme="dark"] .rd-voice-stage.is-bar { background: radial-gradient(40% 140% at 8% 50%, rgba(255, 121, 0, .16), transparent 70%), linear-gradient(90deg, #10203a, #0b1628); }
-.rd-voice-stage.is-bar .rd-sphere { height: 100%; inset: 0; }
-.rd-voice-stage.is-bar .rd-orb { grid-area: orb; width: 132px; height: 132px; margin: 0; }
-.rd-voice-stage.is-bar .rd-orb-icon { width: 54px; height: 54px; }
-.rd-voice-stage.is-bar .rd-voice-caption { grid-area: caption; text-align: start; justify-items: start; margin: 0; gap: 2px; position: relative; z-index: 1; }
-.rd-voice-stage.is-bar .rd-voice-state { font-size: 15px; font-weight: 700; min-height: 0; color: var(--rd-orange-strong); letter-spacing: .02em; order: 2; }
-.rd-voice-stage.is-bar .rd-voice-hint { font-size: 16px; color: var(--rd-ink-2); max-width: 54ch; order: 3; }
-.rd-voice-stage.is-bar .rd-voice-states, .rd-voice-stage.is-bar .rd-voice-options, .rd-voice-stage.is-bar [data-voice="end"], .rd-voice-stage.is-bar [data-rd-voice-language] { display: none; }
-.rd-voice-stage.is-bar .rd-voice-controls { grid-area: controls; margin: 0; flex-wrap: nowrap; position: relative; z-index: 1; }
-.rd-voice-stage.is-bar .rd-voice-controls .rd-icon-btn { width: 48px; height: 48px; border-radius: 50%; background: var(--oi-glass); backdrop-filter: blur(8px); }
-.oi-voice-brand { font-family: var(--rd-display); font-size: 26px; font-weight: 400; letter-spacing: -.015em; order: -1; color: var(--rd-ink); }
-.oi-voice-brand b { color: var(--rd-orange-strong); font-weight: 750; }
-.rd-voice-stage:not(.is-bar) .oi-voice-brand { font-size: 20px; color: var(--rd-muted); }
-.oi-voice-studio .rd-voice-states { flex-wrap: nowrap; }
-.oi-voice-studio .rd-voice-states li { padding: 7px 10px; font-size: 13px; }
-.rd-voice-stage:not(.is-bar) .oi-open-chat { display: none; }
-.rd-voice-caption { display: grid; }
 
 /* ---------- AI Studio ---------- */
-.oi-studio-grid { display: grid; grid-template-columns: minmax(340px, 430px) minmax(0, 1fr); gap: var(--oi-gap); align-items: stretch; }
-.oi-voice-studio .rd-voice-stage { min-height: 100%; height: 100%; }
-.oi-conversation { grid-template-rows: auto minmax(0, 1fr) auto auto auto auto auto; }
-.oi-conversation .rd-transcript { height: clamp(460px, calc(100vh - 430px), 760px); }
-.oi-studio-tools { display: grid; grid-template-columns: 1fr 1fr; gap: var(--oi-gap); margin-top: var(--oi-gap); align-items: start; }
+
 .oi-fold > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .oi-fold > summary::-webkit-details-marker { display: none; }
 .oi-fold > summary span { display: grid; gap: 3px; }
@@ -351,40 +321,6 @@
 .oi-fold > summary::after { content: "+"; font-size: 22px; color: var(--rd-orange); font-weight: 400; }
 .oi-fold[open] > summary::after { content: "–"; }
 .oi-fold[open] > summary { margin-bottom: 14px; }
-.rd-ask { align-items: center; }
-.oi-attach { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 16px; border: 1px solid var(--rd-line); background: var(--rd-surface-2); color: var(--rd-ink-2); cursor: pointer; flex: none; }
-.oi-attach:hover { border-color: var(--rd-orange-strong); color: var(--rd-orange-strong); }
-.oi-attach svg { width: 22px; height: 22px; }
-.oi-attachment { border-radius: 16px; border: 1px dashed color-mix(in srgb, var(--rd-orange-strong) 50%, var(--rd-line)); background: var(--rd-surface-2); padding: 12px 14px; display: grid; gap: 10px; }
-.oi-att-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
-.oi-att-kind { padding: 6px 10px; border-radius: 10px; background: var(--rd-orange-soft); color: var(--rd-orange); font-weight: 800; font-size: 13px; }
-.oi-att-head b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.oi-att-head small { color: var(--rd-muted); font-size: 13.5px; }
-.oi-att-preview { overflow: auto; max-height: 180px; border-radius: 10px; border: 1px solid var(--rd-line); }
-.oi-att-preview table { border-collapse: collapse; font-size: 13.5px; width: 100%; }
-.oi-att-preview th, .oi-att-preview td { padding: 6px 10px; border-bottom: 1px solid var(--rd-line-soft); text-align: start; white-space: nowrap; }
-.oi-att-preview th { background: var(--rd-surface-3); position: sticky; top: 0; }
-.oi-att-text { margin: 0; max-height: 140px; overflow: auto; white-space: pre-wrap; font: 13.5px/1.5 ui-monospace, Consolas, monospace; color: var(--rd-ink-2); }
-.oi-att-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.oi-att-actions label { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 650; }
-.oi-att-actions .rd-btn { height: 38px; font-size: 14px; }
-.oi-msg-file { display: block; font-size: 13px; font-weight: 700; color: var(--rd-orange); margin-bottom: 4px; }
-.oi-visuals { display: grid; gap: 12px; margin-top: 12px; }
-.oi-gen { margin: 12px 0 0; padding: 14px 16px; border-radius: 16px; border: 1px solid var(--rd-line); background: var(--rd-surface); box-shadow: 0 6px 18px rgba(0, 0, 0, .08); }
-.oi-gen.is-upload { border-style: dashed; border-color: color-mix(in srgb, var(--rd-orange-strong) 45%, var(--rd-line)); }
-.oi-gen.is-pinned { border-color: var(--rd-orange-strong); }
-.oi-gen figcaption { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.oi-gen figcaption b { display: block; font-size: 16px; }
-.oi-gen figcaption small { display: block; font-size: 13.5px; color: var(--rd-muted); margin-top: 2px; }
-.oi-gen-actions { display: flex; gap: 6px; flex: none; }
-.oi-gen-actions button { height: 32px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--rd-line); background: var(--rd-surface-2); font-size: 13px; font-weight: 700; color: var(--rd-ink-2); }
-.oi-gen-actions button:hover { border-color: var(--rd-orange-strong); color: var(--rd-ink); }
-.oi-gen-table { overflow-x: auto; }
-.oi-gen-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.oi-gen-table th, .oi-gen-table td { padding: 8px 10px; border-bottom: 1px solid var(--rd-line-soft); text-align: start; white-space: nowrap; }
-.oi-gen-table thead th { color: var(--rd-muted); font-size: 13px; }
-.oi-gen-table tbody th { font-weight: 650; }
-.oi-gen-source { font-size: 12.5px; color: var(--rd-muted); margin-top: 8px; }
 
 /* ---------- Overview ---------- */
 .oi-ov-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--oi-gap); }
@@ -514,15 +450,15 @@
   .oi-universe.has-inspector .oi-uni-tools { inset-inline-end: 388px; }
   .oi-uni-caption { max-width: calc(100% - 560px); }
   .oi-shortcuts { grid-template-columns: 1fr 1fr; }
-  .oi-ov-grid, .oi-studio-grid { grid-template-columns: 1fr; }
-  .oi-voice-studio .rd-voice-stage { min-height: 560px; }
+  .oi-ov-grid { grid-template-columns: 1fr; }
+
   .oi-timeline { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 22px; }
   .oi-timeline li:nth-child(4)::before { display: none; }
 }
 @media (max-width: 1024px) {
   .oi-bar { grid-template-columns: 1fr; }
   .oi-tabs { justify-self: stretch; justify-content: flex-start; }
-  .oi-tender-layout, .oi-two, .oi-studio-tools, .oi-insight-grid { grid-template-columns: 1fr; }
+  .oi-tender-layout, .oi-two, .oi-insight-grid { grid-template-columns: 1fr; }
   .oi-insights-head { flex-wrap: wrap; }
   .oi-insights-badge { margin-inline-start: 70px; }
   .oi-insight-tabs button { flex-direction: column; gap: 4px; text-align: center; }
@@ -537,9 +473,7 @@
   .oi-uni-caption { position: static; order: 3; transform: none; max-width: none; margin: 0 14px 14px; white-space: normal; border-radius: 14px; }
   .oi-universe.has-inspector .oi-uni-caption { left: auto; }
   .oi-uni-table { position: static; order: 2; margin: 14px; max-height: 520px; }
-  .rd-voice-stage.is-bar { grid-template-columns: 112px minmax(0, 1fr); grid-template-areas: "orb caption" "controls controls"; height: auto; padding: 10px 16px 14px; }
-  .rd-voice-stage.is-bar .rd-orb { width: 104px; height: 104px; }
-  .rd-voice-stage.is-bar .rd-voice-controls { justify-self: end; }
+
 }
 @media (max-width: 767px) {
   .radar.oi { --oi-gap: 14px; }
@@ -574,7 +508,7 @@
   .oi-timeline { grid-template-columns: 1fr 1fr; }
   .oi-timeline li::before { display: none; }
   .oi-period input { width: 120px; }
-  .rd-voice-stage.is-bar .rd-voice-hint { font-size: 14.5px; }
+
 }
 @media (prefers-reduced-motion: reduce) {
   .oi-panel, .oi-inspector { animation: none; }
@@ -648,22 +582,116 @@
 @media (max-width: 560px) { .oi-comparison-controls { grid-template-columns: 1fr; } .oi-comparison-head { align-items: start; gap: 10px; } }
 @media (max-width: 900px) { .oi-offers-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 15px; } .oi-offers-strip > span:nth-child(3) { border-inline-end: 0; } .oi-offers-head { flex-wrap: wrap; } .oi-offers-actions { margin-inline-start: auto; } }
 @media (max-width: 650px) { .oi-offers-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .oi-offers-strip > span:nth-child(3) { border-inline-end: 1px solid var(--rd-line); } .oi-offers-strip > span:nth-child(even) { border-inline-end: 0; } .oi-offers-extremes { grid-template-columns: 1fr; } .oi-offers-insight { flex-direction: column; gap: 6px; } .oi-offers-head .oi-insights-mark { width: 44px; height: 44px; } .oi-offers-picks label { flex: 1 1 160px; } }
-.oi-ai-spotlight { outline: 2px solid var(--rd-orange); outline-offset: 5px; border-radius: 14px; animation: oi-ai-spotlight 2.2s ease-out; }
-@keyframes oi-ai-spotlight { 0%, 35% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--rd-orange) 18%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
-@media (prefers-reduced-motion: reduce) { .oi-ai-spotlight { animation: none; } }
-/* Spoken request check: fixed so it is visible from every tab while the conversation runs. */
-.radar .oi-heard { position: fixed; z-index: 60; left: 50%; bottom: 22px; transform: translateX(-50%); width: min(620px, calc(100vw - 32px)); display: grid; gap: 8px; padding: 14px 16px 16px; overflow: hidden;
-  border-radius: 18px; background: var(--rd-surface); border: 1px solid var(--rd-line); box-shadow: var(--rd-shadow-pop, 0 18px 50px rgba(0, 0, 0, .25)); color: var(--rd-ink); }
-.radar .oi-heard[hidden] { display: none; }
-.radar .oi-heard-head { display: flex; gap: 10px; align-items: baseline; font-size: 13px; color: var(--rd-muted); }
-.radar .oi-heard-head b { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--rd-orange-strong); }
-.radar .oi-heard.is-unclear .oi-heard-head span { color: #c2410c; font-weight: 700; }
-.radar .oi-heard textarea { width: 100%; resize: vertical; min-height: 52px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--rd-line); background: var(--rd-surface-2); color: var(--rd-ink); font: inherit; font-size: 16px; line-height: 1.45; }
-.radar .oi-heard textarea:focus { outline: 2px solid var(--rd-orange); outline-offset: 1px; }
-.radar .oi-heard-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
-.radar .oi-heard-actions span { margin-inline-end: auto; font-size: 13px; color: var(--rd-muted); }
-.radar .oi-heard-actions .rd-btn { height: 38px; padding: 0 16px; font-size: 14px; }
-.radar .oi-heard-timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--rd-orange); }
-.radar .oi-heard.is-counting .oi-heard-timer { animation: oi-heard-count 2.2s linear forwards; }
-@keyframes oi-heard-count { from { width: 0; } to { width: 100%; } }
-@media (prefers-reduced-motion: reduce) { .radar .oi-heard.is-counting .oi-heard-timer { animation: none; width: 100%; } }
+
+/* ===== AI Studio (Gemini): supplier summary, text chat, live voice. Visual only - no behaviour lives here. ===== */
+.ais { display: grid; gap: 18px; padding: 22px; border-radius: 26px; border: 1px solid var(--rd-line); background:
+  radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--rd-orange) 10%, transparent) 0%, transparent 55%), var(--rd-surface); box-shadow: var(--rd-shadow); }
+.ais-bar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; }
+.ais-supplier { flex: 1 1 280px; max-width: 460px; }
+.ais-modes { display: inline-flex; gap: 4px; padding: 4px; border-radius: 99px; background: var(--rd-surface-2); border: 1px solid var(--rd-line); }
+.ais-modes button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border: 0; border-radius: 99px; background: transparent; color: var(--rd-ink-2); font-weight: 650; cursor: pointer;
+  transition: background 200ms var(--rd-ease), color 200ms var(--rd-ease); }
+.ais-modes button svg { width: 17px; height: 17px; }
+.ais-modes button[aria-selected="true"] { background: var(--rd-orange); color: #fff; box-shadow: 0 6px 18px color-mix(in srgb, var(--rd-orange) 35%, transparent); }
+.ais-panel { display: grid; gap: 16px; animation: ais-fade 260ms var(--rd-ease); }
+.ais-panel[hidden] { display: none; }
+.ais-panel > .rd-btn { justify-self: start; }
+.ais-answer { min-height: 140px; padding: 20px 22px; border-radius: 18px; background: var(--rd-surface-2); border: 1px solid var(--rd-line-soft); color: var(--rd-ink);
+  font-size: 16px; line-height: 1.7; white-space: pre-wrap; unicode-bidi: plaintext; }
+.ais-hint { color: var(--rd-muted); font-size: 14.5px; margin: 0; }
+.ais-loading { color: var(--rd-muted); animation: ais-pulse 1.2s ease-in-out infinite; }
+.ais-error { margin: 0; padding: 12px 16px; border-radius: 14px; background: var(--rd-review-soft); color: var(--rd-review); font-weight: 600; }
+.ais-error[hidden] { display: none; }
+
+.ais-chat { list-style: none; margin: 0; padding: 4px; display: flex; flex-direction: column; gap: 10px; max-height: 420px; min-height: 200px; overflow-y: auto; }
+.ais-msg { max-width: 78%; padding: 12px 16px; border-radius: 18px; line-height: 1.6; white-space: pre-wrap; animation: ais-fade 220ms var(--rd-ease); }
+.ais-msg.is-ai { align-self: flex-start; background: var(--rd-surface-2); border: 1px solid var(--rd-line-soft); color: var(--rd-ink); border-end-start-radius: 6px; }
+.ais-msg.is-user { align-self: flex-end; background: var(--rd-orange); color: #fff; border-end-end-radius: 6px; }
+.ais-msg.is-error { color: var(--rd-review); }
+.ais-ask { display: flex; gap: 10px; }
+.ais-ask input { flex: 1; min-width: 0; padding: 13px 18px; border-radius: 99px; border: 1px solid var(--rd-line); background: var(--rd-surface); color: var(--rd-ink); font: inherit; }
+.ais-ask input:focus { outline: 2px solid var(--rd-orange); outline-offset: 1px; }
+
+/* Voice orb. The panel's data-state picks the animation: idle | connecting | listening | thinking | speaking.
+   --level (0..1) is the live audio energy set by intelligence-audio.js: the microphone while listening, Gemini's voice while speaking. */
+.ais-voice { --level: 0; --orb-a: #ffb366; --orb-b: var(--rd-orange); --orb-c: var(--rd-orange-strong); justify-items: center; text-align: center; padding: 22px 0 10px; }
+.ais-voice[data-state="connecting"], .ais-voice[data-state="thinking"] { --orb-a: #ffd2a3; --orb-b: #ff9a3c; --orb-c: #c2410c; }
+.ais-orb { position: relative; width: 240px; height: 240px; display: grid; place-items: center; }
+.ais-orb > * { grid-area: 1 / 1; }
+
+/* Soft glow behind everything; it grows with the audio level. */
+.ais-orb::before { content: ""; position: absolute; inset: 30px; border-radius: 50%; z-index: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--orb-b) 55%, transparent) 0%, transparent 70%);
+  filter: blur(18px); opacity: calc(.35 + var(--level) * .65); transform: scale(calc(1 + var(--level) * .35)); transition: transform 120ms linear, opacity 120ms linear; }
+
+/* Core sphere. */
+.ais-orb-core { position: relative; z-index: 3; width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center; color: #fff; overflow: hidden;
+  background: radial-gradient(circle at 32% 28%, #fff3 0%, transparent 34%), radial-gradient(circle at 35% 30%, var(--orb-a) 0%, var(--orb-b) 52%, var(--orb-c) 100%);
+  box-shadow: inset 0 -10px 24px color-mix(in srgb, var(--orb-c) 70%, transparent), 0 calc(14px + var(--level) * 10px) calc(36px + var(--level) * 50px) color-mix(in srgb, var(--rd-orange) 45%, transparent);
+  scale: calc(1 + var(--level) * .12); transition: scale 110ms linear, box-shadow 160ms linear, background 400ms var(--rd-ease); }
+.ais-orb-core > * { grid-area: 1 / 1; }
+.ais-orb-core svg.ais-orb-mic { width: 52px; height: 52px; stroke-width: 1.9; transition: opacity 250ms, transform 250ms var(--rd-ease); }
+
+/* Equalizer bars inside the core (speaking only). The wrapper follows --level; each bar has its own rhythm. */
+.ais-orb-bars { display: flex; align-items: center; gap: 6px; height: 58px; opacity: 0; transform: scaleY(calc(.45 + var(--level) * .9)); transition: opacity 250ms, transform 90ms linear; }
+.ais-orb-bars i { width: 7px; height: 100%; border-radius: 99px; background: #fff; transform: scaleY(.3); box-shadow: 0 0 10px #fff8; }
+
+/* Rotating halo (connecting / thinking). */
+.ais-orb-halo { z-index: 1; width: 186px; height: 186px; border-radius: 50%; opacity: 0; transition: opacity 300ms;
+  background: conic-gradient(from 0deg, transparent 0deg, var(--orb-b) 90deg, #ffe0bf 140deg, transparent 220deg, var(--orb-c) 300deg, transparent 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); }
+
+/* Pulse rings (listening). */
+.ais-orb-ring { z-index: 1; width: 132px; height: 132px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--rd-orange) 65%, transparent); opacity: 0; }
+
+/* Waveform ring (speaking): a dashed ring that turns and swells with Gemini's voice. */
+.ais-orb-wave { z-index: 2; width: 164px; height: 164px; border-radius: 50%; border: 3px dashed color-mix(in srgb, var(--rd-orange) 80%, #fff); opacity: 0;
+  scale: calc(1 + var(--level) * .22); transition: opacity 250ms, scale 90ms linear; }
+
+/* --- idle: slow breathing --- */
+.ais-voice[data-state="idle"] .ais-orb-core { animation: ais-breathe 4.5s ease-in-out infinite; filter: saturate(.85); }
+.ais-voice[data-state="idle"] .ais-orb-ring:nth-of-type(2) { opacity: .25; }
+
+/* --- connecting / thinking: rotating halo, shimmering core --- */
+.ais-voice[data-state="connecting"] .ais-orb-halo, .ais-voice[data-state="thinking"] .ais-orb-halo { opacity: 1; animation: ais-spin 1.6s linear infinite; }
+.ais-voice[data-state="thinking"] .ais-orb-halo { animation-duration: 1.1s; }
+.ais-voice[data-state="connecting"] .ais-orb-core, .ais-voice[data-state="thinking"] .ais-orb-core { animation: ais-shimmer 1.8s ease-in-out infinite; }
+.ais-voice[data-state="thinking"] .ais-orb-core svg.ais-orb-mic { transform: scale(.9); opacity: .8; }
+
+/* --- listening: three expanding rings, spaced in time; the core follows the microphone level --- */
+.ais-voice[data-state="listening"] .ais-orb-ring { animation: ais-ring 2.4s cubic-bezier(.2, .6, .3, 1) infinite; }
+.ais-voice[data-state="listening"] .ais-orb-ring:nth-of-type(3) { animation-delay: .8s; }
+.ais-voice[data-state="listening"] .ais-orb-ring:nth-of-type(4) { animation-delay: 1.6s; }
+
+/* --- speaking: equalizer bars + waveform ring, rings off --- */
+.ais-voice[data-state="speaking"] .ais-orb-core svg.ais-orb-mic { opacity: 0; transform: scale(.6); }
+.ais-voice[data-state="speaking"] .ais-orb-bars { opacity: 1; }
+.ais-voice[data-state="speaking"] .ais-orb-bars i { animation: ais-bar .9s ease-in-out infinite; }
+.ais-voice[data-state="speaking"] .ais-orb-bars i:nth-child(2) { animation-duration: .7s; animation-delay: -.2s; }
+.ais-voice[data-state="speaking"] .ais-orb-bars i:nth-child(3) { animation-duration: .55s; animation-delay: -.4s; }
+.ais-voice[data-state="speaking"] .ais-orb-bars i:nth-child(4) { animation-duration: .75s; animation-delay: -.1s; }
+.ais-voice[data-state="speaking"] .ais-orb-bars i:nth-child(5) { animation-duration: .95s; animation-delay: -.3s; }
+.ais-voice[data-state="speaking"] .ais-orb-wave { opacity: calc(.45 + var(--level) * .55); animation: ais-spin 9s linear infinite; }
+
+/* Status pill: a coloured dot per state. */
+.ais-voice-status { display: inline-flex; align-items: center; gap: 9px; margin: 0; padding: 8px 16px; border-radius: 99px; font-size: 16px; font-weight: 700; color: var(--rd-ink);
+  background: var(--rd-surface-2); border: 1px solid var(--rd-line-soft); }
+.ais-voice-status i { width: 9px; height: 9px; border-radius: 50%; background: var(--rd-neutral); }
+.ais-voice[data-state="connecting"] .ais-voice-status i, .ais-voice[data-state="thinking"] .ais-voice-status i { background: #ff9a3c; animation: ais-pulse .9s ease-in-out infinite; }
+.ais-voice[data-state="listening"] .ais-voice-status i { background: var(--rd-good); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rd-good) 25%, transparent); }
+.ais-voice[data-state="speaking"] .ais-voice-status i { background: var(--rd-orange); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rd-orange) 25%, transparent); }
+.ais-voice-actions { display: flex; gap: 10px; }
+.ais-voice-actions [hidden] { display: none; }
+.ais .ais-end { background: #dc2626; border-color: #dc2626; color: #fff; }
+.ais .ais-end:hover { background: #b91c1c; border-color: #b91c1c; }
+
+@keyframes ais-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ais-pulse { 50% { opacity: .55; } }
+@keyframes ais-ring { 0% { transform: scale(1); opacity: .75; } 100% { transform: scale(1.75); opacity: 0; } }
+@keyframes ais-breathe { 50% { transform: scale(1.04); } }
+@keyframes ais-spin { to { rotate: 360deg; } }
+@keyframes ais-shimmer { 50% { filter: brightness(1.15) saturate(1.2); transform: scale(1.03); } }
+@keyframes ais-bar { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .ais *, .ais { animation: none !important; transition: none !important; } }
+@media (max-width: 640px) { .ais { padding: 16px; } .ais-modes { width: 100%; } .ais-modes button { flex: 1; justify-content: center; padding: 9px 8px; } .ais-msg { max-width: 92%; } }
+.oi-whatif { margin-top: 22px; }

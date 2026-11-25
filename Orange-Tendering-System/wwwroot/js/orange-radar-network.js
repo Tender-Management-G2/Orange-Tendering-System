@@ -779,7 +779,7 @@
         <h4 class="rd-section-title">Links inside (${inner.length})</h4>${inner.length ? `<ul class="rd-tally">${tally(inner).map(([t, n]) => `<li><span>${esc(t)}</span><b>${n}</b></li>`).join('')}</ul>` : '<p class="rd-muted">No supported link between members in this view.</p>'}
         ${st.view === 'category' ? `<h4 class="rd-section-title">Links to other categories</h4>${cross.size ? `<ul class="rd-tally">${[...cross].map(([key, n]) => { const [c, t] = key.split('|'); return `<li><span><i class="rd-dot" style="background:${catColor(c)}"></i>${esc(c)} · ${esc(t)}</span><b>${n}</b></li>`; }).join('')}</ul>` : '<p class="rd-muted">No real link crosses this category boundary.</p>'}` : ''}
         <h4 class="rd-section-title">Members</h4><ul class="rd-member-list">${members.map(m => `<li><button type="button" data-net-supplier="${m.supplierId}"><i class="rd-dot" style="background:${catColor(catKey(m.category))}"></i><span><b>${esc(short(m.name))}</b><small>${m.participations} closed round${m.participations === 1 ? '' : 's'}${m.wins ? ` · ${m.wins} award${m.wins > 1 ? 's' : ''}` : ''}</small></span>${m.status !== 'Approved' ? `<em>${esc(m.status)}</em>` : ''}</button></li>`).join('')}</ul>
-        <div class="rd-actions">${active.length >= 2 ? `<button type="button" class="rd-btn" data-net-compare="${active.slice(0, 5).map(m => m.supplierId).join(',')}">Compare the most active</button>` : ''}<button type="button" class="rd-btn rd-btn-ghost" data-ask="${esc(gr.kind === 'category' ? `Tell me about the ${gr.label} supplier category.` : `Explain ${gr.label} in the ${st.view} view.`)}">Ask the analyst</button><button type="button" class="rd-btn rd-btn-ghost" data-net-tool="back">Back</button></div>`);
+        <div class="rd-actions">${active.length >= 2 ? `<button type="button" class="rd-btn" data-net-compare="${active.slice(0, 5).map(m => m.supplierId).join(',')}">Compare the most active</button>` : ''}<button type="button" class="rd-btn rd-btn-ghost" data-net-tool="back">Back</button></div>`);
     }
     function inspectSupplier(id) {
       const s = supplier(id); if (!s) return;
@@ -794,7 +794,7 @@
         <div class="rd-actions">${st.ego === id ? '<button type="button" class="rd-btn" data-net-tool="back">Back to market</button>' : `<button type="button" class="rd-btn" data-net-ego="${id}">Focus & show its rounds</button>`}
           ${others.length ? `<button type="button" class="rd-btn" data-net-path="${others[0]},${id}">Trace path to ${esc(clip(short(supplier(others[0])?.name || ''), 18))}</button>` : ''}
           <button type="button" class="rd-btn rd-btn-ghost" data-net-add="${id}">${st.selected.length > 1 && st.selected.includes(id) ? 'Remove from comparison' : 'Add to comparison'}</button>
-          <button type="button" class="rd-btn rd-btn-ghost" data-ask="Tell me about ${esc(short(s.name))}.">Ask the analyst</button><button type="button" class="rd-btn rd-btn-ghost" data-scenario="${id}">What if unavailable?</button></div>`);
+          <button type="button" class="rd-btn rd-btn-ghost" data-ask-supplier="${id}">Ask AI</button><button type="button" class="rd-btn rd-btn-ghost" data-scenario="${id}">What if unavailable?</button></div>`);
     }
     function inspectCompare(ids) {
       const rows = ids.map(supplier).filter(Boolean);
@@ -802,7 +802,7 @@
       openInspector('Comparison', `${rows.length} suppliers`, `<table class="rd-table rd-compare"><thead><tr><th></th>${rows.map(r => `<th><i class="rd-dot" style="background:${catColor(catKey(r.category))}"></i>${esc(clip(short(r.name), 16))}</th>`).join('')}</tr></thead><tbody>
         ${[['Rounds with offer', r => r.participations], ['Invited', r => r.invitations], ['Response rate', r => fmt.pct(r.participationRate)], ['Wins / awarded bid', r => `${r.wins}/${r.awardedTendersBid}`], ['Avg. vs median', r => fmt.signed(r.relativePrice)], ['Compliance', r => (r.complianceChecked ? `${r.compliant}/${r.complianceChecked}` : '—')]].map(([k, f]) => `<tr><td>${k}</td>${rows.map(r => `<td class="num">${f(r)}</td>`).join('')}</tr>`).join('')}</tbody></table>
         <h4 class="rd-section-title">Shared closed bidding cycles</h4>${links.length ? `<ul class="rd-tally">${links.map(l => `<li><span>${esc(clip(short(supplier(l.supplierA)?.name || ''), 18))} · ${esc(clip(short(supplier(l.supplierB)?.name || ''), 18))}</span><b>${l.roundIds.length}</b></li>`).join('')}</ul>` : '<p class="rd-muted">They never bid in the same closed round.</p>'}
-        <div class="rd-actions"><button type="button" class="rd-btn" data-net-path="${ids[0]},${ids[1]}">Trace relationship path</button><button type="button" class="rd-btn rd-btn-ghost" data-ask="Compare these suppliers.">Ask the analyst</button><button type="button" class="rd-btn rd-btn-ghost" data-scene-jump="market">See them in the charts</button></div>`);
+        <div class="rd-actions"><button type="button" class="rd-btn" data-net-path="${ids[0]},${ids[1]}">Trace relationship path</button><button type="button" class="rd-btn rd-btn-ghost" data-scene-jump="market">See them in the charts</button></div>`);
     }
     function openSelectionInspector() { if (st.selected.length === 1) inspectSupplier(st.selected[0]); else if (st.selected.length > 1) inspectCompare(st.selected); }
     function inspectEdge(e) {
@@ -969,12 +969,6 @@
       init, setView, focusGroup, syncSelection, egoFocus, openEdge, tracePath, setReplayAt, png, cancel, back, focusCategory,
       restyle() { readPalette(); renderGroups(); wake(); },
       showElements(ids) { const es = st.edges.filter(e => ids.includes(e.id) && e.shown); if (es.length) { lightUp(es, cancel()); wake(); } },
-      // Visible feedback when the analyst moves the network: a banner and a pulse on every entity it touched.
-      aiCue(label, supplierIds = []) {
-        const el = $('[data-net-ai]');
-        if (el) { el.innerHTML = `<i aria-hidden="true"></i><span>Analyst</span>${esc(label)}`; el.hidden = false; el.classList.remove('is-on'); void el.offsetWidth; el.classList.add('is-on'); clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove('is-on'); setTimeout(() => (el.hidden = true), 400); }, 3800); }
-        supplierIds.map(id => node(`s-${id}`)).filter(n => n?.shown).forEach((n, i) => setTimeout(() => { st.pulses.push({ n, t0: performance.now(), color: P.orange }); wake(); }, 250 + i * 110));
-      },
       fit: () => tool('fit'),
       get view() { return st.view; }, get edgeFilters() { return [...st.rel]; }, get ready() { return st.ready; }, viewTitle: v => VIEW[v]?.title
     };

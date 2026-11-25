@@ -1,10 +1,10 @@
 @*
 ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Orange Intelligence - the shared AI intelligence workspace (every internal role except Supplier).
+PAGE: Orange Intelligence - the shared intelligence workspace (every internal role except Supplier).
 Four exclusive tabs (Overview, Suppliers, Tenders, AI Studio): a tab replaces the main content, it never stacks below
-another. One AI conversation (text + voice) follows the user across tabs: its voice stage docks into the Suppliers bar or AI Studio,
-and a compact companion appears on the other tabs. All numbers come from the server (Services/Radar), already limited to the
-user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md describes the feature.
+another. All numbers come from the server (Services/Radar), already limited to the user's authorized scope; the scripts only
+draw them. The AI Studio tab (Gemini) has three features: supplier summary, text chat and a live voice call
+(intelligence-ai.js, intelligence-audio.js, Services/Radar/IntelligenceAiService.cs).
 *@
 @using Orange_Tendering_System.ViewModels
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
@@ -31,10 +31,7 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
      data-url-workspace="@U("Workspace")" data-url-simulate="@U("Simulate")"
      data-url-offer-comparison="@U("OfferComparison")"
      data-url-offer-record="@(officerLayout ? Url.Action("Details", "Bids", new { area = "SourcingOfficer" }) : null)"
-     data-url-compare="@U("CompareDocuments")" data-url-status="@U("Status")" data-url-warm="@U("Warm")" data-url-ask="@U("Ask")"
-     data-url-briefing="@U("Briefing")" data-url-report="@U("Report")" data-url-transcribe="@U("Transcribe")" data-url-speak="@U("Speak")"
-     data-url-extract="@U("Extract")" data-url-exporttable="@U("ExportTable")" data-url-exportvisual="@U("ExportVisual")" data-url-download="@U("Download")" data-url-export="@U("Export")"
-     data-worklet="@Url.Content("~/js/orange-radar-capture.js")" data-three="@Url.Content("~/lib/three/three.module.min.js")">
+     data-url-export="@U("Export")" data-three="@Url.Content("~/lib/three/three.module.min.js")">
 
     <!-- ===== Shared shell: brand, four exclusive tabs, global scope ===== -->
     <header class="oi-bar">
@@ -48,16 +45,6 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
             <button type="button" role="tab" id="oi-tab-tenders" aria-controls="oi-tenders" aria-selected="false" tabindex="-1" data-tab-link="tenders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5" /></svg><span>@L("Tenders", "العطاءات")</span></button>
             <button type="button" role="tab" id="oi-tab-studio" aria-controls="oi-studio" aria-selected="false" tabindex="-1" data-tab-link="studio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9zM5.5 15.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" /></svg><span>@L("AI Studio", "استوديو الذكاء")</span></button>
         </nav>
-        <!-- Compact AI companion: the same session, inline in the bar so it never covers content. -->
-        <div class="rd-dock" data-dock role="region" aria-label="@L("AI companion", "رفيق الذكاء")" data-dock-hidden="true">
-            <button type="button" class="rd-dock-orb" data-dock="live" aria-label="@L("Start live conversation", "ابدأ محادثة مباشرة")"><canvas data-dock-orb width="120" height="120" aria-hidden="true"></canvas></button>
-            <div class="rd-dock-text"><strong data-dock-state>Analyst</strong><span data-dock-last>@L("Ask about this tab", "اسأل عن هذا القسم")</span></div>
-            <div class="rd-dock-actions">
-                <button type="button" class="rd-icon-btn" data-dock="mute" aria-pressed="false" aria-label="@L("Mute microphone", "كتم الميكروفون")"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16" /></svg></button>
-                <button type="button" class="rd-icon-btn" data-dock="stop" aria-label="@L("Stop speaking", "إيقاف الكلام")"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg></button>
-                <button type="button" class="rd-icon-btn" data-dock="open" aria-label="@L("Open the conversation", "فتح المحادثة")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg></button>
-            </div>
-        </div>
     </header>
 
     <div class="oi-context" role="group" aria-label="@L("Analysis scope", "نطاق التحليل")">
@@ -84,7 +71,6 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
         <header class="oi-head">
             <div><p class="oi-kicker">@L("Overview", "نظرة عامة")</p><h2>@L("Your procurement intelligence at a glance", "ذكاء مشترياتك في لمحة")</h2>
                 <p class="oi-lead" data-ov-lead></p></div>
-            <div class="oi-head-actions"><button type="button" class="rd-btn" data-action="brief"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z" /></svg>@L("Brief me", "لخّص لي")</button></div>
         </header>
         <div class="oi-kpis" data-ov-kpis></div>
         <div class="oi-ov-grid">
@@ -220,7 +206,6 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
                         <div class="rd-net-canvas" data-net-canvas>
                             <div class="rd-cy" data-cy role="application" tabindex="0" aria-roledescription="@L("network", "شبكة")" aria-label="@L("Supplier network. Drag to pan, wheel to zoom, Space pauses motion, Escape steps back.", "شبكة الموردين.")"></div>
                             <nav class="rd-crumbs" data-net-crumbs aria-label="@L("Network focus", "تركيز الشبكة")" hidden></nav>
-                            <div class="rd-ai-cue" data-net-ai role="status" hidden></div>
                             <div class="rd-selection" data-net-selection aria-live="polite"></div>
                             <div class="rd-net-replaying" data-net-replaying hidden></div>
                             <div class="rd-empty" data-net-empty hidden></div>
@@ -255,9 +240,6 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
                 <div class="rd-net-table" data-net-table hidden></div>
             </div>
         </div>
-
-        <!-- The voice stage docks here while Suppliers is open (same session as AI Studio). -->
-        <div class="oi-voice-slot oi-voice-bar" data-voice-slot="suppliers"></div>
 
         <section class="oi-insights" aria-labelledby="oi-insights-title">
             <header class="oi-insights-head">
@@ -301,6 +283,12 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
             <p class="oi-comparison-status" data-comparison-status role="status">@L("Loading authorized suppliers…", "جارٍ تحميل الموردين المصرح بهم…")</p>
             <div data-comparison-result hidden></div>
         </section>
+        <details class="rd-card oi-fold oi-whatif">
+            <summary><span><b>@L("What-if: market dependency", "ماذا لو: الاعتماد على السوق")</b><small>@L("Replay recorded history without chosen suppliers. Hypothetical, never a forecast.", "إعادة التاريخ دون موردين مختارين. افتراضي وليس توقعاً.")</small></span></summary>
+            <div class="rd-scenario-pick" data-scenario-pick></div>
+            <button type="button" class="rd-btn rd-btn-primary" data-action="simulate">@L("Run scenario", "تشغيل السيناريو")</button>
+            <div class="rd-scenario-result" data-scenario-result></div>
+        </details>
     </section>
 
     <!-- ===== 3. Tenders ===== -->
@@ -323,7 +311,6 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
                     <ol class="oi-timeline" data-tender-timeline></ol>
                 </article>
                 <div class="oi-tender-actions">
-                    <button type="button" class="rd-btn" data-tender-ask><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z" /></svg>@L("Ask AI about this tender", "اسأل الذكاء عن هذا العطاء")</button>
                     <button type="button" class="rd-btn" data-export="tender-lifecycle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("Export lifecycle (Excel)", "تصدير دورة الحياة (إكسل)")</button>
                     <button type="button" class="rd-btn" data-export="tender-pdf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("PDF report", "تقرير PDF")</button>
                 </div>
@@ -363,97 +350,70 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
         </section>
     </section>
 
-    <!-- ===== 4. AI Studio ===== -->
+    <!-- ===== 4. AI Studio (Google Gemini) ===== -->
     <section class="oi-panel oi-studio" id="oi-studio" role="tabpanel" aria-labelledby="oi-tab-studio" data-tab-panel="studio" hidden>
         <header class="oi-head">
             <div class="oi-head-title"><span class="oi-head-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /></svg></span>
-                <div><h2>@L("AI Studio", "استوديو الذكاء")</h2><p class="oi-lead rd-components" data-voice-model>@L("Local model · checking…", "نموذج محلي · جارٍ التحقق…")</p></div></div>
-            <div class="oi-head-actions">
-                <button type="button" class="rd-btn rd-btn-primary rd-btn-live" data-action="live" aria-pressed="false"><span class="rd-live-dot" aria-hidden="true"></span><span data-live-label>@L("Start live conversation", "ابدأ محادثة مباشرة")</span></button>
-            </div>
+                <div><h2>@L("AI Studio", "استوديو الذكاء")</h2><p class="oi-lead">@L("Powered by Google Gemini · answers use only the selected supplier's authorized facts", "مدعوم بـ Google Gemini · تعتمد الإجابات على بيانات المورد المصرح بها فقط")</p></div></div>
         </header>
-        <div class="oi-studio-grid">
-            <div class="oi-voice-slot oi-voice-studio" data-voice-slot="studio">
-                <!-- The single voice stage (moved between slots, never duplicated). -->
-                <div class="rd-voice-stage" data-voice-stage>
-                    <canvas class="rd-sphere" data-sphere aria-hidden="true"></canvas>
-                    <button type="button" class="rd-orb" data-orb aria-label="@L("Start live conversation", "ابدأ محادثة مباشرة")"><span class="rd-orb-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg></span></button>
-                    <div class="rd-voice-caption">
-                        <p class="oi-voice-brand"><b>Orange</b> @L("AI Analyst", "المحلل الذكي")</p>
-                        <p class="rd-voice-state" data-voice-state>Idle</p>
-                        <p class="rd-voice-hint" data-voice-hint>@L("Ask about suppliers, tenders, prices or relationships - Arabic or English.", "اسأل عن الموردين أو العطاءات أو الأسعار أو العلاقات - بالعربية أو الإنجليزية.")</p>
-                        <p class="rd-voice-meter" data-voice-meter aria-hidden="true"><i></i></p>
-                    </div>
-                    <ol class="rd-voice-states" aria-label="@L("Conversation states", "حالات المحادثة")">
-                        <li data-vs="listening">@L("Listening", "استماع")</li><li data-vs="transcribing">@L("Transcribing", "تفريغ")</li><li data-vs="analyzing">@L("Analyzing", "تحليل")</li><li data-vs="speaking">@L("Speaking", "تحدث")</li>
-                    </ol>
-                    <div class="rd-voice-controls">
-                        <select data-rd-voice-language aria-label="@L("Conversation language", "لغة المحادثة")"><option value="auto">Auto · AR/EN</option><option value="ar">العربية</option><option value="en">English</option></select>
-                        <button type="button" class="rd-icon-btn" data-voice="mute" aria-pressed="false" aria-label="@L("Mute microphone", "كتم الميكروفون")" title="@L("Mute microphone", "كتم الميكروفون")"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg></button>
-                        <button type="button" class="rd-icon-btn" data-voice="speaker" aria-pressed="true" aria-label="@L("Voice replies on", "الردود الصوتية مفعلة")" title="@L("Voice replies", "الردود الصوتية")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" /></svg></button>
-                        <button type="button" class="rd-icon-btn" data-voice="stop" aria-label="@L("Stop speaking", "إيقاف الكلام")" title="@L("Stop speaking (Esc)", "إيقاف الكلام (Esc)")"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg></button>
-                        <button type="button" class="rd-icon-btn rd-end" data-voice="end" aria-label="@L("End conversation", "إنهاء المحادثة")" title="@L("End conversation", "إنهاء المحادثة")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c5-5 13-5 18 0l-3 3-3-2v-3a12 12 0 0 0-6 0v3l-3 2z" /></svg></button>
-                        <button type="button" class="rd-icon-btn oi-open-chat" data-tab-jump="studio" aria-label="@L("Open the conversation", "فتح المحادثة")" title="@L("Open the conversation in AI Studio", "فتح المحادثة في الاستوديو")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z" /><path d="M8 9h8M8 12h5" /></svg></button>
-                    </div>
-                    <div class="rd-voice-options">
-                        <label class="rd-speed">@L("Speed", "السرعة") <input type="range" min="0.8" max="1.3" step="0.05" value="1" data-voice-speed aria-label="@L("Speech speed", "سرعة الكلام")" /></label>
-                        <label title="@L("Answers may move the page to relevant supplier and tender records.", "قد تنقل الإجابات الصفحة إلى سجلات الموردين والعطاءات ذات الصلة.")"><input type="checkbox" data-follow-ai checked /> @L("Follow the analyst", "تتبّع المحلل")</label>
-                        <label title="@L("Experimental: interrupt by speaking. Stop is always available.", "تجريبي: المقاطعة بالكلام.")"><input type="checkbox" data-voice-bargein /> @L("Barge-in (beta)", "المقاطعة (تجريبي)")</label>
-                        <label title="@L("Spoken requests are always shown for checking. Unclear ones always wait for you.", "يُعرض كل طلب منطوق للتحقق. الطلبات غير الواضحة تنتظر تأكيدك دائماً.")">@L("Send speech", "إرسال الكلام") <select data-voice-review><option value="auto">@L("when clear", "عند الوضوح")</option><option value="always">@L("after I confirm", "بعد تأكيدي")</option></select></label>
-                    </div>
-                </div>
-            </div>
-            <div class="rd-conversation oi-conversation">
-                <div class="rd-ai-context" data-ai-context></div>
-                <ol class="rd-transcript" data-transcript aria-live="polite" aria-label="@L("Conversation transcript", "نص المحادثة")">
-                    <li class="rd-msg rd-msg-system">@L("Answers use verified records in your authorized scope. Charts and tables you ask for appear here. Figures that cannot be verified are flagged and never read aloud. The analyst advises only - it never changes a tender, offer or decision.", "تستخدم الإجابات سجلات موثقة ضمن نطاقك. تظهر المخططات والجداول المطلوبة هنا. الأرقام غير الموثقة تُعلَّم ولا تُقرأ. المحلل يقدّم توصيات فقط ولا يغيّر أي عطاء أو عرض أو قرار.")</li>
-                </ol>
-                <button type="button" class="rd-jump-latest" data-jump-latest hidden>@L("New messages ↓", "رسائل جديدة ↓")</button>
-                <div class="oi-attachment" data-attachment hidden></div>
-                <div class="rd-suggestions" data-suggestions></div>
-                <form class="rd-ask" data-ask-form>
-                    <label class="oi-attach" title="@L("Attach a PDF, Excel, CSV or text file", "إرفاق ملف PDF أو Excel أو CSV أو نص")"><input type="file" accept=".pdf,.xlsx,.csv,.txt" data-upload hidden /><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5 12.4 19a5 5 0 0 1-7.1-7.1l8-8a3.4 3.4 0 0 1 4.8 4.8l-8 8a1.7 1.7 0 0 1-2.4-2.4L15 7" /></svg><span class="sr-only">@L("Attach file", "إرفاق ملف")</span></label>
-                    <input type="text" maxlength="1200" dir="auto" placeholder="@L("Ask, or request a chart: “compare the top suppliers' win rates”…", "اسأل أو اطلب مخططاً…")" data-ask-input aria-label="@L("Ask the AI analyst", "اسأل المحلل الذكي")" />
-                    <button type="submit" aria-label="@L("Send", "إرسال")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg></button>
-                </form>
-                <p class="rd-metrics" data-voice-metrics></p>
-            </div>
-        </div>
 
-        <div class="oi-studio-tools">
-            <details class="rd-card oi-fold">
-                <summary><span><b>@L("Intelligence report (PDF)", "تقرير الاستخبارات (PDF)")</b><small>@L("Server calculations, your selection and this conversation", "حسابات الخادم واختيارك وهذه المحادثة")</small></span></summary>
-                <dl class="rd-kv" data-report-scope></dl>
-                <div class="rd-report-options">
-                    <label><input type="checkbox" data-report-transcript checked /> @L("Include the conversation", "تضمين المحادثة")</label>
-                    <label><input type="checkbox" data-report-ai checked /> @L("Include AI interpretation (figures verified)", "تضمين تفسير الذكاء الاصطناعي")</label>
+        <div class="ais" data-studio
+             data-url-summary="@U("SupplierSummary")" data-url-ask="@U("AskSupplier")" data-url-voice="@U("StartVoice")">
+            <div class="ais-bar">
+                <label class="oi-select oi-select-wide ais-supplier">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5l8-3 8 3v16M4 21h16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg>
+                    <select data-studio-supplier aria-label="@L("Choose a supplier", "اختر مورداً")"><option value="">@L("Choose a supplier…", "اختر مورداً…")</option></select>
+                </label>
+                <div class="ais-modes" role="tablist" aria-label="@L("AI Studio mode", "وضع الاستوديو")">
+                    <button type="button" role="tab" aria-selected="true" data-studio-mode="summary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM10 12h5M10 16h5" /></svg>@L("Summary", "ملخص")</button>
+                    <button type="button" role="tab" aria-selected="false" data-studio-mode="chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z" /></svg>@L("Text Chat", "محادثة نصية")</button>
+                    <button type="button" role="tab" aria-selected="false" data-studio-mode="voice"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>@L("Live Voice", "مكالمة صوتية")</button>
                 </div>
-                <button type="button" class="rd-btn rd-btn-primary" data-action="report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("Generate PDF report", "إنشاء تقرير PDF")</button>
-            </details>
-            <details class="rd-card oi-fold">
-                <summary><span><b>@L("What-if: market dependency", "ماذا لو: الاعتماد على السوق")</b><small>@L("Replay recorded history without chosen suppliers. Hypothetical, never a forecast.", "إعادة التاريخ دون موردين مختارين. افتراضي وليس توقعاً.")</small></span></summary>
-                <div class="rd-scenario-pick" data-scenario-pick></div>
-                <button type="button" class="rd-btn rd-btn-primary" data-action="simulate">@L("Run scenario", "تشغيل السيناريو")</button>
-                <div class="rd-scenario-result" data-scenario-result></div>
-            </details>
+            </div>
+
+            <p class="ais-error" data-studio-error role="alert" hidden></p>
+
+            <!-- A. Supplier summary -->
+            <div class="ais-panel" data-studio-panel="summary">
+                <button type="button" class="rd-btn rd-btn-primary" data-studio-summary-button>@L("Generate Summary", "إنشاء الملخص")</button>
+                <div class="ais-answer" data-studio-summary aria-live="polite">
+                    <p class="ais-hint">@L("Choose a supplier, then generate a short AI summary of its procurement activity.", "اختر مورداً ثم أنشئ ملخصاً قصيراً لنشاطه في المشتريات.")</p>
+                </div>
+            </div>
+
+            <!-- B. Text chat -->
+            <div class="ais-panel" data-studio-panel="chat" hidden>
+                <ol class="ais-chat" data-studio-chat aria-live="polite">
+                    <li class="ais-msg is-ai">@L("Ask anything about the selected supplier, in Arabic or English.", "اسأل أي شيء عن المورد المختار بالعربية أو الإنجليزية.")</li>
+                </ol>
+                <form class="ais-ask" data-studio-ask-form>
+                    <input type="text" maxlength="1000" dir="auto" data-studio-question placeholder="@L("e.g. How often does this supplier respond to invitations?", "مثال: كم مرة يستجيب هذا المورد للدعوات؟")" aria-label="@L("Your question", "سؤالك")" />
+                    <button type="submit" class="rd-btn rd-btn-primary">@L("Send", "إرسال")</button>
+                </form>
+            </div>
+
+            <!-- C. Live voice call -->
+            <div class="ais-panel ais-voice" data-studio-panel="voice" data-voice-panel data-state="idle" hidden>
+                <!-- Voice orb: the panel's data-state (idle | connecting | listening | thinking | speaking) picks the CSS animation;
+                     --level (0..1, live audio energy) is set by intelligence-audio.js. -->
+                <div class="ais-orb" data-voice-orb aria-hidden="true">
+                    <span class="ais-orb-halo"></span>
+                    <span class="ais-orb-ring"></span><span class="ais-orb-ring"></span><span class="ais-orb-ring"></span>
+                    <span class="ais-orb-wave"></span>
+                    <span class="ais-orb-core">
+                        <svg class="ais-orb-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+                        <span class="ais-orb-bars"><i></i><i></i><i></i><i></i><i></i></span>
+                    </span>
+                </div>
+                <p class="ais-voice-status" role="status"><i aria-hidden="true"></i><span data-voice-status>@L("Ready", "جاهز")</span></p>
+                <div class="ais-voice-actions">
+                    <button type="button" class="rd-btn rd-btn-primary" data-voice-start>@L("Start Call", "بدء المكالمة")</button>
+                    <button type="button" class="rd-btn ais-end" data-voice-end hidden>@L("End Call", "إنهاء المكالمة")</button>
+                </div>
+                <p class="ais-hint">@L("Speak naturally in Arabic or English. You can interrupt Gemini while it is speaking.", "تحدث بشكل طبيعي بالعربية أو الإنجليزية. يمكنك مقاطعة Gemini أثناء حديثه.")</p>
+            </div>
         </div>
     </section>
-
-    <div class="rd-briefing" data-briefing role="region" aria-label="@L("Guided briefing", "الإحاطة الموجهة")" hidden>
-        <div class="rd-briefing-progress" data-brief-progress></div>
-        <p class="rd-kicker" data-brief-kicker></p>
-        <h3 data-brief-title></h3>
-        <p class="rd-briefing-text" data-brief-text></p>
-        <dl class="rd-briefing-facts" data-brief-facts></dl>
-        <div class="rd-briefing-controls">
-            <button type="button" data-brief="prev" aria-label="@L("Previous scene", "المشهد السابق")">‹</button>
-            <button type="button" data-brief="toggle" aria-label="@L("Pause", "إيقاف مؤقت")">❚❚</button>
-            <button type="button" data-brief="next" aria-label="@L("Next scene", "المشهد التالي")">›</button>
-            <button type="button" data-brief="replay">@L("Replay", "إعادة")</button>
-            <button type="button" data-brief="ask">@L("Ask about this", "اسأل عن هذا")</button>
-            <button type="button" data-brief="stop">@L("Stop", "إيقاف")</button>
-        </div>
-    </div>
 
     <div class="rd-toast" data-toast role="status" aria-live="polite" hidden></div>
 </div>
@@ -462,7 +422,7 @@ user's authorized scope; the scripts only draw them. docs/ORANGE_RADAR.md descri
     <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
     <script src="~/js/orange-radar-network.js" asp-append-version="true"></script>
     <script src="~/js/orange-radar.js" asp-append-version="true"></script>
-    <script src="~/js/orange-radar-audio.js" asp-append-version="true"></script>
-    <script src="~/js/orange-radar-voice.js" asp-append-version="true"></script>
     <script type="module" src="~/js/orange-intelligence-universe.js" asp-append-version="true"></script>
+    <script src="~/js/intelligence-ai.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/intelligence-audio.js" asp-append-version="true"></script>
 }

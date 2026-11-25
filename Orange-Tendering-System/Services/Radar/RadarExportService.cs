@@ -14,19 +14,21 @@ public sealed record RadarExportFile(byte[] Bytes, string ContentType, string Fi
 public sealed class RadarExportService(RadarService radar, RadarDataService data, ApplicationDbContext db, ReportExport writer)
 {
     public static readonly string[] Formats = ["xlsx", "docx", "pdf"];
-    // Request-specific scopes (RadarIntents.Reports) plus "price_timing", the combined manual export of the Price & Timing panel.
-    public static readonly string[] Types = [.. RadarIntents.Reports.Keys.Where(k => k != "conversation"), "price_timing"];
+    // Report scopes the page may request, plus "price_timing", the combined manual export of the Price & Timing panel.
+    public static readonly string[] Types = ["suppliers", "supplier_comparison", "supplier_participation", "market_overview", "supplier_profile", "tenders",
+        "tender_summary", "tender_lifecycle", "tender_offers", "supplier_offers", "price_patterns", "submission_timing", "price_timing"];
+    private static readonly HashSet<string> TenderReports = ["tender_summary", "tender_lifecycle", "tender_offers"];
 
     public async Task<RadarExportFile> BuildAsync(RadarExportRequest request, CancellationToken ct)
     {
         var format = request.Format?.ToLowerInvariant() ?? "";
         if (!Formats.Contains(format) || !Types.Contains(request.ReportType)) throw new RadarToolException("Choose a supported report type and PDF, Excel or Word format.");
-        var period = RadarAnalystService.ParsePeriod(request.From, request.To);
+        var period = RadarPeriod.Parse(request.From, request.To);
         await data.ScopeAsync(ct);
         data.Invalidate(period);
         var s = await radar.SnapshotAsync(period, ct);
         var tender = request.TenderId is { } id ? s.Tender(id) ?? throw new RadarToolException("The selected tender is unavailable in your reporting scope and period.") : null;
-        if (RadarIntents.TenderReports.Contains(request.ReportType) && tender == null) throw new RadarToolException("Select an authorized tender for this report.");
+        if (TenderReports.Contains(request.ReportType) && tender == null) throw new RadarToolException("Select an authorized tender for this report.");
         var ids = (request.SupplierIds ?? []).Distinct().ToArray();
         if (ids.Any(id => s.Supplier(id) == null)) throw new RadarToolException("A selected supplier is unavailable in your reporting scope.");
         if (request.ReportType == "supplier_profile" && ids.Length != 1) throw new RadarToolException("Choose one authorized supplier for this report.");
@@ -285,5 +287,5 @@ public sealed class RadarExportService(RadarService radar, RadarDataService data
     }
 }
 
-// A generated file held in memory for the user who asked for it (IntelligenceController.Download).
-public sealed record RadarStoredFile(string Owner, RadarExportFile File);
+// A request the export cannot fulfil (unknown report, record outside the user's scope); its message is shown to the user.
+public sealed class RadarToolException(string message) : Exception(message);

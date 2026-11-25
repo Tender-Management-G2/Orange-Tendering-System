@@ -15,6 +15,15 @@ namespace Orange_Tendering_System.Services.Radar;
 public sealed record RadarPeriod(DateTime? From, DateTime? To)
 {
     public static RadarPeriod All { get; } = new(null, null);
+
+    // Reads the page's "yyyy-MM-dd" date inputs; an empty or invalid value means "no limit" and a reversed range is swapped.
+    public static RadarPeriod Parse(string? from, string? to)
+    {
+        DateTime? Parse(string? value) => DateTime.TryParseExact(value, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var d) ? d.Date : null;
+        var f = Parse(from); var t = Parse(to);
+        if (f != null && t != null && f > t) (f, t) = (t, f);
+        return new RadarPeriod(f, t);
+    }
     public bool Contains(DateTime value) => (From == null || value >= From) && (To == null || value < To.Value.Date.AddDays(1));
     public string Label => From == null && To == null ? "All recorded history" : $"{From:yyyy-MM-dd} to {To:yyyy-MM-dd}";
 }

@@ -2,7 +2,7 @@
 // A slowly orbiting 3D sphere of the real, authorized suppliers in the workspace JSON. Nothing here is invented: positions only
 // arrange the market for overview (the sphere is not a map), colour = registered category, size = closed rounds with an offer,
 // and every link comes from the server (competition links and closed-round offers). Selection is shared with
-// orange-radar.js through window.OrangeRadar, so charts, the 2D network, the AI analyst and reports see the same focus.
+// orange-radar.js through window.OrangeRadar, so charts and the 2D network see the same focus.
 const root = document.querySelector('[data-radar]');
 if (root) boot().catch(e => console.warn('Supplier Universe unavailable', e));
 
@@ -678,7 +678,7 @@ async function boot() {
       const shared = d.network.rounds.filter(r => st.selected.every(id => r.supplierIds.includes(id)));
       body.innerHTML = `<div class="oi-compare"><table><thead><tr><th></th>${ss.map(s => `<th><i style="background:${radar()?.catColor?.(s.category)}"></i>${esc(clean(s.name))}</th>`).join('')}</tr></thead><tbody>${rows.map(([k, f]) => `<tr><th>${k}</th>${ss.map(s => `<td>${f(s)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
         <p class="oi-note">${T('Shared Bidding Cycles', 'دورات العطاء المشتركة')}: <b>${shared.length}</b></p><ul class="oi-rounds">${shared.map(r => `<li><button type="button" data-insp-round="${r.roundId}"><span><b>${esc(clean(r.tender))}</b><small>${cycleLabel(r.roundNumber)} · ${fmtDate(r.availableAt)} · ${esc(r.department)}</small></span></button></li>`).join('')}</ul>`;
-      foot.innerHTML = `<button type="button" class="rd-btn" data-insp-act="ask">${T('Ask AI to compare', 'اطلب من الذكاء المقارنة')}</button>${ss.length === 2 ? `<button type="button" class="rd-btn" data-insp-act="path">${T('Show path (2D)', 'إظهار المسار')}</button>` : ''}`;
+      foot.innerHTML = ss.length === 2 ? `<button type="button" class="rd-btn" data-insp-act="path">${T('Show path (2D)', 'إظهار المسار')}</button>` : '';
       return;
     }
     $('[data-insp-tabs]').hidden = false; $('[data-insp-status]').hidden = false;
@@ -727,12 +727,9 @@ async function boot() {
     else if (v.inspPeer) choose(+v.inspPeer, true);
     else if (v.inspRound) radar()?.openRoundTab?.(+v.inspRound);
     else if (v.inspAct === 'focus') { const c = st.selected.reduce((x, id) => x.add(byId.get(id).to), new THREE.Vector3()).normalize(); faceDirection(c, HOME.focus - 0.4); wake(); }
-    else if (v.inspAct === 'path' && st.selected.length === 2) { setView('2d'); radar()?.apply?.({ action: 'path', from: st.selected[0], to: st.selected[1] }); }
-    else if (v.inspAct === 'ask') {
-      const names = st.selected.map(id => clean(byId.get(id).s.name));
-      radar()?.setTab?.('studio');
-      window.OrangeRadarVoice?.ask?.(names.length > 1 ? `Compare the selected suppliers ${names.join(', ')} using their authorized records.` : `Give me a short profile of selected supplier ${names[0]} using authorized records.`);
-    }
+    else if (v.inspAct === 'path' && st.selected.length === 2) { setView('2d'); radar()?.tracePath?.(st.selected[0], st.selected[1]); }
+    // Open the AI Studio with this supplier already chosen (intelligence-ai.js).
+    else if (v.inspAct === 'ask') window.OrangeIntelligenceAI?.chooseSupplier(st.selected[0]);
   });
 
   // ---------- controls ----------

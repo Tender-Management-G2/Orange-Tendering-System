@@ -1,9 +1,9 @@
-// ORANGE INTELLIGENCE - shared AI intelligence workspace (Views/Intelligence/Index.cshtml), built on the Orange Radar engine.
+// ORANGE INTELLIGENCE - shared intelligence workspace (Views/Intelligence/Index.cshtml), built on the Orange Radar engine.
 // Draws server-calculated data only: every metric, tender and edge comes from /Intelligence/Workspace, already limited
 // to the signed-in user's authorized scope. Four exclusive tabs (overview, suppliers, tenders, studio) replace each
 // other; one page state (filters, selection, tender, replay) is shared by the 3D universe
-// (orange-intelligence-universe.js), the 2D network (orange-radar-network.js), the charts, the report studio
-// and the AI analyst (orange-radar-voice.js), which may only call the whitelisted apply() commands.
+// (orange-intelligence-universe.js), the 2D network (orange-radar-network.js) and the charts.
+// The AI Studio tab has its own scripts (intelligence-ai.js, intelligence-audio.js).
 (() => {
   'use strict';
   const root = document.querySelector('[data-radar]');
@@ -25,19 +25,16 @@
     date: d => (d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—')
   };
   const TABS = ['overview', 'suppliers', 'tenders', 'studio'];
-  // Old scene names (AI commands, briefings, deep links) map onto the tabs.
-  const SCENE_TAB = { overview: 'overview', network: 'suppliers', market: 'suppliers', suppliers: 'suppliers', tenders: 'tenders', price: 'suppliers', analyst: 'studio', reports: 'studio', studio: 'studio' };
+  // Old scene names (deep links) map onto the tabs.
+  const SCENE_TAB = { overview: 'overview', network: 'suppliers', market: 'suppliers', suppliers: 'suppliers', tenders: 'tenders', price: 'suppliers', analyst: 'studio', reports: 'suppliers', studio: 'studio' };
   const MAX_SELECTED = 5;
 
   const state = {
-    data: null, selected: [], tender: null, chartPoint: null, simulation: null,
+    data: null, selected: [], tender: null,
     replayAt: null, playing: false, suppliers: new Map(), supplierSlot: new Map(), catColor: new Map(), scene: 'suppliers', tab: 'suppliers',
     filters: { department: '', category: '', activity: 'all' }, tenderSel: null
   };
   const charts = {};
-  const timers = new Set();
-  const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); return t; };
-  function cancelAnimations() { timers.forEach(clearTimeout); timers.clear(); network.cancel(); }
 
   // ---------- helpers ----------
   const css = name => getComputedStyle(root).getPropertyValue(name).trim();
@@ -73,7 +70,7 @@
   const network = window.OrangeRadarNetwork({
     root, $, $$, esc, fmt, dur, reduced, toast: t => toast(esc(t)),
     onSelect: (ids, o) => select(ids, o),
-    onViewChange: () => { renderAiContext(); window.dispatchEvent(new CustomEvent('radar:selection', { detail: context() })); },
+    onViewChange: () => window.dispatchEvent(new CustomEvent('radar:selection')),
     onReplayToggle: open => { if (open) renderTimeline(); }
   });
 
@@ -103,7 +100,7 @@
     $('[data-demo-marker]').hidden = !demo;
     $('[data-scope-label]').textContent = data.scope || 'Authorized scope';
     if (!data.tenders.some(t => t.tenderId === state.tenderSel)) state.tenderSel = (data.tenders.find(t => t.rounds.some(r => r.analysed && r.offers)) || data.tenders[0])?.tenderId ?? null;
-    renderFilterOptions(); renderKpis(); renderSnapshot(); renderOverview(); renderTenders(); renderMarket(); network.init(data); renderTimeline(); renderScenarioPick(); renderStudio(); renderSelection('load'); renderFind(); renderChips();
+    renderFilterOptions(); renderKpis(); renderSnapshot(); renderOverview(); renderTenders(); renderMarket(); network.init(data); renderTimeline(); renderScenarioPick(); renderSelection('load'); renderFind(); renderChips();
     window.dispatchEvent(new CustomEvent('radar:data', { detail: data }));
     if (!state.suppliers.has(comparison.a)) comparison.a = null;
     if (!state.suppliers.has(comparison.b)) comparison.b = null;
@@ -251,7 +248,7 @@
     $('[data-ov-attention]').innerHTML = items.length ? items.map(x => `<li class="is-${x.tone}"><span class="oi-att-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON[x.icon]}</svg></span><div><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></div><button type="button" class="rd-link" ${x.act}>${x.cta} →</button></li>`).join('')
       : '<li class="oi-att-empty"><div><b>Nothing needs attention</b><small>No low-competition round or long-running tender in this scope.</small></div></li>';
     const cards = [['suppliers', 'Suppliers', `${d.suppliers.length} suppliers in a living 3D universe`, ICON.users], ['tenders', 'Tenders', `${tenders.length} tenders · lifecycle, offers and outcome`, ICON.doc],
-      ['studio', 'AI Studio', 'Ask, chart, upload PDF or Excel, export', ICON.spark]];
+      ['studio', 'AI Studio', 'Supplier summary, text chat and live voice with Gemini', ICON.spark]];
     $('[data-ov-shortcuts]').innerHTML = cards.map(([k, t, sub, ic]) => `<button type="button" class="oi-shortcut" data-tab-jump="${k}"><span aria-hidden="true"><svg viewBox="0 0 24 24">${ic}</svg></span><b>${t}</b><small>${esc(sub)}</small><i aria-hidden="true">→</i></button>`).join('');
   }
 
@@ -347,33 +344,8 @@
     state.tenderSel = id; state.tender = id;
     renderTenders(); competition();
     if (tab) setTab('tenders');
-    window.dispatchEvent(new CustomEvent('radar:selection', { detail: context() }));
+    window.dispatchEvent(new CustomEvent('radar:selection'));
     return true;
-  }
-  async function exportTable(title, columns, rows, source) {
-    try {
-      const response = await post(urls.exporttable, { title, columns, rows: rows.map(r => r.map(v => String(v ?? ''))), source });
-      const blob = await response.blob(); const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
-      link.download = (response.headers.get('content-disposition') || '').match(/filename="?([^";]+)/)?.[1] || 'Orange-Intelligence.xlsx';
-      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(link.href), 4000); toast('Excel file downloaded.');
-    } catch (e) { toast(`Export failed: ${esc(e.message)}`); }
-  }
-  async function download(href, fileName) {
-    try {
-      const response = await fetch(href, { credentials: 'same-origin' });
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || `HTTP ${response.status}`);
-      const link = document.createElement('a'); link.href = URL.createObjectURL(await response.blob()); link.download = fileName || 'Orange-Intelligence';
-      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(link.href), 4000); toast('File downloaded.');
-    } catch (e) { toast(`Download failed: ${esc(e.message)}`); }
-  }
-  // Chat charts are exported from their spec: the server rebuilds every row in the user's scope.
-  async function exportVisual(spec) {
-    try {
-      const response = await post(urls.exportvisual, { spec, ...period() });
-      const link = document.createElement('a'); link.href = URL.createObjectURL(await response.blob());
-      link.download = (response.headers.get('content-disposition') || '').match(/filename="?([^";]+)/)?.[1] || 'Orange-Intelligence.xlsx';
-      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(link.href), 4000); toast('Excel file downloaded.');
-    } catch (e) { toast(`Export failed: ${esc(e.message)}`); }
   }
   async function exportFile(request) {
     try {
@@ -610,7 +582,6 @@
     if (tab === 'suppliers') { renderSnapshot(); landscape(); positions(); renderInsights(); }
     else if (tab === 'tenders') { renderTender(); competition(); groups(); awards(); }
     (TAB_CHARTS[tab] || []).forEach(k => charts[k]?.resize());
-    $$('.rd-chat-chart').forEach(el => window.echarts?.getInstanceByDom(el)?.resize());
   }
 
   function landscape() {
@@ -701,7 +672,7 @@
         markLine: id === show[0] ? { silent: true, symbol: 'none', lineStyle: { color: p.muted, type: [6, 6], width: 1.6 }, label: { formatter: 'bidding cycle median', position: 'insideEndTop', color: p.muted, fontSize: 13.5, fontWeight: 600 }, data: [{ yAxis: 0 }] } : undefined
       }))
     }, true);
-    c.off('click'); c.on('click', d => d.data?.row && (state.chartPoint = `${fullName(d.data.row.supplierId)} in round #${d.data.row.roundId}: ${fmt.signed(d.data.row.relative)} vs median`, select([d.data.row.supplierId], { additive: d.event?.event?.shiftKey, source: 'positions' })));
+    c.off('click'); c.on('click', d => d.data?.row && select([d.data.row.supplierId], { additive: d.event?.event?.shiftKey, source: 'positions' }));
   }
   let insightTab = 'positions';
   function setInsightTab(tab, focus = false) {
@@ -797,9 +768,9 @@
     landscape(); awards(); positions(); competition(); groups(); renderInsights();
     const chips = state.selected.map(id => `<span class="rd-sel-chip"><i class="rd-dot" style="background:${catColor(catKey(state.suppliers.get(id)?.category))}"></i>${esc(name(id))}<button type="button" data-unselect="${id}" aria-label="Remove ${esc(name(id))}">×</button></span>`).join('');
     $('[data-market-focus]').innerHTML = state.selected.length ? `<span class="rd-muted">Focused</span>${chips}<button type="button" class="rd-link" data-clear-selection>Reset</button>` : '<span class="rd-muted">Select suppliers in the network or any chart (Shift+click to compare up to five).</span>';
-    renderScenarioPick(); renderStudio(); renderAiContext();
+    renderScenarioPick();
     if (state.tab === 'tenders') { const t = tenderById(state.tenderSel); if (t) tenderOffers(t, t.rounds.filter(r => r.analysed && r.offers)); }
-    window.dispatchEvent(new CustomEvent('radar:selection', { detail: context() }));
+    window.dispatchEvent(new CustomEvent('radar:selection'));
   }
   function selectTender(tenderId, round) {
     openTender(tenderId, { tab: false });
@@ -809,15 +780,6 @@
     $('[data-tender-main]')?.scrollIntoView({ behavior: reduced.matches ? 'auto' : 'smooth', block: 'start' });
   }
 
-  function renderAiContext() {
-    const el = $('[data-ai-context]'); if (!el || !state.data) return;
-    const parts = [`<span>Tab: <b>${esc(state.tab)}</b></span>`, `<span>Scope: <b>${esc(state.data.scope)}</b></span>`];
-    if (state.tab === 'tenders' && tenderById(state.tenderSel)) parts.push(`<span>Tender: <b>${esc(clean(tenderById(state.tenderSel).title))}</b></span>`);
-    if (state.selected.length) parts.push(`<span>Suppliers: <b>${state.selected.map(name).map(esc).join(', ')}</b></span>`);
-    if (state.replayAt != null) parts.push(`<span>Replay at <b>${fmt.date(state.replayAt)}</b></span>`);
-    el.innerHTML = `<span class="rd-muted">Shared with the analyst</span>${parts.join('')}`;
-  }
-
   // ---------- tabs (exclusive: a tab replaces the main content) ----------
   function setTab(tab, { push = true, focus = false } = {}) {
     tab = SCENE_TAB[tab] || tab; if (!TABS.includes(tab)) return;
@@ -825,25 +787,15 @@
     state.tab = tab; state.scene = tab; root.dataset.tab = tab;
     $$('[data-tab-link]').forEach(b => { const on = b.dataset.tabLink === tab; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
     $$('[data-tab-panel]').forEach(p => (p.hidden = p.dataset.tabPanel !== tab));
-    // The single voice stage docks under the universe on Suppliers and in AI Studio elsewhere; the compact companion covers the rest.
-    const stage = $('[data-voice-stage]'); const slot = $(`[data-voice-slot="${tab === 'suppliers' ? 'suppliers' : 'studio'}"]`);
-    if (stage && slot && stage.parentElement !== slot) slot.append(stage);
-    stage?.classList.toggle('is-bar', tab === 'suppliers');
     if (push) history.replaceState(null, '', `#${tab}`);
     if (changed) { const top = root.getBoundingClientRect().top + scrollY - 12; if (scrollY > top) window.scrollTo({ top, behavior: 'auto' }); }
     requestAnimationFrame(() => renderTab(tab));
     if (focus) $(`[data-tab-link="${tab}"]`)?.focus();
-    renderAiContext();
     window.dispatchEvent(new CustomEvent('radar:tab', { detail: tab }));
-    window.dispatchEvent(new CustomEvent('radar:scene', { detail: tab }));
   }
   root.classList.add('is-enhanced');
-  const followAI = () => $('[data-follow-ai]')?.checked !== false;
-  function goScene(scene, { guided = false, target = null } = {}) {
-    const tab = SCENE_TAB[scene] || scene;
-    // AI-directed moves respect "Follow the analyst"; otherwise the user gets a one-click jump instead of a forced tab change.
-    if (guided && !followAI() && tab !== state.tab) { toast(`The analyst updated <b>${esc(tab)}</b>. <button type="button" class="rd-link" data-scene-jump="${esc(tab)}">Go there</button>`); return; }
-    setTab(tab);
+  function goScene(scene, { target = null } = {}) {
+    setTab(SCENE_TAB[scene] || scene);
     if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: reduced.matches ? 'auto' : 'smooth', block: 'center' }));
   }
 
@@ -863,7 +815,6 @@
     out.innerHTML = '<p class="rd-muted">Replaying history without the chosen suppliers…</p>';
     try {
       const s = await (await post(urls.simulate, { ...period(), supplierIds: chosen })).json();
-      state.simulation = `Without ${s.excludedNames.join(', ')}: ${s.roundsAffected} rounds affected, rounds below minimum ${s.roundsBelowMinimumBefore} → ${s.roundsBelowMinimumAfter}, ${s.roundsWithoutBidders} without any bidder.`;
       const max = Math.max(1, ...s.rounds.map(r => r.before));
       const compare = (label, before, after, f = v => v) => `<div class="rd-before-after"><span>${label}</span><b>${f(before)}</b><i aria-hidden="true">→</i><b class="${after > before ? 'is-worse' : ''}">${f(after)}</b></div>`;
       out.innerHTML = `<div class="rd-note"><b>Hypothetical.</b> ${esc(s.notice)}</div>
@@ -875,14 +826,6 @@
     } catch (e) { out.innerHTML = `<p class="rd-msg rd-msg-error">${esc(e.message)}</p>`; }
   }
   const kvBlock = rows => `<dl class="rd-kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
-
-  // ---------- report studio ----------
-  function renderStudio() {
-    if (!state.data) return;
-    const p = period();
-    $('[data-report-scope]').innerHTML = kvBlock([['Period', p.from || p.to ? `${esc(p.from || '…')} → ${esc(p.to || '…')}` : 'All recorded history'],
-      ['Suppliers in focus', state.selected.length ? state.selected.map(name).map(esc).join(', ') : '<span class="rd-muted">none - market-wide report</span>']]);
-  }
 
   // ---------- timeline / historical replay ----------
   let replayFrame = 0;
@@ -916,7 +859,7 @@
     state.replayAt = value >= 1000 ? null : range.min + (range.max - range.min) * (value / 1000);
     $('[data-timeline-range]').value = value;
     network.setReplayAt(state.replayAt);
-    renderTimeline(); renderAiContext();
+    renderTimeline();
     root.classList.toggle('is-replaying', state.replayAt != null);
   }
   function openReplay() { const r = $('[data-replay]'); if (r.hidden) { r.hidden = false; $('[data-net-tool="replay"]').setAttribute('aria-expanded', 'true'); renderTimeline(); } }
@@ -940,196 +883,11 @@
     replayFrame = requestAnimationFrame(step);
   }
 
-  // ---------- briefing ----------
-  const brief = { scenes: [], index: 0, paused: false, token: 0 };
-  async function startBriefing() {
-    const language = window.OrangeRadarVoice?.language?.() === 'ar' || root.dataset.uiLanguage === 'ar' ? 'ar' : 'en';
-    status('Preparing a verified briefing…');
-    try {
-      const b = await (await post(urls.briefing, { ...period(), language, aiNarration: true })).json();
-      status('');
-      Object.assign(brief, { scenes: b.scenes, index: 0, paused: false, token: brief.token + 1, language });
-      $('[data-briefing]').hidden = false;
-      $('[data-brief-progress]').innerHTML = b.scenes.map(() => '<i></i>').join('');
-      playScene();
-    } catch (e) { status(`The briefing could not be prepared: ${e.message}`, true); }
-  }
-  async function playScene() {
-    const token = ++brief.token; const scene = brief.scenes[brief.index];
-    if (!scene) return stopBriefing();
-    cancelAnimations();
-    $$('[data-brief-progress] i').forEach((i, n) => { i.className = n < brief.index ? 'is-done' : n === brief.index ? 'is-current' : ''; i.style.setProperty('--p', 0); });
-    $('[data-brief-kicker]').textContent = `Scene ${brief.index + 1} of ${brief.scenes.length} · ${scene.narrationSource}`;
-    $('[data-brief-title]').textContent = scene.title.replace(/RADAR DEMO /g, '');
-    $('[data-brief-text]').textContent = scene.narration.replace(/RADAR DEMO /g, '');
-    $('[data-brief-text]').dir = brief.language === 'ar' ? 'rtl' : 'ltr';
-    $('[data-brief-facts]').innerHTML = scene.facts.map(f => `<div><dt>${esc(f.label)}</dt><dd>${esc(f.value)}</dd></div>`).join('');
-    // Visual direction: section, selection and camera. Briefing is explicit intent, so it may scroll.
-    const ids = scene.supplierIds.filter(id => state.suppliers.has(id));
-    if (scene.mode === 'network') {
-      goScene('network');
-      const analytic = scene.edgeIds.some(id => !/^e-(participation|award)-/.test(id));
-      if (analytic && network.view !== 'category') network.setView('category', { animate: true });
-      select(ids, { source: 'network-silent' }); network.syncSelection(ids, { inspect: false });
-      if (analytic) later(() => network.showElements(scene.edgeIds), dur(620)); else if (scene.focus === 'fit') network.fit();
-    } else { select(ids, { source: 'briefing' }); goScene('market', { target: scene.mode === 'price' ? $('[data-chart="positions"]').closest('.rd-card') : null }); }
-    const started = performance.now();
-    const minimum = Math.max(4500, scene.narration.split(/\s+/).length * 330);
-    const spoken = window.OrangeRadarVoice?.narrate ? window.OrangeRadarVoice.narrate(scene.narration, brief.language) : null;
-    const progress = () => { if (token !== brief.token) return; const el = $('[data-brief-progress] .is-current'); if (el) el.style.setProperty('--p', Math.min(1, (performance.now() - started) / minimum)); if (performance.now() - started < minimum) requestAnimationFrame(progress); };
-    requestAnimationFrame(progress);
-    await Promise.all([spoken || Promise.resolve(), new Promise(r => later(r, minimum))]);
-    if (token !== brief.token || brief.paused) return;
-    brief.index++;
-    if (brief.index < brief.scenes.length) playScene(); else { $$('[data-brief-progress] i').forEach(i => (i.className = 'is-done')); $('[data-brief-kicker]').textContent = 'Briefing complete'; }
-  }
-  function stopBriefing() { brief.token++; window.OrangeRadarVoice?.stopSpeaking?.(); $('[data-briefing]').hidden = true; cancelAnimations(); }
-  function pauseBriefing(pause = !brief.paused) {
-    brief.paused = pause;
-    $('[data-brief="toggle"]').textContent = pause ? '▶' : '❚❚';
-    $('[data-brief="toggle"]').setAttribute('aria-label', pause ? 'Resume' : 'Pause');
-    if (pause) { brief.token++; window.OrangeRadarVoice?.stopSpeaking?.(); } else playScene();
-  }
-
-  // ---------- report ----------
-  async function generateReport() {
-    status('Generating the PDF intelligence report from verified calculations…');
-    const images = [];
-    const grab = (key, title) => { const c = charts[key]; if (c && c.getDom().clientWidth > 0) { try { images.push({ title, dataUrl: c.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' }) }); } catch { /* chart not drawable */ } } };
-    grab('competition', 'Competition per round');
-    grab('positions', 'Relative price position over time');
-    try {
-      const transcript = $('[data-report-transcript]')?.checked === false ? [] : window.OrangeRadarVoice?.transcript?.() || [];
-      const response = await post(urls.report, { ...period(), supplierIds: state.selected, findingIds: [], transcript, images, aiInterpretation: $('[data-report-ai]')?.checked !== false });
-      const blob = await response.blob();
-      const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
-      link.download = (response.headers.get('content-disposition') || '').match(/filename="?([^";]+)/)?.[1] || 'Orange-Radar-Report.pdf';
-      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(link.href), 4000);
-      status(''); toast('Report downloaded.');
-      return true;
-    } catch (e) { status(`The report could not be generated: ${e.message}`, true); return false; }
-  }
-
-  // ---------- context & commands (for the AI analyst) ----------
-  function context() {
-    const p = period();
-    const mode = { suppliers: 'network', tenders: 'price', overview: 'overview', studio: 'overview' }[state.tab] || 'network';
-    const f = state.filters; const filters = [f.department && `department ${f.department}`, f.category && `category ${f.category}`, f.activity !== 'all' && `activity ${f.activity}`].filter(Boolean).join(', ');
-    return { mode, selectedSupplierIds: state.selected, selectedTenderId: state.tab === 'tenders' ? state.tenderSel : state.tender, selectedRoundId: offerRoundSel || null, from: p.from, to: p.to, selectedFindingId: null,
-      comparisonSupplierA: comparison.a, comparisonSupplierB: comparison.b, comparisonTenderId: comparison.tender,
-      selectedChartPoint: [state.chartPoint, filters && `Supplier filters: ${filters}`, `Open tab: ${state.tab}`].filter(Boolean).join(' · ') || null, edgeFilters: network.edgeFilters,
-      simulationSummary: state.simulation, networkView: window.OrangeUniverse && window.OrangeUniverse.view === '3d' ? `universe-${window.OrangeUniverse.mode}` : network.view };
-  }
-  // ---------- verified navigation ----------
-  // The user asked to see something: open it, select the record, wait until the component is rendered, bring it into view,
-  // highlight it, and report what is actually visible. The analyst only states success when this returns ok.
-  const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  const visible = el => { if (!el || el.closest('[hidden]')) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 40 && r.top < innerHeight - 40; };
-  async function until(check, ms = 2500) { const end = performance.now() + ms; while (performance.now() < end) { if (check()) return true; await new Promise(r => setTimeout(r, 80)); } return check(); }
-  async function navigate(command) {
-    if (!command || typeof command !== 'object' || !state.data) return { ok: false, reason: 'The page data is not loaded yet.' };
-    const d = String(command.destination || ''); const tid = +command.tenderId || 0, sid = +command.supplierId || 0, rid = +command.roundId || 0;
-    const uni = window.OrangeUniverse; let target = null; let check = () => true; let label = '';
-    const universeMode = mode => { setTab('suppliers'); uni?.setView?.('3d'); if (uni && uni.mode !== mode) uni.setMode(mode); target = $('[data-universe]'); };
-    cancelAnimations();
-    if (['tender', 'tender_lifecycle', 'tender_offers'].includes(d)) {
-      if (!tenderById(tid)) return { ok: false, reason: 'That tender is not on this page.' };
-      if (rid && state.data.network.rounds.some(r => r.roundId === rid && r.tenderId === tid)) offerRoundSel = rid;
-      openTender(tid, { tab: false }); setTab('tenders'); await frame();
-      target = d === 'tender_offers' ? $('[data-tender-offers-section]') : d === 'tender_lifecycle' ? $('[data-tender-timeline]')?.closest('.rd-card') : $('[data-tender-main]');
-      check = () => state.tenderSel === tid; label = `${clean(tenderById(tid).title)} · ${d === 'tender' ? 'tender' : d === 'tender_offers' ? 'financial offers' : 'lifecycle'}`;
-    } else if (d === 'supplier' || (d === 'competition' && sid)) {
-      if (!state.suppliers.has(sid)) return { ok: false, reason: 'That supplier is not on this page.' };
-      universeMode(d === 'competition' ? 'competition' : 'universe'); select([sid], { source: 'ai', center: true });
-      check = () => (uni?.selected || []).includes(sid) && (d !== 'competition' || uni?.mode === 'competition');
-      label = `${name(sid)}${d === 'competition' ? ' · competitors' : ''}`;
-    } else if (['supplier_market', 'categories', 'competition', 'tender_network'].includes(d)) {
-      const mode = { supplier_market: 'universe', categories: 'category', competition: 'competition', tender_network: 'tender' }[d];
-      if (state.selected.length) select([], { source: 'ai' });
-      universeMode(mode);
-      if (d === 'categories' && command.category && !uni?.focusCategory(command.category)) return { ok: false, reason: `Category ${command.category} is not on this page.` };
-      check = () => !uni || uni.mode === mode; label = `Supplier Universe · ${mode} mode${command.category ? ` · ${command.category}` : ''}`;
-    } else if (d === 'price_patterns' || d === 'submission_timing' || d === 'supplier_offer_comparison') {
-      if (d === 'supplier_offer_comparison' && tid) {
-        const second = Number(command.secondSupplierId);
-        if (!state.suppliers.has(sid) || !state.suppliers.has(second) || sid === second)
-          return { ok: false, reason: 'Both suppliers must be in the authorized supplier list.' };
-        Object.assign(comparison, { a: sid, b: second });
-        if (!(await loadComparison(tid)) || comparison.tender !== tid || (rid && selectedComparison()?.roundId !== rid))
-          return { ok: false, reason: 'No shared eligible bidding cycle was loaded for that tender.' };
-        check = () => comparison.a === sid && comparison.b === second && comparison.tender === tid && !comparisonResult.hidden;
-      }
-      setTab('suppliers');
-      target = d === 'submission_timing' && !comparisonResult.hidden ? $('[data-comparison-timing]') :
-        d === 'price_patterns' && !comparisonResult.hidden ? $('[data-comparison-price]') : comparisonPanel;
-      label = tr('Supplier Offer Comparison', 'مقارنة عروض الموردين');
-    } else if (d === 'tenders') { setTab('tenders'); target = $('[data-tab-panel="tenders"]'); label = 'Tenders'; }
-    else if (d === 'overview') { setTab('overview'); target = $('[data-tab-panel="overview"]'); label = 'Overview'; }
-    else return { ok: false, reason: 'That view does not exist.' };
-    await frame();
-    if (!(await until(check))) return { ok: false, label, reason: 'The view opened, but the requested selection could not be applied.' };
-    if (target) target.scrollIntoView({ behavior: reduced.matches ? 'auto' : 'smooth', block: target === comparisonPanel ? 'start' : 'center' });
-    // A slow or interrupted smooth scroll must not leave the target off screen: finish it instantly.
-    let seen = await until(() => visible(target), 1800);
-    if (!seen && target) { target.scrollIntoView({ behavior: 'auto', block: 'start' }); seen = await until(() => visible(target), 600); }
-    if (target) { target.classList.remove('oi-ai-spotlight'); void target.offsetWidth; target.classList.add('oi-ai-spotlight'); later(() => target.classList.remove('oi-ai-spotlight'), 2400); }
-    if (!seen) return { ok: false, label, reason: 'The view opened but is not visible on screen.' };
-    lastAction = `Showing ${label}`;
-    window.dispatchEvent(new CustomEvent('radar:action', { detail: lastAction }));
-    return { ok: true, label };
-  }
-
-  // Whitelisted visual commands only; arguments were validated on the server and are re-checked here.
-  let lastAction = '';
-  function apply(command) {
-    if (!command || typeof command !== 'object' || !state.data) return;
-    try {
-      lastAction = '';
-      applyCommand(command);
-      window.dispatchEvent(new CustomEvent('radar:action', { detail: lastAction }));
-      // Visible feedback on the network whenever the analyst moved it.
-      if (lastAction && ['network', 'category', 'highlight', 'compare', 'path', 'timeline'].includes(command.action)) {
-        const touched = [...(Array.isArray(command.supplierIds) ? command.supplierIds : []), command.from, command.to].map(Number).filter(id => state.suppliers.has(id));
-        later(() => network.aiCue(lastAction, touched), 500);
-      }
-    } catch (e) { console.warn('Orange Radar command ignored', e); }
-  }
-  function applyCommand(command) {
-    const ids = (Array.isArray(command.supplierIds) ? command.supplierIds : []).map(Number).filter(id => state.suppliers.has(id)).slice(0, MAX_SELECTED);
-    const guided = { guided: true };
-    const spotlight = el => { if (!el) return; el.classList.remove('oi-ai-spotlight'); void el.offsetWidth; el.classList.add('oi-ai-spotlight'); el.scrollIntoView({ behavior: reduced.matches ? 'auto' : 'smooth', block: 'center' }); setTimeout(() => el.classList.remove('oi-ai-spotlight'), 2200); };
-    switch (command.action) {
-      case 'navigate': navigate(command); break;
-      case 'mode': {
-        const m = String(command.mode);
-        if (m === 'network') { goScene('network', guided); lastAction = 'Showed the network'; }
-        else if (m === 'price') { goScene('market', { ...guided, target: $('[data-chart="positions"]').closest('.rd-card') }); lastAction = 'Showed price intelligence'; }
-        else if (m === 'overview') { goScene('market', guided); lastAction = 'Showed market patterns'; }
-        break;
-      }
-      case 'network': if (['universe', 'category', 'competition', 'tender'].includes(command.view)) {
-        if (command.view !== 'universe') network.setView(command.view); goScene('network', guided);
-        if (window.OrangeUniverse && window.OrangeUniverse.view !== '2d') window.OrangeUniverse.setMode(command.view);
-        lastAction = `Supplier universe: ${command.view} view`; } break;
-      case 'category': if (typeof command.category === 'string' && (window.OrangeUniverse?.focusCategory(command.category) || network.focusCategory(command.category))) { goScene('network', guided); lastAction = `Focused category ${command.category}`; } break;
-      case 'highlight':
-        if (ids.length) { select(ids, { source: 'ai', center: true }); goScene('network', guided); lastAction = `Highlighted ${ids.map(name).join(', ')}`; }
-        break;
-      case 'compare': if (ids.length) { select(ids, { source: 'ai', center: true }); goScene('network', guided); lastAction = `Comparing ${ids.length} suppliers`; } break;
-      case 'path': if (state.suppliers.has(+command.from) && state.suppliers.has(+command.to)) { goScene('network', guided); window.OrangeUniverse?.setView('2d'); setTimeout(() => network.tracePath(+command.from, +command.to), 120); lastAction = `Path ${name(+command.from)} → ${name(+command.to)}`; } break;
-      case 'simulate': if (ids.length) { select(ids, { source: 'ai' }); goScene('reports', guided); simulate(ids); lastAction = 'Ran the dependency scenario'; } break;
-      case 'period': $('#rd-from').value = /^\d{4}-\d{2}-\d{2}$/.test(command.from) ? command.from : ''; $('#rd-to').value = /^\d{4}-\d{2}-\d{2}$/.test(command.to) ? command.to : ''; load(); lastAction = 'Changed the period'; break;
-      case 'timeline': if (command.value === 'reset') { play(false); setReplay(1000); } else { if (command.value === 'play') { goScene('network', guided); window.OrangeUniverse?.setView('2d'); } play(command.value === 'play'); } lastAction = `Replay ${command.value}`; break;
-      case 'briefing': startBriefing(); lastAction = 'Started the briefing'; break;
-      case 'report': generateReport(); lastAction = 'Generating the report'; break;
-      case 'download': if (/^[0-9a-f]{32}$/.test(command.token)) { download(`${urls.download}?token=${command.token}`, command.fileName); lastAction = 'Downloading the generated file'; } break;
-      case 'export': if (['xlsx', 'docx', 'pdf'].includes(command.format) && ['tender_lifecycle', 'tender_offers', 'tender_summary', 'supplier_offers', 'supplier_participation', 'market_overview', 'price_timing'].includes(command.reportType)) { exportFile({ format: command.format, reportType: command.reportType, tenderId: command.tenderId || null, supplierIds: command.supplierIds || [], roundId: command.roundId || null, from: command.from || null, to: command.to || null }); lastAction = 'Generating the requested file'; } break;
-    }
-  }
+  // Shared with the 3D universe (orange-intelligence-universe.js) and the AI Studio (intelligence-ai.js).
   window.OrangeRadar = Object.freeze({
-    context, apply, cancelAnimations, name, fullName, goScene, setTab, get data() { return state.data; }, get selected() { return [...state.selected]; }, get scene() { return state.scene; }, get tab() { return state.tab; },
-    stopBriefing, pauseBriefing: () => pauseBriefing(true), get briefingActive() { return !$('[data-briefing]').hidden; },
-    select: (ids, o) => select(ids, o), catColor: c => catColor(catKey(c)), filteredSupplierIds, toast: t => toast(esc(t)), exportTable, exportVisual, navigate,
+    name, fullName, goScene, setTab, get data() { return state.data; }, get selected() { return [...state.selected]; }, get scene() { return state.scene; }, get tab() { return state.tab; },
+    select: (ids, o) => select(ids, o), catColor: c => catColor(catKey(c)), filteredSupplierIds, toast: t => toast(esc(t)),
+    tracePath: (from, to) => { if (state.suppliers.has(from) && state.suppliers.has(to)) { goScene('network'); window.OrangeUniverse?.setView('2d'); setTimeout(() => network.tracePath(from, to), 120); } },
     openRoundTab: roundId => { const r = state.data?.network.rounds.find(x => x.roundId === roundId); if (r) { offerRoundSel = roundId; openTender(r.tenderId); } }
   });
 
@@ -1143,7 +901,7 @@
     else if (d.offerPick) { offerBidSel = +d.offerPick; renderOfferDetail(chosenOfferRound(tenderById(state.tenderSel))); $('[data-tender-offer-detail]')?.scrollIntoView({ behavior: reduced.matches ? 'auto' : 'smooth', block: 'nearest' }); }
     else if (t.hasAttribute('data-offer-detail-close')) { offerBidSel = null; $('[data-tender-offer-detail]').hidden = true; }
     else if (d.tabLink) setTab(d.tabLink);
-    else if (d.tabJump) { setTab(d.tabJump); if (d.tabJump === 'studio') setTimeout(() => $('[data-ask-input]')?.focus({ preventScroll: true }), 80); }
+    else if (d.tabJump) setTab(d.tabJump);
     else if (d.sceneJump) goScene(d.sceneJump);
     else if (d.clearFilter) clearFilter(d.clearFilter);
     else if (d.snapCat) setFilter('category', state.filters.category === d.snapCat ? '' : d.snapCat);
@@ -1151,23 +909,19 @@
     else if (d.openTender) openTender(+d.openTender);
     else if (t.hasAttribute('data-open-silent')) { setTab('suppliers'); setFilter('activity', 'silent'); }
     else if (d.export) exportTender(d.export);
-    else if (t.hasAttribute('data-tender-ask')) { const x = tenderById(state.tenderSel); if (x) { setTab('studio'); window.OrangeRadarVoice?.ask?.(`Analyze tender #${x.tenderId} "${clean(x.title)}": its lifecycle, offers and official outcome. Show its offers as a chart.`); } }
     else if (d.action === 'run') load(true);
-    else if (d.action === 'brief') startBriefing();
-    else if (d.action === 'report') generateReport();
     else if (d.action === 'simulate') simulate();
     else if (d.action === 'replay-network') { goScene('network'); setReplay(0); play(true); }
     else if (d.pick) select([+d.pick], { additive: e.shiftKey, source: 'pick' });
     else if (d.pair) select(d.pair.split(',').map(Number), { source: 'pair' });
     else if (d.unselect) select([+d.unselect], { additive: true, source: 'chips' });
     else if (t.hasAttribute('data-clear-selection')) select([], { source: 'chips' });
-    else if (d.scenario) { goScene('reports'); simulate([+d.scenario]); }
+    else if (d.scenario) { setTab('suppliers'); const fold = $('.oi-whatif'); fold.open = true; fold.scrollIntoView({ behavior: reduced.matches ? 'auto' : 'smooth', block: 'start' }); simulate([+d.scenario]); }
     else if (d.tenderNetwork) { setTab('suppliers'); window.OrangeUniverse?.showTender(+d.tenderNetwork); }
-    else if (d.ask) window.OrangeRadarVoice?.ask?.(d.ask);
+    else if (d.askSupplier) window.OrangeIntelligenceAI?.chooseSupplier(+d.askSupplier);
     else if (d.table) { const card = t.closest('.rd-card'); if (tables[d.table]) showTable(card, tables[d.table]()); }
     else if (t.hasAttribute('data-close-table')) t.closest('.rd-table-wrap').remove();
     else if (d.select) select([+d.select], { additive: e.shiftKey, source: 'table' });
-    else if (d.brief) ({ prev: () => { brief.index = Math.max(0, brief.index - 1); brief.paused = false; playScene(); }, next: () => { brief.index = Math.min(brief.scenes.length - 1, brief.index + 1); brief.paused = false; playScene(); }, toggle: () => pauseBriefing(), replay: () => { brief.index = 0; brief.paused = false; playScene(); }, stop: stopBriefing, ask: () => { pauseBriefing(true); const s = brief.scenes[brief.index]; window.OrangeRadarVoice?.prefill?.(`Tell me more about "${s?.title}".`); } })[d.brief]?.();
     else if (d.timeline === 'play') play();
     else if (d.timeline === 'reset') { play(false); setReplay(1000); }
   });
@@ -1208,8 +962,6 @@
   });
   let resizeTimer = 0;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderTimeline, 120); });
-  // Any direct page interaction cancels pending guided animations (never the officer's own actions).
-  ['wheel', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { if (timers.size) cancelAnimations(); }, { passive: true }));
 
   const hash = location.hash.replace(/^#(rd-)?/, '');
   setTab(SCENE_TAB[hash] || 'suppliers', { push: false });
