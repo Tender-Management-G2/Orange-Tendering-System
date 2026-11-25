@@ -20,6 +20,7 @@
     @* Request information: the department is filled in by the system and never typed by the employee. *@
     <section class="dr-card">
         <h2 class="dr-card-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg> Request Information</h2>
+        <p class="dr-muted">Department: <strong>@Model.DepartmentName</strong></p>
         <div class="dr-grid dr-grid-3">
             <div class="dr-field"><label asp-for="NeededBy">Needed by</label>
                 <div class="dr-input"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg><input asp-for="NeededBy" type="date" required min="@DateTime.UtcNow.ToString("yyyy-MM-dd")" /></div>

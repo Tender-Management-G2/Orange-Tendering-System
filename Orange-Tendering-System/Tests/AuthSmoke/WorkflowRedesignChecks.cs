@@ -355,7 +355,8 @@ public static class WorkflowRedesignChecks
             return await response.Content.ReadAsStringAsync();
         }
         var sendScreen = await WeightScreen(officer, "SourcingOfficer");
-        Check(sendScreen.Contains("Send to Committee") && sendScreen.Contains("Assigned Committee") && sendScreen.Contains("/RequestWeights"),
+        Check(sendScreen.Contains("Send to Committee") && sendScreen.Contains("data-wz-panel=\"2\"") && sendScreen.Contains("/RequestWeights")
+            && new[] { manager, depRep, fin, tech }.All(member => sendScreen.Contains(WebUtility.HtmlEncode(member.FullName))),
             "send-to-committee shows the assigned roster and existing action");
         await Flow(w => w.RequestWeights(id, P(officer)));
         var voteScreen = await WeightScreen(fin, "EvaluationCommittee");
@@ -369,7 +370,7 @@ public static class WorkflowRedesignChecks
         await Flow(w => w.Propose(id, 40, 60, P(fin)));
         var progressScreen = await WeightScreen(officer, "SourcingOfficer");
         Check(progressScreen.Contains("Voting Progress") && progressScreen.Contains("1 of 4 voted")
-            && progressScreen.Contains("ew-success") && progressScreen.Contains("ew-pending"), "voting progress reflects the recorded proposal");
+            && progressScreen.Contains("Voted</span>") && progressScreen.Contains("Pending</span>"), "voting progress reflects the recorded proposal");
         foreach (var m in new[] { manager, depRep, tech }) await Flow(w => w.Propose(id, 40, 60, P(m)));
         var departmentSeatId = await Read(d => d.CommitteeMembers.Where(c => c.TenderId == id && c.UserId == depRep.Id).Select(c => c.Id).SingleAsync());
         await Flow(w => w.ReturnWeights(id, [departmentSeatId], "Please revisit the technical weighting.", P(officer)));
@@ -391,7 +392,7 @@ public static class WorkflowRedesignChecks
             var html = await response.Content.ReadAsStringAsync();
             Check(response.IsSuccessStatusCode && html.Contains("data-technical-total") && html.Contains("criteria[3].Weight"),
                 "the Officer's approval form renders the interactive technical criteria table");
-            Check(html.Contains("Evaluation Weights (Average)") && html.Contains(">41.5%</dd>") && html.Contains(">58.5%</dd>"),
+            Check(html.Contains("All proposals are in. Review the average") && html.Contains(">41.5%</span>") && html.Contains(">58.5%</span>"),
                 "result displays the actual average of revised proposals");
             Check(html.Contains("value=\"16 GB RAM\"") && html.Contains("value=\"512 GB SSD\"") && html.Contains("value=\"Processor (CPU)\""),
                 "technical weights offer tender specification details and laptop component suggestions");
@@ -408,7 +409,7 @@ public static class WorkflowRedesignChecks
         technicalCriteria[3].Weight = 15;
         await Flow(w => w.ApproveWeights(id, P(officer), technicalCriteria));
         var lockedScreen = await WeightScreen(officer, "SourcingOfficer");
-        Check(lockedScreen.Contains("Evaluation weights are approved and locked.") && lockedScreen.Contains("/OpenBidding"),
+        Check(lockedScreen.Contains("The weights are approved and locked.") && lockedScreen.Contains("/OpenBidding"),
             "approved weights expose the existing open-bidding action");
         await Refuse(w => w.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(90), P(officer)), "submission deadline cannot be after the department's needed-by date", "needs the items");
         await Flow(w => w.OpenBidding(id, DateTimeOffset.UtcNow.AddDays(5), P(officer)));
