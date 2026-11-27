@@ -56,12 +56,12 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     }
     private void Audit(ApplicationUser actor, int tenderId, string action, object? evidence = null) => db.AuditLogs.Add(new AuditLog
     { UserId = actor.Id, EntityName = "Tender", EntityId = tenderId.ToString(), Action = action, NewValues = JsonSerializer.Serialize(evidence), CreatedAt = Now });
-    private void Notify(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
-    { UserId = userId, Title = title, Message = message, Link = $"/Workflow/Details/{tenderId}", CreatedAt = Now });
-    // Notification whose link opens the evaluation meeting page ("Join meeting") for the person it is sent to.
-    private void NotifyMeeting(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
-    { UserId = userId, Title = title, Message = message, Link = $"/Meetings/Join/{tenderId}", CreatedAt = Now });
-    private async Task NotifyOfficerMeeting(int tenderId, string message) => NotifyMeeting((await GlobalOfficer()).Id, tenderId, "Evaluation meeting scheduled", message);
+    private void Notify(string userId, int tenderId, string title, string message, string? link = null) => db.Notifications.Add(new Notification
+    { UserId = userId, Title = title, Message = message, Link = link ?? $"/Workflow/Details/{tenderId}", CreatedAt = Now });
+    private void NotifyEvaluator(string userId, int tenderId, string title, string message) =>
+        Notify(userId, tenderId, title, message, NotificationDto.EvaluationWorkflowLink(tenderId));
+    private async Task NotifyOfficerMeeting(int tenderId, string message) =>
+        Notify((await GlobalOfficer()).Id, tenderId, "Evaluation meeting scheduled", message, $"/Meetings/Join/{tenderId}");
     private async Task NotifyOfficer(int tenderId, string title, string message) => Notify((await GlobalOfficer()).Id, tenderId, title, message);
 
     // Every mutation of a tender takes the same SQL Server row lock, including bidding,
@@ -436,7 +436,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var meeting = zoomMeetingId != null ? $"Zoom meeting {zoomMeetingId} was created for this session. Use Join meeting in this notification."
             : input.MeetingUrl!.Contains("meet.jit.si") ? "The system created the video meeting room for this session. Use Join meeting in this notification at the scheduled time." : "The Zoom link was supplied by the officer; open it from the tender page.";
         await NotifyOfficerMeeting(id, $"Evaluation meeting scheduled for {JordanTime.Display(session.StartsAt)}. {meeting}");
-        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {JordanTime.Display(session.StartsAt)} and remains available after the meeting ends until you submit your final evaluation. {meeting} The reviewed AI analysis #{ai.Id} is attached to this meeting: download it (PDF) from the meeting card on the tender page, together with {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s).");
+        foreach (var m in members) NotifyEvaluator(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {JordanTime.Display(session.StartsAt)} and remains available after the meeting ends until you submit your final evaluation. Open the tender to access the meeting, reviewed AI analysis #{ai.Id}, and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s).");
         Audit(a, id, "EvaluationScheduleEvidence", new { r.RoundNumber, session.StartsAt, session.EndsAt, ZoomMeetingId = zoomMeetingId, AiAnalysisId = ai.Id, EligibleBidIds = eligible.Select(x => x.Id), AttachedDocuments = attachedDocuments, InvitedMemberIds = members.Select(x => x.Id) });
     });
     // The Officer moves the meeting (and the scoring window) while nobody has submitted yet. Members and the Officer are notified.
@@ -453,7 +453,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         db.Entry(s).Property(x => x.State).IsModified = true;
         var zoom = s.ZoomMeetingId != null ? " Update the time of the Zoom meeting as well if it was created outside this system." : "";
         foreach (var m in await Members(id, CommitteeType.Evaluation))
-            NotifyMeeting(m.UserId, id, "Evaluation meeting rescheduled", $"New time: {JordanTime.Display(s.StartsAt)} to {JordanTime.Display(s.EndsAt)}. Reason: {reason.Trim()}. The meeting link is unchanged.");
+            NotifyEvaluator(m.UserId, id, "Evaluation meeting rescheduled", $"New time: {JordanTime.Display(s.StartsAt)} to {JordanTime.Display(s.EndsAt)}. Reason: {reason.Trim()}. The meeting link is unchanged.");
         await NotifyOfficerMeeting(id, $"Evaluation meeting moved to {JordanTime.Display(s.StartsAt)} - {JordanTime.Display(s.EndsAt)}.{zoom}");
         Audit(a, id, "EvaluationRescheduleEvidence", new { Old = old, New = new { s.StartsAt, s.EndsAt }, Reason = reason.Trim() });
     });

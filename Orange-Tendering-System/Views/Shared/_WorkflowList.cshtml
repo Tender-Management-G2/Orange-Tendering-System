@@ -297,6 +297,9 @@
             updateTechnicalResults();
         });
         var pad = function (n) { return ('0' + n).slice(-2); }, local = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+        body.querySelectorAll('input[name="StartsAt"][data-utc="local"]').forEach(function (input) {
+            if (!input.value) input.value = local(new Date(Date.now() + 60 * 1000));
+        });
         body.querySelectorAll('select[data-preset="deadline"]').forEach(function (sel) { sel.addEventListener('change', function () { if (!sel.value) return; var d = new Date(); d.setDate(d.getDate() + Number(sel.value)); d.setHours(17, 0, 0, 0); sel.closest('form').querySelector('input[name=deadline]').value = local(d); }); });
         body.querySelectorAll('table.wp-sortable').forEach(function (tb) {
             tb.querySelectorAll('thead th').forEach(function (th, ci) {
@@ -332,7 +335,13 @@
         var signatureRequired = !decisionSel || decisionSel.value === 'Approve' || form.action.indexOf('/TopCommittee/') >= 0;
         if (pad && signatureRequired) { if (!pad._drawn) { showError('Draw your signature in the box first.'); return; } fd.set('signatureImage', pad.querySelector('canvas').toDataURL('image/png')); }
         if (btn && btn.name) fd.set(btn.name, btn.value);
-        form.querySelectorAll('input[data-utc]').forEach(function (i) { if (i.value) { fd.delete(i.name); fd.set(i.name, new Date(i.value + (i.value.length === 16 ? ':00' : '') + '+03:00').toISOString()); } });
+        form.querySelectorAll('input[data-utc]').forEach(function (input) {
+            if (!input.value) return;
+            var instant = input.dataset.utc === 'local'
+                ? new Date(input.value)
+                : new Date(input.value + (input.value.length === 16 ? ':00' : '') + '+03:00');
+            fd.set(input.name, instant.toISOString());
+        });
         var label = btn ? btn.textContent : ''; form.querySelectorAll('button').forEach(function (b) { b.disabled = true; }); if (btn) btn.textContent = /\/Analyze\//.test(form.action) ? 'Analyzing the offers… about a minute' : 'Working…';
         var keep = openTitles();
         // Orange Motion: processing while the request runs, then the server's own feedback (Services/OrangeWorkflowFeedback.cs).

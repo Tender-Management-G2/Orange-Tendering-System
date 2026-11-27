@@ -87,9 +87,16 @@
     }
     catch { requirementRows.Clear(); }
 
-    var allAnswered = round != null && round.Invitations.Count > 0 && round.Invitations.All(i => i.Status == InvitationStatus.Declined || Model.Bids.Any(b => b.TenderInvitationId == i.Id && b.Status == BidStatus.Submitted));
+    var submittedBidsByInvitation = Model.Bids.Where(b => b.Status == BidStatus.Submitted)
+        .OrderByDescending(b => b.Id).ToLookup(b => b.TenderInvitationId);
+    var supplierBidRows = (round?.Invitations ?? [])
+        .Select(invitation => new { Invitation = invitation, Bid = submittedBidsByInvitation[invitation.Id].FirstOrDefault() })
+        .OrderByDescending(row => row.Bid != null)
+        .ThenBy(row => SupplierName(row.Invitation.SupplierId))
+        .ToList();
+    var allAnswered = round != null && round.Invitations.Count > 0 && round.Invitations.All(i => i.Status == InvitationStatus.Declined || submittedBidsByInvitation.Contains(i.Id));
     var waitingInvitations = round?.Invitations.Where(i => i.Status != InvitationStatus.Declined
-        && !Model.Bids.Any(b => b.TenderInvitationId == i.Id && b.Status == BidStatus.Submitted)).ToList() ?? [];
+        && !submittedBidsByInvitation.Contains(i.Id)).ToList() ?? [];
     var submittedSupplierCount = Model.Bids.Where(b => b.Status == BidStatus.Submitted)
         .Select(b => b.TenderInvitation.SupplierId).Distinct().Count();
     var canCloseBidding = round?.Status == TenderRoundStatus.Open && (submittedSupplierCount >= 3 || round.Deadline <= Model.UtcNow || allAnswered);
@@ -494,7 +501,7 @@
                     else
                     {
                         <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Setup" asp-route-id="@id" method="post" class="wp-form">
-                            <div class="wp-cols"><label class="wp-schedule-ai">@L("Reviewed AI supplier comparison", "مقارنة الموردين المراجعة")<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">@L("Analysis", "التحليل") #@ai.Id</option> }</select></label></div><div class="wp-cols"><label>@L("Starts", "البدء")<input name="StartsAt" type="datetime-local" data-utc required data-fv-future data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label><label>@L("Ends", "الانتهاء")<input name="EndsAt" type="datetime-local" data-utc required data-fv-after="StartsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label></div>
+                            <div class="wp-cols"><label class="wp-schedule-ai">@L("Reviewed AI supplier comparison", "مقارنة الموردين المراجعة")<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">@L("Analysis", "التحليل") #@ai.Id</option> }</select></label></div><div class="wp-cols"><label>@L("Starts", "البدء")<input name="StartsAt" type="datetime-local" data-utc="local" required data-fv-future data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label><label>@L("Ends", "الانتهاء")<input name="EndsAt" type="datetime-local" data-utc="local" required data-fv-after="StartsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label></div>
                             <label class="wp-check"><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> @L("Create the video meeting automatically", "إنشاء اجتماع الفيديو تلقائيًا")</label>
                             <details class="wp-opt"><summary>@L("Use an existing Zoom link", "استخدام رابط Zoom موجود")</summary><label>@L("Zoom link", "رابط Zoom")<input name="MeetingUrl" type="url" placeholder="https://zoom.us/j/..." data-fv-optional /></label></details>
                             <button class="wp-primary">@L("Schedule and Invite Committee", "جدولة الاجتماع ودعوة اللجنة")</button></form>
@@ -507,12 +514,23 @@
                 }
                 else
                 {
-                <h3>@L("Track Supplier Bids", "متابعة عروض الموردين")</h3><p class="wz-lead">@L("View the suppliers who submitted their offers.", "اعرض الموردين الذين قدّموا عروضهم.")</p>
-                <div class="wz-table"><table><thead><tr><th>#</th><th>@L("Supplier", "المورد")</th><th>@L("Offer Amount", "قيمة العرض")</th><th>@L("Submission Time", "وقت التقديم")</th><th>@L("Status", "الحالة")</th></tr></thead><tbody>
-                @{ var wzRows = (round?.Invitations ?? []).Select(inv => new { Inv = inv, Bid = Model.Bids.Where(b => b.TenderInvitationId == inv.Id && b.Status == BidStatus.Submitted).OrderByDescending(b => b.Id).FirstOrDefault() }).ToList(); var rowNo = 0; }
-                @foreach (var r in wzRows.Take(6)) { rowNo++; <tr><td>@rowNo</td><td>@SupplierName(r.Inv.SupplierId)</td><td>@(r.Bid != null ? Price(r.Bid).ToString("N0") + " " + r.Bid.CurrencyCode : "—")</td><td>@WzTime(r.Bid?.SubmittedAt)</td><td><span class="wz-tag @(r.Bid != null ? "is-good" : r.Inv.Status == InvitationStatus.Declined ? "is-bad" : "")">@(r.Bid != null ? L("Submitted", "تم التقديم") : r.Inv.Status == InvitationStatus.Declined ? L("Declined", "اعتذر") : L("Pending", "قيد الانتظار"))</span></td></tr> }
-                @if (wzRows.Count > 6) { <tr><td colspan="5" class="wz-muted">+ @(wzRows.Count - 6) @L("more suppliers (see the classic view for the full list)", "موردين آخرين (القائمة الكاملة في العرض التقليدي)")</td></tr> }
-                @if (wzRows.Count == 0) { <tr><td colspan="5" class="wz-empty">@L("No suppliers have been invited yet.", "لم تتم دعوة أي مورد بعد.")</td></tr> }
+                <h3 id="wz-supplier-bids-title">@L("Track Supplier Bids", "متابعة عروض الموردين")</h3>
+                <div class="wz-table wz-supplier-bids" role="region" aria-labelledby="wz-supplier-bids-title" tabindex="0"><table><thead><tr><th>#</th><th>@L("Supplier", "المورد")</th><th>@L("Offer Amount", "قيمة العرض")</th><th>@L("Submission Time", "وقت التقديم")</th><th>@L("Status", "الحالة")</th></tr></thead><tbody>
+                @{ var rowNo = 0; }
+                @foreach (var row in supplierBidRows)
+                {
+                    rowNo++;
+                    var bid = row.Bid;
+                    var declined = row.Invitation.Status == InvitationStatus.Declined;
+                    <tr>
+                        <td>@rowNo</td>
+                        <td>@SupplierName(row.Invitation.SupplierId)</td>
+                        <td>@(bid != null ? Price(bid).ToString("N0") + " " + bid.CurrencyCode : "—")</td>
+                        <td>@WzTime(bid?.SubmittedAt)</td>
+                        <td><span class="wz-tag @(bid != null ? "is-good" : declined ? "is-bad" : "")">@(bid != null ? L("Submitted", "تم التقديم") : declined ? L("Declined", "اعتذر") : L("Pending", "قيد الانتظار"))</span></td>
+                    </tr>
+                }
+                @if (supplierBidRows.Count == 0) { <tr><td colspan="5" class="wz-empty">@L("No suppliers have been invited yet.", "لم تتم دعوة أي مورد بعد.")</td></tr> }
                 </tbody></table></div>
                 <p class="wz-muted">@submittedSupplierCount @L("offer(s) received", "عرض/عروض مستلمة") · @L("closing", "الإغلاق") @WzTime(wzClosing)</p>
                 <div class="wz-actions">
@@ -530,6 +548,20 @@
                 @if (s != null)
                 {
                     <dl class="wz-rows"><div><dt>@L("Meeting & scoring", "الاجتماع والتقييم")</dt><dd>@WzTime(s.StartsAt) → @WzTime(s.EndsAt)</dd></div><div><dt>@L("Submitted", "تم التقديم")</dt><dd>@s.Submissions.Count / @evalMembers.Count</dd></div></dl>
+                    @if (Model.IsOfficer && status == TenderStatus.Evaluation && s.ReportId == null && s.State is (SessionState.Scheduled or SessionState.Incomplete) && s.Submissions.Count == 0)
+                    {
+                        <details class="wp-opt"><summary>@L("Change the meeting time", "تغيير موعد الاجتماع")</summary>
+                            <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RescheduleEvaluation" asp-route-id="@id" method="post" class="wp-form">
+                                <div class="wp-cols">
+                                    <label>@L("New start", "وقت البدء الجديد")<input name="startsAt" type="datetime-local" value="@s.StartsAt.ToJordan("yyyy-MM-ddTHH:mm")" required data-utc data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label>
+                                    <label>@L("New end", "وقت الانتهاء الجديد")<input name="endsAt" type="datetime-local" value="@s.EndsAt.ToJordan("yyyy-MM-ddTHH:mm")" required data-utc data-fv-after="startsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label>
+                                </div>
+                                <label>@L("Reason", "السبب")<textarea name="reason" maxlength="500" required rows="2" data-fv-label="Reason" data-fv-label-ar="السبب"></textarea></label>
+                                <small>@L("Enter times in Jordan time. You can change the meeting time until the first final evaluation is submitted. The meeting link stays the same.", "أدخل الأوقات بتوقيت الأردن. يمكنك تغيير موعد الاجتماع حتى تقديم أول تقييم نهائي. يظل رابط الاجتماع كما هو.")</small>
+                                <button class="wz-primary">@L("Save the new time and notify the committee", "حفظ الموعد الجديد وإبلاغ اللجنة")</button>
+                            </form>
+                        </details>
+                    }
                     <ul class="wz-people wz-compact">@foreach (var m in evalMembers) { var done = s.Submissions.Any(x => x.CommitteeMemberId == m.Id); <li><span class="wz-avatar">@Initial(Who(m.UserId))</span><div><strong>@Who(m.UserId)</strong><small>@WeightRole(m.Responsibility)</small></div><span class="wz-tag @(done ? "is-good" : "")">@(done ? L("Submitted", "تم") : L("Pending", "قيد الانتظار"))</span></li> }</ul>
                     @if (s.State == SessionState.Scheduled && s.Submissions.Count == 4) { <div class="wz-actions"><form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="EndEvaluation" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="reason" value="All four committee evaluations were submitted." /><label class="wp-check"><input name="confirmed" type="checkbox" value="true" required /> @L("I confirm that all four evaluations are final.", "أؤكد أن التقييمات الأربعة نهائية.")</label><button class="wz-primary">@L("Generate the report now", "إنشاء التقرير الآن")</button></form></div> }
                     @if (s.MeetingUrl != null && s.State == SessionState.Scheduled) { <p class="wz-muted"><a class="wz-link" data-no-modal href="/Meetings/Join/@id">&#127909; @L("Join the meeting", "الانضمام إلى الاجتماع")</a></p> }
@@ -764,12 +796,12 @@
                     }
                     <h5>All invited suppliers</h5>
                     <ul>
-                        @foreach (var invitation in round.Invitations.OrderBy(i => SupplierName(i.SupplierId)))
+                        @foreach (var row in supplierBidRows)
                         {
-                            var offer = Model.Bids.FirstOrDefault(b => b.TenderInvitationId == invitation.Id);
-                            var progress = invitation.Status == InvitationStatus.Declined ? "Declined invitation"
-                                : offer?.Status == BidStatus.Submitted ? "Submitted offer"
-                                : offer?.Status == BidStatus.Draft ? "Draft offer"
+                            var invitation = row.Invitation;
+                            var progress = row.Bid != null ? "Submitted offer"
+                                : invitation.Status == InvitationStatus.Declined ? "Declined invitation"
+                                : Model.Bids.Any(b => b.TenderInvitationId == invitation.Id && b.Status == BidStatus.Draft) ? "Draft offer"
                                 : invitation.Status == InvitationStatus.Accepted ? "Accepted invitation — no offer yet"
                                 : "Invitation pending";
                             <li>@SupplierName(invitation.SupplierId) — @progress</li>
@@ -908,7 +940,7 @@
                     else
                     {
                         <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="Setup" asp-route-id="@id" method="post" class="wp-form">
-                            <div class="wp-cols"><label class="wp-schedule-ai">@L("Reviewed AI supplier comparison", "مقارنة الموردين المراجعة")<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">@L("Analysis", "التحليل") #@ai.Id</option> }</select></label></div><div class="wp-cols"><label>@L("Starts", "البدء")<input name="StartsAt" type="datetime-local" data-utc required data-fv-future data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label><label>@L("Ends", "الانتهاء")<input name="EndsAt" type="datetime-local" data-utc required data-fv-after="StartsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label></div>
+                            <div class="wp-cols"><label class="wp-schedule-ai">@L("Reviewed AI supplier comparison", "مقارنة الموردين المراجعة")<select name="AiAnalysisId" required>@foreach (var ai in reviewedAi) { <option value="@ai.Id">@L("Analysis", "التحليل") #@ai.Id</option> }</select></label></div><div class="wp-cols"><label>@L("Starts", "البدء")<input name="StartsAt" type="datetime-local" data-utc="local" required data-fv-future data-fv-label="Start time" data-fv-label-ar="وقت البدء" /></label><label>@L("Ends", "الانتهاء")<input name="EndsAt" type="datetime-local" data-utc="local" required data-fv-after="StartsAt" data-fv-label="End time" data-fv-label-ar="وقت الانتهاء" /></label></div>
                             <label class="wp-check"><input name="CreateJitsiMeeting" type="checkbox" value="true" checked /> @L("Create the video meeting automatically", "إنشاء اجتماع الفيديو تلقائيًا")</label>
                             <details class="wp-opt"><summary>@L("Use an existing Zoom link", "استخدام رابط Zoom موجود")</summary><label>@L("Zoom link", "رابط Zoom")<input name="MeetingUrl" type="url" placeholder="https://zoom.us/j/..." data-fv-optional /></label></details>
                             <button class="wp-primary">@L("Schedule and Invite Committee", "جدولة الاجتماع ودعوة اللجنة")</button></form>
@@ -1164,16 +1196,6 @@
                             <div class="wp-clock-times"><span>Starts <time data-local="@startIso">@s.StartsAt.ToJordan("yyyy-MM-dd HH:mm")</time></span><span>Ends <time data-local="@endIso">@s.EndsAt.ToJordan("yyyy-MM-dd HH:mm")</time></span></div>
                             @if (!string.IsNullOrWhiteSpace(s.MeetingUrl) && s.State == SessionState.Scheduled) { <a class="wp-primary wp-link wp-join@(roomState == "before" ? " is-locked" : null)" data-no-modal data-join="/Meetings/Join/@id" @(roomState == "before" ? Html.Raw("aria-disabled=\"true\" tabindex=\"-1\"") : Html.Raw("href=\"/Meetings/Join/" + id + "\""))><span data-join-label>@Html.Raw(roomState == "before" ? "&#128274; Opens when the meeting starts" : "&#127909; Join the meeting")</span></a> }
                         </div>
-                        @if (Model.IsOfficer && s.ReportId == null && (s.State == SessionState.Scheduled || s.State == SessionState.Incomplete) && doneCount == 0)
-                        {
-                            <details class="wp-opt"><summary>Change the meeting time</summary>
-                                <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RescheduleEvaluation" asp-route-id="@id" method="post" class="wp-form">
-                                    <div class="wp-cols"><label>New start<input name="startsAt" type="datetime-local" required data-utc /></label><label>New end<input name="endsAt" type="datetime-local" required data-utc /></label></div>
-                                    <label>Reason<select class="wp-quick" aria-label="Quick text"><option value="">Quick pick&hellip;</option><option>A committee member is not available at the original time.</option><option>The meeting time passed before the committee could meet.</option></select><textarea name="reason" maxlength="500" required rows="2" data-fv-label="Reason" data-fv-label-ar="السبب"></textarea></label>
-                                    <button class="wp-primary">Save the new time and notify the committee</button><small>Times are in your local time (Jordan). Possible until the first member submits final scores; the meeting link stays the same.</small>
-                                </form>
-                            </details>
-                        }
                         var meetingAi = Model.Analyses.FirstOrDefault(x => x.Id == s.AiAnalysisId);
                         @if (meetingAi != null)
                         {

@@ -591,13 +591,67 @@ public static class WorkflowRedesignChecks
         var scheduled = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", schedule.ConversationId);
         Check(scheduled.Reply.Contains("Meeting scheduled"), "confirmed officer chat schedules the meeting");
 
+        // ---- Committee notification deep links and the Officer's reschedule form ----
+        var popupLink = "/EvaluationCommittee/Workflow/Details/" + id;
+        var invitations = await Read(d => d.Notifications.Where(n => n.Title == "Evaluation invitation" && n.Link == popupLink).ToListAsync());
+        Check(invitations.Select(n => n.UserId).ToHashSet().SetEquals(new[] { fin.Id, manager.Id, depRep.Id, tech.Id }),
+            "all four evaluation invitations link to the tender popup");
+        var legacyNotificationId = await Read(async d =>
+        {
+            var legacy = new Notification { UserId = fin.Id, Title = "Evaluation invitation", Message = "Previously sent invitation", Link = "/Meetings/Join/" + id, CreatedAt = DateTime.UtcNow };
+            d.Notifications.Add(legacy);
+            await d.SaveChangesAsync();
+            return legacy.Id;
+        });
+        var newStart = DateTimeOffset.UtcNow.AddHours(3);
+        var newEnd = newStart.AddHours(1);
+        using (var officerClient = await Login(officer))
+        {
+            using var popupRequest = new HttpRequestMessage(HttpMethod.Get, "/SourcingOfficer/Workflow/Details/" + id);
+            popupRequest.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var popup = await (await officerClient.SendAsync(popupRequest)).Content.ReadAsStringAsync();
+            var rescheduleForm = Regex.Match(popup, "<form[^>]*RescheduleEvaluation.*?</form>", RegexOptions.Singleline).Value;
+            var token = WebUtility.HtmlDecode(Regex.Match(rescheduleForm, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+            Check(popup.Contains("data-wz-panel=\"6\"") && popup.Contains("Change the meeting time") && token.Length > 0,
+                "the Officer's Committee Evaluation wizard exposes the reschedule form after scheduling");
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/SourcingOfficer/Workflow/RescheduleEvaluation/" + id)
+            {
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["__RequestVerificationToken"] = token, ["startsAt"] = newStart.ToString("O"), ["endsAt"] = newEnd.ToString("O"),
+                    ["reason"] = "A committee member is unavailable at the original time."
+                })
+            };
+            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            using var response = await officerClient.SendAsync(request);
+            Check(response.StatusCode == HttpStatusCode.OK, "the Officer reschedules through the wizard's HTTP endpoint");
+        }
+        var movedSession = await Read(d => d.Set<EvaluationSession>().SingleAsync(s => s.TenderRoundId == roundId));
+        Check(movedSession.StartsAt == newStart.UtcDateTime && movedSession.EndsAt == newEnd.UtcDateTime,
+            "both updated meeting times are persisted");
+        Check(await Read(d => d.Notifications.CountAsync(n => n.Title == "Evaluation meeting rescheduled" && n.Link == popupLink)) == 4,
+            "rescheduling sends four new notifications that link to the tender popup");
+
         // ---- Before the meeting: page access yes, scoring no ----
         using (var member = await Login(fin))
         {
+            using var feed = JsonDocument.Parse(await member.GetStringAsync("/Notifications/Feed"));
+            Check(feed.RootElement.GetProperty("items").EnumerateArray().Single(n => n.GetProperty("id").GetInt32() == legacyNotificationId)
+                .GetProperty("link").GetString() == popupLink, "the notification bell updates a previously sent invitation's destination");
+            var opened = await member.GetAsync("/Notifications/Open/" + legacyNotificationId);
+            Check(opened.StatusCode == HttpStatusCode.Redirect && opened.Headers.Location?.OriginalString == popupLink,
+                "the notifications page opens a previously sent invitation at the same destination");
+            var deepLink = await member.GetAsync(popupLink);
+            var popupIndex = deepLink.Headers.Location?.OriginalString;
+            Check(deepLink.StatusCode == HttpStatusCode.Redirect && popupIndex?.EndsWith("?open=" + id) == true,
+                "the notification opens the workflow list with the tender popup selected");
+            var list = await member.GetStringAsync(popupIndex);
+            Check(list.Contains("id=\"wf-dialog\"") && list.Contains($"data-id=\"{id}\" data-url=\"{popupLink}\""),
+                "the linked list renders the selected tender's dialog entry point");
             var lobby = await member.GetAsync("/Meetings/Join/" + id);
             var lobbyHtml = await lobby.Content.ReadAsStringAsync();
             Check(lobby.StatusCode == HttpStatusCode.OK && lobbyHtml.Contains("Open the evaluation workspace") && !lobbyHtml.Contains("Please come back then"),
-                "the meeting notification opens a useful page before the start time");
+                "the meeting room remains available before the start time");
             var workspace = await member.GetStringAsync("/EvaluationCommittee/Workflow/Meeting/" + id);
             Check(workspace.Contains("Supplier comparison") && workspace.Contains("Alpha Tech"), "before the start the workspace compares the offers");
             Check(workspace.Contains("Approved evaluation model"), "before the start the workspace shows the locked evaluation model");

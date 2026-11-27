@@ -82,8 +82,9 @@ public sealed class NotificationsController(ApplicationDbContext db, UserManager
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        return !string.IsNullOrWhiteSpace(notification.Link) && Url.IsLocalUrl(notification.Link)
-            ? LocalRedirect(notification.Link)
+        var destination = NotificationDto.Destination(notification);
+        return destination is not null && Url.IsLocalUrl(destination)
+            ? LocalRedirect(destination)
             : RedirectToAction(nameof(Index));
     }
     // JSON API for the live notification bell (Views/Shared/_NotificationBell.cshtml, wwwroot/js/notification-bell.js).

@@ -185,7 +185,7 @@ internal static class PresentationDataSeeder
                 await workflow.SubmitEvaluation(tender.Id, scores, Actor(evaluator), signature);
             if (!top)
             {
-                Notify(technical.Id, title, "Three evaluations are submitted. Score and sign to complete this round.", $"/EvaluationCommittee/Workflow/Meeting/{tender.Id}");
+                Notify(technical.Id, title, "Three evaluations are submitted. Score and sign to complete this round.", NotificationDto.EvaluationWorkflowLink(tender.Id));
                 return (tender.Id, tender.Id);
             }
 
