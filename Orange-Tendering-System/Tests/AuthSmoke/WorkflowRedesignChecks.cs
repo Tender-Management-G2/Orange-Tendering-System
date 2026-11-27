@@ -139,6 +139,7 @@ public static class WorkflowRedesignChecks
         }
         var officer = await User("officer", SystemRoles.SourcingOfficer); var admin = await User("admin", SystemRoles.Admin);
         var requester = await User("requester", SystemRoles.RequestingDepartment); var manager = await User("manager", SystemRoles.SourcingManager);
+        Check((await users.AddToRoleAsync(manager, SystemRoles.EvaluationCommittee)).Succeeded, "the manager fixture has both the Sourcing Manager and Evaluation Committee roles");
         var depRep = await User("deprep", SystemRoles.DepartmentRepresentative); var fin = await User("financial", SystemRoles.Finance); var tech = await User("technical", SystemRoles.Technical);
         var outsider = await User("outsider", SystemRoles.Technical);
         var chiefs = new[] { await User("ceo", SystemRoles.ChiefExecutiveOfficer), await User("cfo", SystemRoles.ChiefFinancialOfficer), await User("cto", SystemRoles.ChiefTechnologyOfficer), await User("coo", SystemRoles.ChiefOperationsOfficer) };
@@ -300,8 +301,12 @@ public static class WorkflowRedesignChecks
         using (var creator = await Login(officer))
         {
             var page = await creator.GetStringAsync($"/SourcingOfficer/Workflow?request={prId}");
+            var managerPicker = System.Text.RegularExpressions.Regex.Match(page, """<select\b[^>]*\bid="SourcingManagerId"[^>]*>[\s\S]*?</select>""").Value;
+            Check(managerPicker.Contains($"""value="{manager.Id}" """), "the Officer wizard lists the dual-role manager in the Sourcing Manager seat");
             Check(page.Contains("Select Purchase Request") && page.Contains("Tender Requirements") && page.Contains("Evaluation Committee")
                 && page.Contains("Review &amp; Create") && !page.Contains("Additional technical requirements"), "the Officer list renders the four-step tender wizard");
+            Check(new[] { "CommercialConditions", "DeliveryExpectations", "MandatoryCompliance" }
+                .All(field => !page.Contains($"name=\"{field}\"")), "the Officer wizard omits the three free-text requirements");
             using var arabicRequest = new HttpRequestMessage(HttpMethod.Get, $"/SourcingOfficer/Workflow?request={prId}");
             arabicRequest.Headers.Add("Cookie", "orange-lang=ar");
             using var arabic = await creator.SendAsync(arabicRequest);
@@ -312,8 +317,7 @@ public static class WorkflowRedesignChecks
             var values = new List<KeyValuePair<string, string>>
             {
                 new("PurchaseRequestId", prId.ToString()), new("Title", "Client override"), new("Description", "Client override"),
-                new("TechnicalRequirements", "Client override"), new("CommercialConditions", "Prices in JOD"),
-                new("DeliveryExpectations", "30 days"), new("MandatoryCompliance", "Signed quotation"),
+                new("TechnicalRequirements", "Client override"),
                 new("SourcingManagerId", manager.Id), new("DepartmentRepresentativeId", depRep.Id),
                 new("FinancialRepresentativeId", fin.Id), new("TechnicalRepresentativeId", tech.Id),
                 new("Currency", "JOD"), new("RequiredDocuments", "OfficialQuotation"), new("RequiredDocuments", "ProductDatasheet")
@@ -341,7 +345,7 @@ public static class WorkflowRedesignChecks
                 "the same request cannot create a second tender");
         }
         Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.Title == pr.Title && t.Description == pr.Justification
-            && !t.Requirements!.Contains("TechnicalRequirements"))), "the server derives inherited fields and discards additional technical requirements");
+            && t.Requirements == null)), "the server derives inherited fields and creates the tender without free-text requirements");
         Check(await Read(d => d.TenderItems.Where(i => i.TenderId == id).AllAsync(i => i.CategoryId != null)) && await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.RequiredDocuments == "OfficialQuotation,ProductDatasheet")),
             "tender inherits item categories and stores the required offer documents");
         async Task<string> WeightScreen(ApplicationUser person, string area, bool arabic = false)

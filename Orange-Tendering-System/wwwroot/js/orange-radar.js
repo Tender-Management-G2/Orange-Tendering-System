@@ -1,4 +1,4 @@
-// ORANGE INTELLIGENCE - shared intelligence workspace (Views/Intelligence/Index.cshtml), built on the Orange Radar engine.
+// ORANGE INTELLIGENCE - Sourcing Officer workspace (Views/Intelligence/Index.cshtml), built on the Orange Radar engine.
 // Draws server-calculated data only: every metric, tender and edge comes from /Intelligence/Workspace, already limited
 // to the signed-in user's authorized scope. Four exclusive tabs (overview, suppliers, tenders, studio) replace each
 // other; one page state (filters, selection, tender, replay) is shared by the 3D universe

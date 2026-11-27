@@ -70,7 +70,7 @@ The signed software authenticator checks exercise real server cryptographic veri
 - `Models/Biometric/BiometricModels.cs`, `Data/ApplicationDbContext.cs`, `Program.cs`.
 - `Data/Migrations/20261113192717_UseIdentityPasskeys.cs`, its designer, and `ApplicationDbContextModelSnapshot.cs`.
 - `Areas/Identity/Pages/Account/Login.cshtml` and its model; `PendingApproval.cshtml` and its model; `Register.cshtml`; `_RegistrationSteps.cshtml`.
-- `Views/Biometrics/Fingerprint.cshtml`, `Views/FaceDemo/Index.cshtml`, new `Views/FingerprintDemo/Index.cshtml`, `wwwroot/js/biometric.js`.
+- `Views/Biometrics/Fingerprint.cshtml`, `Views/FaceDemo/Index.cshtml`, new `Views/FingerprintDemo/Index.cshtml`, `wwwroot/js/biometric.js` + `wwwroot/js/biometric-demo.js`.
 - `Tests/AuthSmoke/BiometricChecks.cs`, `Program.cs`, new `FaceCaptureChecks.js`, and this guide.
 
 No push or commit was made. Pre-existing unrelated work was preserved.

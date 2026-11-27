@@ -1,9 +1,9 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
@@ -11,36 +11,57 @@ using Orange_Tendering_System.Services.Biometric;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
+/// <summary>
+/// The supplier's page after email verification: enroll a face or a phone / passkey, then wait for the administrator.
+/// An approved supplier who signed in with a sign-in method goes straight to the supplier workspace.
+/// </summary>
 [Authorize(Roles = SystemRoles.Supplier)]
-public class PendingApprovalModel(UserManager<ApplicationUser> users, ApplicationDbContext db) : PageModel
+public class PendingApprovalModel : PageModel
 {
-    // Face enrollment is available here; a device passkey is optional. Company approval is separate.
-    public int FaceTemplateCount { get; private set; }
-    public int PasskeyCount { get; private set; }
-    public bool JustRegistered { get; private set; }
-    public bool CompanyApproved { get; private set; }
+    private readonly UserManager<ApplicationUser> users;
+    private readonly ApplicationDbContext db;
 
+    public PendingApprovalModel(UserManager<ApplicationUser> users, ApplicationDbContext db)
+    {
+        this.users = users;
+        this.db = db;
+    }
+
+    public int FaceTemplateCount { get; set; }
+    public int PasskeyCount { get; set; }
+    public bool JustRegistered { get; set; }
+    public bool CompanyApproved { get; set; }
+
+    // GET /Identity/Account/PendingApproval (faceRegistered=true right after a face enrollment)
     public async Task<IActionResult> OnGetAsync(bool faceRegistered = false)
     {
-        var user = await users.GetUserAsync(User);
-        if (user?.SupplierId == null || !user.EmailConfirmed) return Forbid();
+        ApplicationUser? user = await users.GetUserAsync(User);
+        if (user == null || user.SupplierId == null || !user.EmailConfirmed)
+        {
+            return Forbid();
+        }
+
         FaceTemplateCount = await db.FaceTemplates.CountAsync(t => t.UserId == user.Id);
         PasskeyCount = (await users.GetPasskeysAsync(user)).Count;
         JustRegistered = faceRegistered && FaceTemplateCount > 0;
-        var status = await db.Suppliers.AsNoTracking()
+
+        SupplierStatus? status = await db.Suppliers.AsNoTracking()
             .Where(s => s.Id == user.SupplierId)
             .Select(s => (SupplierStatus?)s.Status)
             .SingleOrDefaultAsync();
         CompanyApproved = status == SupplierStatus.Approved;
-        var method = User.FindFirstValue(BiometricSignInService.AuthenticationMethodClaim);
-        if (CompanyApproved && method is BiometricSignInService.FaceMethod or BiometricSignInService.PasskeyMethod or BiometricSignInService.PasswordStepMethod)
-            return LocalRedirect("/Supplier");
-        return status switch
-        {
-            SupplierStatus.Pending => Page(),
-            SupplierStatus.Approved => Page(),
-            _ => Forbid()
-        };
-    }
 
+        string? method = User.FindFirstValue(BiometricSignInService.AuthenticationMethodClaim);
+        if (CompanyApproved && BiometricSignInService.IsKnownMethod(method))
+        {
+            return LocalRedirect("/Supplier");
+        }
+
+        // Rejected and Suspended companies cannot use this page.
+        if (status == SupplierStatus.Pending || status == SupplierStatus.Approved)
+        {
+            return Page();
+        }
+        return Forbid();
+    }
 }

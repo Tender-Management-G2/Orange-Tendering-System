@@ -1,6 +1,6 @@
 @model Orange_Tendering_System.Models.Biometric.FaceDemoViewModel
 @*
-    DEVELOPMENT-ONLY face recognition test bench (Controllers/FaceDemoController.cs, wwwroot/js/biometric.js).
+    DEVELOPMENT-ONLY face recognition test bench (Controllers/FaceDemoController.cs, wwwroot/js/biometric.js + biometric-demo.js).
     Uses the real eight-second capture, sample checks and matching threshold; never creates an account or signs anyone in.
 *@
 @{
@@ -42,7 +42,7 @@
                 <dt>Distance</dt><dd id="dbgDistance">—</dd>
                 <dt>Threshold</dt><dd id="dbgThreshold">@Model.Threshold</dd>
             </dl>
-            <small>Distance is the Euclidean distance between 128-number face descriptors: lower means more similar. A match needs at least 70% of the live samples (minimum 3) and the average distance to be at or below the threshold (setting <code>Biometric:FaceMatchThreshold</code>).</small>
+            <small>Distance is the Euclidean distance between 128-number face descriptors: lower means more similar. A match needs at least 60% of the live samples (minimum 3) and the average distance to be at or below the threshold (setting <code>Biometric:FaceMatchThreshold</code>).</small>
         </fieldset>
     </div>
 </section>
@@ -52,4 +52,5 @@
 }
 @section Scripts {
     <script src="~/js/biometric.js" asp-append-version="true"></script>
+    <script src="~/js/biometric-demo.js" asp-append-version="true"></script>
 }

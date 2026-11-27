@@ -19,6 +19,8 @@ if (builder.Environment.IsDevelopment())
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("Default Connection") ?? throw new InvalidOperationException("Connection string 'Default Connection' not found.");
+var presentationData = builder.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("PresentationData:Enabled");
+if (presentationData) PresentationDataSeeder.RequireDatabase(connectionString);
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<Orange_Tendering_System.Services.NotificationPushInterceptor>();
 builder.Services.AddSingleton<NotificationTransactionInterceptor>();
@@ -235,6 +237,8 @@ if (app.Environment.IsDevelopment())
         if (teamAccounts) await TeamAccountSeeder.EnsureAsync(app.Services, startup);
         else startup.LogWarning("Team accounts were NOT provisioned: TeamAccounts:Enabled is false in this run's configuration (environment variable, User Secrets or appsettings). Remove that setting for normal team development.");
         if (app.Configuration.GetValue<bool>("DemoData:Enabled")) await DemoDataSeeder.SeedAsync(app.Services);
+        if (teamAccounts && presentationData)
+            await PresentationDataSeeder.SeedAsync(app.Services, startup);
         // Fictional ORANGE RADAR market; the seeder itself refuses any database not named *_RadarDemo.
         if (teamAccounts && app.Configuration.GetValue<bool>("OrangeRadar:DemoDataset:Enabled"))
             await Orange_Tendering_System.Services.Radar.RadarDemoSeeder.SeedAsync(app.Services, startup);

@@ -1,509 +1,559 @@
-// "Use my phone" for fingerprint / phone sign-in. Needs wwwroot/js/biometric.js (window.OrangeBiometric) first.
+// "Use my phone" for fingerprint / passkey. Needs biometric.js first (postJson, createPasskey, getPasskey, ...).
 // Server side: Controllers/PhonePasskeyController.cs and Services/Biometric/PhoneLink.cs.
-//   - Registration step / device settings (#phoneSetup): a QR code (or emailed link) registers a phone; the page
-//     waits and updates itself. On a smartphone the phone registers itself, no QR code.
-//   - Supplier sign-in, identity step (#btnPasskeyStep, #phoneSignIn): this phone directly, the browser's own
-//     phone prompt where the browser supports it, or a QR code from this site that the phone approves.
-//   - Phone page (#phonePage, /Biometrics/Phone#t=...): opened from the QR code or the email link.
-// Nothing here decides anything: every step is verified on the server, which only issues a session to the
-// computer that started the sign-in after the phone's passkey answer was verified.
-(function () {
-    'use strict';
+//
+// Part 1  Shared QR helpers   showPhoneView(), countdown, asking the server for the QR code status
+// Part 2  Method choice       "Face Recognition" / "Fingerprint / Phone" cards on the enrollment pages
+// Part 3  Computer            register a phone with a QR code (#phoneSetup in Views/Shared/_PhonePasskeySetup.cshtml)
+// Part 4  Phone               the page opened from the QR code: /Biometrics/Phone#t=... (Views/PhonePasskey/Index.cshtml)
+// The Login page's "sign in with my phone" QR code is in supplier-login.js (it uses Part 1).
+//
+// Nothing here decides anything: every step is checked on the server.
 
-    var B = window.OrangeBiometric;
-    if (!B) { return; }
-    var POLL_MS = 2000;
+// =====================================================================================================
+// Part 1: shared QR helpers (one countdown and one status check per page at a time)
+// =====================================================================================================
 
-    function $(id) { return document.getElementById(id); }
-    function show(root, name) {
-        root.querySelectorAll('[data-pp-view]').forEach(function (el) { el.hidden = el.getAttribute('data-pp-view') !== name; });
+var PHONE_STATUS_EVERY_MS = 2000;
+
+// A box contains several views marked data-pp-view="name"; this shows one of them and hides the others.
+function showPhoneView(box, viewName) {
+    var views = box.querySelectorAll('[data-pp-view]');
+    for (var i = 0; i < views.length; i++) {
+        views[i].hidden = views[i].getAttribute('data-pp-view') !== viewName;
     }
-    function clock(seconds) {
-        var s = Math.max(0, seconds | 0);
-        return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
-    }
-    function reducedMotion() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+}
 
-    // Counts down on the page; the server's own expiry is what really counts.
-    function countdown(label, seconds, onZero) {
-        var left = seconds;
-        var timer = window.setInterval(tick, 1000);
-        function tick() {
-            left -= 1;
-            if (label) { label.textContent = clock(left); }
-            if (left <= 0) { window.clearInterval(timer); if (onZero) { onZero(); } }
+// 75 -> "1:15"
+function formatMinutesSeconds(totalSeconds) {
+    var seconds = Math.max(0, Math.floor(totalSeconds));
+    var minutes = Math.floor(seconds / 60);
+    var rest = seconds % 60;
+    if (rest < 10) {
+        return minutes + ':0' + rest;
+    }
+    return minutes + ':' + rest;
+}
+
+// ---- The countdown on the page (the server's own expiry is what really counts) ----
+
+var phoneCountdownTimer = null;
+var phoneCountdownSeconds = 0;
+var phoneCountdownLabel = null;
+var phoneCountdownFinished = null;
+
+function startPhoneCountdown(label, seconds, onFinished) {
+    stopPhoneCountdown();
+    phoneCountdownLabel = label;
+    phoneCountdownSeconds = seconds;
+    phoneCountdownFinished = onFinished;
+    if (label) {
+        label.textContent = formatMinutesSeconds(seconds);
+    }
+    phoneCountdownTimer = setInterval(phoneCountdownTick, 1000);
+}
+
+function phoneCountdownTick() {
+    phoneCountdownSeconds = phoneCountdownSeconds - 1;
+    if (phoneCountdownLabel) {
+        phoneCountdownLabel.textContent = formatMinutesSeconds(phoneCountdownSeconds);
+    }
+    if (phoneCountdownSeconds <= 0) {
+        stopPhoneCountdown();
+        if (phoneCountdownFinished) {
+            phoneCountdownFinished();
         }
-        if (label) { label.textContent = clock(left); }
-        return {
-            stop: function () { window.clearInterval(timer); },
-            sync: function (serverSeconds) { if (typeof serverSeconds === 'number' && Math.abs(serverSeconds - left) > 3) { left = serverSeconds; } }
-        };
     }
+}
 
-    // Asks the server how this computer's QR code is doing until onStatus returns false.
-    function watch(onStatus) {
-        var stopped = false;
-        var timer = null;
-        async function tick() {
-            if (stopped) { return; }
-            try {
-                var response = await fetch('/Biometrics/Phone/Status', { credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'application/json' } });
-                var data = await response.json();
-                if (!stopped && onStatus(data) === false) { stopped = true; }
-            } catch (e) { /* a network hiccup: try again until the code expires */ }
-            if (!stopped) { timer = window.setTimeout(tick, POLL_MS); }
+// The server sends the real seconds left with every status answer; a difference of more than 3 seconds is corrected.
+function correctPhoneCountdown(serverSeconds) {
+    if (typeof serverSeconds === 'number' && Math.abs(serverSeconds - phoneCountdownSeconds) > 3) {
+        phoneCountdownSeconds = serverSeconds;
+    }
+}
+
+function stopPhoneCountdown() {
+    if (phoneCountdownTimer !== null) {
+        clearInterval(phoneCountdownTimer);
+        phoneCountdownTimer = null;
+    }
+}
+
+// ---- Asking the server every 2 seconds how this computer's QR code is doing ----
+
+var phoneStatusTimer = null;
+var phoneStatusHandler = null;   // a function(data) that returns true to keep asking, false to stop
+
+function startWatchingPhoneLink(handler) {
+    stopWatchingPhoneLink();
+    phoneStatusHandler = handler;
+    phoneStatusTimer = setTimeout(askPhoneLinkStatus, PHONE_STATUS_EVERY_MS);
+}
+
+async function askPhoneLinkStatus() {
+    if (phoneStatusHandler === null) {
+        return;
+    }
+    var keepAsking = true;
+    try {
+        var response = await fetch('/Biometrics/Phone/Status', { credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        var data = await response.json();
+        if (phoneStatusHandler !== null) {
+            correctPhoneCountdown(data.expiresIn);
+            keepAsking = phoneStatusHandler(data);
         }
-        timer = window.setTimeout(tick, POLL_MS);
-        return function () { stopped = true; window.clearTimeout(timer); };
+    } catch (e) {
+        // A network hiccup: simply ask again (the code expires by itself anyway).
     }
 
-    function cancelOnServer() {
-        return B.post('/Biometrics/Phone/Cancel').catch(function () { /* the code also expires by itself */ });
+    if (keepAsking === false) {
+        stopWatchingPhoneLink();
+    } else if (phoneStatusHandler !== null) {
+        phoneStatusTimer = setTimeout(askPhoneLinkStatus, PHONE_STATUS_EVERY_MS);
     }
+}
 
-    // ---------- Registration step: choose Face Recognition or Fingerprint / Phone ----------
+function stopWatchingPhoneLink() {
+    phoneStatusHandler = null;
+    if (phoneStatusTimer !== null) {
+        clearTimeout(phoneStatusTimer);
+        phoneStatusTimer = null;
+    }
+}
 
-    function initMethodChoice() {
-        var choices = Array.prototype.slice.call(document.querySelectorAll('[data-method-choice]'));
-        choices.forEach(function (choice) {
-            choice.addEventListener('click', function () {
-                choices.forEach(function (other) {
-                    var selected = other === choice;
-                    other.setAttribute('aria-pressed', selected ? 'true' : 'false');
-                    var card = $(other.getAttribute('data-method-choice'));
-                    if (card) { card.hidden = !selected; }
-                });
-            });
+function isWatchingPhoneLink() {
+    return phoneStatusHandler !== null;
+}
+
+// Ends this computer's QR code on the server (it also expires by itself, so errors are ignored).
+function cancelPhoneLink() {
+    postJson('/Biometrics/Phone/Cancel', {}).catch(function () { });
+}
+
+// =====================================================================================================
+// Part 2: choose Face Recognition or Fingerprint / Phone (enrollment pages)
+// =====================================================================================================
+
+function setUpMethodChoice() {
+    var choices = document.querySelectorAll('[data-method-choice]');
+    for (var i = 0; i < choices.length; i++) {
+        choices[i].addEventListener('click', function (event) {
+            chooseEnrollmentMethod(event.currentTarget);
         });
     }
+}
 
-    // ---------- Computer: register a phone with a QR code ----------
-
-    function initEnrollment() {
-        var root = $('phoneSetup');
-        if (!root) { return; }
-        var page = B.page || { setStatus: function () { }, announce: function () { } };
-        var qrButton = $('btnPhoneQr');
-        var deviceButton = $('btnPasskeyRegister');
-        var deviceNote = $('ppDeviceNote');
-        var emailButton = $('btnPhoneEmail');
-        var emailNote = $('ppEmailNote');
-        var waitText = $('ppWaitText');
-        var stopWatch = null;
-        var timer = null;
-
-        // On a smartphone "this device" is the phone: it registers itself and no QR code is needed.
-        // On a computer the QR code is the main way; the computer's own fingerprint reader is offered when it has one.
-        (async function () {
-            var platform = await B.platformAuthenticator();
-            if (B.isMobile()) {
-                root.setAttribute('data-mode', 'phone');
-                if (qrButton) { qrButton.hidden = true; }
-                if (deviceButton) {
-                    deviceButton.hidden = false;
-                    deviceButton.className = 'pp-btn pp-btn--primary';
-                    deviceButton.textContent = 'Register this phone';
-                }
-                if (deviceNote) {
-                    deviceNote.textContent = platform === false
-                        ? 'This phone has no screen lock set up for passkeys. Turn on a screen lock or fingerprint, then try again.'
-                        : 'Your phone asks for its fingerprint, face unlock or screen lock.';
-                }
-            } else if (deviceButton) {
-                deviceButton.hidden = platform !== true;
-            }
-        })();
-
-        function ended(message) {
-            stop();
-            $('ppEndedText').textContent = message;
-            show(root, 'ended');
-            page.announce('failed', { method: 'passkey' });
+// Marks the clicked choice as selected and shows only its card.
+function chooseEnrollmentMethod(selectedChoice) {
+    var choices = document.querySelectorAll('[data-method-choice]');
+    for (var i = 0; i < choices.length; i++) {
+        var selected = choices[i] === selectedChoice;
+        choices[i].setAttribute('aria-pressed', String(selected));
+        var card = document.getElementById(choices[i].getAttribute('data-method-choice'));
+        if (card) {
+            card.hidden = !selected;
         }
+    }
+}
 
-        function stop() {
-            if (stopWatch) { stopWatch(); stopWatch = null; }
-            if (timer) { timer.stop(); timer = null; }
-        }
+// =====================================================================================================
+// Part 3: computer - register a phone with a QR code (#phoneSetup)
+// =====================================================================================================
 
-        function onStatus(data) {
-            if (timer) { timer.sync(data.expiresIn); }
-            switch (data.status) {
-                case 'waiting':
-                    waitText.textContent = 'Waiting for your phone…';
-                    return true;
-                case 'opened':
-                case 'verifying':
-                    waitText.textContent = 'Your phone opened the link' + (data.device ? ' (' + data.device + ')' : '') + '. Confirm on the phone.';
-                    return true;
-                case 'completed':
-                    stop();
-                    $('ppDevice').textContent = data.device || 'Your phone';
-                    show(root, 'done');
-                    page.setStatus('Phone registered. You can now sign in with it.', 'success');
-                    page.announce('confirmed', { method: 'passkey' });
-                    // Show the server's own confirmation once the Identity Station has finished its sequence.
-                    window.setTimeout(function () { window.location.reload(); }, reducedMotion() ? 600 : 1900);
-                    return false;
-                case 'expired':
-                    ended('This QR code expired before a phone was registered. Create a new one to try again.');
-                    return false;
-                case 'cancelled':
-                    ended('The setup was cancelled on the phone.');
-                    return false;
-                case 'failed':
-                    ended('The phone could not be registered after several tries. Create a new QR code to try again.');
-                    return false;
-                default:
-                    ended('This QR code is no longer active. Create a new one to try again.');
-                    return false;
-            }
-        }
-
-        async function start() {
-            var passwordInput = $('bioPassword');
-            var password = passwordInput ? passwordInput.value : '';
-            if (!password) {
-                page.setStatus('Enter your current password to continue.', 'danger');
-                if (passwordInput) { passwordInput.focus(); }
-                return;
-            }
-            stop();
-            page.setStatus('');
-            [qrButton, $('btnPhoneRetry')].forEach(function (b) { if (b) { b.disabled = true; } });
-            try {
-                var data = await B.post('/Biometrics/Phone/EnrollStart', { password: password });
-                $('ppQr').src = data.qr;
-                emailButton.hidden = !data.email;
-                emailButton.disabled = false;
-                emailNote.textContent = '';
-                waitText.textContent = 'Waiting for your phone…';
-                show(root, 'qr');
-                page.announce('requesting', { method: 'passkey' });
-                timer = countdown($('ppTimer'), data.expiresIn, function () {
-                    ended('This QR code expired before a phone was registered. Create a new one to try again.');
-                });
-                stopWatch = watch(onStatus);
-            } catch (e) {
-                page.setStatus(e.message, 'danger');
-            } finally {
-                [qrButton, $('btnPhoneRetry')].forEach(function (b) { if (b) { b.disabled = false; } });
-            }
-        }
-
-        if (qrButton) { qrButton.addEventListener('click', start); }
-        var retry = $('btnPhoneRetry');
-        if (retry) { retry.addEventListener('click', start); }
-
-        $('btnPhoneCancel').addEventListener('click', function () {
-            stop();
-            cancelOnServer();
-            show(root, 'start');
-            page.setStatus('');
-            page.announce('cancelled', { method: 'passkey' });
-        });
-
-        emailButton.addEventListener('click', async function () {
-            emailButton.disabled = true;
-            emailNote.textContent = 'Sending…';
-            try {
-                var data = await B.post('/Biometrics/Phone/EnrollEmail');
-                emailNote.textContent = 'Sent to ' + data.to + '. Open the email on your phone and tap the link.';
-                // One message is enough for a while; the button comes back if it did not arrive.
-                window.setTimeout(function () { emailButton.disabled = false; }, 30000);
-            } catch (e) {
-                emailNote.textContent = e.message;
-                emailButton.disabled = false;
-            }
-        });
-
-        window.addEventListener('pagehide', stop);
+async function setUpPhoneEnrollment() {
+    var box = document.getElementById('phoneSetup');
+    if (!box) {
+        return;
     }
 
-    // ---------- Computer: sign in with my phone (supplier identity step on the Login page) ----------
+    document.getElementById('btnPhoneQr').addEventListener('click', startPhoneEnrollment);
+    document.getElementById('btnPhoneRetry').addEventListener('click', startPhoneEnrollment);
+    document.getElementById('btnPhoneCancel').addEventListener('click', cancelPhoneEnrollment);
+    document.getElementById('btnPhoneEmail').addEventListener('click', emailPhoneEnrollmentLink);
+    window.addEventListener('pagehide', stopPhoneEnrollmentTimers);
 
-    function initSignIn() {
-        var tile = $('btnPasskeyStep');
-        var panel = $('phoneSignIn');
-        if (!tile || !panel) { return; }
-        var offer = $('phoneQrOffer');
-        var waitText = $('ppLoginWait');
-        var stopWatch = null;
-        var timer = null;
-        var mobile = B.isMobile();
-        if (offer && mobile) { offer.remove(); offer = null; }
-        // Known before the supplier clicks, so the click decides at once (no late prompt over a QR code already shown).
-        var hybrid = null;
-        B.hybridSupported().then(function (value) { hybrid = value; });
-
-        function page() { return B.page; }
-
-        function stop() {
-            if (stopWatch) { stopWatch(); stopWatch = null; }
-            if (timer) { timer.stop(); timer = null; }
+    // On a smartphone "this device" is the phone: it registers itself, no QR code is needed.
+    // On a computer the QR code is the main way; the computer's own fingerprint reader is offered when it has one.
+    var qrButton = document.getElementById('btnPhoneQr');
+    var deviceButton = document.getElementById('btnPasskeyRegister');
+    var deviceNote = document.getElementById('ppDeviceNote');
+    var hasOwnReader = await hasDeviceAuthenticator();
+    if (isMobileDevice()) {
+        box.setAttribute('data-mode', 'phone');
+        qrButton.hidden = true;
+        deviceButton.hidden = false;
+        deviceButton.className = 'pp-btn pp-btn--primary';
+        deviceButton.textContent = 'Register this phone';
+        if (hasOwnReader === false) {
+            deviceNote.textContent = 'This phone has no screen lock set up for passkeys. Turn on a screen lock or fingerprint, then try again.';
+        } else {
+            deviceNote.textContent = 'Your phone asks for its fingerprint, face unlock or screen lock.';
         }
-
-        function ended(message) {
-            stop();
-            $('ppLoginEnded').textContent = message;
-            show(panel, 'ended');
-            page().announce('failed', { method: 'passkey' });
-        }
-
-        function close() {
-            stop();
-            panel.hidden = true;
-            if (offer) { offer.hidden = false; }
-        }
-
-        function onStatus(data) {
-            if (timer) { timer.sync(data.expiresIn); }
-            switch (data.status) {
-                case 'waiting':
-                    waitText.textContent = 'Waiting for your phone…';
-                    return true;
-                case 'opened':
-                case 'verifying':
-                    waitText.textContent = 'Your phone opened the code' + (data.device ? ' (' + data.device + ')' : '') + '. Type the number and confirm on the phone.';
-                    return true;
-                case 'approved':
-                    stop();
-                    waitText.textContent = 'Approved on your phone. Signing in…';
-                    // The server signs in only this browser, inside its own password step, and checks the account again.
-                    page().guarded(function () {
-                        return B.post('/Biometrics/Phone/SignInComplete', { returnUrl: page().returnUrl });
-                    }, 'Signed in.', 'passkey');
-                    return false;
-                case 'denied':
-                    ended('The sign-in was declined on your phone. Nobody was signed in.');
-                    return false;
-                case 'expired':
-                    ended('This QR code expired. Create a new one to try again.');
-                    return false;
-                case 'failed':
-                    ended('Too many failed attempts on the phone. Create a new QR code to try again.');
-                    return false;
-                default:
-                    ended('This sign-in step is no longer active. Create a new QR code, or enter your password again.');
-                    return false;
-            }
-        }
-
-        // fallback: when no phone link can be made here (409: no public address), use the browser's own prompt instead.
-        async function startQr(fallback) {
-            stop();
-            panel.hidden = false;
-            if (offer) { offer.hidden = true; }
-            show(panel, 'loading');
-            page().setStatus('');
-            try {
-                var data = await B.post('/Biometrics/Phone/SignInStart');
-                $('ppLoginQr').src = data.qr;
-                $('ppLoginCode').textContent = data.code;
-                waitText.textContent = 'Waiting for your phone…';
-                show(panel, 'qr');
-                page().announce('requesting', { method: 'passkey' });
-                timer = countdown($('ppLoginTimer'), data.expiresIn, function () { ended('This QR code expired. Create a new one to try again.'); });
-                stopWatch = watch(onStatus);
-            } catch (e) {
-                close();
-                if (fallback === true && e.status === 409) { standard(['client-device', 'hybrid']); return; }
-                page().setStatus(e.message, 'danger');
-                if (e.restart) { page().announce('restart', { method: 'passkey', message: e.message }); }
-            }
-        }
-
-        // The browser's own passkey prompt: this device, or a phone through the browser's QR code (Bluetooth).
-        function standard(hints) {
-            close();
-            page().setStatus('Touch your fingerprint reader when your device asks.');
-            page().announce('requesting', { method: 'passkey' });
-            return page().guarded(function () { return B.passkeyLogin(page().returnUrl, null, hints); }, 'Signed in.', 'passkey');
-        }
-
-        tile.addEventListener('click', function () {
-            if (tile.disabled || !B.page) { return; }
-            if (mobile) { standard(['client-device']); return; }
-            // On a computer: its own fingerprint reader (Windows Hello / Touch ID) first. A phone registered on the
-            // public address answers through this site's QR code instead (the link shown below the form).
-            standard(hybrid === true ? ['client-device', 'hybrid'] : ['client-device']);
-        });
-
-        var qrLogin = $('btnPhoneQrLogin');
-        if (qrLogin) { qrLogin.addEventListener('click', function () { startQr(); }); }
-        $('btnPhoneLoginRetry').addEventListener('click', function () { startQr(); });
-        $('btnPhoneLoginCancel').addEventListener('click', function () {
-            close();
-            cancelOnServer();
-            page().setStatus('');
-            page().announce('cancelled', { method: 'passkey' });
-        });
-
-        // Leaving the identity step ("Use a different account", expiry) ends the QR code too.
-        var shell = $('authStudio');
-        if (shell) {
-            shell.addEventListener('authstudio:step', function (event) {
-                if (event.detail && event.detail.step === 'credentials' && (stopWatch || !panel.hidden)) {
-                    close();
-                    cancelOnServer();
-                }
-                if (event.detail && event.detail.step === 'biometric' && offer) { offer.hidden = !event.detail.passkey; }
-            });
-        }
-        window.addEventListener('pagehide', stop);
-    }
-
-    // ---------- Phone page (/Biometrics/Phone#t=...) ----------
-
-    function initPhonePage() {
-        var root = $('phonePage');
-        if (!root) { return; }
-        var token = new URLSearchParams(window.location.hash.slice(1)).get('t');
-        // A new QR code opened in the same tab changes only the fragment: start again with the new code.
-        window.addEventListener('hashchange', function () { window.location.reload(); });
-        var message = $('ppMessage');
-        var timer = null;
-
-        function say(text, kind) {
-            message.textContent = text || '';
-            message.className = 'pp-message' + (kind ? ' pp-message--' + kind : '');
-        }
-
-        function finish(view, title, text) {
-            if (timer) { timer.stop(); }
-            var expires = root.querySelector('.pp-expires');
-            if (expires) { expires.hidden = true; }
-            $(view === 'done' ? 'ppDoneTitle' : 'ppEndTitle').textContent = title;
-            $(view === 'done' ? 'ppDoneText' : 'ppEndText').textContent = text;
-            say('');
-            show(root, view);
-        }
-
-        function busy(on) {
-            root.querySelectorAll('button').forEach(function (b) { b.disabled = on; });
-        }
-
-        async function deny(title, text) {
-            busy(true);
-            try { await B.post('/Biometrics/Phone/Deny', { token: token }); } catch (e) { /* the code expires anyway */ }
-            busy(false);
-            finish('ended', title, text);
-        }
-
-        async function enroll() {
-            var options = null;
-            async function load() { options = await B.post('/Biometrics/Phone/EnrollOptions', { token: token }); }
-            try { await load(); } catch (e) { finish('ended', 'This code cannot be used', e.message); return; }
-            show(root, 'enroll');
-
-            $('btnPhoneEnroll').addEventListener('click', async function () {
-                busy(true);
-                say('Confirm with your fingerprint, face or screen lock when your phone asks.');
-                try {
-                    if (!options) { await load(); }
-                    var current = options;
-                    options = null; // each challenge answers once
-                    var credential = await B.webauthnCreate(current, ['client-device']);
-                    say('Checking…');
-                    var result = await B.post('/Biometrics/Phone/EnrollFinish', { token: token, credentialJson: credential });
-                    finish('done', 'This phone is registered',
-                        (result.device ? result.device + ' can now be used to sign in. ' : '') + 'You can close this page: your computer updates by itself.');
-                } catch (e) {
-                    if (e.restart) { finish('ended', 'This code cannot be used', e.message); return; }
-                    say(e.message, e.code === 'cancelled' ? null : 'danger');
-                    load().catch(function () { });
-                } finally {
-                    busy(false);
-                }
-            });
-            $('btnPhoneEnrollCancel').addEventListener('click', function () {
-                deny('Setup cancelled', 'No device was added to your account. You can close this page.');
-            });
-        }
-
-        function signIn(info) {
-            var options = null;
-            $('ppRequestedFrom').textContent = (info.requestedFrom || 'A computer') + ' · ' +
-                new Date(info.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Amman' });
-            show(root, 'signin');
-            var input = $('ppCode');
-            input.focus();
-
-            $('ppCodeForm').addEventListener('submit', async function (event) {
-                event.preventDefault();
-                var code = (input.value || '').replace(/\D/g, '');
-                if (code.length !== 2) { say('Type the two-digit number shown on your computer.', 'danger'); return; }
-                busy(true);
-                say('');
-                try {
-                    options = await B.post('/Biometrics/Phone/SignInOptions', { token: token, code: code });
-                    show(root, 'approve');
-                } catch (e) {
-                    if (e.restart) { finish('ended', 'Sign-in not approved', e.message); return; }
-                    say(e.message, 'danger');
-                    input.select();
-                } finally {
-                    busy(false);
-                }
-            });
-
-            $('btnPhoneApprove').addEventListener('click', async function () {
-                busy(true);
-                say('Confirm with your fingerprint, face or screen lock when your phone asks.');
-                try {
-                    if (!options) { options = await B.post('/Biometrics/Phone/SignInOptions', { token: token, code: (input.value || '').replace(/\D/g, '') }); }
-                    var current = options;
-                    options = null;
-                    var credential = await B.webauthnGet(current, ['client-device']);
-                    say('Checking…');
-                    await B.post('/Biometrics/Phone/SignInApprove', { token: token, credentialJson: credential });
-                    finish('done', 'Sign-in approved', 'Return to your computer: it continues by itself. You can close this page.');
-                } catch (e) {
-                    if (e.restart) { finish('ended', 'Sign-in not approved', e.message); return; }
-                    say(e.message, e.code === 'cancelled' ? null : 'danger');
-                } finally {
-                    busy(false);
-                }
-            });
-
-            root.querySelectorAll('[data-pp-deny]').forEach(function (button) {
-                button.addEventListener('click', function () {
-                    deny('Sign-in declined', 'Nobody was signed in. If you did not try to sign in, change your password.');
-                });
-            });
-        }
-
-        (async function () {
-            if (!token) {
-                finish('ended', 'Link incomplete', 'Scan the QR code on your computer again, or open the link from the email.');
-                return;
-            }
-            var info;
-            try {
-                info = await B.post('/Biometrics/Phone/Info', { token: token });
-            } catch (e) {
-                finish('ended', 'This code cannot be used', e.message);
-                return;
-            }
-            root.querySelectorAll('[data-pp-name]').forEach(function (el) { el.textContent = info.name || info.account; });
-            root.querySelectorAll('[data-pp-account]').forEach(function (el) { el.textContent = info.account; });
-            timer = countdown($('ppExpires'), info.expiresIn, function () {
-                finish('ended', 'Code expired', 'Create a new QR code on your computer and scan it again.');
-            });
-            if (info.kind === 'enroll') { await enroll(); } else { signIn(info); }
-        })();
-    }
-
-    function start() {
-        initMethodChoice();
-        initEnrollment();
-        initSignIn();
-        initPhonePage();
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start);
     } else {
-        start();
+        deviceButton.hidden = hasOwnReader !== true;
     }
-})();
+}
+
+async function startPhoneEnrollment() {
+    var box = document.getElementById('phoneSetup');
+    var passwordInput = document.getElementById('bioPassword');
+    var password = enrollmentPassword();
+    if (!password) {
+        showBiometricStatus('Enter your current password to continue.', 'danger');
+        if (passwordInput) {
+            passwordInput.focus();
+        }
+        return;
+    }
+
+    stopPhoneEnrollmentTimers();
+    showBiometricStatus('');
+    var qrButton = document.getElementById('btnPhoneQr');
+    var retryButton = document.getElementById('btnPhoneRetry');
+    qrButton.disabled = true;
+    retryButton.disabled = true;
+    try {
+        // The server checks the password, then creates the QR code (PhonePasskeyController.EnrollStart).
+        var data = await postJson('/Biometrics/Phone/EnrollStart', { password: password });
+        document.getElementById('ppQr').src = data.qr;
+
+        var emailButton = document.getElementById('btnPhoneEmail');
+        emailButton.hidden = !data.email;
+        emailButton.disabled = false;
+        document.getElementById('ppEmailNote').textContent = '';
+        document.getElementById('ppWaitText').textContent = 'Waiting for your phone…';
+        showPhoneView(box, 'qr');
+        tellIllustration('authstudio:face', { state: 'requesting', method: 'passkey' });
+
+        startPhoneCountdown(document.getElementById('ppTimer'), data.expiresIn, function () {
+            endPhoneEnrollment('This QR code expired before a phone was registered. Create a new one to try again.');
+        });
+        startWatchingPhoneLink(phoneEnrollmentStatusChanged);
+    } catch (error) {
+        showBiometricStatus(error.message, 'danger');
+    } finally {
+        qrButton.disabled = false;
+        retryButton.disabled = false;
+    }
+}
+
+// Called every 2 seconds with the server's answer. Returns true to keep asking.
+function phoneEnrollmentStatusChanged(data) {
+    var waitText = document.getElementById('ppWaitText');
+    if (data.status === 'waiting') {
+        waitText.textContent = 'Waiting for your phone…';
+        return true;
+    }
+    if (data.status === 'opened' || data.status === 'verifying') {
+        var device = '';
+        if (data.device) {
+            device = ' (' + data.device + ')';
+        }
+        waitText.textContent = 'Your phone opened the link' + device + '. Confirm on the phone.';
+        return true;
+    }
+    if (data.status === 'completed') {
+        stopPhoneEnrollmentTimers();
+        document.getElementById('ppDevice').textContent = data.device || 'Your phone';
+        showPhoneView(document.getElementById('phoneSetup'), 'done');
+        showBiometricStatus('Phone registered. You can now sign in with it.', 'success');
+        tellIllustration('authstudio:face', { state: 'confirmed', method: 'passkey' });
+        // Show the server's own confirmation once the illustration has finished.
+        var delay = 1900;
+        if (prefersReducedMotion()) {
+            delay = 600;
+        }
+        setTimeout(function () { window.location.reload(); }, delay);
+        return false;
+    }
+    if (data.status === 'expired') {
+        endPhoneEnrollment('This QR code expired before a phone was registered. Create a new one to try again.');
+    } else if (data.status === 'cancelled') {
+        endPhoneEnrollment('The setup was cancelled on the phone.');
+    } else if (data.status === 'failed') {
+        endPhoneEnrollment('The phone could not be registered after several tries. Create a new QR code to try again.');
+    } else {
+        endPhoneEnrollment('This QR code is no longer active. Create a new one to try again.');
+    }
+    return false;
+}
+
+function endPhoneEnrollment(message) {
+    stopPhoneEnrollmentTimers();
+    document.getElementById('ppEndedText').textContent = message;
+    showPhoneView(document.getElementById('phoneSetup'), 'ended');
+    tellIllustration('authstudio:face', { state: 'failed', method: 'passkey' });
+}
+
+function cancelPhoneEnrollment() {
+    stopPhoneEnrollmentTimers();
+    cancelPhoneLink();
+    showPhoneView(document.getElementById('phoneSetup'), 'start');
+    showBiometricStatus('');
+    tellIllustration('authstudio:face', { state: 'cancelled', method: 'passkey' });
+}
+
+function stopPhoneEnrollmentTimers() {
+    stopWatchingPhoneLink();
+    stopPhoneCountdown();
+}
+
+// The same setup as a link in the account's verified mailbox.
+async function emailPhoneEnrollmentLink() {
+    var emailButton = document.getElementById('btnPhoneEmail');
+    var emailNote = document.getElementById('ppEmailNote');
+    emailButton.disabled = true;
+    emailNote.textContent = 'Sending…';
+    try {
+        var data = await postJson('/Biometrics/Phone/EnrollEmail', {});
+        emailNote.textContent = 'Sent to ' + data.to + '. Open the email on your phone and tap the link.';
+        // One message is enough for a while; the button comes back after 30 seconds.
+        setTimeout(function () { emailButton.disabled = false; }, 30000);
+    } catch (error) {
+        emailNote.textContent = error.message;
+        emailButton.disabled = false;
+    }
+}
+
+// =====================================================================================================
+// Part 4: the phone page (/Biometrics/Phone#t=...)
+// =====================================================================================================
+
+var phoneToken = null;            // from the address after "#t=" (never sent to the server in the address)
+var phoneWebAuthnOptions = null;  // the options of the next WebAuthn step (each one can be used once)
+
+// A message under the buttons. kind: null (normal) or 'danger'.
+function sayOnPhone(text, kind) {
+    var message = document.getElementById('ppMessage');
+    message.textContent = text || '';
+    message.className = 'pp-message';
+    if (kind) {
+        message.className = 'pp-message pp-message--' + kind;
+    }
+}
+
+// Shows the final screen: view 'done' (success) or 'ended' (the code cannot be used).
+function finishOnPhone(view, title, text) {
+    stopPhoneCountdown();
+    var expires = document.querySelector('#phonePage .pp-expires');
+    if (expires) {
+        expires.hidden = true;
+    }
+    if (view === 'done') {
+        document.getElementById('ppDoneTitle').textContent = title;
+        document.getElementById('ppDoneText').textContent = text;
+    } else {
+        document.getElementById('ppEndTitle').textContent = title;
+        document.getElementById('ppEndText').textContent = text;
+    }
+    sayOnPhone('');
+    showPhoneView(document.getElementById('phonePage'), view);
+}
+
+function setPhoneButtonsDisabled(disabled) {
+    var buttons = document.querySelectorAll('#phonePage button');
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].disabled = disabled;
+    }
+}
+
+async function setUpPhonePage() {
+    var page = document.getElementById('phonePage');
+    if (!page) {
+        return;
+    }
+
+    phoneToken = new URLSearchParams(window.location.hash.substring(1)).get('t');
+    // A new QR code opened in the same tab changes only the "#..." part: start again with the new code.
+    window.addEventListener('hashchange', function () { window.location.reload(); });
+
+    if (!phoneToken) {
+        finishOnPhone('ended', 'Link incomplete', 'Scan the QR code on your computer again, or open the link from the email.');
+        return;
+    }
+
+    // 1. Ask the server what this code is for (it also marks the code as opened).
+    var info;
+    try {
+        info = await postJson('/Biometrics/Phone/Info', { token: phoneToken });
+    } catch (error) {
+        finishOnPhone('ended', 'This code cannot be used', error.message);
+        return;
+    }
+
+    var nameFields = page.querySelectorAll('[data-pp-name]');
+    for (var i = 0; i < nameFields.length; i++) {
+        nameFields[i].textContent = info.name || info.account;
+    }
+    var accountFields = page.querySelectorAll('[data-pp-account]');
+    for (var j = 0; j < accountFields.length; j++) {
+        accountFields[j].textContent = info.account;
+    }
+    startPhoneCountdown(document.getElementById('ppExpires'), info.expiresIn, function () {
+        finishOnPhone('ended', 'Code expired', 'Create a new QR code on your computer and scan it again.');
+    });
+
+    // 2. Register this phone, or approve a sign-in.
+    if (info.kind === 'enroll') {
+        await showPhoneEnrollment();
+    } else {
+        showPhoneSignIn(info);
+    }
+}
+
+// ---- Register this phone ----
+
+async function loadPhoneEnrollOptions() {
+    phoneWebAuthnOptions = await postJson('/Biometrics/Phone/EnrollOptions', { token: phoneToken });
+}
+
+async function showPhoneEnrollment() {
+    try {
+        await loadPhoneEnrollOptions();
+    } catch (error) {
+        finishOnPhone('ended', 'This code cannot be used', error.message);
+        return;
+    }
+    showPhoneView(document.getElementById('phonePage'), 'enroll');
+    document.getElementById('btnPhoneEnroll').addEventListener('click', registerThisPhone);
+    document.getElementById('btnPhoneEnrollCancel').addEventListener('click', function () {
+        denyOnPhone('Setup cancelled', 'No device was added to your account. You can close this page.');
+    });
+}
+
+async function registerThisPhone() {
+    setPhoneButtonsDisabled(true);
+    sayOnPhone('Confirm with your fingerprint, face or screen lock when your phone asks.');
+    try {
+        if (phoneWebAuthnOptions === null) {
+            await loadPhoneEnrollOptions();
+        }
+        var options = phoneWebAuthnOptions;
+        phoneWebAuthnOptions = null; // each challenge can be answered once
+        var credentialJson = await createPasskey(options, ['client-device']);
+        sayOnPhone('Checking…');
+        var result = await postJson('/Biometrics/Phone/EnrollFinish', { token: phoneToken, credentialJson: credentialJson });
+
+        var deviceText = '';
+        if (result.device) {
+            deviceText = result.device + ' can now be used to sign in. ';
+        }
+        finishOnPhone('done', 'This phone is registered', deviceText + 'You can close this page: your computer updates by itself.');
+    } catch (error) {
+        if (error.restart) {
+            finishOnPhone('ended', 'This code cannot be used', error.message);
+            return;
+        }
+        if (error.code === 'cancelled') {
+            sayOnPhone(error.message, null);
+        } else {
+            sayOnPhone(error.message, 'danger');
+        }
+        // Prepare a fresh challenge for the next try.
+        loadPhoneEnrollOptions().catch(function () { });
+    } finally {
+        setPhoneButtonsDisabled(false);
+    }
+}
+
+// ---- Approve a sign-in on the computer ----
+
+function showPhoneSignIn(info) {
+    var time = new Date(info.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Amman' });
+    document.getElementById('ppRequestedFrom').textContent = (info.requestedFrom || 'A computer') + ' · ' + time;
+    showPhoneView(document.getElementById('phonePage'), 'signin');
+    document.getElementById('ppCode').focus();
+
+    document.getElementById('ppCodeForm').addEventListener('submit', function (event) {
+        event.preventDefault(); // checked with JavaScript, the form is not sent
+        checkNumberOnPhone();
+    });
+    document.getElementById('btnPhoneApprove').addEventListener('click', approveSignInOnPhone);
+
+    var denyButtons = document.querySelectorAll('[data-pp-deny]');
+    for (var i = 0; i < denyButtons.length; i++) {
+        denyButtons[i].addEventListener('click', function () {
+            denyOnPhone('Sign-in declined', 'Nobody was signed in. If you did not try to sign in, change your password.');
+        });
+    }
+}
+
+// Only the digits the person typed.
+function typedPhoneCode() {
+    return (document.getElementById('ppCode').value || '').replace(/\D/g, '');
+}
+
+// Step 1: the two-digit number shown on the computer.
+async function checkNumberOnPhone() {
+    var code = typedPhoneCode();
+    if (code.length !== 2) {
+        sayOnPhone('Type the two-digit number shown on your computer.', 'danger');
+        return;
+    }
+    setPhoneButtonsDisabled(true);
+    sayOnPhone('');
+    try {
+        phoneWebAuthnOptions = await postJson('/Biometrics/Phone/SignInOptions', { token: phoneToken, code: code });
+        showPhoneView(document.getElementById('phonePage'), 'approve');
+    } catch (error) {
+        if (error.restart) {
+            finishOnPhone('ended', 'Sign-in not approved', error.message);
+            return;
+        }
+        sayOnPhone(error.message, 'danger');
+        document.getElementById('ppCode').select();
+    } finally {
+        setPhoneButtonsDisabled(false);
+    }
+}
+
+// Step 2: the phone's own fingerprint / face unlock / screen lock.
+async function approveSignInOnPhone() {
+    setPhoneButtonsDisabled(true);
+    sayOnPhone('Confirm with your fingerprint, face or screen lock when your phone asks.');
+    try {
+        if (phoneWebAuthnOptions === null) {
+            phoneWebAuthnOptions = await postJson('/Biometrics/Phone/SignInOptions', { token: phoneToken, code: typedPhoneCode() });
+        }
+        var options = phoneWebAuthnOptions;
+        phoneWebAuthnOptions = null;
+        var credentialJson = await getPasskey(options, ['client-device']);
+        sayOnPhone('Checking…');
+        await postJson('/Biometrics/Phone/SignInApprove', { token: phoneToken, credentialJson: credentialJson });
+        finishOnPhone('done', 'Sign-in approved', 'Return to your computer: it continues by itself. You can close this page.');
+    } catch (error) {
+        if (error.restart) {
+            finishOnPhone('ended', 'Sign-in not approved', error.message);
+            return;
+        }
+        if (error.code === 'cancelled') {
+            sayOnPhone(error.message, null);
+        } else {
+            sayOnPhone(error.message, 'danger');
+        }
+    } finally {
+        setPhoneButtonsDisabled(false);
+    }
+}
+
+// "This wasn't me" / "Cancel".
+async function denyOnPhone(title, text) {
+    setPhoneButtonsDisabled(true);
+    try {
+        await postJson('/Biometrics/Phone/Deny', { token: phoneToken });
+    } catch (e) {
+        // the code expires anyway
+    }
+    setPhoneButtonsDisabled(false);
+    finishOnPhone('ended', title, text);
+}
+
+// =====================================================================================================
+
+function setUpPhonePasskeyPages() {
+    setUpMethodChoice();
+    setUpPhoneEnrollment();
+    setUpPhonePage();
+}
+
+document.addEventListener('DOMContentLoaded', setUpPhonePasskeyPages);

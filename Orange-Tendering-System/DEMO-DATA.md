@@ -1,5 +1,26 @@
 # Team accounts and demo data
 
+## Tender presentation
+
+In Visual Studio, select **https (Tender presentation)** and run the project. From the solution folder, use:
+
+```powershell
+dotnet run --project Orange-Tendering-System/Orange-Tendering-System.csproj --launch-profile "https (Tender presentation)"
+```
+
+The profile prepares four fictional tenders in the local `OrangeTenderingTeamDev_Presentation` database. Sign in with
+`OrangeDemo2026!` for each account. Open the notification that starts with the corresponding **PRESENTATION** number.
+
+| Stop | Choose on sign-in | Account | What to show |
+| --- | --- | --- | --- |
+| 01 · Business laptops | Other User | `evaluation.technical@orange-demo.local` | Score the three offers and sign. The other three evaluations are complete. |
+| 02 · Office printers | Supplier | `supplier10@orange-demo.local` | Review the accepted invitation's prefilled offer and submit it as the third supplier. |
+| 03 · Network switches | Other User | `evaluation.technical@orange-demo.local` | Complete evaluation in bidding round 2. Round 1 failed after receiving two offers. |
+| 04 · Backup storage | Other User | `top.coo@orange-demo.local` | Review the executive summary and PDF, then sign and vote. Three Top Committee approvals are already recorded. |
+
+Sign out when switching accounts. Restarting the profile preserves completed presentation actions so the same tenders
+can be inspected afterward. The startup log prints the four direct routes for this database.
+
 ## Team development accounts (automatic)
 
 `git pull origin WorkV2`, open `Orange-Tendering-System.slnx`, run the **https** profile in Visual Studio. On every

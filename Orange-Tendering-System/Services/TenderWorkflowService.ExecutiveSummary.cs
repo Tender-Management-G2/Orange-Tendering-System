@@ -60,10 +60,11 @@ public partial class TenderWorkflowService
     // One transaction: the summary is submitted and the Manager's approval signature is recorded together, or neither is.
     public async Task SubmitExecutiveSummary(int tenderId, ExecutiveSummaryInput input, ClaimsPrincipal principal, string documentHash, bool confirmed, byte[]? signatureImage)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        await using var tx = db.Database.CurrentTransaction == null
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable) : null;
         await Change(tenderId, principal, "ExecutiveSummarySubmitted", async (t, a) => await StoreSummary(t, a, input, submit: true));
         await ManagerDecision(tenderId, "Approve", "Executive summary submitted to the Top Committee.", principal, documentHash, confirmed, signatureImage);
-        await tx.CommitAsync();
+        if (tx != null) await tx.CommitAsync();
     }
 
     private async Task StoreSummary(Tender t, ApplicationUser a, ExecutiveSummaryInput input, bool submit)

@@ -1,415 +1,777 @@
-// Supplier registration wizard (Areas/Identity/Pages/Account/Register.cshtml).
-// Owns the four steps, client-side validation and the fetch submission; the server validates
-// everything again. It also publishes a small, sanitised description of form readiness for the
-// illustration (wwwroot/js/auth-studio): never the password, never an e-mail address, never the
-// registration or tax number, never document contents.
-(() => {
-    'use strict';
-    const root = document.getElementById('authStudio');
-    const form = document.getElementById('registerForm');
-    if (!root || !form) return;
-    const steps = [...form.querySelectorAll('.as-step')];
-    const progress = [...root.querySelectorAll('.as-steps li')];
-    const next = document.getElementById('registrationNext');
-    const back = document.getElementById('registrationBack');
-    const submit = document.getElementById('registerSubmit');
-    const summary = document.getElementById('registrationErrors');
-    const review = document.getElementById('registrationReview');
-    const rules = [...form.querySelectorAll('#passwordRules li')];
-    const requiredFields = new Set([
-        'Input.FullName', 'Input.Email', 'Input.Password', 'Input.ConfirmPassword',
-        'Input.CompanyName', 'Input.Category', 'Input.RegistrationNumber',
-        'Input.CompanyEmail', 'Input.CompanyPhone', 'Input.CompanyAddress'
-    ]);
-    const fileFields = ['CommercialRegistrationCertificate', 'TaxCertificate', 'LegalDocuments'];
-    const sceneNames = {
-        'Input.FullName': 'name', 'Input.Email': 'email', 'Input.Password': 'password',
-        'Input.ConfirmPassword': 'confirm', 'Input.CompanyName': 'company', 'Input.Category': 'category'
-    };
-    // The same rules the server applies: StringLength(100, MinimumLength = 8) on the page model
-    // plus ASP.NET Core Identity's default password options.
-    const passwordRules = [
-        { test: v => v.length >= 8, label: 'at least 8 characters' },
-        { test: v => /[a-z]/.test(v), label: 'a lowercase letter' },
-        { test: v => /[A-Z]/.test(v), label: 'an uppercase letter' },
-        { test: v => /\d/.test(v), label: 'a number' },
-        { test: v => /[^A-Za-z0-9]/.test(v), label: 'a symbol' }
-    ];
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-    const maxFileBytes = 10 * 1024 * 1024;
-    const attempted = new Set();
-    let stage = 0;
-    let sending = false;
-    let submitState = 'idle';
-    let focusName = null;
+// The supplier registration wizard (Areas/Identity/Pages/Account/Register.cshtml).
+// Four steps on ONE form: 0 Contact, 1 Company, 2 Documents, 3 Review. Only one step is visible at a time.
+// "Continue" checks the fields of the visible step. "Send verification code" sends the whole form to
+// Register.cshtml.cs (OnPostAsync), which checks everything again.
+//
+// The illustration (wwwroot/js/auth-studio/register-page.js) receives a harmless description of the form through
+// publishRegistrationState(): never the password, the email address, the registration / tax number or a document.
 
-    const field = name => form.elements.namedItem(name);
-    const value = name => (field(name)?.value || '').trim();
-    const messageBox = name => form.querySelector('[data-valmsg-for="' + name + '"]');
-    const filesOf = name => [...(field(name)?.files || [])];
+var REQUIRED_FIELDS = [
+    'Input.FullName', 'Input.Email', 'Input.Password', 'Input.ConfirmPassword',
+    'Input.CompanyName', 'Input.Category', 'Input.RegistrationNumber',
+    'Input.CompanyEmail', 'Input.CompanyPhone', 'Input.CompanyAddress'
+];
+var FILE_FIELDS = ['CommercialRegistrationCertificate', 'TaxCertificate', 'LegalDocuments'];
+// The fields the illustration reacts to, with the short names it knows.
+var ILLUSTRATION_NAMES = {
+    'Input.FullName': 'name', 'Input.Email': 'email', 'Input.Password': 'password',
+    'Input.ConfirmPassword': 'confirm', 'Input.CompanyName': 'company', 'Input.Category': 'category'
+};
+var REGISTRATION_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+var MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-    function label(input) {
-        const element = form.querySelector('label[for="' + input.id + '"]');
-        if (!element) return 'This field';
-        // The visible name only: hints inside <small> are not part of it.
-        return [...element.childNodes].filter(node => node.nodeType === Node.TEXT_NODE)
-            .map(node => node.textContent).join(' ').trim() || 'This field';
-    }
+var currentStep = 0;                                  // the visible step (0 to 3)
+var stepWasChecked = [false, false, false, false];    // "Continue" was pressed on this step
+var registrationSending = false;                      // the form is being sent
+var registrationSubmitState = 'idle';                 // 'idle', 'sending', 'accepted' or 'failed' (for the illustration)
+var registrationFocus = null;                         // the focused field's short name (for the illustration)
 
-    // ---------- Messages ----------
+// =====================================================================================================
+// Small helpers
+// =====================================================================================================
 
-    function error(message) {
-        summary.className = 'as-summary is-error';
-        const list = document.createElement('ul');
-        const item = document.createElement('li');
-        item.textContent = message;
-        list.append(item);
-        summary.replaceChildren(list);
-        summary.scrollIntoView({ block: 'nearest' });
-    }
+function registrationForm() {
+    return document.getElementById('registerForm');
+}
 
-    function clearError() {
-        summary.className = 'as-summary';
-        summary.replaceChildren();
-    }
+function registrationSteps() {
+    return registrationForm().querySelectorAll('.as-step');
+}
 
-    function setFieldError(name, message) {
-        const input = field(name);
-        const box = messageBox(name);
-        if (box) {
-            box.textContent = message || '';
-            box.classList.toggle('field-validation-error', !!message);
-            box.classList.toggle('field-validation-valid', !message);
-        }
-        if (input?.classList) {
-            input.classList.toggle('input-validation-error', !!message);
-            if (message) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
-        }
-    }
+function registrationField(name) {
+    return registrationForm().elements.namedItem(name);
+}
 
-    // ---------- Validation ----------
-
-    function missingPasswordRules() {
-        const password = field('Input.Password')?.value || '';
-        return passwordRules.filter(rule => !rule.test(password)).map(rule => rule.label);
-    }
-
-    function fileProblem(name) {
-        const files = filesOf(name);
-        if (!files.length) {
-            if (name === 'CommercialRegistrationCertificate') return 'Commercial registration certificate is required.';
-            if (name === 'LegalDocuments') return 'At least one business license or legal document is required.';
-            return value('Input.TaxNumber') ? 'Tax certificate is required when a tax number is provided.' : '';
-        }
-        for (const file of files) {
-            if (!/\.(pdf|png|jpe?g)$/i.test(file.name)) return file.name + ' is not a PDF, PNG or JPEG file.';
-            if (file.size > maxFileBytes) return file.name + ' is larger than 10 MB.';
-            if (file.size === 0) return file.name + ' is empty.';
-        }
-        if (name === 'LegalDocuments' && fileFields.flatMap(filesOf).length > 7) return 'Upload no more than seven documents.';
+function registrationValue(name) {
+    var field = registrationField(name);
+    if (!field || !field.value) {
         return '';
     }
+    return field.value.trim();
+}
 
-    function problem(name) {
-        const input = field(name);
-        if (!input) return '';
-        if (fileFields.includes(name)) return fileProblem(name);
-        const text = (input.value || '').trim();
-        if (name === 'Input.Password') {
-            if (!input.value) return 'Password is required.';
-            const missing = missingPasswordRules();
-            return missing.length ? 'Password still needs ' + missing.join(', ') + '.' : '';
+function rawValue(name) {
+    var field = registrationField(name);
+    if (!field || !field.value) {
+        return '';
+    }
+    return field.value;
+}
+
+function selectedFiles(name) {
+    var field = registrationField(name);
+    var files = [];
+    if (field && field.files) {
+        for (var i = 0; i < field.files.length; i++) {
+            files.push(field.files[i]);
         }
-        if (name === 'Input.ConfirmPassword') {
-            if (!input.value) return 'Enter the password again to confirm it.';
-            return input.value === field('Input.Password').value ? '' : 'The two passwords do not match.';
+    }
+    return files;
+}
+
+function allSelectedFiles() {
+    var files = [];
+    for (var i = 0; i < FILE_FIELDS.length; i++) {
+        files = files.concat(selectedFiles(FILE_FIELDS[i]));
+    }
+    return files;
+}
+
+function messageSlot(name) {
+    return registrationForm().querySelector('[data-valmsg-for="' + name + '"]');
+}
+
+// The visible name of a field from its <label> (the hint inside <small> is not part of it).
+function fieldLabel(input) {
+    var label = registrationForm().querySelector('label[for="' + input.id + '"]');
+    if (!label) {
+        return 'This field';
+    }
+    var text = '';
+    for (var i = 0; i < label.childNodes.length; i++) {
+        if (label.childNodes[i].nodeType === Node.TEXT_NODE) {
+            text = text + ' ' + label.childNodes[i].textContent;
         }
-        if (name === 'Input.Category') return text ? '' : 'Choose your main supply category.';
-        if (!text) return requiredFields.has(name) ? label(input) + ' is required.' : '';
-        if (name === 'Input.Email' || name === 'Input.CompanyEmail')
-            return emailPattern.test(text) ? '' : 'Enter a valid email address, for example name@company.com.';
-        if (input.dataset.valRegex && input.validity.patternMismatch) return input.dataset.valRegex; // e.g. telephone: exactly 10 digits
-        return input.checkValidity() ? '' : 'Check ' + label(input).toLowerCase() + '.';
+    }
+    text = text.trim();
+    if (!text) {
+        return 'This field';
+    }
+    return text;
+}
+
+// =====================================================================================================
+// Messages
+// =====================================================================================================
+
+function showRegistrationError(message) {
+    var summary = document.getElementById('registrationErrors');
+    summary.className = 'as-summary is-error';
+    var list = document.createElement('ul');
+    var item = document.createElement('li');
+    item.textContent = message;
+    list.appendChild(item);
+    summary.replaceChildren(list);
+    summary.scrollIntoView({ block: 'nearest' });
+}
+
+function clearRegistrationError() {
+    var summary = document.getElementById('registrationErrors');
+    summary.className = 'as-summary';
+    summary.replaceChildren();
+}
+
+// The red text under one field ('' removes it).
+function setRegistrationFieldError(name, message) {
+    var input = registrationField(name);
+    var slot = messageSlot(name);
+    if (slot) {
+        slot.textContent = message || '';
+        slot.classList.toggle('field-validation-error', Boolean(message));
+        slot.classList.toggle('field-validation-valid', !message);
+    }
+    if (input && input.classList) {
+        if (message) {
+            input.classList.add('input-validation-error');
+            input.setAttribute('aria-invalid', 'true');
+        } else {
+            input.classList.remove('input-validation-error');
+            input.removeAttribute('aria-invalid');
+        }
+    }
+}
+
+// =====================================================================================================
+// Validation (the same rules as the server: Register.cshtml.cs and Identity's password options)
+// =====================================================================================================
+
+// The password rules that are not met yet, for example ['a number', 'a symbol'].
+function missingPasswordRules() {
+    var password = rawValue('Input.Password');
+    var missing = [];
+    if (password.length < 8) {
+        missing.push('at least 8 characters');
+    }
+    if (!/[a-z]/.test(password)) {
+        missing.push('a lowercase letter');
+    }
+    if (!/[A-Z]/.test(password)) {
+        missing.push('an uppercase letter');
+    }
+    if (!/\d/.test(password)) {
+        missing.push('a number');
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+        missing.push('a symbol');
+    }
+    return missing;
+}
+
+// The problem with one file input, or '' when it is fine.
+function fileProblem(name) {
+    var files = selectedFiles(name);
+    if (files.length === 0) {
+        if (name === 'CommercialRegistrationCertificate') {
+            return 'Commercial registration certificate is required.';
+        }
+        if (name === 'LegalDocuments') {
+            return 'At least one business license or legal document is required.';
+        }
+        if (registrationValue('Input.TaxNumber')) {
+            return 'Tax certificate is required when a tax number is provided.';
+        }
+        return '';
+    }
+    for (var i = 0; i < files.length; i++) {
+        if (!/\.(pdf|png|jpe?g)$/i.test(files[i].name)) {
+            return files[i].name + ' is not a PDF, PNG or JPEG file.';
+        }
+        if (files[i].size > MAX_FILE_BYTES) {
+            return files[i].name + ' is larger than 10 MB.';
+        }
+        if (files[i].size === 0) {
+            return files[i].name + ' is empty.';
+        }
+    }
+    if (name === 'LegalDocuments' && allSelectedFiles().length > 7) {
+        return 'Upload no more than seven documents.';
+    }
+    return '';
+}
+
+// The problem with one field, or '' when it is fine.
+function fieldProblem(name) {
+    var input = registrationField(name);
+    if (!input) {
+        return '';
+    }
+    if (FILE_FIELDS.indexOf(name) >= 0) {
+        return fileProblem(name);
     }
 
-    const namesIn = index => [...steps[index].querySelectorAll('input,select')]
-        .filter(input => !input.disabled && input.type !== 'hidden' && input.name)
-        .map(input => input.name);
+    var text = (input.value || '').trim();
+    if (name === 'Input.Password') {
+        if (!input.value) {
+            return 'Password is required.';
+        }
+        var missing = missingPasswordRules();
+        if (missing.length > 0) {
+            return 'Password still needs ' + missing.join(', ') + '.';
+        }
+        return '';
+    }
+    if (name === 'Input.ConfirmPassword') {
+        if (!input.value) {
+            return 'Enter the password again to confirm it.';
+        }
+        if (input.value !== rawValue('Input.Password')) {
+            return 'The two passwords do not match.';
+        }
+        return '';
+    }
+    if (name === 'Input.Category') {
+        if (text) {
+            return '';
+        }
+        return 'Choose your main supply category.';
+    }
+    if (!text) {
+        if (REQUIRED_FIELDS.indexOf(name) >= 0) {
+            return fieldLabel(input) + ' is required.';
+        }
+        return '';
+    }
+    if (name === 'Input.Email' || name === 'Input.CompanyEmail') {
+        if (REGISTRATION_EMAIL_PATTERN.test(text)) {
+            return '';
+        }
+        return 'Enter a valid email address, for example name@company.com.';
+    }
+    // The server's message for a pattern, for example the telephone: exactly 10 digits.
+    if (input.dataset.valRegex && input.validity.patternMismatch) {
+        return input.dataset.valRegex;
+    }
+    if (input.checkValidity()) {
+        return '';
+    }
+    return 'Check ' + fieldLabel(input).toLowerCase() + '.';
+}
 
-    function check(name) {
-        const message = problem(name);
-        setFieldError(name, message);
-        return !message;
+// Checks one field and shows or removes its message. True when it is fine.
+function checkRegistrationField(name) {
+    var problem = fieldProblem(name);
+    setRegistrationFieldError(name, problem);
+    return problem === '';
+}
+
+// The names of the fields inside one step.
+function fieldNamesInStep(index) {
+    var inputs = registrationSteps()[index].querySelectorAll('input,select');
+    var names = [];
+    for (var i = 0; i < inputs.length; i++) {
+        if (!inputs[i].disabled && inputs[i].type !== 'hidden' && inputs[i].name) {
+            names.push(inputs[i].name);
+        }
+    }
+    return names;
+}
+
+// Checks every field of one step; shows that step and focuses the first wrong field when one fails.
+function validateRegistrationStep(index) {
+    stepWasChecked[index] = true;
+    var names = fieldNamesInStep(index);
+    var firstInvalid = null;
+    for (var i = 0; i < names.length; i++) {
+        if (!checkRegistrationField(names[i]) && firstInvalid === null) {
+            firstInvalid = registrationField(names[i]);
+        }
+    }
+    if (index === 2) {
+        updateFileStates();
     }
 
-    function validateStep(index) {
-        attempted.add(index);
-        let firstInvalid = null;
-        for (const name of namesIn(index)) {
-            if (!check(name) && !firstInvalid) firstInvalid = field(name);
+    if (firstInvalid !== null) {
+        if (registrationSteps()[index].hidden) {
+            goToRegistrationStep(index, false);
         }
-        if (index === 2) updateFileStates();
-        if (firstInvalid) {
-            if (steps[index].hidden) goTo(index, false);
-            firstInvalid.focus();
-            publish();
+        firstInvalid.focus();
+        publishRegistrationState();
+        return false;
+    }
+    clearRegistrationError();
+    return true;
+}
+
+// =====================================================================================================
+// Password rules list, document lines
+// =====================================================================================================
+
+// Ticks the rules under the password field.
+function updatePasswordRules() {
+    var password = rawValue('Input.Password');
+    var met = [
+        password.length >= 8,
+        /[a-z]/.test(password),
+        /[A-Z]/.test(password),
+        /\d/.test(password),
+        /[^A-Za-z0-9]/.test(password)
+    ];
+    var items = registrationForm().querySelectorAll('#passwordRules li');
+    for (var i = 0; i < items.length; i++) {
+        items[i].classList.toggle('is-met', met[i]);
+        var screenReaderText = items[i].querySelector('.sr-only');
+        if (screenReaderText) {
+            if (met[i]) {
+                screenReaderText.textContent = '— met';
+            } else {
+                screenReaderText.textContent = '— not met';
+            }
+        }
+    }
+}
+
+// 'none', 'accepted' or 'rejected'. "Accepted" only means it passed the checks in the browser:
+// the server checks every file again and an administrator reviews the documents later.
+function fileState(name) {
+    if (selectedFiles(name).length === 0) {
+        return 'none';
+    }
+    if (fileProblem(name)) {
+        return 'rejected';
+    }
+    return 'accepted';
+}
+
+function updateFileStates() {
+    for (var i = 0; i < FILE_FIELDS.length; i++) {
+        var name = FILE_FIELDS[i];
+        var line = registrationForm().querySelector('[data-file-state="' + name + '"]');
+        if (!line) {
+            continue;
+        }
+        var files = selectedFiles(name);
+        var state = fileState(name);
+        line.classList.toggle('is-accepted', state === 'accepted');
+        line.classList.toggle('is-rejected', state === 'rejected');
+        if (state === 'accepted') {
+            var what = files.length + ' files';
+            if (files.length === 1) {
+                what = files[0].name;
+            }
+            line.textContent = what + ' selected. Checked again on the server when you submit.';
+        } else {
+            line.textContent = '';
+        }
+    }
+}
+
+// =====================================================================================================
+// What the illustration is told
+// =====================================================================================================
+
+function registrationEmailState() {
+    var text = registrationValue('Input.Email');
+    if (!text) {
+        return 'empty';
+    }
+    if (REGISTRATION_EMAIL_PATTERN.test(text)) {
+        return 'valid';
+    }
+    if (registrationFocus === 'email' && !stepWasChecked[0]) {
+        return 'typing';
+    }
+    return 'invalid';
+}
+
+function confirmPasswordState() {
+    var password = rawValue('Input.Password');
+    var confirm = rawValue('Input.ConfirmPassword');
+    if (!confirm) {
+        return 'empty';
+    }
+    if (confirm === password) {
+        return 'match';
+    }
+    if (registrationFocus === 'confirm' && password.indexOf(confirm) === 0 && !stepWasChecked[0]) {
+        return 'partial';
+    }
+    return 'mismatch';
+}
+
+function companyStepReady() {
+    var names = fieldNamesInStep(1);
+    for (var i = 0; i < names.length; i++) {
+        if (fieldProblem(names[i])) {
             return false;
         }
-        clearError();
-        return true;
+    }
+    return true;
+}
+
+function publishRegistrationState() {
+    var state = {
+        step: currentStep,
+        focus: registrationFocus,
+        name: registrationValue('Input.FullName'),
+        email: registrationEmailState(),
+        hasPassword: rawValue('Input.Password').length > 0,
+        rules: 5 - missingPasswordRules().length,
+        confirm: confirmPasswordState(),
+        company: registrationValue('Input.CompanyName'),
+        category: registrationValue('Input.Category'),
+        companyReady: companyStepReady(),
+        documents: {
+            registration: fileState('CommercialRegistrationCertificate'),
+            tax: fileState('TaxCertificate'),
+            legal: fileState('LegalDocuments')
+        },
+        submit: registrationSubmitState
+    };
+    var studio = document.getElementById('authStudio');
+    studio.authState = state; // the illustration starts after this script and reads the last state from here
+    studio.dispatchEvent(new CustomEvent('authstudio:state', { detail: state }));
+}
+
+// =====================================================================================================
+// Steps
+// =====================================================================================================
+
+// Fills the "Review and submit" list.
+function updateReview() {
+    var fileNames = [];
+    var files = allSelectedFiles();
+    for (var i = 0; i < files.length; i++) {
+        fileNames.push(files[i].name);
+    }
+    var rows = [
+        ['Contact', registrationValue('Input.FullName')],
+        ['Email', registrationValue('Input.Email')],
+        ['Company', registrationValue('Input.CompanyName')],
+        ['Category', registrationValue('Input.Category')],
+        ['Registration', registrationValue('Input.RegistrationNumber')],
+        ['Company email', registrationValue('Input.CompanyEmail')],
+        ['Telephone', registrationValue('Input.CompanyPhone')],
+        ['Address', registrationValue('Input.CompanyAddress')],
+        ['Documents', fileNames.join(', ')]
+    ];
+
+    var review = document.getElementById('registrationReview');
+    review.replaceChildren();
+    for (var r = 0; r < rows.length; r++) {
+        var term = document.createElement('dt');
+        var value = document.createElement('dd');
+        term.textContent = rows[r][0];
+        value.textContent = rows[r][1] || '—';
+        review.appendChild(term);
+        review.appendChild(value);
+    }
+}
+
+// Shows step "index" and hides the others; updates the step list and the buttons.
+function goToRegistrationStep(index, moveFocus) {
+    var steps = registrationSteps();
+    var lastStep = steps.length - 1;
+    currentStep = index;
+    document.getElementById('authStudio').dataset.step = String(index);
+
+    for (var i = 0; i < steps.length; i++) {
+        steps[i].hidden = i !== index;
     }
 
-    // ---------- Field furniture: password rules, reveal buttons, document states ----------
-
-    function updateRules() {
-        const password = field('Input.Password')?.value || '';
-        rules.forEach((item, index) => {
-            const met = passwordRules[index].test(password);
-            item.classList.toggle('is-met', met);
-            const state = item.querySelector('.sr-only');
-            if (state) state.textContent = met ? '— met' : '— not met';
-        });
-    }
-
-    root.querySelectorAll('[data-reveal]').forEach(button => {
-        button.addEventListener('click', () => {
-            const input = document.getElementById(button.dataset.reveal);
-            const show = input.type === 'password';
-            input.type = show ? 'text' : 'password';
-            button.textContent = show ? 'Hide' : 'Show';
-            button.setAttribute('aria-pressed', String(show));
-        });
-    });
-
-    // 'none' | 'accepted' | 'rejected'. Accepted means "passed the local checks", nothing more:
-    // the server checks every file again and an administrator reviews the documents later.
-    function fileState(name) {
-        if (!filesOf(name).length) return 'none';
-        return fileProblem(name) ? 'rejected' : 'accepted';
-    }
-
-    function updateFileStates() {
-        for (const name of fileFields) {
-            const line = form.querySelector('[data-file-state="' + name + '"]');
-            if (!line) continue;
-            const files = filesOf(name);
-            const state = fileState(name);
-            line.classList.toggle('is-accepted', state === 'accepted');
-            line.classList.toggle('is-rejected', state === 'rejected');
-            line.textContent = state === 'accepted'
-                ? (files.length === 1 ? files[0].name : files.length + ' files') + ' selected. Checked again on the server when you submit.'
-                : '';
+    var progressItems = document.querySelectorAll('#authStudio .as-steps li');
+    for (var p = 0; p < progressItems.length; p++) {
+        progressItems[p].classList.toggle('is-current', p === index);
+        progressItems[p].classList.toggle('is-done', p < index);
+        if (p === index) {
+            progressItems[p].setAttribute('aria-current', 'step');
+        } else {
+            progressItems[p].removeAttribute('aria-current');
         }
     }
 
-    // ---------- Sanitised state for the illustration ----------
-
-    function emailState() {
-        const text = value('Input.Email');
-        if (!text) return 'empty';
-        if (emailPattern.test(text)) return 'valid';
-        return focusName === 'email' && !attempted.has(0) ? 'typing' : 'invalid';
+    document.getElementById('registrationBack').hidden = index === 0;
+    document.getElementById('registrationNext').hidden = index === lastStep;
+    document.getElementById('registerSubmit').hidden = index !== lastStep;
+    if (index === lastStep) {
+        updateReview();
     }
 
-    function confirmState() {
-        const password = field('Input.Password')?.value || '';
-        const confirm = field('Input.ConfirmPassword')?.value || '';
-        if (!confirm) return 'empty';
-        if (confirm === password) return 'match';
-        return focusName === 'confirm' && password.startsWith(confirm) && !attempted.has(0) ? 'partial' : 'mismatch';
+    if (moveFocus) {
+        var first = steps[index].querySelector('input,select');
+        if (!first) {
+            first = steps[index].querySelector('legend');
+            first.setAttribute('tabindex', '-1');
+        }
+        first.focus({ preventScroll: true });
+        steps[index].scrollIntoView({ block: 'nearest' });
+    }
+    publishRegistrationState();
+}
+
+function nextRegistrationStep() {
+    if (validateRegistrationStep(currentStep)) {
+        goToRegistrationStep(currentStep + 1, true);
+    }
+}
+
+function previousRegistrationStep() {
+    clearRegistrationError();
+    goToRegistrationStep(currentStep - 1, true);
+}
+
+// =====================================================================================================
+// Live checks while typing
+// =====================================================================================================
+
+function onRegistrationInput(event) {
+    var name = event.target.name;
+    if (name === 'Input.Password') {
+        updatePasswordRules();
+    }
+    // A message that is already showing follows the field; no new message appears while typing.
+    var slot = messageSlot(name);
+    if (name && slot && slot.textContent) {
+        checkRegistrationField(name);
+    }
+    var confirmSlot = messageSlot('Input.ConfirmPassword');
+    if (name === 'Input.Password' && confirmSlot && confirmSlot.textContent) {
+        checkRegistrationField('Input.ConfirmPassword');
+    }
+    publishRegistrationState();
+}
+
+function onRegistrationChange(event) {
+    var name = event.target.name;
+    if (FILE_FIELDS.indexOf(name) >= 0) {
+        // A wrong file is reported beside its field at once; a missing one only on Continue.
+        if (selectedFiles(name).length > 0) {
+            setRegistrationFieldError(name, fileProblem(name));
+        } else {
+            setRegistrationFieldError(name, '');
+        }
+        var legalSlot = messageSlot('LegalDocuments');
+        if (name !== 'LegalDocuments' && legalSlot && legalSlot.textContent) {
+            checkRegistrationField('LegalDocuments');
+        }
+        updateFileStates();
+    } else if (name === 'Input.Category' && event.target.value) {
+        setRegistrationFieldError(name, '');
+    } else if (name === 'Input.TaxNumber') {
+        var taxSlot = messageSlot('TaxCertificate');
+        if (taxSlot && taxSlot.textContent) {
+            checkRegistrationField('TaxCertificate');
+        }
+    }
+    publishRegistrationState();
+}
+
+function onRegistrationFocusIn(event) {
+    registrationFocus = ILLUSTRATION_NAMES[event.target.name] || null;
+    publishRegistrationState();
+}
+
+function onRegistrationFocusOut(event) {
+    var name = event.target.name;
+    registrationFocus = null;
+    // Leaving a field with content checks it; empty fields are reported only on Continue.
+    if (name && FILE_FIELDS.indexOf(name) < 0 && (event.target.value || stepWasChecked[currentStep])) {
+        checkRegistrationField(name);
+    }
+    publishRegistrationState();
+}
+
+// =====================================================================================================
+// Sending the form
+// =====================================================================================================
+
+// The server answered with the page again (validation errors). Its messages are copied into this page,
+// so the files the person already chose stay selected (a reloaded page would lose them).
+function showServerValidation(html) {
+    var returnedForm = new DOMParser().parseFromString(html, 'text/html').getElementById('registerForm');
+    if (!returnedForm) {
+        showRegistrationError('Registration could not be completed. Please try again.');
+        return;
     }
 
-    function publish() {
-        const detail = {
-            step: stage,
-            focus: focusName,
-            name: value('Input.FullName'),
-            email: emailState(),
-            hasPassword: (field('Input.Password')?.value || '').length > 0,
-            rules: passwordRules.length - missingPasswordRules().length,
-            confirm: confirmState(),
-            company: value('Input.CompanyName'),
-            category: value('Input.Category'),
-            companyReady: steps[1] ? namesIn(1).every(name => !problem(name)) : false,
-            documents: {
-                registration: fileState('CommercialRegistrationCertificate'),
-                tax: fileState('TaxCertificate'),
-                legal: fileState('LegalDocuments')
-            },
-            submit: submitState
-        };
-        root.authState = detail;
-        root.dispatchEvent(new CustomEvent('authstudio:state', { detail }));
+    // 1. The summary at the top (for example "An account or company with these details already exists").
+    var summary = document.getElementById('registrationErrors');
+    var returnedSummaries = returnedForm.querySelectorAll('.validation-summary-errors');
+    var returnedSummary = null;
+    for (var i = 0; i < returnedSummaries.length; i++) {
+        if (returnedSummaries[i].textContent.trim()) {
+            returnedSummary = returnedSummaries[i];
+            break;
+        }
+    }
+    if (returnedSummary) {
+        summary.className = 'as-summary is-error';
+        summary.innerHTML = returnedSummary.innerHTML; // Razor already HTML-encoded these messages
+    } else {
+        clearRegistrationError();
     }
 
-    // ---------- Steps ----------
-
-    function updateReview() {
-        const entries = [
-            ['Contact', value('Input.FullName')], ['Email', value('Input.Email')],
-            ['Company', value('Input.CompanyName')], ['Category', value('Input.Category')],
-            ['Registration', value('Input.RegistrationNumber')],
-            ['Company email', value('Input.CompanyEmail')], ['Telephone', value('Input.CompanyPhone')],
-            ['Address', value('Input.CompanyAddress')],
-            ['Documents', fileFields.flatMap(filesOf).map(file => file.name).join(', ')]
-        ];
-        review.replaceChildren();
-        for (const [key, text] of entries) {
-            const dt = document.createElement('dt');
-            const dd = document.createElement('dd');
-            dt.textContent = key; dd.textContent = text || '—';
-            review.append(dt, dd);
+    // 2. The message under each field.
+    var firstInvalid = null;
+    var slots = registrationForm().querySelectorAll('[data-valmsg-for]');
+    for (var s = 0; s < slots.length; s++) {
+        var name = slots[s].getAttribute('data-valmsg-for');
+        var returnedSlot = returnedForm.querySelector('[data-valmsg-for="' + name + '"]');
+        if (!returnedSlot) {
+            continue;
+        }
+        var message = returnedSlot.textContent.trim();
+        setRegistrationFieldError(name, message);
+        if (firstInvalid === null && message) {
+            firstInvalid = registrationField(name);
         }
     }
 
-    function goTo(index, focus = true) {
-        stage = index;
-        root.dataset.step = String(index);
-        steps.forEach((step, i) => { step.hidden = i !== index; });
-        progress.forEach((item, i) => {
-            item.classList.toggle('is-current', i === index);
-            item.classList.toggle('is-done', i < index);
-            if (i === index) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
-        });
-        back.hidden = index === 0;
-        next.hidden = index === steps.length - 1;
-        submit.hidden = index !== steps.length - 1;
-        if (index === steps.length - 1) updateReview();
-        if (focus) {
-            const first = steps[index].querySelector('input,select') || steps[index].querySelector('legend');
-            if (first) {
-                if (first.tagName === 'LEGEND') first.setAttribute('tabindex', '-1');
-                first.focus({ preventScroll: true });
+    // 3. Show the step with the first wrong field.
+    if (firstInvalid) {
+        var steps = registrationSteps();
+        for (var index = 0; index < steps.length; index++) {
+            if (steps[index].contains(firstInvalid)) {
+                goToRegistrationStep(index, false);
+                break;
             }
-            steps[index].scrollIntoView({ block: 'nearest' });
         }
-        publish();
+        firstInvalid.focus();
+    } else {
+        summary.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function setRegistrationSubmitState(state) {
+    registrationSubmitState = state;
+    publishRegistrationState();
+}
+
+async function onRegistrationSubmit(event) {
+    event.preventDefault();           // this script sends the form itself, with fetch()
+    event.stopImmediatePropagation(); // and no page-wide form script (busy buttons, validation) handles it too
+    if (registrationSending) {
+        return;
+    }
+    // Every step before Review must be correct.
+    for (var i = 0; i < registrationSteps().length - 1; i++) {
+        if (!validateRegistrationStep(i)) {
+            return;
+        }
     }
 
-    next.addEventListener('click', () => { if (validateStep(stage)) goTo(stage + 1); });
-    back.addEventListener('click', () => { clearError(); goTo(stage - 1); });
+    var form = registrationForm();
+    var submitButton = document.getElementById('registerSubmit');
+    registrationSending = true;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Sending…';
+    setRegistrationSubmitState('sending');
+    try {
+        // new FormData(form) contains every field AND the chosen files, like a normal multipart post.
+        var response = await fetch(form.action || location.href, { method: 'POST', body: new FormData(form), credentials: 'same-origin' });
 
-    form.addEventListener('input', event => {
-        const name = event.target.name;
-        if (name === 'Input.Password') updateRules();
-        // A message that is already showing follows the field; nothing new appears while typing.
-        if (name && messageBox(name)?.textContent) check(name);
-        if (name === 'Input.Password' && messageBox('Input.ConfirmPassword')?.textContent) check('Input.ConfirmPassword');
-        publish();
-    });
-    form.addEventListener('change', event => {
-        const name = event.target.name;
-        if (fileFields.includes(name)) {
-            // A rejected file is reported beside its field at once; a missing one only on Continue.
-            setFieldError(name, filesOf(name).length ? fileProblem(name) : '');
-            if (name !== 'LegalDocuments' && messageBox('LegalDocuments')?.textContent) check('LegalDocuments');
-            updateFileStates();
-        } else if (name === 'Input.Category' && event.target.value) {
-            setFieldError(name, '');
-        } else if (name === 'Input.TaxNumber' && messageBox('TaxCertificate')?.textContent) {
-            check('TaxCertificate');
+        // Success: the server redirected to VerifyEmail (it created the application and sent the code).
+        if (response.redirected && new URL(response.url).origin === location.origin) {
+            setRegistrationSubmitState('accepted');
+            location.assign(response.url);
+            return;
         }
-        publish();
-    });
-    form.addEventListener('focusin', event => {
-        focusName = sceneNames[event.target.name] || null;
-        publish();
-    });
-    form.addEventListener('focusout', event => {
-        const name = event.target.name;
-        focusName = null;
-        // Leaving a field that has content checks it; empty fields are only reported on Continue.
-        if (name && !fileFields.includes(name) && (event.target.value || attempted.has(stage))) check(name);
-        publish();
-    });
-    requiredFields.forEach(name => field(name)?.setAttribute('aria-required', 'true'));
 
-    // ---------- Submission ----------
-
-    function showServerValidation(html) {
-        const returned = new DOMParser().parseFromString(html, 'text/html').getElementById('registerForm');
-        if (!returned) { error('Registration could not be completed. Please try again.'); return; }
-        const returnedSummary = [...returned.querySelectorAll('.validation-summary-errors')]
-            .find(element => element.textContent.trim());
-        if (returnedSummary) {
-            summary.className = 'as-summary is-error';
-            summary.innerHTML = returnedSummary.innerHTML;
-        } else clearError();
-        let firstInvalid = null;
-        for (const current of form.querySelectorAll('[data-valmsg-for]')) {
-            const name = current.getAttribute('data-valmsg-for');
-            const replacement = [...returned.querySelectorAll('[data-valmsg-for]')]
-                .find(element => element.getAttribute('data-valmsg-for') === name);
-            if (!replacement) continue;
-            const message = replacement.textContent.trim();
-            setFieldError(name, message);
-            if (!firstInvalid && message) firstInvalid = form.elements.namedItem(name);
+        setRegistrationSubmitState('failed');
+        if (!response.ok) {
+            showRegistrationError('Registration could not be completed. Please try again.');
+            return;
         }
-        if (firstInvalid) {
-            const invalidStep = steps.findIndex(step => step.contains(firstInvalid));
-            if (invalidStep >= 0) goTo(invalidStep, false);
-            firstInvalid.focus();
-        } else summary.scrollIntoView({ block: 'nearest' });
+        showServerValidation(await response.text());
+    } catch (e) {
+        setRegistrationSubmitState('failed');
+        showRegistrationError('Could not contact the registration service. Please try again.');
+    } finally {
+        registrationSending = false;
+        submitButton.disabled = false;
+        submitButton.textContent = 'Send verification code →';
+    }
+}
+
+// =====================================================================================================
+// Start
+// =====================================================================================================
+
+function setUpRegistrationPage() {
+    var form = registrationForm();
+    if (!document.getElementById('authStudio') || !form) {
+        return;
     }
 
-    function setSubmitState(state) {
-        submitState = state;
-        publish();
+    document.getElementById('registrationNext').addEventListener('click', nextRegistrationStep);
+    document.getElementById('registrationBack').addEventListener('click', previousRegistrationStep);
+    form.addEventListener('input', onRegistrationInput);
+    form.addEventListener('change', onRegistrationChange);
+    form.addEventListener('focusin', onRegistrationFocusIn);
+    form.addEventListener('focusout', onRegistrationFocusOut);
+    // true = "capture": this listener runs before the page-wide ones, so it can stop them.
+    form.addEventListener('submit', onRegistrationSubmit, true);
+
+    for (var i = 0; i < REQUIRED_FIELDS.length; i++) {
+        var field = registrationField(REQUIRED_FIELDS[i]);
+        if (field) {
+            field.setAttribute('aria-required', 'true');
+        }
     }
 
-    form.addEventListener('submit', async event => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        if (sending) return;
-        for (let i = 0; i < steps.length - 1; i++) {
-            if (!validateStep(i)) return;
-        }
-        sending = true;
-        submit.disabled = true;
-        submit.textContent = 'Sending…';
-        setSubmitState('sending');
-        try {
-            const response = await fetch(form.action || location.href, {
-                method: 'POST', body: new FormData(form), credentials: 'same-origin'
-            });
-            if (response.redirected && new URL(response.url).origin === location.origin) {
-                // The server created the pending application and sent the verification code.
-                setSubmitState('accepted');
-                location.assign(response.url);
-                return;
+    // "Show" / "Hide" on the two password fields
+    var revealButtons = form.querySelectorAll('[data-reveal]');
+    for (var r = 0; r < revealButtons.length; r++) {
+        revealButtons[r].addEventListener('click', function (event) {
+            var button = event.currentTarget;
+            var input = document.getElementById(button.getAttribute('data-reveal'));
+            var showText = input.type === 'password';
+            if (showText) {
+                input.type = 'text';
+                button.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                button.textContent = 'Show';
             }
-            setSubmitState('failed');
-            if (!response.ok) { error('Registration could not be completed. Please try again.'); return; }
-            showServerValidation(await response.text());
-        } catch {
-            setSubmitState('failed');
-            error('Could not contact the registration service. Please try again.');
-        } finally {
-            sending = false;
-            submit.disabled = false;
-            submit.textContent = 'Send verification code →';
+            button.setAttribute('aria-pressed', String(showText));
+        });
+    }
+
+    // Company telephone: digits only, at most 10 (the server requires exactly 10 digits).
+    var phone = registrationField('Input.CompanyPhone');
+    phone.addEventListener('input', function () {
+        var digits = phone.value.replace(/\D/g, '').substring(0, 10);
+        if (phone.value !== digits) {
+            phone.value = digits;
         }
-    }, true);
+    });
 
-    // ---------- Start ----------
-
-    updateRules();
+    updatePasswordRules();
     updateFileStates();
-    goTo(0, false);
-    const firstServerError = form.querySelector('.field-validation-error, .validation-summary-errors');
-    if (firstServerError) {
-        const invalidInput = form.elements.namedItem(firstServerError.getAttribute('data-valmsg-for'));
-        const index = invalidInput ? steps.findIndex(step => step.contains(invalidInput)) : 0;
-        goTo(Math.max(0, index), false);
-    }
-    // Values restored by the browser (back navigation, autofill) arrive after this script ran.
-    window.addEventListener('pageshow', () => { updateRules(); updateFileStates(); publish(); });
-})();
+    goToRegistrationStep(0, false);
 
-// Company telephone: digits only, at most 10 (the server requires exactly 10 digits).
-document.querySelectorAll('input[data-digits-only]').forEach(input => {
-    input.addEventListener('input', () => {
-        const digits = input.value.replace(/\D/g, '').slice(0, 10);
-        if (input.value !== digits) input.value = digits;
+    // After a normal (no-JavaScript) post with errors, open the step with the first server message.
+    var firstServerError = form.querySelector('.field-validation-error, .validation-summary-errors');
+    if (firstServerError) {
+        var invalidInput = registrationField(firstServerError.getAttribute('data-valmsg-for'));
+        var steps = registrationSteps();
+        var stepWithError = 0;
+        if (invalidInput) {
+            for (var s = 0; s < steps.length; s++) {
+                if (steps[s].contains(invalidInput)) {
+                    stepWithError = s;
+                }
+            }
+        }
+        goToRegistrationStep(stepWithError, false);
+    }
+
+    // Values restored by the browser (Back button, autofill) arrive after this script ran.
+    window.addEventListener('pageshow', function () {
+        updatePasswordRules();
+        updateFileStates();
+        publishRegistrationState();
     });
-});
+}
+
+// This script is at the end of <body>, so the form already exists: start at once (no flash of all four steps).
+setUpRegistrationPage();

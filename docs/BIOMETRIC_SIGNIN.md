@@ -10,12 +10,12 @@ authentication system: ASP.NET Core Identity and its cookie. Biometric methods a
 | Endpoints + enrollment pages | `Controllers/BiometricsController.cs` (the existing scaffold, now real) |
 | Pages | `Views/Biometrics/Fingerprint.cshtml`, `Views/Biometrics/Face.cshtml` (linked from the account menu) |
 | Login entry points | `Areas/Identity/Pages/Account/Login.cshtml` (buttons enabled; password form untouched) |
-| Browser logic | `wwwroot/js/biometric.js`, `wwwroot/css/biometric.css` |
+| Browser logic | `wwwroot/js/biometric.js` (shared functions + enrollment buttons), `wwwroot/js/supplier-login.js` (Login page, including the phone QR sign-in), `wwwroot/js/biometric-demo.js` (development demos), `wwwroot/css/biometric.css`. Beginner walkthrough: `docs/AUTHENTICATION_BEGINNER_GUIDE.md` |
 | Services | `Services/Biometric/` — WebAuthn verifier, passkey service, face service, liveness verifier, sign-in rules, one-time challenges, throttle |
 | Models | `Models/Biometric/BiometricModels.cs`; entities `Models/Entities/UserPasskeyCredential.cs`, `FaceTemplate.cs` |
 | Database | migration `20261113133104_AddBiometricSignIn` (tables `UserPasskeyCredentials`, `FaceTemplates`; existing `AuditLogs` reused) |
 | Registration | `AddBiometrics()` in `Program.cs` |
-| "Use my phone" (QR code / email link) | `Controllers/PhonePasskeyController.cs`, `Services/Biometric/PhoneLink.cs`, `Views/PhonePasskey/Index.cshtml` (phone page), `Views/Shared/_PhonePasskeySetup.cshtml`, `wwwroot/js/phone-passkey.js`, `wwwroot/css/phone-passkey.css` |
+| "Use my phone" (QR code / email link) | `Controllers/PhonePasskeyController.cs`, `Services/Biometric/PhoneLink.cs`, `Views/PhonePasskey/Index.cshtml` (phone page), `Views/Shared/_PhonePasskeySetup.cshtml`, `wwwroot/js/phone-passkey.js` (QR enrollment + phone page), `wwwroot/css/phone-passkey.css` |
 | Tests | `Tests/AuthSmoke/BiometricChecks.cs`, `Tests/AuthSmoke/PhonePasskeyChecks.cs` (`AuthSmoke.dll --phone-checks` or `--biometric-checks`) |
 
 ## Adaptations made to the supplied code

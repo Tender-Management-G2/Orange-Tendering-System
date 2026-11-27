@@ -1,12 +1,9 @@
-// ORANGE TENDER MANAGEMENT SYSTEM
-// Owner: Ahmad
-// Module: Authentication & Biometrics
-// Purpose: DEVELOPMENT-ONLY face recognition test bench at /face-demo. Register a test face, verify it as often as
-//   you like, reset it. Uses the real FaceService one-time token, sample checks and matching
-//   (FaceService.Match + Biometric:FaceMatchThreshold) and the same biometric.js/face-api.js capture as sign-in.
-// Not authentication: no Identity user, no Supplier, no FaceTemplates row and no sign-in cookie is ever created.
-//   The test face lives in server memory for this browser (random cookie id) and is lost on restart.
-//   Every action returns 404 outside the Development environment.
+// ORANGE TENDER MANAGEMENT SYSTEM — Owner: Ahmad — Module: Authentication & Biometrics
+// DEVELOPMENT-ONLY face recognition test bench at /face-demo: register a test face, verify it as often as you like, reset it.
+// It uses the real FaceService token, sample checks and matching (FaceService.Match + Biometric:FaceMatchThreshold) and the
+// same capture code as sign-in (wwwroot/js/biometric.js).
+// It is NOT authentication: no user, no Supplier, no FaceTemplates row and no sign-in cookie is ever created. The test face
+// lives in server memory for this browser (a random cookie id) and is lost on restart. Outside Development every action is 404.
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,97 +13,167 @@ using Microsoft.Extensions.Options;
 using Orange_Tendering_System.Models.Biometric;
 using Orange_Tendering_System.Services.Biometric;
 
-namespace Orange_Tendering_System.Controllers
+namespace Orange_Tendering_System.Controllers;
+
+[AllowAnonymous, Route("face-demo")]
+public class FaceDemoController : Controller
 {
-    [AllowAnonymous, Route("face-demo")]
-    public class FaceDemoController(
-        FaceService faces,
-        IMemoryCache cache,
-        IOptions<BiometricOptions> options,
-        IWebHostEnvironment environment) : Controller
+    private const string CookieName = "OrangeFaceDemo";
+
+    private readonly FaceService faces;
+    private readonly IMemoryCache cache;
+    private readonly BiometricOptions options;
+    private readonly IWebHostEnvironment environment;
+
+    public FaceDemoController(FaceService faces, IMemoryCache cache, IOptions<BiometricOptions> options, IWebHostEnvironment environment)
     {
-        private const string CookieName = "OrangeFaceDemo";
+        this.faces = faces;
+        this.cache = cache;
+        this.options = options.Value;
+        this.environment = environment;
+    }
 
-        public override void OnActionExecuting(ActionExecutingContext context)
+    // Runs before every action: the demo exists only in Development.
+    public override void OnActionExecuting(ActionExecutingContext context)
+    {
+        if (!environment.IsDevelopment())
         {
-            if (!environment.IsDevelopment())
-                context.Result = NotFound();
+            context.Result = NotFound();
+        }
+    }
+
+    // GET /face-demo
+    [HttpGet("")]
+    public IActionResult Index()
+    {
+        string? id = DemoId();
+        if (id == null)
+        {
+            id = Base64Url.Encode(RandomNumberGenerator.GetBytes(16));
+            CookieOptions cookie = new CookieOptions();
+            cookie.HttpOnly = true;
+            cookie.Secure = true;
+            cookie.SameSite = SameSiteMode.Strict;
+            cookie.IsEssential = true;
+            cookie.Path = "/face-demo";
+            Response.Cookies.Append(CookieName, id, cookie);
         }
 
-        // GET /face-demo
-        [HttpGet("")]
-        public IActionResult Index()
+        FaceDemoViewModel model = new FaceDemoViewModel();
+        List<float[]>? templates = Templates(id);
+        if (templates != null)
         {
-            var id = DemoId();
-            if (id is null)
-            {
-                id = Base64Url.Encode(RandomNumberGenerator.GetBytes(16));
-                Response.Cookies.Append(CookieName, id, new CookieOptions
-                {
-                    HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict, IsEssential = true, Path = "/face-demo"
-                });
-            }
+            model.TestFaceSamples = templates.Count;
+        }
+        model.Threshold = options.FaceMatchThreshold;
+        return View(model);
+    }
 
-            return View(new FaceDemoViewModel
-            {
-                TestFaceSamples = Templates(id)?.Count ?? 0,
-                Threshold = options.Value.FaceMatchThreshold
-            });
+    // POST /face-demo/challenge — a one-time token for one attempt, as in the real flow.
+    [HttpPost("challenge"), ValidateAntiForgeryToken]
+    public IActionResult StartChallenge()
+    {
+        string? id = DemoId();
+        if (id == null)
+        {
+            return NoDemo();
+        }
+        return Json(faces.CreateChallenge(FaceService.DemoPurpose, id));
+    }
+
+    [HttpPost("register"), ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
+    public IActionResult Register([FromBody] FaceSubmission submission)
+    {
+        string? id = DemoId();
+        if (id == null)
+        {
+            return NoDemo();
         }
 
-        // POST /face-demo/challenge — a one-time token for one attempt, as in the real flow.
-        [HttpPost("challenge"), ValidateAntiForgeryToken]
-        public IActionResult StartChallenge() =>
-            DemoId() is { } id ? Json(faces.CreateChallenge(FaceService.DemoPurpose, id)) : NoDemo();
-
-        [HttpPost("register"), ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
-        public IActionResult Register([FromBody] FaceSubmission submission)
+        string? problem = faces.CheckDemoSubmission(submission, id);
+        if (problem != null)
         {
-            if (DemoId() is not { } id) return NoDemo();
-            var (problem, templates) = faces.CheckDemoEnrollment(submission, id);
-            if (problem is not null)
-                return Json(new { registered = false, problem });
-
-            cache.Set(Key(id), templates, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromHours(2) });
-            return Json(new { registered = true, samples = templates.Count });
+            return Json(new { registered = false, problem = problem });
         }
 
-        [HttpPost("verify"), ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
-        public IActionResult Verify([FromBody] FaceSubmission submission)
+        List<float[]> templates = faces.DemoTemplates(submission.Descriptors);
+        cache.Set(CacheKey(id), templates, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromHours(2) });
+        return Json(new { registered = true, samples = templates.Count });
+    }
+
+    [HttpPost("verify"), ValidateAntiForgeryToken, RequestSizeLimit(400_000)]
+    public IActionResult Verify([FromBody] FaceSubmission submission)
+    {
+        string? id = DemoId();
+        if (id == null)
         {
-            if (DemoId() is not { } id) return NoDemo();
-            var templates = Templates(id);
-            if (templates is null || templates.Count == 0)
-                return Json(new { stage = "noTestFace" });
-
-            var (problem, match) = faces.CheckDemoVerification(submission, id, templates);
-            if (problem is not null || match is null)
-                return Json(new { stage = "rejected", problem });
-
-            return Json(new
-            {
-                stage = "match", matched = match.Matched,
-                bestDistances = match.BestDistances.Select(d => Math.Round(d, 3)),
-                averageDistance = Math.Round(match.AverageDistance, 3),
-                matchingSamples = match.MatchingSamples, requiredSamples = match.RequiredSamples,
-                threshold = match.Threshold
-            });
+            return NoDemo();
         }
 
-        [HttpPost("reset"), ValidateAntiForgeryToken]
-        public IActionResult Reset()
+        List<float[]>? templates = Templates(id);
+        if (templates == null || templates.Count == 0)
         {
-            if (DemoId() is { } id) cache.Remove(Key(id));
-            return Json(new { reset = true });
+            return Json(new { stage = "noTestFace" });
         }
 
-        private string? DemoId() =>
-            Request.Cookies.TryGetValue(CookieName, out var id) && id.Length is > 10 and < 64 ? id : null;
+        string? problem = faces.CheckDemoSubmission(submission, id);
+        if (problem != null)
+        {
+            return Json(new { stage = "rejected", problem = problem });
+        }
 
-        private List<float[]>? Templates(string id) => cache.Get<List<float[]>>(Key(id));
+        FaceMatch match = faces.Match(submission.Descriptors, templates);
+        List<double> rounded = new List<double>();
+        foreach (double distance in match.BestDistances)
+        {
+            rounded.Add(Math.Round(distance, 3));
+        }
+        return Json(new
+        {
+            stage = "match",
+            matched = match.Matched,
+            bestDistances = rounded,
+            averageDistance = Math.Round(match.AverageDistance, 3),
+            matchingSamples = match.MatchingSamples,
+            requiredSamples = match.RequiredSamples,
+            threshold = match.Threshold
+        });
+    }
 
-        private static string Key(string id) => "face-demo:" + id;
+    [HttpPost("reset"), ValidateAntiForgeryToken]
+    public IActionResult Reset()
+    {
+        string? id = DemoId();
+        if (id != null)
+        {
+            cache.Remove(CacheKey(id));
+        }
+        return Json(new { reset = true });
+    }
 
-        private BadRequestObjectResult NoDemo() => BadRequest(new { error = "Reload /face-demo to start a demo session." });
+    // The random id of this demo browser, from its cookie (null when missing or malformed).
+    private string? DemoId()
+    {
+        string? id = Request.Cookies[CookieName];
+        if (id == null || id.Length <= 10 || id.Length >= 64)
+        {
+            return null;
+        }
+        return id;
+    }
+
+    private List<float[]>? Templates(string id)
+    {
+        return cache.Get<List<float[]>>(CacheKey(id));
+    }
+
+    private static string CacheKey(string id)
+    {
+        return "face-demo:" + id;
+    }
+
+    private BadRequestObjectResult NoDemo()
+    {
+        return BadRequest(new { error = "Reload /face-demo to start a demo session." });
     }
 }

@@ -11,22 +11,47 @@ using Orange_Tendering_System.Services;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
 
-public class ForgotPasswordModel(
-    UserManager<ApplicationUser> users,
-    IEmailSender emailSender,
-    AccountLinkGenerator accountLinks,
-    IConfiguration configuration,
-    ILogger<ForgotPasswordModel> logger) : PageModel
+/// <summary>
+/// Step 1 of password recovery: email a one-hour reset link (Program.cs: TokenLifespan = 1 hour) to an active,
+/// confirmed account. The answer is the same for every email, so the page does not reveal which accounts exist.
+/// </summary>
+public class ForgotPasswordModel : PageModel
 {
-    [BindProperty] public InputModel Input { get; set; } = new();
+    private readonly UserManager<ApplicationUser> users;
+    private readonly IEmailSender emailSender;
+    private readonly AccountLinkGenerator accountLinks;
+    private readonly IConfiguration configuration;
+    private readonly ILogger<ForgotPasswordModel> logger;
+
+    public ForgotPasswordModel(
+        UserManager<ApplicationUser> users,
+        IEmailSender emailSender,
+        AccountLinkGenerator accountLinks,
+        IConfiguration configuration,
+        ILogger<ForgotPasswordModel> logger)
+    {
+        this.users = users;
+        this.emailSender = emailSender;
+        this.accountLinks = accountLinks;
+        this.configuration = configuration;
+        this.logger = logger;
+    }
+
+    [BindProperty]
+    public InputModel Input { get; set; } = new InputModel();
+
     public class InputModel
     {
-        [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!ModelState.IsValid) return Page();
+        if (!ModelState.IsValid)
+        {
+            return Page();
+        }
         if (!SmtpEmailSender.IsConfigured(configuration))
         {
             logger.LogError("Password recovery email delivery is not configured.");
@@ -34,18 +59,21 @@ public class ForgotPasswordModel(
             return Page();
         }
 
-        var user = await users.FindByEmailAsync(Input.Email.Trim());
+        ApplicationUser? user = await users.FindByEmailAsync(Input.Email.Trim());
         if (user == null || !await users.IsEmailConfirmedAsync(user) || !user.IsActive)
+        {
             return RedirectToPage("./ForgotPasswordConfirmation");
+        }
 
-        var code = await users.GeneratePasswordResetTokenAsync(user);
-        var encoded = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var url = accountLinks.GetUriByPage(HttpContext, "/Account/ResetPassword",
-            new { area = "Identity", code = encoded });
+        // Identity makes the reset code; it is Base64url-encoded so it can travel inside a link.
+        string code = await users.GeneratePasswordResetTokenAsync(user);
+        string encodedCode = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        string url = accountLinks.GetUriByPage(HttpContext, "/Account/ResetPassword", new { area = "Identity", code = encodedCode });
+
         try
         {
             await emailSender.SendEmailAsync(user.Email!, "Reset your password",
-                $"<p>Reset your password using <a href=\"{HtmlEncoder.Default.Encode(url)}\">this one-hour link</a>.</p><p>If you did not request this, ignore the message.</p>");
+                "<p>Reset your password using <a href=\"" + HtmlEncoder.Default.Encode(url) + "\">this one-hour link</a>.</p><p>If you did not request this, ignore the message.</p>");
         }
         catch (Exception exception)
         {

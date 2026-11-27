@@ -1,127 +1,102 @@
-// ORANGE TENDER MANAGEMENT SYSTEM — Owner: Ahmad (Authentication).
-// Identity reset-token flow with security audit.
-// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-#nullable disable
-
-using System;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
-using Orange_Tendering_System.Models.Entities;
 using Orange_Tendering_System.Data;
+using Orange_Tendering_System.Models.Entities;
 
-namespace Orange_Tendering_System.Areas.Identity.Pages.Account
+namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
+
+/// <summary>
+/// Step 2 of password recovery. The person opens the one-hour link from ForgotPassword (it carries the reset code),
+/// types the email and a new password, and Identity checks the code and saves the new password hash.
+/// </summary>
+public class ResetPasswordModel : PageModel
 {
-    public class ResetPasswordModel : PageModel
+    private readonly UserManager<ApplicationUser> users;
+    private readonly ApplicationDbContext db;
+
+    public ResetPasswordModel(UserManager<ApplicationUser> users, ApplicationDbContext db)
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly ApplicationDbContext _db;
+        this.users = users;
+        this.db = db;
+    }
 
-        public ResetPasswordModel(UserManager<ApplicationUser> userManager, ApplicationDbContext db)
+    [BindProperty]
+    public InputModel Input { get; set; } = new InputModel();
+
+    public class InputModel
+    {
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required, DataType(DataType.Password)]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        public string Password { get; set; } = string.Empty;
+
+        [DataType(DataType.Password), Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        /// <summary>The reset code from the link (kept in a hidden field).</summary>
+        [Required]
+        public string Code { get; set; } = string.Empty;
+    }
+
+    // GET /Identity/Account/ResetPassword?code=... (the code is Base64url-encoded in the link)
+    public IActionResult OnGet(string? code)
+    {
+        if (code == null)
         {
-            _userManager = userManager;
-            _db = db;
+            return BadRequest("A code must be supplied for password reset.");
         }
 
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [BindProperty]
-        public InputModel Input { get; set; }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public class InputModel
+        try
         {
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            [EmailAddress]
-            public string Email { get; set; }
+            Input.Code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
+        }
+        catch (FormatException)
+        {
+            return BadRequest("Invalid reset link.");
+        }
+        return Page();
+    }
 
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-            [DataType(DataType.Password)]
-            public string Password { get; set; }
-
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [DataType(DataType.Password)]
-            [Display(Name = "Confirm password")]
-            [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
-            public string ConfirmPassword { get; set; }
-
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
-            [Required]
-            public string Code { get; set; }
-
+    public async Task<IActionResult> OnPostAsync()
+    {
+        if (!ModelState.IsValid)
+        {
+            return Page();
         }
 
-        public IActionResult OnGet(string code = null)
+        ApplicationUser? user = await users.FindByEmailAsync(Input.Email);
+        if (user == null)
         {
-            if (code == null)
-            {
-                return BadRequest("A code must be supplied for password reset.");
-            }
-            else
-            {
-                try { Input = new InputModel { Code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code)) }; }
-                catch (FormatException) { return BadRequest("Invalid reset link."); }
-                return Page();
-            }
+            // The same answer as a success, so the page does not reveal which emails exist.
+            return RedirectToPage("./ResetPasswordConfirmation");
         }
 
-        public async Task<IActionResult> OnPostAsync()
+        // Identity checks that the code is valid, unused and less than one hour old, then saves the new hash.
+        IdentityResult result = await users.ResetPasswordAsync(user, Input.Code, Input.Password);
+        if (!result.Succeeded)
         {
-            if (!ModelState.IsValid)
-            {
-                return Page();
-            }
-
-            var user = await _userManager.FindByEmailAsync(Input.Email);
-            if (user == null)
-            {
-                // Don't reveal that the user does not exist
-                return RedirectToPage("./ResetPasswordConfirmation");
-            }
-
-            var result = await _userManager.ResetPasswordAsync(user, Input.Code, Input.Password);
-            if (result.Succeeded)
-            {
-                _db.AuditLogs.Add(new AuditLog
-                {
-                    UserId = user.Id, Action = "PasswordReset", EntityName = "ApplicationUser",
-                    EntityId = user.Id, CreatedAt = DateTime.UtcNow
-                });
-                await _db.SaveChangesAsync();
-                return RedirectToPage("./ResetPasswordConfirmation");
-            }
-
-            foreach (var error in result.Errors)
+            foreach (IdentityError error in result.Errors)
             {
                 ModelState.AddModelError(string.Empty, error.Description);
             }
             return Page();
         }
+
+        AuditLog audit = new AuditLog();
+        audit.UserId = user.Id;
+        audit.Action = "PasswordReset";
+        audit.EntityName = "ApplicationUser";
+        audit.EntityId = user.Id;
+        audit.CreatedAt = DateTime.UtcNow;
+        db.AuditLogs.Add(audit);
+        await db.SaveChangesAsync();
+        return RedirectToPage("./ResetPasswordConfirmation");
     }
 }

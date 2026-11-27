@@ -1,26 +1,19 @@
 @*
 ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Orange Intelligence - the shared intelligence workspace (every internal role except Supplier).
+PAGE: Orange Intelligence - the Sourcing Officer intelligence workspace.
 Four exclusive tabs (Overview, Suppliers, Tenders, AI Studio): a tab replaces the main content, it never stacks below
 another. All numbers come from the server (Services/Radar), already limited to the user's authorized scope; the scripts only
 draw them. The AI Studio tab (Gemini) has three features: supplier summary, text chat and a live voice call
 (intelligence-ai.js, intelligence-audio.js, Services/Radar/IntelligenceAiService.cs).
 *@
-@using Orange_Tendering_System.ViewModels
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
-    Layout = WorkspaceNavigation.LayoutFor(User);
+    Layout = "_SourcingOfficerLayout";
     var arabic = UiLanguage.IsArabic(Context);
     string L(string en, string ar) => arabic ? ar : en;
     string U(string action) => Url.Action(action, "Intelligence", new { area = "" })!;
-    var officerLayout = Layout == "_SourcingOfficerLayout";
 }
 @section Styles {
-    @if (!officerLayout)
-    {
-        <script src="~/js/sidebar-collapse.js" asp-append-version="true"></script>
-        <link rel="stylesheet" href="~/css/sidebar-collapse.css" asp-append-version="true" />
-    }
     <link rel="stylesheet" href="~/css/orange-radar.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/orange-intelligence.css" asp-append-version="true" />
 }
@@ -30,7 +23,7 @@ draw them. The AI Studio tab (Gemini) has three features: supplier summary, text
      data-ui-language="@(arabic ? "ar" : "en")"
      data-url-workspace="@U("Workspace")" data-url-simulate="@U("Simulate")"
      data-url-offer-comparison="@U("OfferComparison")"
-     data-url-offer-record="@(officerLayout ? Url.Action("Details", "Bids", new { area = "SourcingOfficer" }) : null)"
+     data-url-offer-record="@Url.Action("Details", "Bids", new { area = "SourcingOfficer" })"
      data-url-export="@U("Export")" data-three="@Url.Content("~/lib/three/three.module.min.js")">
 
     <!-- ===== Shared shell: brand, four exclusive tabs, global scope ===== -->
