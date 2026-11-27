@@ -37,7 +37,8 @@
             else if (e.target.closest('[data-wz-back]') && current > 1) show(current - 1, true);
         });
 
-        // Closing date chosen in "Tender Settings" feeds the Publish form (same form attribute), so Publish stays a single real action.
+        // The closing date is chosen inside the Publish stage and feeds its hidden UTC field. Publish stays disabled until the date is valid
+        // (the stage itself only opens once every earlier stage is complete).
         var deadline = root.querySelector('input[data-wz-deadline]'), utc = root.querySelector('input[data-wz-deadline-utc]'), echo = root.querySelector('[data-wz-deadline-echo]');
         var publish = root.querySelector('[data-wz-publish]'), publishHint = root.querySelector('[data-wz-publish-hint]'), badHint = root.querySelector('[data-wz-deadline-error]');
         function sync() {
@@ -52,6 +53,9 @@
         }
         if (deadline) {
             ['input', 'change'].forEach(function (n) { deadline.addEventListener(n, sync); });
+            // Never let Enter in the date field (or any other path) post the Publish form without a valid closing date.
+            var publishForm = publish && publish.form;
+            if (publishForm) publishForm.addEventListener('submit', function (e) { sync(); if (publish.disabled || !utc.value) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
             root.addEventListener('change', function (e) {
                 var pick = e.target.closest('[data-wz-preset]'); if (!pick || !pick.value) return;
                 // N days from now, at the same time of day as now in Jordan time (rounded up to 5 minutes); the field stays editable.

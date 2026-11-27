@@ -351,7 +351,7 @@
         @* 3 — Tender settings: weights and closing date *@
         <section class="wz-panel" data-wz-panel="3">
             <div class="wz-art-side"><div class="wz-ring" style="--a:@((wzFw ?? 0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%"><b>@(wzFw != null ? "100%" : "—")</b><small>@L("Total Weight", "إجمالي الوزن")</small></div></div>
-            <div class="wz-main"><h3>@L("Evaluation Weights & Closing Date", "أوزان التقييم وموعد الإغلاق")</h3>
+            <div class="wz-main"><h3>@L("Evaluation Weights", "أوزان التقييم")</h3>
                 @if (lowestPrice) { <p class="wz-lead">@L("This tender is evaluated 100% on the lowest compliant price: no committee weights are needed.", "تُقيَّم هذه المناقصة بنسبة ١٠٠٪ على أقل سعر مطابق: لا حاجة لأوزان اللجنة.")</p> }
                 else
                 {
@@ -371,14 +371,6 @@
                         </dl>
                     }
                 }
-                <h4>@L("Tender Closing Date & Time", "تاريخ ووقت إغلاق المناقصة")</h4>
-                @if (status == TenderStatus.Draft)
-                {
-                    <div class="wz-deadline"><select class="wz-select" data-wz-preset aria-label="@L("Days from now", "عدد الأيام من الآن")"><option value="">@L("Choose number of days…", "اختر عدد الأيام…")</option><option value="1">@L("In 1 day", "خلال يوم")</option><option value="2">@L("In 2 days", "خلال يومين")</option><option value="3">@L("In 3 days", "خلال ٣ أيام")</option><option value="5">@L("In 5 days", "خلال ٥ أيام")</option><option value="7">@L("In 1 week", "خلال أسبوع")</option><option value="14">@L("In 2 weeks", "خلال أسبوعين")</option><option value="21">@L("In 3 weeks", "خلال ٣ أسابيع")</option><option value="30">@L("In 1 month", "خلال شهر")</option></select>
-                        <input type="datetime-local" class="wz-select" data-wz-deadline aria-label="@L("Bidding deadline", "الموعد النهائي")" @(Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeeded && wzNeeded.Date > Model.UtcNow.AddHours(3).Date ? Html.Raw("max=\"" + wzNeeded.ToString("yyyy-MM-dd") + "T23:59\"") : null) /></div>
-                    @if (Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeededBy) { <p class="wz-muted">@(wzNeededBy.Date > Model.UtcNow.AddHours(3).Date ? L("The department needs the items by", "تحتاج الجهة الطالبة المواد بحلول") + " " + wzNeededBy.ToString("d MMM yyyy") + ". " + L("The closing date cannot be later.", "ولا يمكن أن يكون موعد الإغلاق بعد ذلك.") : L("The department's needed-by date", "تاريخ حاجة الجهة الطالبة") + " (" + wzNeededBy.ToString("d MMM yyyy") + ") " + L("is today or has passed, so you can choose any closing date.", "هو اليوم أو انتهى، فيمكنك اختيار أي موعد إغلاق."))</p> }
-                }
-                else { <p class="wz-strong">@WzTime(wzClosing)</p> }
                 @if (!lowestPrice)
                 {
                     @if (!wzApproved && status == TenderStatus.Draft && !(Model.CanApproveWeights && w?.State == WeightState.AwaitingApproval)) { <p class="wz-callout" role="status"><b aria-hidden="true">&#9203;</b> @(w == null ? L("Next step: send the tender to the committee so each member proposes the weights.", "الخطوة التالية: أرسل المناقصة إلى اللجنة ليقترح كل عضو الأوزان.") : w.State == WeightState.Proposals ? L($"Next step: the committee proposes the weights ({votedMembers} of {evalMembers.Count} so far). \"Continue\" opens when the weights are approved.", $"الخطوة التالية: تقترح اللجنة الأوزان ({votedMembers} من {evalMembers.Count} حتى الآن). يُفتح \"متابعة\" عند اعتماد الأوزان.") : L("Next step: approve the average of the proposals to unlock \"Continue\".", "الخطوة التالية: اعتمد متوسط المقترحات لفتح \"متابعة\".")) </p> }
@@ -407,7 +399,21 @@
                     <div><dt>@L("Invited Suppliers", "الموردون المدعوون")</dt><dd>@(round?.Invitations.Count ?? 0)</dd></div>
                 </dl>
                 <div class="wz-actions">
-                    @if (status == TenderStatus.Draft && wzApproved) { <form id="wz-open-form" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="deadline" data-wz-deadline-utc /><button class="wz-primary" data-wz-publish>&#128227; @L("Publish to Suppliers", "نشر للموردين")</button><small data-wz-publish-hint>@L("Choose the closing date in the Tender Settings stage first.", "اختر تاريخ الإغلاق في مرحلة إعدادات المناقصة أولاً.")</small><small class="wz-bad" data-wz-deadline-error hidden>@L("The closing time must be at least one hour from now.", "يجب أن يكون وقت الإغلاق بعد ساعة على الأقل من الآن.")</small></form> }
+                    @if (status == TenderStatus.Draft && wzApproved)
+                    {
+                        @* The closing date is chosen here, in the Publish stage. This stage only opens once Requirements, Committee and the evaluation weights are complete,
+                           and the Publish button stays disabled (server-rendered) until a valid closing date is chosen; workflow-wizard.js enables it. *@
+                        <form id="wz-open-form" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post" class="wp-form wz-publish-form">
+                            <h4>@L("Tender Closing Date & Time", "تاريخ ووقت إغلاق المناقصة")</h4>
+                            <div class="wz-deadline"><select class="wz-select" data-wz-preset aria-label="@L("Days from now", "عدد الأيام من الآن")"><option value="">@L("Choose number of days…", "اختر عدد الأيام…")</option><option value="1">@L("In 1 day", "خلال يوم")</option><option value="2">@L("In 2 days", "خلال يومين")</option><option value="3">@L("In 3 days", "خلال ٣ أيام")</option><option value="5">@L("In 5 days", "خلال ٥ أيام")</option><option value="7">@L("In 1 week", "خلال أسبوع")</option><option value="14">@L("In 2 weeks", "خلال أسبوعين")</option><option value="21">@L("In 3 weeks", "خلال ٣ أسابيع")</option><option value="30">@L("In 1 month", "خلال شهر")</option></select>
+                                <input type="datetime-local" class="wz-select" data-wz-deadline aria-label="@L("Bidding deadline", "الموعد النهائي")" @(Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeeded && wzNeeded.Date > Model.UtcNow.AddHours(3).Date ? Html.Raw("max=\"" + wzNeeded.ToString("yyyy-MM-dd") + "T23:59\"") : null) /></div>
+                            @if (Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeededBy) { <p class="wz-muted">@(wzNeededBy.Date > Model.UtcNow.AddHours(3).Date ? L("The department needs the items by", "تحتاج الجهة الطالبة المواد بحلول") + " " + wzNeededBy.ToString("d MMM yyyy") + ". " + L("The closing date cannot be later.", "ولا يمكن أن يكون موعد الإغلاق بعد ذلك.") : L("The department's needed-by date", "تاريخ حاجة الجهة الطالبة") + " (" + wzNeededBy.ToString("d MMM yyyy") + ") " + L("is today or has passed, so you can choose any closing date.", "هو اليوم أو انتهى، فيمكنك اختيار أي موعد إغلاق."))</p> }
+                            <input type="hidden" name="deadline" data-wz-deadline-utc />
+                            <button class="wz-primary" data-wz-publish disabled>&#128227; @L("Publish to Suppliers", "نشر للموردين")</button>
+                            <small data-wz-publish-hint>@L("Choose the closing date above to enable publishing.", "اختر تاريخ الإغلاق أعلاه لتفعيل النشر.")</small>
+                            <small class="wz-bad" data-wz-deadline-error hidden>@L("The closing time must be at least one hour from now.", "يجب أن يكون وقت الإغلاق بعد ساعة على الأقل من الآن.")</small>
+                        </form>
+                    }
                     @if (status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open && inviteable is { Count: > 0 })
                     {
                         <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form">@foreach (var sp in inviteable) { <input type="hidden" name="supplierIds" value="@sp.Id" /> }<button class="wz-primary" data-confirm="@L("Send tender invitations to all eligible suppliers?", "هل تريد إرسال دعوات المناقصة لجميع الموردين المؤهلين؟")">@L($"Invite {inviteable.Count} eligible supplier(s)", $"دعوة {inviteable.Count} من الموردين المؤهلين")</button></form>
