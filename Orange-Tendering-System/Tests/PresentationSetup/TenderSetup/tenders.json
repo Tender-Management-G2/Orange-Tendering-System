@@ -1,0 +1,92 @@
+{
+  "suppliers": {
+    "ali": { "email": "ali@gmail.com", "company": "Ali Technology Supplies", "address": "Wasfi Al-Tal St., Amman, Jordan", "phone": "+962 7 9512 4410", "registration": "200145872", "signer": "Ali" },
+    "mosa": { "email": "mosa@gmail.com", "company": "Mosa Computer Systems", "address": "Mecca St., Amman, Jordan", "phone": "+962 7 9634 1187", "registration": "200238419", "signer": "Mosa" },
+    "omar": { "email": "omar@gmail.com", "company": "Omar IT Solutions", "address": "University St., Irbid, Jordan", "phone": "+962 7 7845 2309", "registration": "200311064", "signer": "Omar" }
+  },
+  "tenders": [
+    {
+      "key": "t1", "stop": 1,
+      "item": "48-port PoE+ network switch", "category": "Telecommunications", "unit": "Each", "quantity": 12,
+      "specifications": "Layer 3 managed switch\n48 x 1 GbE PoE+ ports, 740 W PoE budget\n4 x 10 GbE SFP+ uplinks\nStacking support and redundant power supply\nRack-mount 1U with mounting kit\nLifetime limited hardware warranty",
+      "justification": "The access switches in the Amman, Irbid and Zarqa branches have reached end of support and cannot power the new IP phones and access points. Replacing them keeps the branch networks secure and supported.",
+      "priority": "High", "neededDays": 45, "estimated": 26400, "image": "switch"
+    },
+    {
+      "key": "t2", "stop": 2,
+      "item": "Business laptop", "category": "IT & Electronics", "unit": "Each", "quantity": 25,
+      "specifications": "Intel Core Ultra 7 processor\n16 GB DDR5 RAM, 512 GB NVMe SSD\n14-inch FHD+ anti-glare display\nWindows 11 Pro, TPM 2.0, fingerprint reader\nWi-Fi 6E, Bluetooth 5.3\n3-year next-business-day onsite warranty",
+      "justification": "The finance team's laptops are more than five years old and no longer receive security updates. New laptops are required for the year-end closing and the new ERP rollout.",
+      "priority": "High", "neededDays": 40, "estimated": 21250, "image": "laptop"
+    },
+    {
+      "key": "t3", "stop": 3,
+      "item": "A3 colour multifunction printer", "category": "IT & Electronics", "unit": "Each", "quantity": 10,
+      "specifications": "A3/A4 colour laser, print, copy, scan and fax\nMinimum 35 pages per minute\nDuplex automatic document feeder, 100 sheets\nSecure print release with employee ID cards\nNetwork and Wi-Fi connectivity\n3-year maintenance contract including toner",
+      "justification": "Each floor currently relies on several small desktop printers with high toner costs. Ten shared multifunction printers with secure release reduce running costs and protect confidential documents.",
+      "priority": "Normal", "neededDays": 50, "estimated": 18500, "image": "printer"
+    },
+    {
+      "key": "t4", "stop": 4,
+      "item": "Wi-Fi 6 indoor access point", "category": "Telecommunications", "unit": "Each", "quantity": 40,
+      "specifications": "Wi-Fi 6 (802.11ax), dual band, 4x4 MU-MIMO\n2.5 GbE uplink port, PoE+ powered\nCentral cloud or controller management\nWPA3 Enterprise security\nCeiling mount kit included\n5-year warranty",
+      "justification": "Wireless coverage in the head office is weak on several floors and the current access points do not support WPA3. Forty Wi-Fi 6 access points cover all floors and meeting rooms.",
+      "priority": "Normal", "neededDays": 45, "estimated": 16000, "image": "accesspoint",
+      "offers": [
+        { "supplier": "ali", "submit": true, "unitPrice": 372.00, "delivery": 21, "warranty": 60, "product": "Aruba Instant On AP25", "proposal": "Wi-Fi 6 4x4 access points with 2.5 GbE uplink, cloud management, ceiling mounts and on-site installation by certified engineers." },
+        { "supplier": "mosa", "submit": true, "unitPrice": 355.00, "delivery": 28, "warranty": 60, "product": "Ubiquiti UniFi U6 Pro", "proposal": "Wi-Fi 6 access points with controller software, PoE+ powered, WPA3 Enterprise, configuration and coverage survey included." },
+        { "supplier": "omar", "submit": false, "unitPrice": 389.00, "delivery": 18, "warranty": 60, "product": "Cisco Meraki MR46", "proposal": "Enterprise Wi-Fi 6 4x4 access points with cloud dashboard, 5-year licence and warranty, installation and training for the IT team." }
+      ]
+    },
+    {
+      "key": "t5", "stop": 5,
+      "item": "10 kVA online UPS", "category": "Electrical Equipment", "unit": "Each", "quantity": 4,
+      "specifications": "Double-conversion online UPS, 10 kVA / 10 kW\nRack/tower convertible with rail kit\nExternal battery pack for 30 minutes at 50% load\nNetwork management card (SNMP)\nHot-swappable batteries\n3-year warranty including batteries",
+      "justification": "The server room UPS units are nine years old and their batteries fail the monthly test. Four new online UPS units protect the servers and network core during power cuts.",
+      "priority": "Urgent", "neededDays": 35, "estimated": 22000, "image": "ups",
+      "offers": [
+        { "supplier": "ali", "submit": true, "unitPrice": 5480.00, "delivery": 30, "warranty": 36, "product": "APC Smart-UPS SRT 10kVA", "proposal": "Double-conversion online UPS with network card, extended battery pack and rail kit. Installation and load test included." },
+        { "supplier": "mosa", "submit": true, "unitPrice": 5195.00, "delivery": 35, "warranty": 36, "product": "Eaton 9PX 10kVA", "proposal": "Online UPS with hot-swappable batteries, external battery module and SNMP card. Delivery, installation and commissioning included." },
+        { "supplier": "omar", "submit": true, "unitPrice": 5320.00, "delivery": 25, "warranty": 36, "product": "Vertiv Liebert GXT5 10kVA", "proposal": "Online double-conversion UPS with Liebert IntelliSlot card, battery cabinet and rack kit. On-site installation and two preventive visits per year." }
+      ]
+    },
+    {
+      "key": "t6", "stop": 6,
+      "item": "Engineering desktop workstation", "category": "IT & Electronics", "unit": "Each", "quantity": 15,
+      "specifications": "Intel Core i9 or AMD Ryzen 9 processor\n64 GB DDR5 RAM, 1 TB NVMe SSD + 2 TB HDD\nNVIDIA RTX A2000 12 GB graphics or equivalent\n27-inch 4K IPS monitor included\nWindows 11 Pro for Workstations\n3-year onsite warranty",
+      "justification": "The network planning team runs simulation and design software that the current office PCs cannot handle. Fifteen workstations are needed for the 5G rollout planning project.",
+      "priority": "High", "neededDays": 40, "estimated": 33750, "image": "workstation",
+      "offers": [
+        { "supplier": "ali", "submit": true, "unitPrice": 2240.00, "delivery": 21, "warranty": 36, "product": "Dell Precision 3680 Tower", "proposal": "Core i9-14900K, 64 GB DDR5, RTX A2000 12 GB, 1 TB NVMe + 2 TB HDD, Dell 27 4K monitor, 3-year ProSupport onsite." },
+        { "supplier": "mosa", "submit": true, "unitPrice": 2185.00, "delivery": 30, "warranty": 36, "product": "HP Z2 G9 Tower", "proposal": "Core i9-13900, 64 GB DDR5, RTX A2000 12 GB, 1 TB NVMe + 2 TB HDD, HP Z27k 4K monitor, 3-year onsite warranty." },
+        { "supplier": "omar", "submit": true, "unitPrice": 2295.00, "delivery": 18, "warranty": 36, "product": "Lenovo ThinkStation P3 Tower", "proposal": "Core i9-14900, 64 GB DDR5, RTX A2000 12 GB, 1 TB NVMe + 2 TB HDD, ThinkVision 27 4K monitor, 3-year Premier Support." }
+      ],
+      "scores": {
+        "majed": { "ali": [84, 88, 85, 80], "mosa": [92, 82, 80, 72], "omar": [80, 86, 88, 90] },
+        "tariq": { "ali": [85, 90, 84, 82], "mosa": [91, 80, 78, 70], "omar": [79, 85, 86, 88] },
+        "amal":  { "ali": [86, 87, 85, 80], "mosa": [93, 81, 79, 72], "omar": [81, 84, 87, 89] },
+        "saja":  { "ali": [84, 91, 86, 81], "mosa": [92, 79, 80, 71], "omar": [80, 87, 88, 90] }
+      }
+    },
+    {
+      "key": "t7", "stop": 7,
+      "item": "Meeting room video conferencing kit", "category": "Telecommunications", "unit": "Each", "quantity": 8,
+      "specifications": "4K PTZ camera with auto-framing\nTable microphone pods with noise suppression\nCertified for Microsoft Teams and Zoom Rooms\n10-inch touch controller\n65-inch 4K display with wall mount\nInstallation, cabling and 3-year warranty",
+      "justification": "Eight meeting rooms have no video conferencing, so regional meetings depend on personal laptops. Room kits allow reliable meetings with the regional offices and partners.",
+      "priority": "Normal", "neededDays": 50, "estimated": 38400, "image": "videoconf",
+      "offers": [
+        { "supplier": "ali", "submit": true, "unitPrice": 4620.00, "delivery": 28, "warranty": 36, "product": "Logitech Rally Plus kit", "proposal": "Logitech Rally Plus with Tap controller, Samsung 65-inch 4K display, wall mount, cabling and installation, Teams Rooms certified." },
+        { "supplier": "mosa", "submit": true, "unitPrice": 4480.00, "delivery": 35, "warranty": 36, "product": "Poly Studio X70 kit", "proposal": "Poly Studio X70 with TC8 controller, LG 65-inch 4K display, installation and configuration for Microsoft Teams." },
+        { "supplier": "omar", "submit": true, "unitPrice": 4750.00, "delivery": 21, "warranty": 36, "product": "Yealink MVC860 kit", "proposal": "Yealink MVC860 Teams Rooms system, dual 4K cameras, mic pods, Sony 65-inch BRAVIA display, installation and user training." }
+      ],
+      "scores": {
+        "majed": { "ali": [86, 90, 88, 84], "mosa": [92, 80, 78, 72], "omar": [80, 86, 84, 90] },
+        "tariq": { "ali": [87, 91, 86, 85], "mosa": [91, 79, 80, 70], "omar": [79, 84, 85, 88] },
+        "amal":  { "ali": [86, 89, 87, 84], "mosa": [93, 81, 79, 71], "omar": [81, 85, 84, 89] },
+        "saja":  { "ali": [85, 92, 88, 83], "mosa": [92, 78, 80, 72], "omar": [80, 87, 86, 90] }
+      }
+    }
+  ],
+  "weights": { "majed": [40, 60], "tariq": [30, 70], "amal": [50, 50], "saja": [40, 60] },
+  "criteria": [ ["Compliance with technical specifications", 50], ["Warranty and after-sales support", 30], ["Delivery schedule", 20] ]
+}
