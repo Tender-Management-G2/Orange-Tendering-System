@@ -2,49 +2,36 @@ using Orange_Tendering_System.Models.Entities;
 
 namespace Orange_Tendering_System.Models.Biometric;
 
-/// <summary>Settings for biometric sign-in (section "Biometric" in configuration; every value has a default).</summary>
+/// <summary>Settings for biometric sign-in (section "Biometric" in appsettings.json; every value has a default).</summary>
 public class BiometricOptions
 {
-    /// <summary>WebAuthn relying-party id. Default: the host name of the request (for example "localhost").</summary>
+    /// <summary>WebAuthn relying-party id (the site name a passkey belongs to). Default: the host name of the request, for example "localhost".</summary>
     public string? RpId { get; set; }
 
-    /// <summary>Origins a WebAuthn response may come from. Default: the origin of the request.</summary>
+    /// <summary>Origins a WebAuthn answer may come from. Default: the origin of the request.</summary>
     public string[]? Origins { get; set; }
-
-    public string RpName { get; set; } = "Sourcing & Tender Management System";
 
     /// <summary>Largest allowed Euclidean distance between a live face descriptor and an enrolled one.</summary>
     public double FaceMatchThreshold { get; set; } = 0.5;
 
-    /// <summary>How long a one-time face challenge stays valid.</summary>
+    /// <summary>How long a one-time face token stays valid.</summary>
     public int ChallengeSeconds { get; set; } = 90;
 
-    /// <summary>
-    /// How long a one-time fingerprint (passkey) challenge stays valid. Longer than the face one,
-    /// because using a phone through the QR code (scan, unlock, confirm) takes a while.
-    /// </summary>
+    /// <summary>How long a passkey challenge stays valid. Longer than the face one: using a phone (scan, unlock, confirm) takes a while.</summary>
     public int PasskeyChallengeSeconds { get; set; } = 300;
 
-    /// <summary>
-    /// Legacy setting, not read. Face sign-in always follows a correct password: the password step opens a
-    /// short-lived pre-auth transaction (SupplierPreAuth) and the face check is accepted only inside it.
-    /// </summary>
-    public bool FaceLoginRequiresPassword { get; set; } = true;
-
-    /// <summary>How long a supplier has, after a correct password, to complete the face step before starting again.</summary>
+    /// <summary>How long the Face ID / Fingerprint identity step (SupplierPreAuth) stays open.</summary>
     public int PreAuthSeconds { get; set; } = 300;
 
     /// <summary>
-    /// Owner decision 2026-11-15: after a correct password an approved supplier may choose "Continue with Email &amp;
-    /// Password" instead of face or passkey. The choice is accepted only inside the server-side pre-auth transaction.
-    /// Set to false to make face or passkey mandatory again for the supplier workspace.
+    /// Owner decision 2026-11-15: an approved supplier may enter the supplier workspace with Email &amp; Password.
+    /// Set to false to make Face ID or Fingerprint mandatory for the supplier workspace again.
     /// </summary>
     public bool SupplierPasswordOnly { get; set; } = true;
 
     /// <summary>
-    /// Extra Data Protection application names whose face templates are still readable (they are re-encrypted with the
-    /// current key scope on first use). Before 2026-11-15 the scope was the content root folder of whichever copy ran.
-    /// In Development the content roots of sibling checkouts are tried automatically.
+    /// Extra Data Protection application names whose face templates can still be read (they are re-encrypted with the
+    /// current key scope on first use). Before 2026-11-15 the scope was the folder of whichever copy ran.
     /// </summary>
     public string[] LegacyKeyScopes { get; set; } = [];
 
@@ -52,47 +39,57 @@ public class BiometricOptions
     public int MaxPasskeysPerUser { get; set; } = 10;
 
     /// <summary>
-    /// The public HTTPS address of this site (for example the ngrok URL), offered when a supplier opens the
-    /// "use my phone" setup on an address a phone cannot reach (http://localhost). A passkey belongs to the
-    /// host name it was created on (the WebAuthn RP ID), so changing this domain later means registering
-    /// phones again. Null: phone setup works only when the page itself is opened over a public HTTPS address.
+    /// The public HTTPS address of this site (for example the ngrok URL), used for the phone QR code when the page is
+    /// opened on an address a phone cannot reach (http://localhost). Null: the phone flow works only when the page itself
+    /// is opened over a public HTTPS address.
     /// </summary>
     public string? PublicOrigin { get; set; }
 
-    /// <summary>Lifetime of a QR code / email link that registers a phone (single use).</summary>
+    /// <summary>Lifetime of a QR code / email link that registers a phone.</summary>
     public int PhoneEnrollSeconds { get; set; } = 600;
 
-    /// <summary>Lifetime of a QR code that approves a desktop sign-in from the phone (single use).</summary>
+    /// <summary>Lifetime of a QR code that approves a computer's sign-in from the phone.</summary>
     public int PhoneSignInSeconds { get; set; } = 180;
 
     /// <summary>"Send setup link to my email" messages allowed per account inside the failure window.</summary>
     public int PhoneLinkEmailsPerWindow { get; set; } = 3;
 
-    /// <summary>New phone QR codes (setup or sign-in) allowed per account inside the failure window.</summary>
+    /// <summary>New phone QR codes allowed per account inside the failure window.</summary>
     public int PhoneLinksPerWindow { get; set; } = 10;
 
-    /// <summary>Failed biometric attempts allowed per IP address / account name inside the window.</summary>
+    /// <summary>Failed biometric attempts allowed per IP address / account inside the window.</summary>
     public int MaxFailuresPerWindow { get; set; } = 10;
 
     public int FailureWindowMinutes { get; set; } = 10;
 }
 
-/// <summary>Relying-party details for one request.</summary>
-public record RpInfo(string RpId, string[] Origins, string RpName);
-
+/// <summary>The answer of a face or passkey check: success (with the account) or the error message.</summary>
 public class BiometricResult
 {
     public bool Succeeded { get; set; }
     public string? Error { get; set; }
 
-    /// <summary>The account the verification belongs to (sign-in flows).</summary>
+    /// <summary>The account the check belongs to (sign-in flows).</summary>
     public ApplicationUser? User { get; set; }
 
-    public static BiometricResult Fail(string error) => new() { Error = error };
-    public static BiometricResult Ok(ApplicationUser? user = null) => new() { Succeeded = true, User = user };
+    public static BiometricResult Fail(string error)
+    {
+        BiometricResult result = new BiometricResult();
+        result.Succeeded = false;
+        result.Error = error;
+        return result;
+    }
+
+    public static BiometricResult Ok(ApplicationUser? user)
+    {
+        BiometricResult result = new BiometricResult();
+        result.Succeeded = true;
+        result.User = user;
+        return result;
+    }
 }
 
-// ---------- Fingerprint / device passkey (WebAuthn) ----------
+// ---------- Fingerprint / passkey (WebAuthn). The JSON bodies sent by wwwroot/js/biometric.js. ----------
 
 public class PasskeyRegisterRequest
 {
@@ -100,7 +97,7 @@ public class PasskeyRegisterRequest
     public string? Label { get; set; }
 }
 
-/// <summary>Enrolment starts with a password re-check, so a hijacked session cannot add its own biometrics.</summary>
+/// <summary>Every enrollment starts with the current password, so a stolen session cannot add its own face or device.</summary>
 public class EnrollStartRequest
 {
     public string? Password { get; set; }
@@ -112,14 +109,14 @@ public class PasskeyLoginRequest
     public string? ReturnUrl { get; set; }
 }
 
-// ---------- Phone link (QR code / email link opened on a smartphone) ----------
+// ---------- Phone link (QR code / email link opened on a smartphone). Sent by wwwroot/js/phone-passkey.js. ----------
 
-/// <summary>A request from the phone page. The token comes from the QR code or email link (URL fragment).</summary>
 public class PhoneLinkRequest
 {
+    /// <summary>The one-time token from the QR code or email link.</summary>
     public string? Token { get; set; }
 
-    /// <summary>Sign-in approval only: the two-digit number shown on the computer.</summary>
+    /// <summary>Sign-in only: the two-digit number shown on the computer.</summary>
     public string? Code { get; set; }
 
     public string? CredentialJson { get; set; }
@@ -130,59 +127,64 @@ public class PhoneSignInCompleteRequest
     public string? ReturnUrl { get; set; }
 }
 
-// ---------- Face recognition (instant capture, no liveness) ----------
+// ---------- Face recognition ----------
 
+/// <summary>One face sample from the browser.</summary>
 public class FaceDescriptorSample
 {
-    /// <summary>Milliseconds since capture started.</summary>
+    /// <summary>Milliseconds since the capture started.</summary>
     public double T { get; set; }
 
-    /// <summary>The 128-number face descriptor produced in the browser.</summary>
+    /// <summary>The 128 numbers (descriptor) computed by face-api.js.</summary>
     public float[] V { get; set; } = [];
 }
 
+/// <summary>The JSON body of /Biometrics/FaceEnroll, /Biometrics/FaceLogin and the face demo.</summary>
 public class FaceSubmission
 {
+    /// <summary>The one-time token from the challenge request.</summary>
     public string Token { get; set; } = string.Empty;
-    public string? Email { get; set; }
-
-    /// <summary>Legacy field, ignored (the enrollment password is checked when the challenge is issued).</summary>
-    public string? Password { get; set; }
 
     public List<FaceDescriptorSample> Descriptors { get; set; } = [];
 
-    /// <summary>Enrolment only: replace the templates already stored instead of adding to them.</summary>
+    /// <summary>Enrollment only: replace the stored samples instead of adding to them.</summary>
     public bool Replace { get; set; }
 
     public string? ReturnUrl { get; set; }
 }
 
-/// <summary>
-/// Result of comparing live face samples with enrolled templates (FaceService.Match). Used by sign-in and,
-/// with its numbers shown, by the development-only /face-demo page.
-/// </summary>
-/// <param name="BestDistances">For each live sample, the distance to its closest enrolled template.</param>
-public record FaceMatch(bool Matched, IReadOnlyList<double> BestDistances, double AverageDistance,
-    int MatchingSamples, int RequiredSamples, double Threshold);
+/// <summary>The details of one face comparison (FaceService.Match). The demo page shows these numbers.</summary>
+public class FaceMatch
+{
+    public bool Matched { get; set; }
 
-/// <summary>A one-time token for one face attempt, so a captured submission cannot be replayed.</summary>
+    /// <summary>For each live sample: the distance to its closest enrolled template.</summary>
+    public List<double> BestDistances { get; set; } = new List<double>();
+
+    /// <summary>The distance of the averaged live descriptor.</summary>
+    public double AverageDistance { get; set; }
+
+    public int MatchingSamples { get; set; }
+    public int RequiredSamples { get; set; }
+    public double Threshold { get; set; }
+}
+
+/// <summary>A one-time token for one face attempt.</summary>
 public class FaceChallengeResponse
 {
     public string Token { get; set; } = string.Empty;
     public int ExpiresInSeconds { get; set; }
 }
 
-// ---------- Development-only face demo (/face-demo) ----------
+// ---------- Pages ----------
 
 public class FaceDemoViewModel
 {
-    /// <summary>Number of samples of the current test face kept in memory (0 = none registered).</summary>
+    /// <summary>Samples of the current test face kept in memory (0 = none registered).</summary>
     public int TestFaceSamples { get; set; }
 
     public double Threshold { get; set; }
 }
-
-// ---------- Manage page ----------
 
 public class BiometricManageViewModel
 {
@@ -195,5 +197,4 @@ public class PasskeyRow
     public string Id { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
-    public DateTime? LastUsedAt { get; set; }
 }

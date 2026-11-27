@@ -5,7 +5,6 @@
 .wz-head-main{grid-area:main;display:grid;gap:2px}.wz-kicker{font-weight:800;font-size:13px;letter-spacing:.06em;color:var(--wz-orange)}
 .wz-head h2{margin:0;font-size:25px;letter-spacing:-.02em}.wz-sub{margin:0;color:var(--ws-muted,#6b7280);font-size:14px}
 .wz-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}.wz-chip{display:inline-flex;align-items:center;padding:3px 12px;border-radius:999px;font-size:12px;font-weight:800;background:var(--wz-soft);color:#b45300;border:1px solid #ffc690}.wz-chip-role{background:#fff;color:#7a4a1f}
-.wz-head>.tp{grid-area:pass;margin:0 44px 0 0}.wz-head .tp-pkg{width:128px;height:auto}.wz-head .tp-stage{gap:8px}
 .wz-head .wf-passport,.wz-head [class*="passport"]{max-width:100%}
 .wz-steps{grid-area:steps;display:flex;gap:6px;list-style:none;margin:8px 0 0;padding:0;overflow-x:auto;scrollbar-width:none}.wz-steps::-webkit-scrollbar{display:none}
 .wz-step{display:inline-flex;align-items:center;gap:7px;padding:6px 13px 6px 7px;border-radius:999px;border:1px solid var(--wz-rule);background:var(--ws-surface,#fff);color:var(--ws-muted,#6b7280);font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap;transition:border-color .15s,background .15s,color .15s}
@@ -47,6 +46,7 @@
 /* The popup's global section/form/button styles must not leak into the wizard. */
 .wz .wz-panel,.wz section.wz-panel{border:0;background:none;box-shadow:none;margin:0;padding:0;border-radius:0}
 .wz form.wp-form,.wz .wz-actions form{border:0;background:none;box-shadow:none;padding:0;margin:0}
+.wz [data-wz-panel="6"] .wp-opt > form.wp-form{margin:0 14px 14px}
 .wz button.wz-ghost,.wz a.wz-ghost{background:var(--ws-surface,#fff)!important;color:inherit!important;border:1px solid var(--wz-rule)!important;box-shadow:none!important}
 .wz button.wz-ghost:hover:not(:disabled){border-color:var(--wz-orange)!important}
 .wz button.wz-primary,.wz a.wz-primary{background:var(--wz-orange)!important;color:#fff!important;border:1px solid var(--wz-orange)!important;box-shadow:0 6px 16px #ff79003d!important}
@@ -64,12 +64,12 @@
 
 /* ---- Fit without scrolling: workflow-wizard.js adds wz-t1..t3 until the stage fits the popup height ---- */
 .wz.wz-t1 .wz-panel{grid-template-columns:1fr}.wz.wz-t1 .wz-art-side{display:none}
-.wz.wz-t1 .wz-head{padding:12px 22px 8px}.wz.wz-t1 .wz-head h2{font-size:21px}.wz.wz-t1 .wz-head>.tp .tp-pkg{width:96px}.wz.wz-t1 .wz-head>.tp{margin-right:40px}
+.wz.wz-t1 .wz-head{padding:12px 22px 8px}.wz.wz-t1 .wz-head h2{font-size:21px}
 .wz.wz-t1 .wz-body{padding:12px 22px}.wz.wz-t1 .wz-main{gap:6px}.wz.wz-t1 .wz-main h3{font-size:18px}.wz.wz-t1 .wz-lead{font-size:13px}
 .wz.wz-t1 .wz-rows>div{padding:6px 12px}.wz.wz-t1 .wz-people{gap:6px;grid-template-columns:repeat(2,minmax(0,1fr))}.wz.wz-t1 .wz-people li{padding:5px 10px}.wz.wz-t1 .wz-avatar{width:32px;height:32px}
 .wz.wz-t1 .wz-table td{padding:5px 10px}.wz.wz-t1 .wz-table th{padding:6px 10px}.wz.wz-t1 .wz-item{padding:7px 12px}.wz.wz-t1 .wz-specs{grid-template-columns:repeat(3,minmax(0,1fr))}.wz.wz-t1 .wz-specs span{padding:5px 10px}
 .wz.wz-t1 .wz-foot{padding:8px 22px}.wz.wz-t1 .wz-table{max-height:none;overflow:visible}
-.wz.wz-t2 .wz-sub,.wz.wz-t2 .wz-lead{display:none}.wz.wz-t2 .wz-head{padding:8px 20px 6px;row-gap:3px}.wz.wz-t2 .wz-head h2{font-size:19px}.wz.wz-t2 .wz-head>.tp .tp-pkg{width:70px}
+.wz.wz-t2 .wz-sub,.wz.wz-t2 .wz-lead{display:none}.wz.wz-t2 .wz-head{padding:8px 20px 6px;row-gap:3px}.wz.wz-t2 .wz-head h2{font-size:19px}
 .wz.wz-t2 .wz-chips{margin-top:0}.wz.wz-t2 .wz-chip{padding:1px 10px}.wz.wz-t2 .wz-steps{margin-top:2px}
 .wz.wz-t2 button.wz-step{font-size:12px!important;padding:3px 10px 3px 5px!important}.wz.wz-t2 .wz-step b{width:19px;height:19px;font-size:11px}
 .wz.wz-t2 .wz-body{padding:8px 20px}.wz.wz-t2 .wz-main h3{font-size:16px}.wz.wz-t2 .wz-main h4{margin:2px 0 0}
@@ -107,7 +107,7 @@
 /* ---- Fixed popup: the same size, header and footer on every stage; only the stage content changes ---- */
 .wf-dialog:has(.wz){width:min(1180px,96vw)!important;height:min(780px,94vh)!important;max-height:94vh!important}
 .wz{height:100%;min-height:0}
-.wz-head{padding:12px 24px 10px;row-gap:6px}.wz-head h2{font-size:21px}.wz-head>.tp{margin:0 40px 0 0}.wz-head>.tp .tp-pkg{width:84px}
+.wz-head{padding:12px 24px 10px;row-gap:6px}.wz-head h2{font-size:21px}
 .wz-sub{font-size:13px}.wz-chips{margin-top:2px}.wz-steps{margin-top:2px}
 .wz button.wz-step{font-size:12.5px!important;padding:4px 12px 4px 6px!important}
 .wz-body{overflow:auto;padding:14px 24px}.wz-main{gap:7px}.wz-main h3{font-size:19px}.wz-lead{font-size:13.5px}
@@ -116,19 +116,28 @@
 .wz .wz-approve>form,.wz .wz-approve>div{width:100%}
 @media (max-width:900px){.wf-dialog:has(.wz){width:100vw!important;height:100dvh!important;max-height:100dvh!important}}
 
-.wz-head{padding:10px 24px 8px;row-gap:4px}.wz-head-main{gap:1px}.wz-head h2{font-size:20px;line-height:1.2}.wz-head>.tp{margin:-4px 44px -6px 0}.wz-head>.tp .tp-pkg{width:72px}
-.wz-head .tp .tp-hit+svg{width:72px}.wz-chips{margin-top:0}
-
-/* the Tender Passport sits in the corner of the header instead of making the header taller */
-.wz-head{position:relative;padding:10px 24px 8px;grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"main" "steps"!important}
-.wz-head>.tp{position:absolute;top:2px;right:64px;margin:0;grid-area:auto}.wz-head>.tp .tp-pkg{width:78px}
-.wz-head-main{padding-right:300px}
+.wz-head{padding:10px 24px 8px;row-gap:4px;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main pass" "steps steps"}
+.wz-head-main{gap:1px;min-width:0;padding-right:38px;overflow-wrap:anywhere}
+.wz-head:has(>.tp) .wz-head-main{padding-right:0}
+.wz-head h2{font-size:20px;line-height:1.2}.wz-chips{margin-top:0}
+.wz-head>.tp{grid-area:pass;margin:0 38px 0 0}
+.wz-head>.tp .tp-stage{gap:8px;padding:0 10px 0 4px;border:1px solid var(--wz-rule);border-radius:14px;background:var(--ws-surface,#fff)}
+.wz-head>.tp .tp-box{width:clamp(72px,10vw,108px)}
+.wz-head>.tp .tp-caption strong{color:var(--ws-accent,#a84700)}
+.wz-head>.tp .tp-caption span{color:var(--ws-muted,#555e67)}
+@media (max-width:720px){
+    .wz-head{padding-inline:12px;column-gap:10px}
+    .wz-head>.tp .tp-stage{padding-inline:2px}
+}
 .wz-art-side{min-height:0;max-height:210px}
 
 /* messages from the server sit in their own rows instead of overlapping the stage */
 .wz{grid-template-rows:auto auto auto minmax(0,1fr) auto!important}
 .wz>.wz-head{grid-row:1}.wz>.wf-flash{grid-row:2;margin:8px 24px 0}.wz>.wf-error{grid-row:3;margin:8px 24px 0}.wz>.wz-body{grid-row:4}.wz>.wz-foot{grid-row:5}
-.wz-head-main{min-height:84px;align-content:start}.wz-head>.tp{top:0}
-.wz-head>.tp{transform:scale(.68);transform-origin:top right;top:-4px;right:60px}
 
 .wz .wz-bad{color:#b3261e;font-weight:700}
+
+.wz .wz-table.wz-supplier-bids {
+    max-height: min(22rem, 42vh);
+    overflow: auto;
+}

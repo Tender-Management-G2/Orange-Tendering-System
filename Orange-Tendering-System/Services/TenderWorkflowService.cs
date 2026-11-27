@@ -56,12 +56,12 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
     }
     private void Audit(ApplicationUser actor, int tenderId, string action, object? evidence = null) => db.AuditLogs.Add(new AuditLog
     { UserId = actor.Id, EntityName = "Tender", EntityId = tenderId.ToString(), Action = action, NewValues = JsonSerializer.Serialize(evidence), CreatedAt = Now });
-    private void Notify(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
-    { UserId = userId, Title = title, Message = message, Link = $"/Workflow/Details/{tenderId}", CreatedAt = Now });
-    // Notification whose link opens the evaluation meeting page ("Join meeting") for the person it is sent to.
-    private void NotifyMeeting(string userId, int tenderId, string title, string message) => db.Notifications.Add(new Notification
-    { UserId = userId, Title = title, Message = message, Link = $"/Meetings/Join/{tenderId}", CreatedAt = Now });
-    private async Task NotifyOfficerMeeting(int tenderId, string message) => NotifyMeeting((await GlobalOfficer()).Id, tenderId, "Evaluation meeting scheduled", message);
+    private void Notify(string userId, int tenderId, string title, string message, string? link = null) => db.Notifications.Add(new Notification
+    { UserId = userId, Title = title, Message = message, Link = link ?? $"/Workflow/Details/{tenderId}", CreatedAt = Now });
+    private void NotifyEvaluator(string userId, int tenderId, string title, string message) =>
+        Notify(userId, tenderId, title, message, NotificationDto.EvaluationWorkflowLink(tenderId));
+    private async Task NotifyOfficerMeeting(int tenderId, string message) =>
+        Notify((await GlobalOfficer()).Id, tenderId, "Evaluation meeting scheduled", message, $"/Meetings/Join/{tenderId}");
     private async Task NotifyOfficer(int tenderId, string title, string message) => Notify((await GlobalOfficer()).Id, tenderId, title, message);
 
     // Every mutation of a tender takes the same SQL Server row lock, including bidding,
@@ -126,7 +126,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
             if (SystemRoles.AccountRoles(role).All(roles.Contains)
                 && !roles.Intersect(new[] { SystemRoles.Admin, SystemRoles.Supplier, SystemRoles.SourcingOfficer }).Any()
                 && roles.Contains(manager ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee)
-                && !roles.Contains(manager ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager))
+                && (manager || !roles.Contains(SystemRoles.SourcingManager)))
                 eligible.Add(person);
         }
         return eligible.OrderBy(p => p.FullName ?? p.Email).ToList();
@@ -145,9 +145,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         RequireCreationField(!string.IsNullOrWhiteSpace(pr.Title) && !string.IsNullOrWhiteSpace(pr.Justification), nameof(input.PurchaseRequestId), "The purchase request must have a title and description.", "يجب أن يتضمن طلب الشراء عنوانًا ووصفًا.");
         RequireCreationField(input.EstimatedValue is >= 0.01m and <= 9999999999999999.99m && decimal.Round(input.EstimatedValue, 2) == input.EstimatedValue, nameof(input.EstimatedValue), "Enter a valid procurement value with up to two decimal places.", "أدخل قيمة تقديرية موجبة بمنزلتين عشريتين على الأكثر.");
         RequireCreationField((lowestPrice ? CurrencyRules.Offer : CurrencyRules.Tender).Contains(input.Currency), nameof(input.Currency), "Choose a supported tender currency.", "اختر عملة مدعومة للمناقصة.");
-        RequireCreationField(!string.IsNullOrWhiteSpace(input.CommercialConditions) && input.CommercialConditions.Length <= 10000, nameof(input.CommercialConditions), "Enter commercial conditions (up to 10,000 characters).", "أدخل الشروط التجارية بما لا يتجاوز ١٠٬٠٠٠ حرف.");
-        RequireCreationField(!string.IsNullOrWhiteSpace(input.DeliveryExpectations) && input.DeliveryExpectations.Length <= 4000, nameof(input.DeliveryExpectations), "Enter delivery expectations (up to 4,000 characters).", "أدخل متطلبات التسليم بما لا يتجاوز ٤٬٠٠٠ حرف.");
-        RequireCreationField(!string.IsNullOrWhiteSpace(input.MandatoryCompliance) && input.MandatoryCompliance.Length <= 4000, nameof(input.MandatoryCompliance), "Enter mandatory compliance conditions (up to 4,000 characters).", "أدخل شروط الامتثال الإلزامية بما لا يتجاوز ٤٬٠٠٠ حرف.");
+        RequireCreationField(input.CommercialConditions is null || input.CommercialConditions.Length <= 10000, nameof(input.CommercialConditions), "Enter commercial conditions (up to 10,000 characters).", "أدخل الشروط التجارية بما لا يتجاوز ١٠٬٠٠٠ حرف.");
+        RequireCreationField(input.DeliveryExpectations is null || input.DeliveryExpectations.Length <= 4000, nameof(input.DeliveryExpectations), "Enter delivery expectations (up to 4,000 characters).", "أدخل متطلبات التسليم بما لا يتجاوز ٤٬٠٠٠ حرف.");
+        RequireCreationField(input.MandatoryCompliance is null || input.MandatoryCompliance.Length <= 4000, nameof(input.MandatoryCompliance), "Enter mandatory compliance conditions (up to 4,000 characters).", "أدخل شروط الامتثال الإلزامية بما لا يتجاوز ٤٬٠٠٠ حرف.");
         if (lowestPrice)
         {
             ids = [input.SourcingManagerId];
@@ -164,7 +164,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                 var person = await users.FindByIdAsync(userId);
                 Require(person is { IsActive: true }, "Committee account missing or inactive.");
                 Require(await Role(person, i == 0 ? SystemRoles.SourcingManager : SystemRoles.EvaluationCommittee), "Each member must have the appropriate Identity role.");
-                Require(!await Role(person, i == 0 ? SystemRoles.EvaluationCommittee : SystemRoles.SourcingManager), i == 0 ? "The Sourcing Manager seat is only for a dedicated Sourcing Manager." : "A Sourcing Manager cannot take a committee member seat.");
+                Require(i == 0 || !await Role(person, SystemRoles.SourcingManager), "A Sourcing Manager cannot take a committee member seat.");
                 if (i == 1) RequireCreationField(person.DepartmentId == pr.DepartmentId, field, "Department representative must belong to the requesting department.", "يجب أن يكون ممثل القسم من القسم الطالب.");
             }
             catch (WorkflowException error) when (error is not TenderCreationFieldException)
@@ -176,7 +176,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         input.Description = pr.Justification;
         input.TechnicalRequirements = null;
         input.IsCritical = CriticalTenderEnabled && input.IsCritical;
-        var requirements = JsonSerializer.Serialize(new { input.CommercialConditions, input.DeliveryExpectations, input.MandatoryCompliance });
+        var requirements = input.CommercialConditions is null && input.DeliveryExpectations is null && input.MandatoryCompliance is null
+            ? null
+            : JsonSerializer.Serialize(new { input.CommercialConditions, input.DeliveryExpectations, input.MandatoryCompliance });
         var requiredDocuments = (input.RequiredDocuments ?? []).Distinct().ToList();
         RequireCreationField(requiredDocuments.All(k => OfferDocumentTypes.Find(k) != null), nameof(input.RequiredDocuments), "Choose required documents from the list.", "اختر الوثائق المطلوبة من القائمة.");
         RequireCreationField(requiredDocuments.Count > 0, nameof(input.RequiredDocuments), "Choose at least one required supplier document.", "اختر وثيقة واحدة على الأقل من وثائق المورد المطلوبة.");
@@ -434,7 +436,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         var meeting = zoomMeetingId != null ? $"Zoom meeting {zoomMeetingId} was created for this session. Use Join meeting in this notification."
             : input.MeetingUrl!.Contains("meet.jit.si") ? "The system created the video meeting room for this session. Use Join meeting in this notification at the scheduled time." : "The Zoom link was supplied by the officer; open it from the tender page.";
         await NotifyOfficerMeeting(id, $"Evaluation meeting scheduled for {JordanTime.Display(session.StartsAt)}. {meeting}");
-        foreach (var m in members) NotifyMeeting(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {JordanTime.Display(session.StartsAt)} and remains available after the meeting ends until you submit your final evaluation. {meeting} The reviewed AI analysis #{ai.Id} is attached to this meeting: download it (PDF) from the meeting card on the tender page, together with {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s).");
+        foreach (var m in members) NotifyEvaluator(m.UserId, id, "Evaluation invitation", $"Scoring opens automatically at {JordanTime.Display(session.StartsAt)} and remains available after the meeting ends until you submit your final evaluation. Open the tender to access the meeting, reviewed AI analysis #{ai.Id}, and {attachedDocuments} supplier document(s) for {eligible.Count} eligible offer(s).");
         Audit(a, id, "EvaluationScheduleEvidence", new { r.RoundNumber, session.StartsAt, session.EndsAt, ZoomMeetingId = zoomMeetingId, AiAnalysisId = ai.Id, EligibleBidIds = eligible.Select(x => x.Id), AttachedDocuments = attachedDocuments, InvitedMemberIds = members.Select(x => x.Id) });
     });
     // The Officer moves the meeting (and the scoring window) while nobody has submitted yet. Members and the Officer are notified.
@@ -451,7 +453,7 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
         db.Entry(s).Property(x => x.State).IsModified = true;
         var zoom = s.ZoomMeetingId != null ? " Update the time of the Zoom meeting as well if it was created outside this system." : "";
         foreach (var m in await Members(id, CommitteeType.Evaluation))
-            NotifyMeeting(m.UserId, id, "Evaluation meeting rescheduled", $"New time: {JordanTime.Display(s.StartsAt)} to {JordanTime.Display(s.EndsAt)}. Reason: {reason.Trim()}. The meeting link is unchanged.");
+            NotifyEvaluator(m.UserId, id, "Evaluation meeting rescheduled", $"New time: {JordanTime.Display(s.StartsAt)} to {JordanTime.Display(s.EndsAt)}. Reason: {reason.Trim()}. The meeting link is unchanged.");
         await NotifyOfficerMeeting(id, $"Evaluation meeting moved to {JordanTime.Display(s.StartsAt)} - {JordanTime.Display(s.EndsAt)}.{zoom}");
         Audit(a, id, "EvaluationRescheduleEvidence", new { Old = old, New = new { s.StartsAt, s.EndsAt }, Reason = reason.Trim() });
     });

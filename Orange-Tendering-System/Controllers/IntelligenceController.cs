@@ -1,29 +1,23 @@
 // ORANGE TENDER MANAGEMENT SYSTEM
-// Module: Orange Intelligence (shared intelligence workspace, formerly Sourcing Officer / Market Intelligence)
-// Purpose: the intelligence page, its analytics JSON endpoints and the three Gemini AI Studio endpoints, for every internal
-// role except Supplier. Data scope is enforced in RadarDataService (whole market for procurement, management, executives and
-// Admin; otherwise the user's department and committee tenders). Read-only with respect to procurement data.
+// Module: Sourcing Officer / Orange Intelligence
+// The workspace, analytics endpoints and Gemini AI Studio are read-only with respect to procurement data.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Orange_Tendering_System.Areas.TopCommittee.Services;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Services.Radar;
 
 namespace Orange_Tendering_System.Controllers;
 
-[Authorize(Roles = InternalRoles)]
+[Authorize(Roles = SystemRoles.SourcingOfficer)]
 [AutoValidateAntiforgeryToken, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class IntelligenceController(RadarService radar, RadarDataService data, RadarExportService files, IntelligenceAiService ai,
     ILogger<IntelligenceController> logger) : Controller
 {
-    public const string InternalRoles = SystemRoles.Admin + "," + SystemRoles.SourcingOfficer + "," + SystemRoles.SourcingManager + "," + SystemRoles.RequestingDepartment + ","
-        + SystemRoles.DepartmentRepresentative + "," + SystemRoles.Technical + "," + SystemRoles.Finance + "," + SystemRoles.EvaluationCommittee + "," + TopExecutiveRoles.Allowed;
-
     public sealed record SimulateRequest(string? From, string? To, int[]? SupplierIds);
     public sealed record SupplierRequest(int SupplierId);
     public sealed record AskRequest(int SupplierId, string? Question);
 
-    // A supplier account never reaches this workspace, even if it also carries an internal role.
+    // A supplier account never reaches this workspace, even if it also has the Sourcing Officer role.
     public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
     {
         if (User.IsInRole(SystemRoles.Supplier)) context.Result = Forbid();

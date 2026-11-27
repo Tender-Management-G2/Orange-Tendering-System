@@ -11,7 +11,7 @@
             <p class="as-tagline">Every connection begins with a signal.</p>
         </div>
         <div class="as-stage-fallback" data-stage-fallback hidden></div>
-        @* The live camera of Face ID. It opens only after the supplier chooses Face ID and continues. *@
+        @* The live camera of Face ID (biometric.js, runFaceCheck). It opens only after Face ID is chosen and the email accepted. *@
         <div class="as-camera bio-hidden" id="facePanel">
             <video id="faceVideo" playsinline muted autoplay aria-label="Live camera preview"></video>
         </div>
@@ -73,8 +73,9 @@
                     <button type="button" id="btnFaceCancel" class="as-secondary" data-bio-keep>Cancel and close the camera</button>
                 </div>
 
-                @* Fingerprint with a phone: a QR code from this site. The phone approves only after the number below and its
-                   own fingerprint check; this browser then receives the session (Controllers/PhonePasskeyController.cs). *@
+                @* Fingerprint with a phone: a QR code from this site (supplier-login.js, startPhoneSignIn). The phone approves only
+                   after the number below and its own fingerprint check; this browser then receives the session
+                   (Controllers/PhonePasskeyController.cs). *@
                 <div class="pp pp-panel" id="phoneSignIn" hidden>
                     <div data-pp-view="loading" class="pp-wait"><span class="pp-spinner" aria-hidden="true"></span><span>Creating a QR code…</span></div>
                     <div data-pp-view="qr" hidden>
@@ -102,11 +103,6 @@
                     </div>
                 </div>
                 <p class="as-fine pp" id="phoneQrOffer" hidden>Fingerprint is on your phone? <button type="button" id="btnPhoneQrLogin" class="pp-link" data-bio-keep>Show a QR code for my phone</button></p>
-
-                @* Started by wwwroot/js/supplier-login.js once the server opened the identity step for the typed email;
-                   biometric.js (face) and phone-passkey.js (fingerprint) do the actual check. *@
-                <button type="button" id="btnFaceLogin" hidden tabindex="-1" aria-hidden="true">Face ID</button>
-                <button type="button" id="btnPasskeyStep" hidden tabindex="-1" aria-hidden="true">Fingerprint</button>
 
                 <p class="as-fine" id="methodFine" hidden></p>
                 <noscript><p class="as-note">Face ID and Fingerprint need JavaScript. Enable it, or sign in with Email &amp; Password.</p></noscript>

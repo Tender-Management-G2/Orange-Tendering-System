@@ -59,15 +59,14 @@ h4.tw-heading svg { width: 21px; height: 21px; }
 .tw-chip.tw-warm { background: #ffead6; color: #783400; }
 .tw-chip.tw-source { background: #e7f3ff; color: #16426a; }
 .tw-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; border-top: 1px solid var(--tw-border); padding-top: 10px; margin: 10px 0 0; }
-.tw-dialog dt, .tw-caption, .tw-seat small { color: var(--tw-muted); font-size: .85rem; }
+.tw-dialog dt, .tw-seat small { color: var(--tw-muted); font-size: .85rem; }
 .tw-dialog dd { margin: 3px 0 0; font-weight: 650; }
 .tw-items { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .93rem; }
 .tw-items th, .tw-items td { padding: 8px; text-align: start; border-bottom: 1px solid var(--tw-border); overflow-wrap: anywhere; vertical-align: top; }
 .tw-items th:nth-child(2) { width: 20%; }
 .tw-items thead { background: color-mix(in srgb, var(--tw-ink) 5%, var(--tw-surface)); }
 .tw-specifications, .tw-review-line { white-space: pre-wrap; overflow-wrap: anywhere; }
-.tw-two, .tw-financial { display: grid; gap: 0 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.tw-financial { grid-template-columns: minmax(0, 1fr) minmax(0, .65fr) minmax(0, 1.6fr); }
+.tw-two { display: grid; gap: 0 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .tw-field { display: grid; align-content: start; gap: 4px; margin-top: 5px; font-size: .92rem; min-width: 0; }
 .tw-field > span { font-weight: 580; }
 .tw-field:has([required]) > span::after { content: " *"; color: #bd2727; }
@@ -77,7 +76,6 @@ h4.tw-heading svg { width: 21px; height: 21px; }
 }
 .tw-field textarea { resize: vertical; }
 .tw-field textarea[readonly] { background: color-mix(in srgb, var(--tw-ink) 7%, var(--tw-surface)); resize: none; }
-.tw-dialog .tw-caption { margin-top: 5px; }
 .tw-doc-picker summary { cursor: pointer; }
 .tw-doc-options { display: grid; gap: 5px; padding-top: 6px; }
 .tw-doc-picker .tw-chips:not(:empty) { margin-bottom: 5px; }
@@ -135,7 +133,7 @@ h4.tw-heading svg { width: 21px; height: 21px; }
     .tw-steps button { flex-direction: column; gap: 4px; font-size: .73rem; }
     .tw-steps button + button::before { display: none; }
     .tw-step-number { flex: none; width: 27px; height: 27px; }
-    .tw-two, .tw-financial { grid-template-columns: minmax(0, 1fr); }
+    .tw-two { grid-template-columns: minmax(0, 1fr); }
     .tw-review-card :is([data-review="general"], [data-review="financial"]) { grid-template-columns: minmax(0, 1fr); }
     .tw-seat { grid-template-columns: auto minmax(0, 1fr) auto; }
     .tw-seat .tw-field { grid-column: 2 / -1; }

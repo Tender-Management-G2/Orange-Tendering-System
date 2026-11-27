@@ -12,7 +12,6 @@
         "building" => "M4 22V3h12v19M16 10h4v12M2 22h20M8 7h1m3 0h1M8 11h1m3 0h1M8 15h1m3 0h1",
         "coins" => "M2 7a6.5 3 0 1 0 13 0 6.5 3 0 1 0-13 0zm0 0v10c0 4 13 4 13 0V7M2 12c0 4 13 4 13 0m3-8c2 .4 4 1.5 4 3v9c0 1.6-2 2.6-4 3m0-5c2-.4 4-1.4 4-3",
         "code" => "m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18",
-        "truck" => "M2 5h13v12H2zm13 4h4l3 4v4h-7M8 19a2 2 0 1 0-4 0 2 2 0 0 0 4 0zm12 0a2 2 0 1 0-4 0 2 2 0 0 0 4 0z",
         "paperclip" => "m8 13 7-7a3 3 0 0 1 4 4l-9 9a5 5 0 0 1-7-7l9-9m-2 12 7-7",
         "users" or "user-check" => "M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm9 2 2 2 3-4",
         "lock" => "M6 11h12v10H6zm2 0V7a4 4 0 0 1 8 0v4m-4 4v2",
@@ -118,44 +117,27 @@
                 </div>
             </article>
             <article class="tw-card">
-                <h4 class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("coins")" /></svg>@L("Financial & Commercial", "المالية والشروط التجارية")</h4>
-                <div class="tw-financial">
+                <h4 class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("coins")" /></svg>@L("Financial Information", "المعلومات المالية")</h4>
+                <div class="tw-two">
                     <label class="tw-field"><span>@L("Estimated Procurement Value", "القيمة التقديرية للمشتريات")</span><input id="EstimatedValue" name="EstimatedValue" type="number" min="0.01" max="9999999999999999.99" step="0.01" required /></label>
                     <label class="tw-field"><span>@L("Currency", "العملة")</span><select asp-for="Currency" required><option value="">@L("Select currency", "اختر العملة")</option>@foreach (var c in CurrencyRules.Tender) { <option value="@c">@c</option> }</select></label>
-                    <label class="tw-field"><span>@L("Commercial Conditions", "الشروط التجارية")</span><textarea asp-for="CommercialConditions" rows="2" maxlength="10000" required></textarea></label>
                 </div>
             </article>
-            <div class="tw-two">
-                <article class="tw-card">
-                    <h4 class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("truck")" /></svg>@L("Delivery", "التسليم")</h4>
-                    <label class="tw-field"><span>@L("Delivery template", "قالب التسليم")</span>
-                        <select id="tw-delivery-template">
-                            <option value="">@L("Choose a template", "اختر قالبًا")</option>
-                            <option value="@L("Delivery within 30 days of the purchase order.", "التسليم خلال ٣٠ يومًا من أمر الشراء.")">@L("Within 30 days of purchase order", "خلال ٣٠ يومًا من أمر الشراء")</option>
-                            <option value="@L("Delivery within 60 days of the purchase order.", "التسليم خلال ٦٠ يومًا من أمر الشراء.")">@L("Within 60 days of purchase order", "خلال ٦٠ يومًا من أمر الشراء")</option>
-                            <option value="@L("Phased delivery over 90 days according to a schedule agreed with the requesting department.", "التسليم على مراحل خلال ٩٠ يومًا وفق جدول يُتفق عليه مع القسم الطالب.")">@L("Phased delivery over 90 days", "تسليم على مراحل خلال ٩٠ يومًا")</option>
-                        </select>
-                    </label>
-                    <label class="tw-field"><span>@L("Delivery Expectations", "متطلبات التسليم")</span><textarea asp-for="DeliveryExpectations" rows="2" maxlength="4000" required></textarea></label>
-                    <p class="tw-caption" data-tw-optional>@L("Purchase request required by", "تاريخ التسليم المطلوب في طلب الشراء") <strong data-pr="needed"></strong></p>
-                </article>
-                <article class="tw-card">
-                    <h4 id="tw-documents-label" class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("paperclip")" /></svg>@L("Required Supplier Documents", "وثائق المورد المطلوبة")</h4>
-                    <div class="tw-doc-picker" id="tw-documents" role="group" aria-labelledby="tw-documents-label">
-                        <div class="tw-chips" id="tw-selected-documents"></div>
-                        <details><summary>@L("Select documents", "اختر الوثائق")</summary>
-                            <div class="tw-doc-options">
-                            @foreach (var kind in OfferDocumentTypes.All)
-                            {
-                                var name = OfferDocumentTypes.Label(kind.Key, ar);
-                                <label><input type="checkbox" name="RequiredDocuments" value="@kind.Key" data-label="@name" /> @name</label>
-                            }
-                            </div>
-                        </details>
-                    </div>
-                    <label class="tw-field"><span>@L("Mandatory Compliance", "شروط الامتثال الإلزامية")</span><textarea asp-for="MandatoryCompliance" rows="2" maxlength="4000" required></textarea></label>
-                </article>
-            </div>
+            <article class="tw-card">
+                <h4 id="tw-documents-label" class="tw-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="@Icon("paperclip")" /></svg>@L("Required Supplier Documents", "وثائق المورد المطلوبة")</h4>
+                <div class="tw-doc-picker" id="tw-documents" role="group" aria-labelledby="tw-documents-label">
+                    <div class="tw-chips" id="tw-selected-documents"></div>
+                    <details><summary>@L("Select documents", "اختر الوثائق")</summary>
+                        <div class="tw-doc-options">
+                        @foreach (var kind in OfferDocumentTypes.All)
+                        {
+                            var name = OfferDocumentTypes.Label(kind.Key, ar);
+                            <label><input type="checkbox" name="RequiredDocuments" value="@kind.Key" data-label="@name" /> @name</label>
+                        }
+                        </div>
+                    </details>
+                </div>
+            </article>
             @if (Workflow.CriticalTenderEnabled)
             {
                 <label class="tw-critical"><input asp-for="IsCritical" /> <span>@L("Critical procurement — requires Top Committee review before award.", "مشتريات حرجة — تتطلب مراجعة اللجنة العليا قبل الإرساء.")</span></label>
@@ -190,8 +172,7 @@
                 @foreach (var card in new[] {
                     (Key: "request", Step: 0, Icon: "file-text", Title: L("Purchase Request", "طلب الشراء")),
                     (Key: "general", Step: 0, Icon: "lock", Title: L("General Information", "المعلومات العامة")),
-                    (Key: "financial", Step: 1, Icon: "coins", Title: L("Financial & Commercial", "المالية والشروط التجارية")),
-                    (Key: "delivery", Step: 1, Icon: "truck", Title: L("Delivery", "التسليم")),
+                    (Key: "financial", Step: 1, Icon: "coins", Title: L("Financial Information", "المعلومات المالية")),
                     (Key: "documents", Step: 1, Icon: "paperclip", Title: L("Required Supplier Documents", "وثائق المورد المطلوبة")),
                     (Key: "committee", Step: 2, Icon: "users", Title: L("Evaluation Committee", "لجنة التقييم"))
                 })

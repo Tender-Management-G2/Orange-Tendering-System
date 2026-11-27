@@ -201,7 +201,7 @@ public static class DemoDataSeeder
     }
 
     /// <summary>The ten approved demo suppliers and their supplier accounts (fixtures, not team accounts).</summary>
-    private static async Task EnsureDemoSuppliersAsync(ApplicationDbContext db, UserManager<ApplicationUser> users)
+    internal static async Task EnsureDemoSuppliersAsync(ApplicationDbContext db, UserManager<ApplicationUser> users)
     {
         // The original four suppliers are used by the prebuilt tender scenarios. Add the
         // remaining six without changing invitations, bids, or supplier review decisions.

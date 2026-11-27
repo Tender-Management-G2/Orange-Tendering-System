@@ -21,7 +21,6 @@ public static class UnitsOfMeasure
 {
     public static readonly IReadOnlyList<string> All =
     [
-        "Piece", "Unit", "Set", "Box", "Pack", "Pair", "Kit", "Kilogram", "Ton", "Liter", "Meter", "Square meter",
-        "Roll", "License", "User", "Subscription (month)", "Subscription (year)", "Hour", "Day", "Month", "Service", "Lot"
+        "Piece", "Unit", "Set", "Box", "Pack", "Pair", "Kilogram", "Ton", "Liter", "Meter", "Square meter", "License"
     ];
 }

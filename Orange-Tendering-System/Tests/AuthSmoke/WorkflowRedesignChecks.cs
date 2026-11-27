@@ -139,6 +139,7 @@ public static class WorkflowRedesignChecks
         }
         var officer = await User("officer", SystemRoles.SourcingOfficer); var admin = await User("admin", SystemRoles.Admin);
         var requester = await User("requester", SystemRoles.RequestingDepartment); var manager = await User("manager", SystemRoles.SourcingManager);
+        Check((await users.AddToRoleAsync(manager, SystemRoles.EvaluationCommittee)).Succeeded, "the manager fixture has both the Sourcing Manager and Evaluation Committee roles");
         var depRep = await User("deprep", SystemRoles.DepartmentRepresentative); var fin = await User("financial", SystemRoles.Finance); var tech = await User("technical", SystemRoles.Technical);
         var outsider = await User("outsider", SystemRoles.Technical);
         var chiefs = new[] { await User("ceo", SystemRoles.ChiefExecutiveOfficer), await User("cfo", SystemRoles.ChiefFinancialOfficer), await User("cto", SystemRoles.ChiefTechnologyOfficer), await User("coo", SystemRoles.ChiefOperationsOfficer) };
@@ -300,8 +301,12 @@ public static class WorkflowRedesignChecks
         using (var creator = await Login(officer))
         {
             var page = await creator.GetStringAsync($"/SourcingOfficer/Workflow?request={prId}");
+            var managerPicker = System.Text.RegularExpressions.Regex.Match(page, """<select\b[^>]*\bid="SourcingManagerId"[^>]*>[\s\S]*?</select>""").Value;
+            Check(managerPicker.Contains($"""value="{manager.Id}" """), "the Officer wizard lists the dual-role manager in the Sourcing Manager seat");
             Check(page.Contains("Select Purchase Request") && page.Contains("Tender Requirements") && page.Contains("Evaluation Committee")
                 && page.Contains("Review &amp; Create") && !page.Contains("Additional technical requirements"), "the Officer list renders the four-step tender wizard");
+            Check(new[] { "CommercialConditions", "DeliveryExpectations", "MandatoryCompliance" }
+                .All(field => !page.Contains($"name=\"{field}\"")), "the Officer wizard omits the three free-text requirements");
             using var arabicRequest = new HttpRequestMessage(HttpMethod.Get, $"/SourcingOfficer/Workflow?request={prId}");
             arabicRequest.Headers.Add("Cookie", "orange-lang=ar");
             using var arabic = await creator.SendAsync(arabicRequest);
@@ -312,8 +317,7 @@ public static class WorkflowRedesignChecks
             var values = new List<KeyValuePair<string, string>>
             {
                 new("PurchaseRequestId", prId.ToString()), new("Title", "Client override"), new("Description", "Client override"),
-                new("TechnicalRequirements", "Client override"), new("CommercialConditions", "Prices in JOD"),
-                new("DeliveryExpectations", "30 days"), new("MandatoryCompliance", "Signed quotation"),
+                new("TechnicalRequirements", "Client override"),
                 new("SourcingManagerId", manager.Id), new("DepartmentRepresentativeId", depRep.Id),
                 new("FinancialRepresentativeId", fin.Id), new("TechnicalRepresentativeId", tech.Id),
                 new("Currency", "JOD"), new("RequiredDocuments", "OfficialQuotation"), new("RequiredDocuments", "ProductDatasheet")
@@ -341,7 +345,7 @@ public static class WorkflowRedesignChecks
                 "the same request cannot create a second tender");
         }
         Check(await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.Title == pr.Title && t.Description == pr.Justification
-            && !t.Requirements!.Contains("TechnicalRequirements"))), "the server derives inherited fields and discards additional technical requirements");
+            && t.Requirements == null)), "the server derives inherited fields and creates the tender without free-text requirements");
         Check(await Read(d => d.TenderItems.Where(i => i.TenderId == id).AllAsync(i => i.CategoryId != null)) && await Read(d => d.Tenders.AnyAsync(t => t.Id == id && t.RequiredDocuments == "OfficialQuotation,ProductDatasheet")),
             "tender inherits item categories and stores the required offer documents");
         async Task<string> WeightScreen(ApplicationUser person, string area, bool arabic = false)
@@ -587,13 +591,67 @@ public static class WorkflowRedesignChecks
         var scheduled = await Chat(officer, SystemRoles.SourcingOfficer, "confirm", schedule.ConversationId);
         Check(scheduled.Reply.Contains("Meeting scheduled"), "confirmed officer chat schedules the meeting");
 
+        // ---- Committee notification deep links and the Officer's reschedule form ----
+        var popupLink = "/EvaluationCommittee/Workflow/Details/" + id;
+        var invitations = await Read(d => d.Notifications.Where(n => n.Title == "Evaluation invitation" && n.Link == popupLink).ToListAsync());
+        Check(invitations.Select(n => n.UserId).ToHashSet().SetEquals(new[] { fin.Id, manager.Id, depRep.Id, tech.Id }),
+            "all four evaluation invitations link to the tender popup");
+        var legacyNotificationId = await Read(async d =>
+        {
+            var legacy = new Notification { UserId = fin.Id, Title = "Evaluation invitation", Message = "Previously sent invitation", Link = "/Meetings/Join/" + id, CreatedAt = DateTime.UtcNow };
+            d.Notifications.Add(legacy);
+            await d.SaveChangesAsync();
+            return legacy.Id;
+        });
+        var newStart = DateTimeOffset.UtcNow.AddHours(3);
+        var newEnd = newStart.AddHours(1);
+        using (var officerClient = await Login(officer))
+        {
+            using var popupRequest = new HttpRequestMessage(HttpMethod.Get, "/SourcingOfficer/Workflow/Details/" + id);
+            popupRequest.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var popup = await (await officerClient.SendAsync(popupRequest)).Content.ReadAsStringAsync();
+            var rescheduleForm = Regex.Match(popup, "<form[^>]*RescheduleEvaluation.*?</form>", RegexOptions.Singleline).Value;
+            var token = WebUtility.HtmlDecode(Regex.Match(rescheduleForm, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+            Check(popup.Contains("data-wz-panel=\"6\"") && popup.Contains("Change the meeting time") && token.Length > 0,
+                "the Officer's Committee Evaluation wizard exposes the reschedule form after scheduling");
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/SourcingOfficer/Workflow/RescheduleEvaluation/" + id)
+            {
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["__RequestVerificationToken"] = token, ["startsAt"] = newStart.ToString("O"), ["endsAt"] = newEnd.ToString("O"),
+                    ["reason"] = "A committee member is unavailable at the original time."
+                })
+            };
+            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            using var response = await officerClient.SendAsync(request);
+            Check(response.StatusCode == HttpStatusCode.OK, "the Officer reschedules through the wizard's HTTP endpoint");
+        }
+        var movedSession = await Read(d => d.Set<EvaluationSession>().SingleAsync(s => s.TenderRoundId == roundId));
+        Check(movedSession.StartsAt == newStart.UtcDateTime && movedSession.EndsAt == newEnd.UtcDateTime,
+            "both updated meeting times are persisted");
+        Check(await Read(d => d.Notifications.CountAsync(n => n.Title == "Evaluation meeting rescheduled" && n.Link == popupLink)) == 4,
+            "rescheduling sends four new notifications that link to the tender popup");
+
         // ---- Before the meeting: page access yes, scoring no ----
         using (var member = await Login(fin))
         {
+            using var feed = JsonDocument.Parse(await member.GetStringAsync("/Notifications/Feed"));
+            Check(feed.RootElement.GetProperty("items").EnumerateArray().Single(n => n.GetProperty("id").GetInt32() == legacyNotificationId)
+                .GetProperty("link").GetString() == popupLink, "the notification bell updates a previously sent invitation's destination");
+            var opened = await member.GetAsync("/Notifications/Open/" + legacyNotificationId);
+            Check(opened.StatusCode == HttpStatusCode.Redirect && opened.Headers.Location?.OriginalString == popupLink,
+                "the notifications page opens a previously sent invitation at the same destination");
+            var deepLink = await member.GetAsync(popupLink);
+            var popupIndex = deepLink.Headers.Location?.OriginalString;
+            Check(deepLink.StatusCode == HttpStatusCode.Redirect && popupIndex?.EndsWith("?open=" + id) == true,
+                "the notification opens the workflow list with the tender popup selected");
+            var list = await member.GetStringAsync(popupIndex);
+            Check(list.Contains("id=\"wf-dialog\"") && list.Contains($"data-id=\"{id}\" data-url=\"{popupLink}\""),
+                "the linked list renders the selected tender's dialog entry point");
             var lobby = await member.GetAsync("/Meetings/Join/" + id);
             var lobbyHtml = await lobby.Content.ReadAsStringAsync();
             Check(lobby.StatusCode == HttpStatusCode.OK && lobbyHtml.Contains("Open the evaluation workspace") && !lobbyHtml.Contains("Please come back then"),
-                "the meeting notification opens a useful page before the start time");
+                "the meeting room remains available before the start time");
             var workspace = await member.GetStringAsync("/EvaluationCommittee/Workflow/Meeting/" + id);
             Check(workspace.Contains("Supplier comparison") && workspace.Contains("Alpha Tech"), "before the start the workspace compares the offers");
             Check(workspace.Contains("Approved evaluation model"), "before the start the workspace shows the locked evaluation model");

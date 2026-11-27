@@ -20,8 +20,7 @@
     const submit = byId('tc-submit');
     const next = byId('tw-next');
     const back = byId('tw-back');
-    const labels = ['Title', 'Description', 'EstimatedValue', 'Currency', 'CommercialConditions',
-        'DeliveryExpectations', 'MandatoryCompliance'];
+    const labels = ['Title', 'Description', 'EstimatedValue', 'Currency'];
     const format = (pattern, ...values) => pattern.replace(/\{(\d+)\}/g, (_, i) => values[i]);
     const displayNumber = new Intl.NumberFormat(dialog.lang, { maximumFractionDigits: 3 });
     const serverInvalid = new Set();
@@ -163,14 +162,12 @@
             row.items.map(item => item.name + ' × ' + displayNumber.format(item.quantity) + ' ' + item.unit).join(' · '));
         card('general').replaceChildren(labeled(fieldLabel(title), title.value), labeled(fieldLabel(description), description.value));
         const estimate = byId('EstimatedValue');
-        card('financial').replaceChildren(labeled(fieldLabel(estimate), displayNumber.format(estimate.value) + ' ' + currency.value),
-            labeled(fieldLabel(byId('CommercialConditions')), byId('CommercialConditions').value));
+        card('financial').replaceChildren(labeled(fieldLabel(estimate), displayNumber.format(estimate.value) + ' ' + currency.value));
         if (byId('IsCritical')?.checked)
             card('financial').append(node('small', byId('IsCritical').closest('label').innerText.trim()));
-        line('delivery', byId('DeliveryExpectations').value);
         const chips = node('div', '', 'tw-chips');
         chips.append(...docs.filter(doc => doc.checked).map(doc => node('span', doc.dataset.label, 'tw-chip')));
-        card('documents').replaceChildren(chips, node('p', byId('MandatoryCompliance').value, 'tw-review-line'));
+        card('documents').replaceChildren(chips);
         card('committee').replaceChildren(...seats.filter(seat => !seat.hidden).map(seat => {
             const field = byId(seat.dataset.seat);
             return node('div', seat.dataset.label + ' · ' + (field.value ? field.selectedOptions[0].textContent : strings.missing));
@@ -300,15 +297,6 @@
         if (event.target.matches('input:not([type=checkbox]), textarea')) changed(event);
     });
     form.addEventListener('change', event => {
-        if (event.target.id === 'tw-delivery-template') {
-            if (!event.target.value) return;
-            const delivery = byId('DeliveryExpectations');
-            delivery.value = event.target.value;
-            event.target.value = '';
-            delivery.dispatchEvent(new Event('input', { bubbles: true }));
-            delivery.focus();
-            return;
-        }
         if (event.target.matches('select, input[type=checkbox]')) changed(event);
     });
 

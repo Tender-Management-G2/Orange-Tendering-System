@@ -1,6 +1,6 @@
 // ORANGE TENDER MANAGEMENT SYSTEM
 // Module: Sourcing Officer / Market Intelligence
-// Purpose: the old Orange Radar address. The workspace moved to the shared Orange Intelligence page (Controllers/IntelligenceController.cs).
+// Redirects the old Orange Radar address to Orange Intelligence.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;

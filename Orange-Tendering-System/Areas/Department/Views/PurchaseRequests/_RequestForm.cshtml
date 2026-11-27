@@ -68,11 +68,11 @@
                             <div class="dr-input"><input id="Items_0__Name" name="Items[0].Name" value="@item.Name" maxlength="200" required placeholder="e.g. Laptop" data-dr-name autocomplete="off" list="dr-name-suggestions" /></div>
                             <datalist id="dr-name-suggestions"><option value="Laptop"></option><option value="Desktop Computer"></option><option value="Monitor"></option><option value="Printer"></option><option value="Network Switch"></option><option value="Server"></option></datalist></div>
                         <div class="dr-field"><label for="Items_0__CategoryId">Category</label>
-                            <div class="dr-input"><select id="Items_0__CategoryId" name="Items[0].CategoryId" required data-dr-category><option value="">Choose…</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(item.CategoryId == c.Id)">@c.Name</option> }</select></div></div>
+                            <div class="dr-input"><select id="Items_0__CategoryId" name="Items[0].CategoryId" class="dr-compact-select" required data-dr-category><option value="">Choose…</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(item.CategoryId == c.Id)">@c.Name</option> }</select></div></div>
                         <div class="dr-field"><label for="Items_0__Quantity">Quantity</label>
                             <div class="dr-stepper"><button type="button" data-dr-qty="-1" aria-label="Decrease quantity">&minus;</button><input id="Items_0__Quantity" name="Items[0].Quantity" value="@quantity.ToString("0", System.Globalization.CultureInfo.InvariantCulture)" type="number" min="1" max="999999999999999" step="1" inputmode="numeric" required data-dr-quantity /><button type="button" data-dr-qty="1" aria-label="Increase quantity">+</button></div></div>
                         <div class="dr-field"><label for="Items_0__Unit">Unit</label>
-                            <div class="dr-input"><select id="Items_0__Unit" name="Items[0].Unit" required data-dr-unit><option value="">Choose…</option>@foreach (var u in UnitsOfMeasure.All) { <option selected="@(item.Unit == u)">@u</option> }@if (!string.IsNullOrEmpty(item.Unit) && !UnitsOfMeasure.All.Contains(item.Unit)) { <option selected>@item.Unit</option> }</select></div></div>
+                            <div class="dr-input"><select id="Items_0__Unit" name="Items[0].Unit" class="dr-compact-select" required data-dr-unit><option value="">Choose…</option>@foreach (var u in UnitsOfMeasure.All) { <option selected="@(item.Unit == u)">@u</option> }</select></div></div>
                     </div>
 
                     <div class="dr-specs" data-dr-specs-box>

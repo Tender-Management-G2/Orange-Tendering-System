@@ -6,36 +6,52 @@ using Orange_Tendering_System.Models.Entities;
 namespace Orange_Tendering_System.Services.Biometric;
 
 /// <summary>
-/// Fingerprint / passkey sign-in (WebAuthn) on top of ASP.NET Core Identity's built-in passkey support (.NET 10).
-/// Identity does the real work: it builds the options the browser needs, keeps the one-time challenge in a short-lived
-/// protected cookie, verifies the authenticator's signed answer (challenge, origin, site id, user verification,
-/// signature, sign counter) and stores the credential in its AspNetUserPasskeys table. This class only adds the
-/// project's own rules around those calls. Settings: AddBiometrics (IdentityPasskeyOptions).
+/// Fingerprint / passkey (WebAuthn), built on the passkey support that ASP.NET Core Identity has since .NET 10.
 ///
-/// The private key and the fingerprint never leave the authenticator (a phone, this computer's sensor or a security
-/// key); the server keeps the public key. The authenticator decides how it verifies the person, so the site cannot
-/// tell whether a fingerprint, face unlock or the device PIN was used.
+/// Identity does the security work: it creates the options the browser needs, keeps the one-time challenge in a
+/// short-lived protected cookie, verifies the device's signed answer (challenge, origin, site id, user verification,
+/// signature, sign counter) and stores the credential in the AspNetUserPasskeys table. This class only adds the project's
+/// own rules around those calls. The settings are in BiometricServiceCollectionExtensions.cs.
+///
+/// The private key and the fingerprint never leave the device (a phone, this computer's sensor or a security key);
+/// the server keeps only the public key. The device decides how it checks the person, so the site cannot tell
+/// whether a fingerprint, face unlock or the device PIN was used.
 /// </summary>
-public class PasskeyService(
-    UserManager<ApplicationUser> users,
-    SignInManager<ApplicationUser> signInManager,
-    IOptions<BiometricOptions> options)
+public class PasskeyService
 {
     private const string Expired = "The request expired. Try again.";
 
-    /// <summary>Options (WebAuthn JSON) for navigator.credentials.create(): a new passkey for this account.</summary>
-    public Task<string> CreateRegistrationOptionsAsync(ApplicationUser user)
+    private readonly UserManager<ApplicationUser> users;
+    private readonly SignInManager<ApplicationUser> signInManager;
+    private readonly BiometricOptions options;
+
+    public PasskeyService(UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, IOptions<BiometricOptions> options)
     {
-        var name = user.Email ?? user.UserName ?? user.Id;
-        return signInManager.MakePasskeyCreationOptionsAsync(new PasskeyUserEntity
+        this.users = users;
+        this.signInManager = signInManager;
+        this.options = options.Value;
+    }
+
+    /// <summary>Registration step 1: the options (JSON) for navigator.credentials.create() in the browser.</summary>
+    public async Task<string> CreateRegistrationOptionsAsync(ApplicationUser user)
+    {
+        string name = user.Email ?? user.UserName ?? user.Id;
+        string displayName = name;
+        if (!string.IsNullOrWhiteSpace(user.FullName))
+        {
+            displayName = user.FullName;
+        }
+
+        PasskeyUserEntity passkeyUser = new PasskeyUserEntity
         {
             Id = user.Id,
             Name = name,
-            DisplayName = string.IsNullOrWhiteSpace(user.FullName) ? name : user.FullName
-        });
+            DisplayName = displayName
+        };
+        return await signInManager.MakePasskeyCreationOptionsAsync(passkeyUser);
     }
 
-    /// <summary>Verifies the browser's answer to the registration options and links the new passkey to the account.</summary>
+    /// <summary>Registration step 2: verifies the browser's answer and saves the new passkey on the account.</summary>
     public async Task<BiometricResult> RegisterAsync(ApplicationUser user, string? credentialJson, string? label)
     {
         if (string.IsNullOrWhiteSpace(credentialJson))
@@ -50,7 +66,7 @@ public class PasskeyService(
         }
         catch (InvalidOperationException)
         {
-            // No registration was started in this browser, or it was already answered or has expired.
+            // No registration was started in this browser, or it was already answered, or it expired.
             return BiometricResult.Fail(Expired);
         }
 
@@ -59,34 +75,50 @@ public class PasskeyService(
             return BiometricResult.Fail(attestation.Failure.Message);
         }
 
-        // The options must have been issued to this same account.
+        // The options must have been made for this same account.
         if (attestation.UserEntity.Id != user.Id)
         {
             return BiometricResult.Fail(Expired);
         }
 
-        if ((await users.GetPasskeysAsync(user)).Count >= options.Value.MaxPasskeysPerUser)
+        IList<UserPasskeyInfo> existing = await users.GetPasskeysAsync(user);
+        if (existing.Count >= options.MaxPasskeysPerUser)
         {
             return BiometricResult.Fail("You reached the maximum number of registered devices.");
         }
 
-        var name = string.IsNullOrWhiteSpace(label) ? "My device" : label.Trim();
-        attestation.Passkey.Name = name.Length > 150 ? name[..150] : name;
-        var saved = await users.AddOrUpdatePasskeyAsync(user, attestation.Passkey);
-        return saved.Succeeded ? BiometricResult.Ok(user) : BiometricResult.Fail("The passkey could not be saved. Try again.");
+        string name = "My device";
+        if (!string.IsNullOrWhiteSpace(label))
+        {
+            name = label.Trim();
+        }
+        if (name.Length > 150)
+        {
+            name = name.Substring(0, 150);
+        }
+        attestation.Passkey.Name = name;
+
+        IdentityResult saved = await users.AddOrUpdatePasskeyAsync(user, attestation.Passkey);
+        if (!saved.Succeeded)
+        {
+            return BiometricResult.Fail("The passkey could not be saved. Try again.");
+        }
+        return BiometricResult.Ok(user);
     }
 
     /// <summary>
-    /// Options (WebAuthn JSON) for navigator.credentials.get(). Without a user no account name is asked: the
-    /// authenticator offers the passkeys it holds for this site, so the login page never reveals whether an account
-    /// exists. With a user (the /fingerprint-demo page) only that account's passkeys are accepted.
+    /// Sign-in step 1: the options (JSON) for navigator.credentials.get() in the browser.
+    /// Without a user the device offers any passkey it holds for this site. With a user (the identity step after the
+    /// email) only that account's passkeys are accepted.
     /// </summary>
-    public Task<string> CreateLoginOptionsAsync(ApplicationUser? user = null) =>
-        signInManager.MakePasskeyRequestOptionsAsync(user);
+    public async Task<string> CreateLoginOptionsAsync(ApplicationUser? user)
+    {
+        return await signInManager.MakePasskeyRequestOptionsAsync(user);
+    }
 
     /// <summary>
-    /// Verifies the signed answer to the login options. On success the result carries the account the passkey belongs
-    /// to; nobody is signed in here (BiometricSignInService applies the account rules and signs in).
+    /// Sign-in step 2: verifies the signed answer. On success the result carries the account the passkey belongs to.
+    /// Nobody is signed in here: BiometricSignInService checks the account rules and signs in.
     /// </summary>
     public async Task<BiometricResult> VerifyLoginAsync(string? credentialJson)
     {
@@ -102,7 +134,7 @@ public class PasskeyService(
         }
         catch (InvalidOperationException)
         {
-            // No sign-in was started in this browser, or it was already answered or has expired.
+            // No sign-in was started in this browser, or it was already answered, or it expired.
             return BiometricResult.Fail(Expired);
         }
 
@@ -111,21 +143,36 @@ public class PasskeyService(
             return BiometricResult.Fail(assertion.Failure.Message);
         }
 
-        // Keep the stored sign counter and backup state up to date (a counter that goes backwards is refused).
-        var saved = await users.AddOrUpdatePasskeyAsync(assertion.User, assertion.Passkey);
-        return saved.Succeeded ? BiometricResult.Ok(assertion.User) : BiometricResult.Fail("The passkey could not be updated.");
+        // Save the new sign counter (Identity refuses a counter that goes backwards: a sign of a cloned device).
+        IdentityResult saved = await users.AddOrUpdatePasskeyAsync(assertion.User, assertion.Passkey);
+        if (!saved.Succeeded)
+        {
+            return BiometricResult.Fail("The passkey could not be updated.");
+        }
+        return BiometricResult.Ok(assertion.User);
     }
 
-    public Task<IList<UserPasskeyInfo>> ListAsync(ApplicationUser user) => users.GetPasskeysAsync(user);
+    public async Task<IList<UserPasskeyInfo>> ListAsync(ApplicationUser user)
+    {
+        return await users.GetPasskeysAsync(user);
+    }
 
-    /// <summary>Removes one passkey of the account (credential id as base64url text); false when it is not theirs.</summary>
+    /// <summary>Removes one passkey (credential id as base64url text). False when it does not belong to this account.</summary>
     public async Task<bool> RemoveAsync(ApplicationUser user, string? credentialId)
     {
-        if (!Base64Url.TryDecode(credentialId, out var id) || await users.GetPasskeyAsync(user, id) is null)
+        byte[] id;
+        if (!Base64Url.TryDecode(credentialId, out id))
         {
             return false;
         }
 
-        return (await users.RemovePasskeyAsync(user, id)).Succeeded;
+        UserPasskeyInfo? passkey = await users.GetPasskeyAsync(user, id);
+        if (passkey == null)
+        {
+            return false;
+        }
+
+        IdentityResult removed = await users.RemovePasskeyAsync(user, id);
+        return removed.Succeeded;
     }
 }

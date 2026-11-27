@@ -45,7 +45,7 @@ static class BiometricChecks
         var loginHtml = await (await anon.GetAsync("/Identity/Account/Login")).Content.ReadAsStringAsync();
         check(loginHtml.Contains("id=\"signInMethods\"") && loginHtml.Contains("name=\"method\" value=\"password\"") &&
               loginHtml.Contains("name=\"method\" value=\"face\"") && loginHtml.Contains("name=\"method\" value=\"fingerprint\"") &&
-              loginHtml.Contains("id=\"btnFaceLogin\"") && loginHtml.Contains("id=\"btnPasskeyStep\"") && loginHtml.Contains("/js/biometric.") &&
+              loginHtml.Contains("id=\"facePanel\"") && loginHtml.Contains("id=\"phoneSignIn\"") && loginHtml.Contains("/js/biometric.") &&
               !loginHtml.Contains("btnPasskeyLogin") && !loginHtml.Contains("device passkey"),
             "Login page lets the supplier choose Email & Password, Face ID or Fingerprint first (no separate passkey button)");
         check(loginHtml.Contains("id=\"forgot-password\"") && loginHtml.Contains("Input_Password"), "Login page keeps password form and Forgot Password link");
@@ -212,7 +212,7 @@ static class BiometricChecks
         using (var guardScope = services.CreateScope())
         {
             var store = guardScope.ServiceProvider.GetRequiredService<ChallengeStore>();
-            var once = store.Create("parallel-test", RandomNumberGenerator.GetBytes(32));
+            var once = store.Create("parallel-test", null, 60);
             var consumed = 0;
             Parallel.For(0, 100, _ => { if (store.Consume(once, "parallel-test") != null) Interlocked.Increment(ref consumed); });
             check(consumed == 1, "parallel challenge consumption is atomic");

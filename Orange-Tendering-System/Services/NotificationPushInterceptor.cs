@@ -72,5 +72,23 @@ public sealed record NotificationDto(int Id, string Title, string Message, strin
 {
     // Only same-site relative links are ever sent to the browser.
     public static string? SafeLink(string? link) => !string.IsNullOrWhiteSpace(link) && link.StartsWith('/') && !link.StartsWith("//") && !link.Contains((char)92) ? link : null;
-    public static NotificationDto From(Notification n) => new(n.Id, n.Title, n.Message, SafeLink(n.Link), n.IsRead, DateTime.SpecifyKind(n.CreatedAt, DateTimeKind.Utc));
+    internal static string EvaluationWorkflowLink(int tenderId) => $"/EvaluationCommittee/Workflow/Details/{tenderId}";
+
+    internal static string? Destination(Notification notification)
+    {
+        const string workspace = "/EvaluationCommittee/Workflow/Meeting/";
+        const string lobby = "/Meetings/Join/";
+        var link = notification.Link;
+        if (link == null) return null;
+
+        // Older committee notifications may still point to the workspace or meeting lobby.
+        if (link.StartsWith(workspace, StringComparison.OrdinalIgnoreCase) && int.TryParse(link.AsSpan(workspace.Length), out var tenderId))
+            return EvaluationWorkflowLink(tenderId);
+        if (notification.Title is "Evaluation invitation" or "Evaluation meeting rescheduled" or "Evaluation scoring is open"
+            && link.StartsWith(lobby, StringComparison.OrdinalIgnoreCase) && int.TryParse(link.AsSpan(lobby.Length), out tenderId))
+            return EvaluationWorkflowLink(tenderId);
+        return link;
+    }
+
+    public static NotificationDto From(Notification n) => new(n.Id, n.Title, n.Message, SafeLink(Destination(n)), n.IsRead, DateTime.SpecifyKind(n.CreatedAt, DateTimeKind.Utc));
 }
