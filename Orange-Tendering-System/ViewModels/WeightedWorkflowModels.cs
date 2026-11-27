@@ -35,7 +35,7 @@ public class ScoreInput
     [Required, Range(typeof(decimal), "0", "100")] public decimal? Financial { get; set; }
     [Range(typeof(decimal), "0", "100")] public decimal? Technical { get; set; }
     public List<decimal?> TechnicalScores { get; set; } = [];
-    [Required, MaxLength(2000)] public string Justification { get; set; } = "";
+    [MaxLength(2000)] public string? Justification { get; set; }
 }
 public class SessionInput
 {

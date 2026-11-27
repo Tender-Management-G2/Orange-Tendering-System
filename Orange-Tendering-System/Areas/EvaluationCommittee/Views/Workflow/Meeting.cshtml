@@ -94,7 +94,7 @@
         {
             @if (currencies.Count > 1) { <p class="pf-note pf-warn">Offers are in different currencies (@string.Join(", ", currencies)). No exchange-rate rule is approved, so totals are not compared automatically.</p> }
             <div class="pg-table-wrap"><table class="pf-compare">
-                <thead><tr><th></th>@foreach (var o in Model.Offers) { <th>@o.Supplier.Name</th> }</tr></thead>
+                <thead><tr><th></th>@foreach (var o in Model.Offers) { <th scope="col"><partial name="_EvaluationOfferTrigger" model="o.Bid" /></th> }</tr></thead>
                 <tbody>
                     <tr><th>Company status</th>@foreach (var o in Model.Offers) { <td><span class="pf-chip @(o.Supplier.Status == SupplierStatus.Approved ? "pf-chip-good" : "pf-chip-bad")">@o.Supplier.Status</span> <small class="pf-muted">@o.Supplier.Category</small></td> }</tr>
                     <tr><th>Offer compliance</th>@foreach (var o in Model.Offers) { <td><span class="pf-chip @(o.Bid.ComplianceStatus == ComplianceStatus.Compliant ? "pf-chip-good" : "pf-chip-bad")">@o.Bid.ComplianceStatus</span></td> }</tr>
@@ -113,6 +113,7 @@
             </table></div>
             @foreach (var o in Model.Offers)
             {
+                <partial name="_EvaluationOfferSummary" model="(o.Bid, o.Documents.AsEnumerable())" />
                 <details class="pf-more"><summary>Full offer: @o.Supplier.Name (offer #@o.Bid.Id, submitted @o.Bid.SubmittedAt?.ToJordan("d MMM HH:mm"))</summary>
                     <div class="pg-table-wrap"><table class="pg-table"><thead><tr><th>Requested</th><th>Offered product / specifications</th><th class="pf-right">Qty</th><th class="pf-right">Unit price (excl. tax)</th><th class="pf-right">Line total</th></tr></thead><tbody>
                     @foreach (var l in o.Lines) { <tr><td><strong>@l.Item</strong><br /><small class="pf-muted">@l.RequestedQuantity.ToString("0.###") @l.Unit · @l.RequestedSpecifications</small></td><td><b>@l.OfferedProduct</b><br /><span style="white-space:pre-line">@l.OfferedSpecifications</span>@if (!string.IsNullOrWhiteSpace(l.Notes)) { <br /><small>Notes: @l.Notes</small> }</td><td class="pf-right pf-num">@l.OfferedQuantity.ToString("0.###")</td><td class="pf-right pf-num">@Money(l.UnitPrice, o.Bid.CurrencyCode)</td><td class="pf-right pf-num">@Money(l.LineTotal, o.Bid.CurrencyCode)</td></tr> }
@@ -154,14 +155,14 @@
                 {
                     var o = Model.Offers[i];
                     <fieldset class="pf-item evaluation-card" data-score-row>
-                        <legend><b>@o.Supplier.Name</b> <span class="pf-muted">· @Money(o.GrandTotal, o.Bid.CurrencyCode)</span></legend>
+                        <legend><partial name="_EvaluationOfferTrigger" model="o.Bid" /> <span class="pf-muted">· @Money(o.GrandTotal, o.Bid.CurrencyCode)</span></legend>
                         <input type="hidden" name="scores[@i].BidId" value="@o.Bid.Id" />
                         <div class="evaluation-score-line">
                             <label for="f@(i)">@L("Financial score", "الدرجة المالية") <small>/ 100</small></label>
                             <input id="f@(i)" name="scores[@i].Financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required data-score="f" />
                         </div>
                         <partial name="_TechnicalScoreInputs" model='(w.ReadTechnicalCriteria(), i, "t")' />
-                        <div class="pg-field"><label for="j@(i)">@L("Score justification", "مبرر الدرجات")</label><textarea id="j@(i)" name="scores[@i].Justification" rows="2" maxlength="2000" required></textarea></div>
+                        <div class="pg-field"><label for="j@(i)">@L("Score justification (optional)", "مبرر الدرجات (اختياري)")</label><textarea id="j@(i)" name="scores[@i].Justification" rows="2" maxlength="2000"></textarea></div>
                         <small class="pf-muted">@L("Weighted score preview", "معاينة الدرجة المرجّحة") <b data-weighted>—</b></small>
                     </fieldset>
                 }

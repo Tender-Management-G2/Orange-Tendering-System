@@ -962,13 +962,16 @@
                       data-technical-weight="@s.WeightRound.ApprovedTechnical?.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                     @foreach (var eligible in s.EligibleBids)
                     {
-                        <fieldset data-score-row data-bid="@eligible.BidId"><legend>@BidSupplier(eligible.BidId)</legend><input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" />
+                        var bid = Model.Bids.FirstOrDefault(b => b.Id == eligible.BidId);
+                        <fieldset data-score-row data-bid="@eligible.BidId">
+                            <legend>@if (bid != null) { <partial name="_EvaluationOfferTrigger" model="bid" /> } else { @BidSupplier(eligible.BidId) }</legend>
+                            <input type="hidden" name="scores[@scoreIndex].BidId" value="@eligible.BidId" />
                             <div class="evaluation-score-line">
                                 <label for="financial-score-@scoreIndex">@L("Financial score", "الدرجة المالية") <small>/ 100</small></label>
                                 <input id="financial-score-@scoreIndex" name="scores[@scoreIndex].Financial" data-score="financial" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{1,2}" data-score-digits required data-fv-label="Financial score" data-fv-label-ar="الدرجة المالية" />
                             </div>
                             <partial name="_TechnicalScoreInputs" model='(s!.WeightRound.ReadTechnicalCriteria(), scoreIndex, "technical")' />
-                            <label>@L("Score justification", "مبرر الدرجات")<select class="wp-quick" aria-label="@L("Quick text", "نص سريع")"><option value="">@L("Use a suggested justification (optional)", "استخدم مبررًا مقترحًا (اختياري)")</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" required rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label>
+                            <label>@L("Score justification (optional)", "مبرر الدرجات (اختياري)")<select class="wp-quick" aria-label="@L("Quick text", "نص سريع")"><option value="">@L("Use a suggested justification", "استخدم مبررًا مقترحًا")</option><option>Meets all specifications at a competitive price.</option><option>Strong technical offer, price above average.</option><option>Good price but some specifications are weak.</option><option>Does not meet the key requirements.</option></select><textarea name="scores[@scoreIndex].Justification" maxlength="2000" rows="2" data-fv-label="Score justification" data-fv-label-ar="مبرر الدرجات"></textarea></label>
                             <span class="wf-weighted-preview">@L("Weighted score preview", "معاينة الدرجة المرجّحة") <output data-weighted-preview>—</output></span>
                         </fieldset>
                         scoreIndex++;
@@ -1215,9 +1218,24 @@
                         }
                         </tbody></table></div>
                         <h5 class="wp-sub">Compliant offers</h5>
+                        var eligibleBids = s.EligibleBids.Select(e => Model.Bids.FirstOrDefault(b => b.Id == e.BidId)).OfType<Bid>().ToList();
                         <div class="wp-table"><table class="wp-sortable"><thead><tr><th>Supplier</th><th data-num>Total price</th><th data-num>Delivery</th></tr></thead><tbody>
-                        @foreach (var eb in s.EligibleBids) { var ob = Model.Bids.FirstOrDefault(b => b.Id == eb.BidId); if (ob == null) { continue; } <tr><td><strong>@SupplierName(ob.TenderInvitation.SupplierId)</strong></td><td data-v="@Price(ob).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">@Price(ob).ToString("N2") @ob.CurrencyCode</td><td data-v="@ob.DeliveryDays">@ob.DeliveryDays days</td></tr> }
+                        @foreach (var bid in eligibleBids)
+                        {
+                            <tr>
+                                <td>@if (Model.IsEvaluator) { <partial name="_EvaluationOfferTrigger" model="bid" /> } else { <strong>@SupplierName(bid.TenderInvitation.SupplierId)</strong> }</td>
+                                <td data-v="@Price(bid).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">@Price(bid).ToString("N2") @bid.CurrencyCode</td>
+                                <td data-v="@bid.DeliveryDays">@bid.DeliveryDays days</td>
+                            </tr>
+                        }
                         </tbody></table></div>
+                        @if (Model.IsEvaluator)
+                        {
+                            @foreach (var bid in eligibleBids)
+                            {
+                                <partial name="_EvaluationOfferSummary" model="(bid, Model.Documents.Where(d => d.BidId == bid.Id))" />
+                            }
+                        }
                         @if (s.State == SessionState.Incomplete) { <p class="wp-hint wp-warn">The evaluation is incomplete. A missing score is never counted as zero.</p> }
                                             }
                 </div>

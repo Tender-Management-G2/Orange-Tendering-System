@@ -1,0 +1,67 @@
+@using Orange_Tendering_System.Models.Entities
+@using Orange_Tendering_System.Services
+@model (Bid Bid, IEnumerable<Document> Documents)
+@{
+    var bid = Model.Bid;
+    var supplier = bid.TenderInvitation.Supplier;
+    var ar = UiLanguage.IsArabic(Context);
+    string L(string en, string arabic) => ar ? arabic : en;
+    string Money(decimal value) => CurrencyRules.Format(value, bid.CurrencyCode);
+    string Value(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+    var documents = Model.Documents.OrderBy(d => d.Id).ToList();
+}
+<dialog class="evaluation-offer-dialog" id="evaluation-offer-@bid.Id" aria-labelledby="evaluation-offer-title-@bid.Id" dir="@(ar ? "rtl" : "ltr")">
+    <header class="evaluation-offer-header">
+        <div>
+            <p>@L("Supplier offer", "عرض المورّد") #@bid.Id</p>
+            <h3 id="evaluation-offer-title-@bid.Id">@supplier.CompanyName</h3>
+            @if (!string.IsNullOrWhiteSpace(supplier.Category)) { <p>@supplier.Category</p> }
+        </div>
+        <button type="button" class="evaluation-offer-close" data-evaluation-offer-close autofocus aria-label="@L("Close offer details", "إغلاق تفاصيل العرض")">&times;</button>
+    </header>
+    <div class="evaluation-offer-body">
+        <dl class="evaluation-offer-facts">
+            <div><dt>@L("Total including tax", "الإجمالي شامل الضريبة")</dt><dd><bdi>@Money(TenderWorkflowService.TotalOfferPrice(bid))</bdi></dd></div>
+            <div><dt>@L("Delivery lead time", "مدة التسليم")</dt><dd>@(bid.DeliveryDays is int days ? $"{days} {L("days", "يوم")}" : "—")</dd></div>
+            <div><dt>@L("Warranty", "الضمان")</dt><dd>@(bid.WarrantyMonths is int months ? $"{months} {L("months", "شهر")} {bid.WarrantyType}" : Value(bid.WarrantyType))</dd></div>
+            <div><dt>@L("Payment terms", "شروط الدفع")</dt><dd>@Value(bid.PaymentTerms)</dd></div>
+            <div><dt>@L("Offer valid until", "العرض صالح حتى")</dt><dd>@(bid.ValidUntil?.ToString("d MMM yyyy") ?? "—")</dd></div>
+            <div><dt>@L("Offer compliance", "مطابقة العرض")</dt><dd>@(bid.ComplianceStatus == ComplianceStatus.Compliant ? L("Compliant", "مطابق") : bid.ComplianceStatus.ToString())</dd></div>
+        </dl>
+        @if (bid.Items.Count > 0)
+        {
+            <h4>@L("Offered items", "البنود المعروضة")</h4>
+            <ul class="evaluation-offer-items">
+                @foreach (var item in bid.Items.OrderBy(i => i.TenderItemId))
+                {
+                    var name = item.TenderItem?.Name ?? L("Item", "بند");
+                    <li>
+                        <div class="evaluation-offer-line">
+                            <div><strong>@(string.IsNullOrWhiteSpace(item.OfferedProduct) ? name : item.OfferedProduct)</strong><small>@name · @item.Quantity.ToString("0.###") @item.TenderItem?.Unit</small></div>
+                            <bdi>@Money(item.Quantity * item.UnitPrice)</bdi>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(item.OfferedSpecifications)) { <p>@item.OfferedSpecifications</p> }
+                        @if (!string.IsNullOrWhiteSpace(item.Notes)) { <p>@item.Notes</p> }
+                    </li>
+                }
+            </ul>
+        }
+        @if (!string.IsNullOrWhiteSpace(bid.TechnicalProposal) || !string.IsNullOrWhiteSpace(bid.Deviations))
+        {
+            <dl class="evaluation-offer-notes">
+                @if (!string.IsNullOrWhiteSpace(bid.TechnicalProposal)) { <div><dt>@L("Technical proposal", "العرض الفني")</dt><dd>@bid.TechnicalProposal</dd></div> }
+                @if (!string.IsNullOrWhiteSpace(bid.Deviations)) { <div><dt>@L("Declared deviations", "الانحرافات المعلنة")</dt><dd>@bid.Deviations</dd></div> }
+            </dl>
+        }
+        @if (documents.Count > 0)
+        {
+            <h4>@L("Offer documents", "مستندات العرض")</h4>
+            <ul class="evaluation-offer-documents">
+                @foreach (var document in documents)
+                {
+                    <li><a asp-area="EvaluationCommittee" asp-controller="Workflow" asp-action="Download" asp-route-id="@document.Id" target="_blank" rel="noopener">@OfferDocumentTypes.Label(document.DocumentType ?? "", ar)<small>@document.FileName</small></a></li>
+                }
+            </ul>
+        }
+    </div>
+</dialog>

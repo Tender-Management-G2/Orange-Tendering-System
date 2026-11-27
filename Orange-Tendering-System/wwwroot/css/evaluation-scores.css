@@ -103,6 +103,101 @@
 .wf-weighted-preview { padding: 7px 10px; background: color-mix(in srgb, #ff7900 10%, var(--ws-surface)); border-radius: 8px; font-size: .87rem; }
 .wf-weighted-preview output { font-weight: 750; margin-inline-start: 5px; }
 
+.evaluation-supplier-name {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    vertical-align: middle;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.evaluation-supplier-name > button.evaluation-offer-trigger,
+.wp-form .evaluation-supplier-name > button.evaluation-offer-trigger,
+.evaluation-offer-dialog .evaluation-offer-header > button.evaluation-offer-close {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    inline-size: 32px;
+    block-size: 32px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--ws-rule);
+    border-radius: 50%;
+    background: color-mix(in srgb, #ff7900 12%, var(--ws-surface));
+    color: var(--ws-ink);
+    box-shadow: none;
+    font: 800 1rem/1 system-ui, sans-serif;
+    cursor: pointer;
+}
+
+.evaluation-supplier-name > button.evaluation-offer-trigger:hover,
+.wp-form .evaluation-supplier-name > button.evaluation-offer-trigger:hover,
+.evaluation-offer-dialog .evaluation-offer-header > button.evaluation-offer-close:hover {
+    border-color: #ff7900;
+    background: #ff7900;
+    color: #211408;
+}
+
+.evaluation-offer-dialog {
+    --offer-inset: clamp(16px, 3.6vw, 27px);
+    box-sizing: border-box;
+    inline-size: min(750px, calc(100vw - 24px));
+    max-block-size: calc(100dvh - 32px);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--ws-rule);
+    border-radius: 18px;
+    background: var(--ws-surface);
+    color: var(--ws-ink);
+    box-shadow: 0 22px 65px #0005;
+    font-size: 1rem;
+    line-height: 1.55;
+    text-align: start;
+    overflow-wrap: anywhere;
+}
+
+.evaluation-offer-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.evaluation-offer-dialog::backdrop { background: #10182088; }
+.evaluation-offer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: clamp(16px, 4vw, 29px) var(--offer-inset);
+    border-block-start: 3px solid #ff7900;
+    border-block-end: 1px solid var(--ws-rule);
+    background: color-mix(in srgb, #ff7900 7%, var(--ws-surface));
+}
+.evaluation-offer-dialog .evaluation-offer-header h3 { margin: 10px 0; font-size: clamp(1.375rem, 4vw, 1.875rem); line-height: 1.2; }
+.evaluation-offer-dialog .evaluation-offer-header p { margin: 0; color: var(--ws-muted); font-size: .9375rem; line-height: 1.5; }
+.evaluation-offer-dialog .evaluation-offer-header > button.evaluation-offer-close { inline-size: 36px; block-size: 36px; font-size: 1.4rem; background: var(--ws-surface); }
+.evaluation-offer-dialog button:focus-visible, .evaluation-offer-trigger:focus-visible { outline: 2px solid #ff7900; outline-offset: 2px; }
+.evaluation-offer-body {
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ws-rule) transparent;
+    padding: clamp(18px, 5.3vw, 40px) var(--offer-inset) var(--offer-inset);
+}
+.evaluation-offer-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 0; }
+.evaluation-offer-facts > div { padding: 10px 13px 12px; border: 1px solid var(--ws-rule); border-radius: 11px; background: color-mix(in srgb, var(--ws-ink) 5%, var(--ws-surface)); }
+.evaluation-offer-facts > div:first-child { background: color-mix(in srgb, #ff7900 10%, var(--ws-surface)); }
+.evaluation-offer-facts dt, .evaluation-offer-line small { color: var(--ws-muted); font-size: .875rem; }
+.evaluation-offer-facts dd { margin: 4px 0 0; font-weight: 750; white-space: pre-line; }
+.evaluation-offer-dialog .evaluation-offer-body h4 { margin: 18px 0 9px; font-size: 1.0625rem; }
+.evaluation-offer-body :is(.evaluation-offer-items, .evaluation-offer-documents) { list-style: none; margin: 0; padding: 0; }
+.evaluation-offer-items > li, .evaluation-offer-documents a { display: block; margin: 0; padding: 11px 13px; border: 1px solid var(--ws-rule); border-radius: 11px; }
+.evaluation-offer-items > li + li, .evaluation-offer-documents > li + li { margin-block-start: 8px; }
+.evaluation-offer-line { display: grid; gap: 3px; }
+.evaluation-offer-line small, .evaluation-offer-documents small { display: block; color: var(--ws-muted); }
+.evaluation-offer-line bdi { justify-self: start; }
+.evaluation-offer-line bdi, .evaluation-offer-notes dt { font-weight: 700; }
+.evaluation-offer-dialog .evaluation-offer-items p, .evaluation-offer-notes dd { margin: 8px 0 0; white-space: pre-line; }
+.evaluation-offer-notes > div + div { margin-block-start: 10px; }
+.evaluation-offer-documents a:hover { border-color: #ff7900; }
+
 .wf-dialog:has(.wf-evaluation-stage) { width: min(88vw, 1280px); max-width: calc(100vw - 20px); max-height: calc(100dvh - 28px); border-radius: 22px; }
 .wf-dialog:has(.wf-evaluation-stage) .wf-dialog-x { color: var(--ws-ink); background: var(--ws-surface); border-color: var(--ws-rule); z-index: 8; }
 .wf-dialog:has(.wf-evaluation-stage[dir=rtl]) .wf-dialog-x { left: 18px; right: auto; }
@@ -152,6 +247,7 @@
 .evaluation-review-page .pf-section { border-radius: 13px; box-shadow: none; }
 .evaluation-review-page .pg-btn-primary { background: #ff7900; color: #211408; }
 @media (max-width: 620px) {
+    .evaluation-offer-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .wf-dialog:has(.wf-evaluation-stage) { width: calc(100vw - 20px); border-radius: 16px; }
     .wf-evaluation-stage .wf-pop-head, .wf-evaluation-stage .wp-layout { padding-inline: 12px; }
     .wf.wf-evaluation-stage .wp-now { padding: 10px; }

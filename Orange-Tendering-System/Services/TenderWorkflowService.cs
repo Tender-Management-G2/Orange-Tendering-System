@@ -477,8 +477,9 @@ public partial class TenderWorkflowService(ApplicationDbContext db, UserManager<
                 Require(score.Financial.HasValue, "Supply a financial score, including a deliberate zero.");
                 ValidateEnteredScore(score.Financial.Value);
                 var (technical, breakdown) = CalculateTechnicalScore(criteria, score);
-                Require(!string.IsNullOrWhiteSpace(score.Justification) && score.Justification.Length <= 2000, "Every supplier evaluation requires a short justification (up to 2000 characters).");
-                foreach (var criterion in s.CommitteeRound.Criteria) db.EvaluationScores.Add(new EvaluationScore { BidId = score.BidId, CommitteeMemberId = member.Id, EvaluationCriterionId = criterion.Id, Score = criterion.Type == CriterionType.Financial ? score.Financial.Value : technical, Comment = score.Justification.Trim(),
+                Require(score.Justification is null || score.Justification.Length <= 2000, "Score justification must be 2000 characters or fewer.");
+                var comment = string.IsNullOrWhiteSpace(score.Justification) ? null : score.Justification.Trim();
+                foreach (var criterion in s.CommitteeRound.Criteria) db.EvaluationScores.Add(new EvaluationScore { BidId = score.BidId, CommitteeMemberId = member.Id, EvaluationCriterionId = criterion.Id, Score = criterion.Type == CriterionType.Financial ? score.Financial.Value : technical, Comment = comment,
                     TechnicalBreakdownJson = criterion.Type == CriterionType.Technical ? breakdown : null, ScoredAt = Now });
             }
             var participation = s.Invitations.SingleOrDefault(x => x.CommitteeMemberId == member.Id);

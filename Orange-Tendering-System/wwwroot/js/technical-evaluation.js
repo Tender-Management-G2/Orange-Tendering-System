@@ -11,6 +11,23 @@
     });
     document.addEventListener("paste", event => checkInsertion(event, event.clipboardData?.getData("text")));
 
+    document.addEventListener("click", event => {
+        const trigger = event.target.closest("[data-evaluation-offer-open]");
+        if (trigger) {
+            const dialog = document.getElementById(trigger.getAttribute("aria-controls"));
+            if (dialog && !dialog.open) dialog.showModal();
+        }
+        const close = event.target.closest("[data-evaluation-offer-close]");
+        if (close) close.closest("dialog").close();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        const dialog = event.target.closest(".evaluation-offer-dialog[open]");
+        if (!dialog) return;
+        event.preventDefault();
+        dialog.close();
+    });
+
     function score(row, legacySelector) {
         const inputs = [...row.querySelectorAll("[data-technical-weight]")];
         if (!inputs.length) {

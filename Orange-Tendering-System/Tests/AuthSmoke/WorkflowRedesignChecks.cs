@@ -680,13 +680,50 @@ public static class WorkflowRedesignChecks
                 && !popup.Contains("name=\"recommendation.") && popup.Contains("data-pad")
                 && popup.Contains("maxlength=\"2\"") && popup.Contains("data-score-digits") && popup.Contains("data-weighted-preview"),
                 "meeting popup keeps two-digit scores, weighted preview and mandatory signature");
+            var workspace = await member.GetStringAsync("/EvaluationCommittee/Workflow/Meeting/" + id);
+            foreach (var view in new[] { popup, workspace })
+            {
+                var explanations = Regex.Matches(view, "<textarea[^>]*name=\"scores\\[\\d+\\]\\.Justification\"[^>]*>");
+                Check(explanations.Count == 3 && explanations.All(m => !m.Value.Contains(" required")), "each score justification field is optional");
+                foreach (var bid in new[] { bidA, bidB, bidC })
+                    Check(view.Contains($"aria-controls=\"evaluation-offer-{bid.Id}\"")
+                        && Regex.IsMatch(view, $"<dialog[^>]+id=\"evaluation-offer-{bid.Id}\".*?Total including tax.*?Offered items.*?Offer documents.*?</dialog>", RegexOptions.Singleline),
+                        "the supplier button is linked to its own offer facts, items and documents");
+            }
         }
         await Refuse(w => w.SubmitEvaluation(id, Scores(89.95m, 90), P(fin), null), "a decimal score is refused", "whole-number");
         await Refuse(w => w.SubmitEvaluation(id, Scores(100, 90), P(fin), null), "a three-digit financial score is refused", "whole-number");
         await Refuse(w => w.SubmitEvaluation(id, Scores(89, 100), P(fin), null), "a three-digit technical score is refused", "whole-number");
         var evaluationSignature = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9WQAAAAASUVORK5CYII=");
         await Refuse(w => w.Forward(id, P(officer)), "the Officer cannot forward before four signed submissions");
-        await Flow(w => w.SubmitEvaluation(id, Scores(89m, 90), P(fin), evaluationSignature));
+        using (var member = await Login(fin))
+        {
+            // Obtain a token for this authenticated client before exercising real MVC model binding.
+            using var popupRequest = new HttpRequestMessage(HttpMethod.Get, "/EvaluationCommittee/Workflow/Details/" + id);
+            popupRequest.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            var popup = await (await member.SendAsync(popupRequest)).Content.ReadAsStringAsync();
+            var scoreToken = WebUtility.HtmlDecode(Regex.Match(popup, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+            var signature = "data:image/png;base64," + Convert.ToBase64String(evaluationSignature.Concat(new byte[200]).ToArray());
+            var fields = new Dictionary<string, string> { ["__RequestVerificationToken"] = scoreToken, ["signatureImage"] = signature };
+            var scores = Scores(89m, 90);
+            for (var i = 0; i < scores.Count; i++)
+            {
+                fields[$"scores[{i}].BidId"] = scores[i].BidId.ToString();
+                fields[$"scores[{i}].Financial"] = scores[i].Financial!.Value.ToString();
+                for (var j = 0; j < scores[i].TechnicalScores.Count; j++)
+                    fields[$"scores[{i}].TechnicalScores[{j}]"] = scores[i].TechnicalScores[j]!.Value.ToString();
+            }
+            fields["scores[1].Justification"] = "";
+            fields["scores[2].Justification"] = "  Gamma  ";
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/EvaluationCommittee/Workflow/SubmitEvaluation/" + id) { Content = new FormUrlEncodedContent(fields) };
+            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+            using var response = await member.SendAsync(request);
+            Check(response.IsSuccessStatusCode, "a signed evaluation is accepted with omitted and blank justification fields");
+        }
+        var comments = await Read(d => d.EvaluationScores.Where(x => x.CommitteeMember.UserId == fin.Id && x.EvaluationCriterion.CommitteeRound.TenderRoundId == roundId)
+            .Select(x => new { x.BidId, x.Comment }).ToListAsync());
+        Check(comments.Count(x => x.Comment == null) == 4 && comments.Count(x => x.BidId == bidC.Id && x.Comment == "Gamma") == 2,
+            "blank justifications are stored as null and written justifications are trimmed");
         await Refuse(w => w.SubmitEvaluation(id, Scores(80, 80), P(fin), evaluationSignature), "a member cannot submit twice", "immutable");
         foreach (var m in new[] { manager, depRep, tech }) await Flow(w => w.SubmitEvaluation(id, Scores(88, 92), P(m), evaluationSignature));
         var session = await Read(d => d.Set<EvaluationSession>().Include(x => x.Report).Include(x => x.Invitations).SingleAsync(x => x.TenderRoundId == roundId));

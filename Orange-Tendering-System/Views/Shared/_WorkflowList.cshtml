@@ -357,7 +357,12 @@
         }).catch(function () { if (motion) motion.cancel(); form.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); if (btn) btn.textContent = label; showError('The server could not be reached. Try again.'); });
     }
     var lastUrl = '';
-    function refreshView() { if (!lastUrl || !dlg.open) return; ajax(lastUrl).then(function (r) { return r.text(); }).then(function (h) { if (h.indexOf('wf-pop') > -1 && dlg.open) render(h, openTitles()); }); }
+    function refreshView() {
+        if (!lastUrl || !dlg.open || body.querySelector('.evaluation-offer-dialog[open]')) return;
+        ajax(lastUrl).then(function (r) { return r.text(); }).then(function (h) {
+            if (h.indexOf('wf-pop') > -1 && dlg.open && !body.querySelector('.evaluation-offer-dialog[open]')) render(h, openTitles());
+        });
+    }
     function openWorkflow(url) { lastUrl = url; dirty = false; dlg.showModal(); load(url); }
     document.querySelectorAll('[data-open-workflow]').forEach(function (b) { b.addEventListener('click', function () { openWorkflow(b.dataset.url); }); });
     function closeDlg() { if (dlg.open) dlg.close(); }
