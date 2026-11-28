@@ -206,7 +206,7 @@ async function startPhoneEnrollment() {
         return;
     }
 
-    stopPhoneEnrollmentTimers();
+    stopPhoneEnrollmentTimers(); // just to clearn the previous attempts
     showBiometricStatus('');
     var qrButton = document.getElementById('btnPhoneQr');
     var retryButton = document.getElementById('btnPhoneRetry');
@@ -263,7 +263,16 @@ function phoneEnrollmentStatusChanged(data) {
         if (prefersReducedMotion()) {
             delay = 600;
         }
-        setTimeout(function () { window.location.reload(); }, delay);
+        // During registration the page moves on to sign-in (data-enrolled-url); elsewhere it just reloads.
+        var root = document.getElementById('bio-root');
+        var nextUrl = root ? root.getAttribute('data-enrolled-url') : null;
+        setTimeout(function () {
+            if (nextUrl) {
+                window.location.href = nextUrl;
+            } else {
+                window.location.reload();
+            }
+        }, delay);
         return false;
     }
     if (data.status === 'expired') {

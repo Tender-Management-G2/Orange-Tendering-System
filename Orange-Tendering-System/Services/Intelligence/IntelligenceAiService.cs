@@ -1,16 +1,16 @@
-// ORANGE INTELLIGENCE - AI Studio (Google Gemini API).
-// Three features share this one class:
-//   1. Supplier summary   -> GetSupplierFactsAsync + AskGeminiAsync
-//   2. Text chat          -> GetSupplierFactsAsync + AskGeminiAsync
-//   3. Live voice call    -> GetSupplierFactsAsync + CreateLiveTokenAsync (the browser then talks to Gemini directly)
-// Gemini never reads the database. We read a few supplier facts ourselves and put them in the prompt.
+// ORANGE INTELLIGENCE - AI Studio (Google Gemini API). The whole AI backend is in this one class:
+//   1. GetSupplierFactsAsync  authorized supplier data -> a few plain-text facts (used by all three features)
+//   2. AskGeminiAsync         Supplier Summary and Text Chat: one REST request to Gemini, returns its text answer
+//   3. CreateLiveTokenAsync   Live Voice: a single-use token; the browser then talks to Gemini Live directly
+//   4. Errors                 Gemini failures become short messages that are safe to show
+// Gemini never reads the database. We read the supplier statistics ourselves and put them in the prompt.
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
-namespace Orange_Tendering_System.Services.Radar;
+namespace Orange_Tendering_System.Services.Intelligence;
 
-public sealed class IntelligenceAiService(HttpClient http, IConfiguration configuration, RadarService radar)
+public class IntelligenceAiService
 {
     private const string GeminiUrl = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -26,36 +26,47 @@ public sealed class IntelligenceAiService(HttpClient http, IConfiguration config
         Write plain text without Markdown symbols.
         """;
 
+    private readonly HttpClient http;
+    private readonly IConfiguration configuration;
+    private readonly IntelligenceService intelligence;
+
+    public IntelligenceAiService(HttpClient http, IConfiguration configuration, IntelligenceService intelligence)
+    {
+        this.http = http;
+        this.configuration = configuration;
+        this.intelligence = intelligence;
+    }
+
     // Model IDs come from appsettings.json ("Gemini" section), so they can change without code changes.
-    public string TextModel => configuration["Gemini:TextModel"] ?? "gemini-3.5-flash-lite";
-    public string LiveModel => configuration["Gemini:LiveModel"] ?? "gemini-3.8-live";
+    public string TextModel
+    {
+        get { return configuration["Gemini:TextModel"] ?? "gemini-3.5-flash-lite"; }
+    }
+
+    public string LiveModel
+    {
+        get { return configuration["Gemini:LiveModel"] ?? "gemini-3.8-live"; }
+    }
+
+    // ======================================================================
+    // 1. Supplier facts (authorization happens here)
+    // ======================================================================
 
     // Returns the supplier facts as plain text, or null when the supplier is not in this user's authorized scope.
     public async Task<string?> GetSupplierFactsAsync(int supplierId, CancellationToken ct)
     {
-        // The snapshot only contains the suppliers this user may see (RadarDataService applies the scope).
-        RadarSnapshot snapshot = await radar.SnapshotAsync(RadarPeriod.All, ct);
-        if (snapshot.Supplier(supplierId) == null)
-        {
-            return null;
-        }
+        // Same loader as the other tabs: the user's scope and the sealing rule are already applied. Whole history.
+        ProcurementSnapshot snapshot = await intelligence.LoadSnapshotAsync(null, null, false, ct);
 
-        // Reuse the statistics the Suppliers tab already shows, so Gemini never calculates numbers itself.
-        RadarAnalytics.SupplierStats? stats = null;
-        foreach (RadarAnalytics.SupplierStats item in RadarAnalytics.Suppliers(snapshot))
-        {
-            if (item.SupplierId == supplierId)
-            {
-                stats = item;
-            }
-        }
+        // Same statistics as the Suppliers tab, so Gemini never calculates numbers itself.
+        SupplierRow? stats = SupplierCalculator.BuildStats(snapshot).FirstOrDefault(row => row.SupplierId == supplierId);
         if (stats == null)
         {
             return null;
         }
 
-        // Only non-sensitive facts: no contact details, tax numbers, sealed bids or offer prices.
-        var facts = new StringBuilder();
+        // Only non-sensitive facts: no contact details, tax numbers, sealed offers or offer prices.
+        StringBuilder facts = new StringBuilder();
         facts.AppendLine("Supplier name: " + stats.Name);
         facts.AppendLine("Business category: " + stats.Category);
         facts.AppendLine("Registration status: " + stats.Status);
@@ -70,18 +81,22 @@ public sealed class IntelligenceAiService(HttpClient http, IConfiguration config
         return facts.ToString();
     }
 
-    // Sends one request to Gemini and returns its text answer. Used by both the summary and the chat.
+    // ======================================================================
+    // 2. Supplier Summary and Text Chat (one REST request per question, no conversation memory)
+    // ======================================================================
+
     public async Task<string> AskGeminiAsync(string supplierFacts, string question, CancellationToken ct)
     {
         string userMessage = "Supplier facts:\n" + supplierFacts + "\nQuestion: " + question;
 
+        // POST .../models/{model}:generateContent  body: { systemInstruction, contents }
         var body = new
         {
             systemInstruction = new { parts = new[] { new { text = SystemPrompt } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = userMessage } } } }
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GeminiUrl}/models/{TextModel}:generateContent");
+        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, GeminiUrl + "/models/" + TextModel + ":generateContent");
         request.Headers.Add("x-goog-api-key", ReadApiKey());
         request.Content = JsonContent.Create(body);
 
@@ -90,7 +105,7 @@ public sealed class IntelligenceAiService(HttpClient http, IConfiguration config
 
         // The answer is in candidates[0].content.parts[*].text
         using JsonDocument json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-        var answer = new StringBuilder();
+        StringBuilder answer = new StringBuilder();
         JsonElement candidates = json.RootElement.GetProperty("candidates");
         if (candidates.GetArrayLength() > 0 && candidates[0].TryGetProperty("content", out JsonElement content))
         {
@@ -109,8 +124,12 @@ public sealed class IntelligenceAiService(HttpClient http, IConfiguration config
         return answer.ToString();
     }
 
-    // Creates a short-lived, single-use token so the browser can open ONE Live voice session.
-    // The permanent API key stays on the server. The model, the prompt and the supplier facts are locked inside the token.
+    // ======================================================================
+    // 3. Live Voice: a short-lived, single-use token
+    // ======================================================================
+
+    // The permanent API key stays on the server. The model, the prompt and the supplier facts are locked inside the token,
+    // so the browser can open exactly ONE Live session with exactly this setup.
     public async Task<string> CreateLiveTokenAsync(string supplierFacts, CancellationToken ct)
     {
         DateTime now = DateTime.UtcNow;
@@ -129,7 +148,7 @@ public sealed class IntelligenceAiService(HttpClient http, IConfiguration config
             }
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GeminiUrl}/auth_tokens");
+        using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, GeminiUrl + "/auth_tokens");
         request.Headers.Add("x-goog-api-key", ReadApiKey());
         request.Content = JsonContent.Create(body);
 
@@ -140,6 +159,10 @@ public sealed class IntelligenceAiService(HttpClient http, IConfiguration config
         using JsonDocument json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
         return json.RootElement.GetProperty("name").GetString() ?? "";
     }
+
+    // ======================================================================
+    // 4. API key and errors
+    // ======================================================================
 
     // The key is stored in User Secrets as Gemini:Orange-Intelligence-API. It is never sent to the browser or logged.
     private string ReadApiKey()
@@ -182,12 +205,25 @@ public sealed class IntelligenceAiService(HttpClient http, IConfiguration config
         throw new GeminiException(status == 429 ? 429 : 502, message);
     }
 
-    private static string Percent(double? value) => value == null ? "not available" : Math.Round(value.Value * 100) + "%";
-    private static string Date(DateTime? value) => value == null ? "not recorded" : value.Value.ToString("yyyy-MM-dd");
+    // 0.834 -> "83%"; null -> "not available" (for example no invitation yet, so no response rate).
+    private static string Percent(double? value)
+    {
+        return value == null ? "not available" : Math.Round(value.Value * 100) + "%";
+    }
+
+    private static string Date(DateTime? value)
+    {
+        return value == null ? "not recorded" : value.Value.ToString("yyyy-MM-dd");
+    }
 }
 
 // An error from Gemini (or missing configuration) with a message that is safe to show to the user.
-public sealed class GeminiException(int statusCode, string message) : Exception(message)
+public class GeminiException : Exception
 {
-    public int StatusCode { get; } = statusCode;
+    public int StatusCode { get; }
+
+    public GeminiException(int statusCode, string message) : base(message)
+    {
+        StatusCode = statusCode;
+    }
 }

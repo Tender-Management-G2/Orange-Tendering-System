@@ -1,5 +1,10 @@
 # ORANGE RADAR — Supplier Market Intelligence (Orange Intelligence)
 
+> **Superseded (2026-11-28).** The authoritative study references for the final code are `docs/ORANGE_INTELLIGENCE_STUDY_GUIDE.md` (Overview, Suppliers, Tenders) and `docs/AI_STUDIO_STUDY_GUIDE.md` (AI Studio). This file describes an earlier stage: `RadarService`, `RadarDataService`, `RadarSnapshot`, `RadarOptions`, `RadarAnalytics` and `IntelligenceHelpers` no longer exist (merged into `Services/Intelligence/IntelligenceService.cs` and `IntelligenceModels.cs`).
+
+
+> **2026-11-27:** the Overview, Suppliers and Tenders tabs were rewritten in beginner style; the 3D universe, 2D network, forensics and replay described below were removed. Current code: `docs/INTELLIGENCE_BEGINNER_GUIDE.md` and `docs/INTELLIGENCE_REFACTOR_REPORT.md`.
+
 Route: **`/Intelligence`** (sidebar: **Orange Intelligence**), `Controllers/IntelligenceController.cs`, view `Views/Intelligence/Index.cshtml`.
 The old `/SourcingOfficer/MarketIntelligence` address redirects there.
 
@@ -77,7 +82,9 @@ first/last activity) from `RadarAnalytics.Suppliers` and puts them in the prompt
 
 ## Demonstration dataset
 
-Launch profile **`https (Orange Radar demo database)`** uses database `OrangeTenderingTeamDev_RadarDemo` and sets `OrangeRadar:DemoDataset:Enabled=true`. The seeder refuses any database whose name does not end with `_RadarDemo`, so `OrangeTenderingTeamDev` is never touched. It creates 12 fictional "RADAR DEMO" suppliers and 10 tenders containing: normal competition, repeated participation, a shared phone/address pair, a stable 4 % price gap, list-price twins, an identical file, legitimately similar (template) text, a re-worded methodology, award rotation, low-competition rounds, a single-bidder tender, a pending and a suspended supplier, and a sealed open round. The patterns are planted as data; the real detectors find them.
+Launch profile **`https (Orange Radar demo database)`** uses the local database `OrangeTenderingTeamDev_RadarDemo` and sets `OrangeRadar:DemoDataset:Enabled=true`. The seeder requires a local team database with a name ending in `_RadarDemo`.
+
+The original 12 fictional suppliers and 10 tenders illustrate repeated participation, shared contacts, similar pricing and documents, low competition, and a sealed open round. Orange Intelligence adds 15 fictional suppliers across 13 categories, 8 tenders, and 21 priced offers in JOD. The additions also seed on startup when the original demo database already exists. Sign in as a Sourcing Officer and open `/Intelligence` to view them.
 
 ## Network rules
 

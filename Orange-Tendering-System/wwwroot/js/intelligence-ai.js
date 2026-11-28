@@ -128,6 +128,7 @@
   window.OrangeIntelligenceAI = {
     chooseSupplier(supplierId) {
       supplierSelect.value = String(supplierId);
+      supplierSelect.dispatchEvent(new Event('change')); // the supplier list (intelligence-studio-picker.js) shows the choice
       window.OrangeRadar?.setTab('studio');
       setMode('summary');
     }

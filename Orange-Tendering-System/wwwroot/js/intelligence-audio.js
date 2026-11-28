@@ -27,6 +27,7 @@ let thinkingSince = 0;       // when the "thinking" state started
 // The panel's data-state picks the CSS animation: idle, connecting, listening, thinking, speaking.
 function setState(state, text) {
   voicePanel.dataset.state = state;
+  voicePanel.dataset.outcome = ''; // visual only: endCall sets "error" after a failure (intelligence-voice-visual.js)
   statusText.textContent = text;
   startButton.hidden = state !== 'idle';
   endButton.hidden = state === 'idle';
@@ -101,7 +102,7 @@ async function startCall() {
       config: { responseModalities: [Modality.AUDIO] },
       callbacks: {
         onmessage: handleGeminiMessage,
-        onerror: () => endCall('The voice connection failed.'),
+        onerror: () => endCall('The voice connection failed.', true),
         onclose: event => endCall(event.reason ? `Call ended: ${event.reason}` : 'Call ended.')
       }
     });
@@ -110,10 +111,11 @@ async function startCall() {
 
     // Step 3: start sending the microphone.
     await startMicrophone();
+    window.OrangeVoiceVisual?.connect(micAnalyser, speakerAnalyser); // the animated orb reads the same two analysers
     setState('listening', 'Listening… speak now');
     requestAnimationFrame(animateVoice);
   } catch (error) {
-    endCall(error.name === 'NotAllowedError' ? 'Microphone permission was denied.' : error.message);
+    endCall(error.name === 'NotAllowedError' ? 'Microphone permission was denied.' : error.message, true);
   }
 }
 
@@ -193,9 +195,10 @@ function floatToPcmBase64(samples) {
 }
 
 // Closes the Gemini session and releases the microphone and both audio contexts.
-function endCall(message = 'Call ended.') {
+function endCall(message = 'Call ended.', failed = false) {
   if (!callActive) return; // already ended (closing the session fires onclose again)
   callActive = false;
+  window.OrangeVoiceVisual?.connect(null, null);
   const openSession = session;
   session = null;
   openSession?.close();
@@ -206,6 +209,7 @@ function endCall(message = 'Call ended.') {
   playingSources = [];
   nextPlayTime = 0;
   setState('idle', message);
+  if (failed) voicePanel.dataset.outcome = 'error';
 }
 
 if (studio) {

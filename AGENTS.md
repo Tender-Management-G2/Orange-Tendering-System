@@ -1,15 +1,15 @@
 # AGENTS.md — repository rules for every agent
 
-## Current workspace (owner update, 2026-11-27)
+## Current workspace (owner update, 2026-11-28)
 
-- Repository worktree: `C:\Users\user\Desktop\Orange\Projects\Orange-Tendering\Orange-Tendering-System-FinalVersion`
+- Repository worktree: `C:\Users\user\Desktop\Orange\Projects\Orange-Tendering\Orange-Tendering-System-finalfinalVersion`
 - Current integration and development branch: `Workv7-from-Workv6` (case-sensitive)
 - Remote branch: `origin/Workv7-from-Workv6`
 - Visual Studio solution: `Orange-Tendering-System.slnx` at the worktree root
 - Web project: `Orange-Tendering-System/Orange-Tendering-System.csproj`
 - Application URLs: `http://localhost:5254` and `https://localhost:7182`, as defined in `Orange-Tendering-System/Properties/launchSettings.json`
 
-This replaces the 2026-11-16 workspace instruction that named `C:\Users\user\Desktop\Orange-Tendering-System`, `tariq22222`, and `WorkV2`. That directory is not the current worktree. Use `Workv7-from-Workv6` for continuing this integration unless the owner explicitly selects another branch or worktree.
+The owner confirmed `Orange-Tendering-System-finalfinalVersion` and `Workv7-from-Workv6` for this integration. When both match the Git checks below, proceed without asking for workspace confirmation. The sibling `Orange-Tendering-System-FinalVersion` and the older `C:\Users\user\Desktop\Orange-Tendering-System` worktree remain separate.
 
 ## Check before editing, building, committing, or pushing
 

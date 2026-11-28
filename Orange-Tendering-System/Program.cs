@@ -141,14 +141,13 @@ builder.Services.AddSingleton<IExternalInvitationChannel, SmtpInvitationChannel>
 builder.Services.AddScoped<ExternalInvitationDispatcher>();
 builder.Services.AddScoped<SupplierReviewService>();
 builder.Services.AddHostedService<EvaluationDeadlineWorker>();
-// ORANGE INTELLIGENCE - market analytics (docs/ORANGE_RADAR.md) and the Gemini AI Studio (IntelligenceAiService).
-builder.Services.AddMemoryCache();
-builder.Services.Configure<Orange_Tendering_System.Services.Radar.RadarOptions>(builder.Configuration.GetSection("OrangeRadar"));
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarDataService>();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarService>();
-builder.Services.AddScoped<Orange_Tendering_System.Services.Radar.RadarExportService>();
-builder.Services.AddHttpClient<Orange_Tendering_System.Services.Radar.IntelligenceAiService>();
+// ORANGE INTELLIGENCE (docs/ORANGE_INTELLIGENCE_STUDY_GUIDE.md, docs/AI_STUDIO_STUDY_GUIDE.md).
+// IntelligenceService loads the authorized data (EF Core + memory cache) for the Overview, Suppliers and Tenders tabs;
+// IntelligenceExportService builds their Excel/PDF files; IntelligenceAiService is the Gemini AI Studio tab.
+// AddMemoryCache and AddHttpContextAccessor are registered above.
+builder.Services.AddScoped<Orange_Tendering_System.Services.Intelligence.IntelligenceService>();
+builder.Services.AddScoped<Orange_Tendering_System.Services.Intelligence.IntelligenceExportService>();
+builder.Services.AddHttpClient<Orange_Tendering_System.Services.Intelligence.IntelligenceAiService>();
 
 
 var app = builder.Build();

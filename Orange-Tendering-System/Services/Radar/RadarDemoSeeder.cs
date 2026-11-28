@@ -26,16 +26,39 @@ public static class RadarDemoSeeder
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var environment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
-        if (!IsDemoDatabase(db.Database.GetConnectionString()))
+        var connection = db.Database.GetConnectionString();
+        if (!TeamDevDatabase.IsLocalTeamDatabase(connection) || !IsDemoDatabase(connection))
         {
-            logger.LogWarning("OrangeRadar:DemoDataset:Enabled ignored: the demo dataset is only created in a database named *_RadarDemo.");
+            logger.LogWarning("OrangeRadar:DemoDataset:Enabled ignored: the demo dataset requires a local team database named *_RadarDemo.");
             return;
         }
-        if (await db.Suppliers.AnyAsync(s => s.CompanyName.StartsWith(Prefix))) return;
+
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlRawAsync("""
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = N'OrangeRadarDemoSeed', @LockMode = N'Exclusive', @LockTimeout = 30000;
+            IF @result < 0 THROW 50001, 'Could not lock Orange Radar demo seed data.', 1;
+            """);
+
+        var hasOriginalMarket = await db.Suppliers.AnyAsync(s => s.RegistrationNumber == "RADAR-DEMO-001");
+        var hasIntelligenceSuppliers = await db.Suppliers.AnyAsync(s => s.RegistrationNumber == "RADAR-DEMO-INT-001");
+        if (hasOriginalMarket && hasIntelligenceSuppliers) return;
+
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var officer = await users.FindByEmailAsync(TeamAccountSeeder.Find(SystemRoles.SourcingOfficer).Email) ?? throw new InvalidOperationException("Team officer account missing.");
         var requester = await users.FindByEmailAsync(TeamAccountSeeder.Find(SystemRoles.RequestingDepartment).Email) ?? officer;
 
+        if (!hasOriginalMarket)
+            await SeedOriginalMarketAsync(db, environment, officer, requester, logger);
+        if (!hasIntelligenceSuppliers)
+            await SeedIntelligenceSuppliersAsync(db, officer, requester, logger);
+
+        await transaction.CommitAsync();
+    }
+
+    private static async Task SeedOriginalMarketAsync(ApplicationDbContext db, IWebHostEnvironment environment,
+        ApplicationUser officer, ApplicationUser requester, ILogger logger)
+    {
         var it = new Department { Name = Prefix + "- Information Technology", Description = "Fictional Orange Radar demonstration department." };
         var admin = new Department { Name = Prefix + "- Administration", Description = "Fictional Orange Radar demonstration department." };
         db.Departments.AddRange(it, admin);
@@ -81,45 +104,14 @@ public static class RadarDemoSeeder
         const string RequirementsText = "Mandatory requirements: The supplier shall deliver all equipment to the Orange headquarters in Amman within 30 calendar days of the purchase order. All devices must carry a minimum three-year manufacturer warranty with on-site support. The supplier shall provide a valid tax certificate, commercial registration and ISO 9001 certificate. Payment terms are 60 days after acceptance. Prices must be quoted in Jordanian dinars including delivery and installation.";
 
         // ---- Tenders: (title, department, month, status, items(name, unit, qty, base price), bids(supplier, factor, minute offset, compliance), award supplier)
-        var tenders = new List<(Tender Tender, TenderRound Round)>();
+        var tenderCount = 0;
         async Task<(Tender, TenderRound, Dictionary<Supplier, Bid>)> AddTender(string title, Department dept, DateTime deadline, TenderStatus status, TenderRoundStatus roundStatus,
             (string Name, string Unit, decimal Qty, decimal Price)[] items, (Supplier Supplier, decimal Factor, int Minutes, ComplianceStatus Compliance)[] offers,
             Supplier[] invitedOnly, Supplier? winner, string? requirements = null)
         {
-            var pr = new PurchaseRequest { DepartmentId = dept.Id, CreatedByUserId = requester.Id, Title = title, Justification = "Fictional Orange Radar demonstration request.",
-                Status = PurchaseRequestStatus.ConvertedToTender, CreatedAt = deadline.AddDays(-40), SubmittedAt = deadline.AddDays(-39) };
-            var tender = new Tender { PurchaseRequest = pr, Title = Prefix + title, Description = "Fictional demonstration tender for Orange Radar: " + title + ".", Requirements = requirements,
-                Status = status, CreatedByUserId = officer.Id, CreatedAt = deadline.AddDays(-30), Currency = "JOD", EstimatedValue = items.Sum(i => i.Qty * i.Price) };
-            foreach (var i in items) tender.Items.Add(new TenderItem { Name = i.Name, Unit = i.Unit, Quantity = i.Qty, Specifications = $"{i.Name} as per the attached specification." });
-            var round = new TenderRound { Tender = tender, RoundNumber = 1, Status = roundStatus, OpensAt = deadline.AddDays(-21), Deadline = deadline,
-                ClosedAt = roundStatus == TenderRoundStatus.Open ? null : deadline.AddMinutes(5), CreatedByUserId = officer.Id, CreatedAt = deadline.AddDays(-22) };
-            db.Tenders.Add(tender); db.TenderRounds.Add(round);
-            await db.SaveChangesAsync();
-            var bids = new Dictionary<Supplier, Bid>();
-            foreach (var (supplier, factor, minutes, compliance) in offers)
-            {
-                var invitation = new TenderInvitation { TenderRoundId = round.Id, SupplierId = supplier.Id, Status = InvitationStatus.Accepted, InvitedByUserId = officer.Id, InvitedAt = deadline.AddDays(-20), RespondedAt = deadline.AddDays(-18) };
-                var bid = new Bid { TenderInvitation = invitation, RevisionNumber = 1, Status = BidStatus.Submitted, CurrencyCode = "JOD", DeliveryDays = 21 + minutes % 9,
-                    PaymentTerms = "60 days after acceptance", CreatedAt = deadline.AddDays(-3), SubmittedAt = deadline.AddHours(-26).AddMinutes(minutes), ValidUntil = deadline.AddDays(90),
-                    ShippingCost = 0, ComplianceStatus = roundStatus == TenderRoundStatus.Open ? ComplianceStatus.NotChecked : compliance,
-                    ComplianceCheckedByUserId = roundStatus == TenderRoundStatus.Open ? null : officer.Id, ComplianceCheckedAt = roundStatus == TenderRoundStatus.Open ? null : deadline.AddDays(1),
-                    TechnicalProposal = "Fictional demonstration offer." };
-                foreach (var (item, i) in tender.Items.Select((x, i) => (x, i)))
-                    bid.Items.Add(new BidItem { TenderItemId = item.Id, Quantity = item.Quantity, UnitPrice = decimal.Round(items[i].Price * factor, 2) });
-                db.TenderInvitations.Add(invitation); db.Bids.Add(bid);
-                bids[supplier] = bid;
-            }
-            foreach (var supplier in invitedOnly)
-                db.TenderInvitations.Add(new TenderInvitation { TenderRoundId = round.Id, SupplierId = supplier.Id, Status = InvitationStatus.Pending, InvitedByUserId = officer.Id, InvitedAt = deadline.AddDays(-20) });
-            await db.SaveChangesAsync();
-            if (winner != null)
-            {
-                tender.AwardedBidId = bids[winner].Id; tender.AwardedAt = deadline.AddDays(24); tender.AwardedByUserId = officer.Id;
-                tender.AwardApprovalEvidenceJson = "{\"note\":\"Fictional Orange Radar demonstration award.\"}";
-                await db.SaveChangesAsync();
-            }
-            tenders.Add((tender, round));
-            return (tender, round, bids);
+            var tender = await AddTenderAsync(db, officer, requester, title, dept, deadline, status, roundStatus, items, offers, invitedOnly, winner, requirements);
+            tenderCount++;
+            return tender;
         }
 
         DateTime D(int month, int day) => new(2026, month, day, 11, 0, 0, DateTimeKind.Utc);
@@ -167,6 +159,140 @@ public static class RadarDemoSeeder
         db.Documents.Add(File("petra-server-methodology.txt", "Implementation methodology.\n\nOur team will install the rack servers and storage array in the existing data hall, migrate the virtual machines in three controlled waves over consecutive weekends, and validate every workload with the application owners before decommissioning the legacy hosts. A rollback plan is prepared for each wave and daily status reports are shared with Orange IT.", bidId: b3[petra].Id));
         db.Documents.Add(File("wadi-server-approach.txt", "Delivery approach.\n\nWe will mount the new rack servers and the storage array inside the current data hall, move the virtual machines in three planned waves across successive weekends, and confirm each workload with its application owner before the old hosts are retired. Every wave has a prepared rollback plan, and Orange IT receives a status report each day.", bidId: b3[wadi].Id));
         await db.SaveChangesAsync();
-        logger.LogInformation("Orange Radar demonstration dataset created: {Suppliers} fictional suppliers, {Tenders} fictional tenders.", suppliers.Length, tenders.Count);
+        logger.LogInformation("Orange Radar demonstration dataset created: {Suppliers} fictional suppliers, {Tenders} fictional tenders.", suppliers.Length, tenderCount);
+    }
+
+    private static async Task SeedIntelligenceSuppliersAsync(ApplicationDbContext db, ApplicationUser officer,
+        ApplicationUser requester, ILogger logger)
+    {
+        var today = DateTime.UtcNow.Date;
+        var department = new Department
+        {
+            Name = Prefix + "- Procurement Services",
+            Description = "Fictional Orange Intelligence demonstration department."
+        };
+        db.Departments.Add(department);
+
+        var suppliers = new List<Supplier>();
+        Supplier AddSupplier(string name, string category)
+        {
+            var emailDomain = name.ToLowerInvariant().Replace(' ', '-');
+            var supplier = new Supplier
+            {
+                CompanyName = Prefix + name,
+                Category = category,
+                RegistrationNumber = $"RADAR-DEMO-INT-{suppliers.Count + 1:000}",
+                Email = $"bids@{emailDomain}.example",
+                Status = SupplierStatus.Approved,
+                CreatedAt = today.AddDays(-240),
+                ReviewedByUserId = officer.Id,
+                ReviewedAt = today.AddDays(-230),
+                ReviewNotes = "Fictional Orange Intelligence demonstration supplier."
+            };
+            suppliers.Add(supplier);
+            return supplier;
+        }
+
+        var nova = AddSupplier("Nova Technology Supply", SupplierCategories.InformationTechnology);
+        var cedar = AddSupplier("Cedar Fiber Networks", SupplierCategories.Telecommunications);
+        var orbit = AddSupplier("Orbit Connect Services", SupplierCategories.Telecommunications);
+        var ledger = AddSupplier("Ledger Cloud Solutions", SupplierCategories.Software);
+        var summit = AddSupplier("Summit Operations Advisory", SupplierCategories.ProfessionalServices);
+        var volt = AddSupplier("Volt Electrical Supply", SupplierCategories.Electrical);
+        var stonebridge = AddSupplier("Stonebridge Contracting", SupplierCategories.Construction);
+        var clearway = AddSupplier("Clearway Facilities", SupplierCategories.Facilities);
+        var routewell = AddSupplier("Routewell Logistics", SupplierCategories.Transport);
+        var caravan = AddSupplier("Caravan Fleet Services", SupplierCategories.Transport);
+        var formline = AddSupplier("Formline Workspace", SupplierCategories.Furniture);
+        var paperline = AddSupplier("Paperline Business Supplies", SupplierCategories.OfficeSupplies);
+        var safeguard = AddSupplier("Safeguard Medical Supply", SupplierCategories.Medical);
+        var harvest = AddSupplier("Harvest Table Catering", SupplierCategories.Food);
+        var signal = AddSupplier("Signal Creative Studio", SupplierCategories.Marketing);
+        db.Suppliers.AddRange(suppliers);
+        await db.SaveChangesAsync();
+
+        var tenderCount = 0;
+        var offerCount = 0;
+        async Task AddTender(string title, int daysAgo, (string Name, string Unit, decimal Qty, decimal Price)[] items,
+            (Supplier Supplier, decimal PriceFactor)[] quotes, Supplier? winner = null)
+        {
+            var offers = quotes.Select((quote, index) =>
+                (quote.Supplier, quote.PriceFactor, 90 + index * 241, ComplianceStatus.Compliant)).ToArray();
+            await AddTenderAsync(db, officer, requester, title, department, today.AddDays(-daysAgo).AddHours(11),
+                winner == null ? TenderStatus.Evaluation : TenderStatus.Awarded, TenderRoundStatus.SentToEvaluation,
+                items, offers, [], winner);
+            tenderCount++;
+            offerCount += quotes.Length;
+        }
+
+        await AddTender("Branch fiber connectivity", 122,
+            [("Fiber connection installation", "site", 8m, 1150m), ("Managed connectivity", "site-year", 8m, 1860m)],
+            [(cedar, 0.94m), (orbit, 1.04m), (nova, 1.12m)], cedar);
+        await AddTender("IT service desk licences", 104,
+            [("Service desk licence", "agent-year", 55m, 205m), ("System configuration", "lot", 1m, 3600m)],
+            [(ledger, 0.91m), (nova, 1.01m), (summit, 1.09m)], ledger);
+        await AddTender("Branch electrical retrofit", 86,
+            [("Distribution panel replacement", "unit", 4m, 2350m), ("LED fixture with installation", "unit", 90m, 74m)],
+            [(volt, 0.96m), (stonebridge, 1.03m), (clearway, 1.13m)], volt);
+        await AddTender("Regional equipment transport", 68,
+            [("Intercity equipment delivery", "trip", 36m, 310m), ("Pallet handling", "pallet", 144m, 35m)],
+            [(routewell, 1.05m), (caravan, 0.93m)], caravan);
+        await AddTender("Regional office workstation fit-out", 53,
+            [("Desk and chair package", "set", 45m, 580m), ("Workstation assembly", "station", 45m, 48m)],
+            [(formline, 0.92m), (paperline, 1.08m), (stonebridge, 1.02m)], formline);
+        await AddTender("Workplace first-aid supplies", 37,
+            [("Workplace first-aid kit", "kit", 55m, 48m), ("Wall-mounted eye wash station", "unit", 15m, 83m)],
+            [(safeguard, 0.89m), (clearway, 1.06m)], safeguard);
+        await AddTender("Training workshop catering", 21,
+            [("Lunch and refreshments", "person-day", 260m, 18.50m), ("Service setup", "day", 4m, 255m)],
+            [(harvest, 0.95m), (summit, 1.11m)]);
+        await AddTender("Regional branch launch campaign", 9,
+            [("Campaign creative package", "lot", 1m, 7600m), ("Printed outreach kits", "kit", 500m, 8.60m)],
+            [(signal, 0.97m), (summit, 1.14m), (paperline, 1.07m)]);
+
+        logger.LogInformation("Orange Intelligence demo data created: {Suppliers} suppliers, {Tenders} tenders and {Offers} offers.",
+            suppliers.Count, tenderCount, offerCount);
+    }
+
+    private static async Task<(Tender Tender, TenderRound Round, Dictionary<Supplier, Bid> Bids)> AddTenderAsync(
+        ApplicationDbContext db, ApplicationUser officer, ApplicationUser requester, string title, Department dept,
+        DateTime deadline, TenderStatus status, TenderRoundStatus roundStatus,
+        (string Name, string Unit, decimal Qty, decimal Price)[] items,
+        (Supplier Supplier, decimal Factor, int Minutes, ComplianceStatus Compliance)[] offers,
+        Supplier[] invitedOnly, Supplier? winner, string? requirements = null)
+    {
+        var pr = new PurchaseRequest { DepartmentId = dept.Id, CreatedByUserId = requester.Id, Title = title, Justification = "Fictional Orange Radar demonstration request.",
+            Status = PurchaseRequestStatus.ConvertedToTender, CreatedAt = deadline.AddDays(-40), SubmittedAt = deadline.AddDays(-39) };
+        var tender = new Tender { PurchaseRequest = pr, Title = Prefix + title, Description = "Fictional demonstration tender for Orange Radar: " + title + ".", Requirements = requirements,
+            Status = status, CreatedByUserId = officer.Id, CreatedAt = deadline.AddDays(-30), Currency = "JOD", EstimatedValue = items.Sum(i => i.Qty * i.Price) };
+        foreach (var i in items) tender.Items.Add(new TenderItem { Name = i.Name, Unit = i.Unit, Quantity = i.Qty, Specifications = $"{i.Name} as per the attached specification." });
+        var round = new TenderRound { Tender = tender, RoundNumber = 1, Status = roundStatus, OpensAt = deadline.AddDays(-21), Deadline = deadline,
+            ClosedAt = roundStatus == TenderRoundStatus.Open ? null : deadline.AddMinutes(5), CreatedByUserId = officer.Id, CreatedAt = deadline.AddDays(-22) };
+        db.Tenders.Add(tender); db.TenderRounds.Add(round);
+        await db.SaveChangesAsync();
+        var bids = new Dictionary<Supplier, Bid>();
+        foreach (var (supplier, factor, minutes, compliance) in offers)
+        {
+            var invitation = new TenderInvitation { TenderRoundId = round.Id, SupplierId = supplier.Id, Status = InvitationStatus.Accepted, InvitedByUserId = officer.Id, InvitedAt = deadline.AddDays(-20), RespondedAt = deadline.AddDays(-18) };
+            var bid = new Bid { TenderInvitation = invitation, RevisionNumber = 1, Status = BidStatus.Submitted, CurrencyCode = "JOD", DeliveryDays = 21 + minutes % 9,
+                PaymentTerms = "60 days after acceptance", CreatedAt = deadline.AddDays(-3), SubmittedAt = deadline.AddHours(-26).AddMinutes(minutes), ValidUntil = deadline.AddDays(90),
+                ShippingCost = 0, ComplianceStatus = roundStatus == TenderRoundStatus.Open ? ComplianceStatus.NotChecked : compliance,
+                ComplianceCheckedByUserId = roundStatus == TenderRoundStatus.Open ? null : officer.Id, ComplianceCheckedAt = roundStatus == TenderRoundStatus.Open ? null : deadline.AddDays(1),
+                TechnicalProposal = "Fictional demonstration offer." };
+            foreach (var (item, i) in tender.Items.Select((x, i) => (x, i)))
+                bid.Items.Add(new BidItem { TenderItemId = item.Id, Quantity = item.Quantity, UnitPrice = decimal.Round(items[i].Price * factor, 2) });
+            db.TenderInvitations.Add(invitation); db.Bids.Add(bid);
+            bids[supplier] = bid;
+        }
+        foreach (var supplier in invitedOnly)
+            db.TenderInvitations.Add(new TenderInvitation { TenderRoundId = round.Id, SupplierId = supplier.Id, Status = InvitationStatus.Pending, InvitedByUserId = officer.Id, InvitedAt = deadline.AddDays(-20) });
+        await db.SaveChangesAsync();
+        if (winner != null)
+        {
+            tender.AwardedBidId = bids[winner].Id; tender.AwardedAt = deadline.AddDays(24); tender.AwardedByUserId = officer.Id;
+            tender.AwardApprovalEvidenceJson = "{\"note\":\"Fictional Orange Radar demonstration award.\"}";
+            await db.SaveChangesAsync();
+        }
+        return (tender, round, bids);
     }
 }

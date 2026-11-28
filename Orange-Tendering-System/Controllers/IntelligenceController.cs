@@ -1,19 +1,42 @@
 // ORANGE TENDER MANAGEMENT SYSTEM
 // Module: Sourcing Officer / Orange Intelligence
-// The workspace, analytics endpoints and Gemini AI Studio are read-only with respect to procurement data.
+// One controller, two parts:
+//   1. Overview, Suppliers and Tenders tabs: every action loads the user's authorized data through IntelligenceService
+//      and returns JSON that the page scripts (wwwroot/js/intelligence-*.js) draw.
+//   2. AI Studio (Gemini): SupplierSummary, AskSupplier and StartVoice, used by intelligence-ai.js and intelligence-audio.js,
+//      served by IntelligenceAiService (Services/Intelligence/IntelligenceAiService.cs).
+// Everything here is read-only with respect to procurement data.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orange_Tendering_System.Models;
-using Orange_Tendering_System.Services.Radar;
+using Orange_Tendering_System.Services;
+using Orange_Tendering_System.Services.Intelligence;
 
 namespace Orange_Tendering_System.Controllers;
 
+// Only Sourcing Officers may open this page. Every POST must carry the anti-forgery token (RequestVerificationToken header).
+// AgentAntiforgeryFailure (Services/AgentAntiforgeryFailureAttribute.cs) turns a missing or wrong token into a clear JSON 400.
+// NoStore: the browser never caches these answers, so a user always sees current, authorized data.
 [Authorize(Roles = SystemRoles.SourcingOfficer)]
-[AutoValidateAntiforgeryToken, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class IntelligenceController(RadarService radar, RadarDataService data, RadarExportService files, IntelligenceAiService ai,
-    ILogger<IntelligenceController> logger) : Controller
+[AutoValidateAntiforgeryToken, AgentAntiforgeryFailure, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+public sealed class IntelligenceController : Controller
 {
-    public sealed record SimulateRequest(string? From, string? To, int[]? SupplierIds);
+    private readonly IntelligenceService intelligence;
+    private readonly IntelligenceExportService exports;
+    private readonly IntelligenceAiService ai;
+    private readonly ILogger<IntelligenceController> logger;
+
+    // ASP.NET Core creates the controller for each request and passes the registered services (Program.cs).
+    public IntelligenceController(IntelligenceService intelligence, IntelligenceExportService exports, IntelligenceAiService ai,
+        ILogger<IntelligenceController> logger)
+    {
+        this.intelligence = intelligence;
+        this.exports = exports;
+        this.ai = ai;
+        this.logger = logger;
+    }
+
+    // Request bodies of the AI Studio actions.
     public sealed record SupplierRequest(int SupplierId);
     public sealed record AskRequest(int SupplierId, string? Question);
 
@@ -23,6 +46,7 @@ public sealed class IntelligenceController(RadarService radar, RadarDataService 
         if (User.IsInRole(SystemRoles.Supplier)) context.Result = Forbid();
     }
 
+    // GET /Intelligence -> Views/Intelligence/Index.cshtml (the page with the four tabs).
     [HttpGet]
     public IActionResult Index()
     {
@@ -31,43 +55,109 @@ public sealed class IntelligenceController(RadarService radar, RadarDataService 
         return View();
     }
 
+    // ---------- Tab 1: Overview ----------
+
+    // GET /Intelligence/Overview?from=2026-01-01&to=2026-06-30&refresh=false
     [HttpGet]
-    public async Task<IActionResult> Workspace(string? from, string? to, bool refresh, CancellationToken ct)
+    public async Task<IActionResult> Overview(string? from, string? to, bool refresh, CancellationToken ct)
     {
-        var period = RadarPeriod.Parse(from, to);
-        if (refresh) { await data.ScopeAsync(ct); data.Invalidate(period); }
-        return Json(await radar.WorkspaceAsync(period, ct));
+        OverviewData overview = await intelligence.GetOverviewAsync(from, to, refresh, ct);
+        return Json(overview);
     }
 
+    // ---------- Tab 2: Suppliers ----------
+
+    // GET /Intelligence/Suppliers?from=&to=&department=&category=&activity=all&search=
+    [HttpGet]
+    public async Task<IActionResult> Suppliers(string? from, string? to, string? department, string? category, string? activity,
+        string? search, bool refresh, CancellationToken ct)
+    {
+        SupplierFilters filters = new SupplierFilters();
+        filters.Department = department ?? "";
+        filters.Category = category ?? "";
+        filters.Activity = activity ?? "all";
+        filters.Search = search ?? "";
+        SuppliersData suppliers = await intelligence.GetSuppliersAsync(from, to, filters, refresh, ct);
+        return Json(suppliers);
+    }
+
+    // GET /Intelligence/SupplierDetails?supplierId=12&from=&to=
+    [HttpGet]
+    public async Task<IActionResult> SupplierDetails(int supplierId, string? from, string? to, CancellationToken ct)
+    {
+        SupplierDetails? details = await intelligence.GetSupplierDetailsAsync(supplierId, from, to, ct);
+        if (details == null)
+        {
+            return NotFound(new { error = "This supplier is not in your authorized scope." });
+        }
+        return Json(details);
+    }
+
+    // GET /Intelligence/CompareSuppliers?supplierA=3&supplierB=7
+    [HttpGet]
+    public async Task<IActionResult> CompareSuppliers(int supplierA, int supplierB, CancellationToken ct)
+    {
+        if (supplierA <= 0 || supplierB <= 0 || supplierA == supplierB)
+        {
+            return BadRequest(new { error = "Choose two different suppliers." });
+        }
+        List<OfferComparison>? rows = await intelligence.CompareSuppliersAsync(supplierA, supplierB, ct);
+        if (rows == null)
+        {
+            return NotFound(new { error = "A selected supplier is not in your authorized scope." });
+        }
+        return Json(rows);
+    }
+
+    // POST /Intelligence/Simulate   body: { "from": "", "to": "", "supplierIds": [3, 7] }
     [HttpPost]
     public async Task<IActionResult> Simulate([FromBody] SimulateRequest request, CancellationToken ct)
     {
-        var s = await radar.SnapshotAsync(RadarPeriod.Parse(request.From, request.To), ct);
-        var ids = (request.SupplierIds ?? []).Distinct().Take(10).ToArray();
-        if (ids.Length == 0 || ids.Any(id => s.Supplier(id) == null)) return BadRequest(new { error = "Choose one or more existing suppliers to exclude." });
-        return Json(RadarAnalytics.Simulate(s, ids, radar.Thresholds.MinimumBidsForCompetition));
+        SimulationResult? result = await intelligence.SimulateAsync(request, ct);
+        if (result == null)
+        {
+            return BadRequest(new { error = "Choose one or more existing suppliers to exclude." });
+        }
+        return Json(result);
     }
 
+    // ---------- Tab 3: Tenders ----------
+
+    // GET /Intelligence/Tenders?from=&to=
     [HttpGet]
-    public async Task<IActionResult> OfferComparison(int supplierA, int supplierB, CancellationToken ct)
+    public async Task<IActionResult> Tenders(string? from, string? to, bool refresh, CancellationToken ct)
     {
-        if (supplierA <= 0 || supplierB <= 0 || supplierA == supplierB) return BadRequest();
-        var snapshot = await radar.SnapshotAsync(RadarPeriod.All, ct);
-        if (snapshot.Supplier(supplierA) == null || snapshot.Supplier(supplierB) == null) return NotFound();
-        return Json(RadarOfferComparison.Build(snapshot, supplierA, supplierB));
+        TendersData tenders = await intelligence.GetTendersAsync(from, to, refresh, ct);
+        return Json(tenders);
     }
 
-    // Tender lifecycle / offers Excel and the tender PDF summary (Tenders tab).
+    // GET /Intelligence/TenderDetails?tenderId=5&from=&to=
+    [HttpGet]
+    public async Task<IActionResult> TenderDetails(int tenderId, string? from, string? to, CancellationToken ct)
+    {
+        TenderDetails? details = await intelligence.GetTenderDetailsAsync(tenderId, from, to, ct);
+        if (details == null)
+        {
+            return NotFound(new { error = "This tender is not in your authorized scope and period." });
+        }
+        return Json(details);
+    }
+
+    // POST /Intelligence/Export   body: { "format": "xlsx", "reportType": "tender_offers", "tenderId": 5, "roundId": 9 }
+    // Returns the file itself (Excel or PDF); the browser saves it.
     [HttpPost]
-    public async Task<IActionResult> Export([FromBody] RadarExportRequest request, CancellationToken ct)
+    public async Task<IActionResult> Export([FromBody] ExportRequest request, CancellationToken ct)
     {
         try
         {
-            var file = await files.BuildAsync(request, ct);
+            ExportFile file = await exports.BuildAsync(request, ct);
             Response.Headers.CacheControl = "no-store";
             return File(file.Bytes, file.ContentType, file.FileName);
         }
-        catch (RadarToolException e) { return BadRequest(new { error = e.Message }); }
+        catch (IntelligenceExportException e)
+        {
+            return BadRequest(new { error = e.Message });
+        }
     }
 
     // ---------- AI Studio (Gemini) ----------

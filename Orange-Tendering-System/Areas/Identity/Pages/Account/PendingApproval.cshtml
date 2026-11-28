@@ -23,7 +23,7 @@
 
     @* RIGHT: a normal form. *@
     <div class="as-panel">
-        <div class="as-panel-inner" id="bio-root" data-return-url="" data-face-complete="@(faceDone ? "true" : "false")" data-enrolled-url="/Identity/Account/PendingApproval?faceRegistered=true">
+        <div class="as-panel-inner" id="bio-root" data-return-url="" data-face-complete="@(faceDone ? "true" : "false")" data-enrolled-url="/Identity/Account/PendingApproval?handler=Enrolled">
             @Html.AntiForgeryToken()
             <p class="as-brand"><span class="as-brand-mark" aria-hidden="true"></span><span class="as-brand-name">Sourcing &amp; Tender Management</span></p>
             <p class="as-kicker">Supplier registration · Identity</p>

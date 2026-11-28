@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Orange_Tendering_System.Data;
 using Orange_Tendering_System.Models;
 using Orange_Tendering_System.Models.Entities;
+using Orange_Tendering_System.Services;
 using Orange_Tendering_System.Services.Biometric;
 
 namespace Orange_Tendering_System.Areas.Identity.Pages.Account;
@@ -20,11 +21,13 @@ public class PendingApprovalModel : PageModel
 {
     private readonly UserManager<ApplicationUser> users;
     private readonly ApplicationDbContext db;
+    private readonly SignInManager<ApplicationUser> signInManager;
 
-    public PendingApprovalModel(UserManager<ApplicationUser> users, ApplicationDbContext db)
+    public PendingApprovalModel(UserManager<ApplicationUser> users, ApplicationDbContext db, SignInManager<ApplicationUser> signInManager)
     {
         this.users = users;
         this.db = db;
+        this.signInManager = signInManager;
     }
 
     public int FaceTemplateCount { get; set; }
@@ -63,5 +66,14 @@ public class PendingApprovalModel : PageModel
             return Page();
         }
         return Forbid();
+    }
+
+    // GET /Identity/Account/PendingApproval?handler=Enrolled — after a face or phone enrollment the supplier
+    // signs out and starts again from the sign-in page.
+    public async Task<IActionResult> OnGetEnrolledAsync()
+    {
+        await signInManager.SignOutAsync();
+        TempData.Orange(OrangeFeedback.Popup("Identity enrolled", "Sign in with your email and password, then confirm with your face or fingerprint.", OrangeVariant.Approve));
+        return RedirectToPage("./Login");
     }
 }

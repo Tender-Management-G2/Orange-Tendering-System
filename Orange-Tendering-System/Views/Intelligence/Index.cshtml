@@ -1,10 +1,14 @@
 @*
 ORANGE TENDER MANAGEMENT SYSTEM
-PAGE: Orange Intelligence - the Sourcing Officer intelligence workspace.
-Four exclusive tabs (Overview, Suppliers, Tenders, AI Studio): a tab replaces the main content, it never stacks below
-another. All numbers come from the server (Services/Radar), already limited to the user's authorized scope; the scripts only
-draw them. The AI Studio tab (Gemini) has three features: supplier summary, text chat and a live voice call
-(intelligence-ai.js, intelligence-audio.js, Services/Radar/IntelligenceAiService.cs).
+PAGE: Orange Intelligence - the Sourcing Officer intelligence workspace (/Intelligence).
+Four tabs: Overview, Suppliers, Tenders and AI Studio. Only one tab panel is visible at a time.
+  Overview, Suppliers, Tenders -> wwwroot/js/intelligence-page.js (shared: tabs, period, helpers)
+                                  + intelligence-overview.js / intelligence-suppliers.js / intelligence-tenders.js
+                                  -> IntelligenceController -> Services/Intelligence (all numbers are calculated in C#).
+  AI Studio (Gemini)           -> intelligence-ai.js, intelligence-audio.js, Services/Intelligence/IntelligenceAiService.cs.
+Visual-only modules (no requests, no calculations): orange-intelligence-universe.js (3D Supplier Universe, Three.js),
+  intelligence-voice-visual.js (voice orb) and intelligence-studio-picker.js (AI Studio supplier list); styles in orange-intelligence-visuals.css.
+Every element that a script fills has an id; the comment above each block names the JavaScript function that fills it.
 *@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
@@ -16,328 +20,298 @@ draw them. The AI Studio tab (Gemini) has three features: supplier summary, text
 @section Styles {
     <link rel="stylesheet" href="~/css/orange-radar.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/orange-intelligence.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/orange-intelligence-visuals.css" asp-append-version="true" />
 }
 
-<div class="radar oi" id="radar" data-radar data-tab="suppliers"
+@* The page root. data-url-* hold the endpoint addresses that the scripts call; data-csrf is the anti-forgery token
+   that every POST must send (it is also read by the AI Studio scripts). *@
+<div class="radar oi" id="radar" data-radar data-tab="overview"
      data-csrf="@Antiforgery.GetAndStoreTokens(Context).RequestToken"
      data-ui-language="@(arabic ? "ar" : "en")"
-     data-url-workspace="@U("Workspace")" data-url-simulate="@U("Simulate")"
-     data-url-offer-comparison="@U("OfferComparison")"
-     data-url-offer-record="@Url.Action("Details", "Bids", new { area = "SourcingOfficer" })"
-     data-url-export="@U("Export")" data-three="@Url.Content("~/lib/three/three.module.min.js")">
+     data-url-overview="@U("Overview")"
+     data-url-suppliers="@U("Suppliers")" data-url-supplier-details="@U("SupplierDetails")"
+     data-url-compare-suppliers="@U("CompareSuppliers")" data-url-simulate="@U("Simulate")"
+     data-url-tenders="@U("Tenders")" data-url-tender-details="@U("TenderDetails")"
+     data-url-export="@U("Export")"
+     data-url-offer-record="@Url.Action("Details", "Bids", new { area = "SourcingOfficer" })">
 
-    <!-- ===== Shared shell: brand, four exclusive tabs, global scope ===== -->
+    <!-- ===== Shared shell: brand and the four tabs (showTab in intelligence-page.js) ===== -->
     <header class="oi-bar">
         <div class="oi-brand">
             <span class="oi-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="18" cy="22" r="12.5" /><circle cx="18" cy="22" r="5.2" /><path d="M27 13l7-7M29 6h5v5" /></svg></span>
             <div><h1>Orange <em>Intelligence</em></h1><p>@L("Procurement intelligence & analytics", "ذكاء المشتريات والتحليلات")</p></div>
         </div>
-        <nav class="oi-tabs" role="tablist" aria-label="@L("Orange Intelligence workspaces", "مساحات أورنج للذكاء")" data-tabs>
-            <button type="button" role="tab" id="oi-tab-overview" aria-controls="oi-overview" aria-selected="false" tabindex="-1" data-tab-link="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></svg><span>@L("Overview", "نظرة عامة")</span></button>
-            <button type="button" role="tab" id="oi-tab-suppliers" aria-controls="oi-suppliers" aria-selected="true" data-tab-link="suppliers"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-4 3.2-6 6.5-6s5.9 2 6.5 6M16 4.8a3.3 3.3 0 0 1 0 6.4M18.5 14.4c1.8.8 2.8 2.7 3 5.6" /></svg><span>@L("Suppliers", "الموردون")</span></button>
+        <nav class="oi-tabs" role="tablist" aria-label="@L("Orange Intelligence workspaces", "مساحات أورنج للذكاء")" id="page-tabs">
+            <button type="button" role="tab" id="oi-tab-overview" aria-controls="oi-overview" aria-selected="true" data-tab-link="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></svg><span>@L("Overview", "نظرة عامة")</span></button>
+            <button type="button" role="tab" id="oi-tab-suppliers" aria-controls="oi-suppliers" aria-selected="false" tabindex="-1" data-tab-link="suppliers"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-4 3.2-6 6.5-6s5.9 2 6.5 6M16 4.8a3.3 3.3 0 0 1 0 6.4M18.5 14.4c1.8.8 2.8 2.7 3 5.6" /></svg><span>@L("Suppliers", "الموردون")</span></button>
             <button type="button" role="tab" id="oi-tab-tenders" aria-controls="oi-tenders" aria-selected="false" tabindex="-1" data-tab-link="tenders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5" /></svg><span>@L("Tenders", "العطاءات")</span></button>
             <button type="button" role="tab" id="oi-tab-studio" aria-controls="oi-studio" aria-selected="false" tabindex="-1" data-tab-link="studio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9zM5.5 15.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" /></svg><span>@L("AI Studio", "استوديو الذكاء")</span></button>
         </nav>
     </header>
 
+    <!-- ===== Context bar: scope, date period and status (showContext / onPeriodChanged in intelligence-page.js) ===== -->
     <div class="oi-context" role="group" aria-label="@L("Analysis scope", "نطاق التحليل")">
-        <span class="oi-scope" data-scope title="@L("Your data permissions decide what is analysed.", "صلاحياتك تحدد البيانات المحللة.")"><i aria-hidden="true"></i><span data-scope-label>@L("Authorized scope", "النطاق المصرح")</span></span>
+        <span class="oi-scope" title="@L("Your data permissions decide what is analysed.", "صلاحياتك تحدد البيانات المحللة.")"><i aria-hidden="true"></i><span id="ctx-scope">@L("Authorized scope", "النطاق المصرح")</span></span>
         <div class="oi-period">
             <label><span>@L("From", "من")</span><input type="date" id="rd-from" /></label>
             <label><span>@L("To", "إلى")</span><input type="date" id="rd-to" /></label>
-            <button type="button" class="rd-icon-btn" data-action="run" aria-label="@L("Refresh analysis", "تحديث التحليل")" title="@L("Refresh analysis", "تحديث التحليل")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5" /></svg></button>
+            <button type="button" class="rd-icon-btn" id="ctx-refresh" aria-label="@L("Refresh analysis", "تحديث التحليل")" title="@L("Refresh analysis", "تحديث التحليل")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5" /></svg></button>
         </div>
-        <div class="oi-chips" data-filter-chips aria-live="polite"></div>
-        <b class="rd-demo" data-demo-marker hidden>@L("Demo dataset", "بيانات تجريبية")</b>
-        <div class="rd-status" role="status" aria-live="polite" data-status></div>
-        <div class="oi-context-find">
-            <label class="oi-find">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
-                <input type="search" list="oi-find-list" data-global-find placeholder="@L("Find a supplier or tender", "ابحث عن مورد أو عطاء")" aria-label="@L("Find an authorized supplier or tender", "ابحث عن مورد أو عطاء مصرح به")" autocomplete="off" />
-                <datalist id="oi-find-list" data-global-find-list></datalist>
-            </label>
-        </div>
-        </div>
+        <div class="oi-chips" id="ctx-chips" aria-live="polite"></div>
+        <b class="rd-demo" id="ctx-demo" hidden>@L("Demo dataset", "بيانات تجريبية")</b>
+        <div class="rd-status" role="status" aria-live="polite" id="ctx-status"></div>
+    </div>
 
-    <!-- ===== 1. Overview ===== -->
-    <section class="oi-panel" id="oi-overview" role="tabpanel" aria-labelledby="oi-tab-overview" data-tab-panel="overview" hidden>
+    <!-- ===== 1. Overview (intelligence-overview.js -> GET /Intelligence/Overview) ===== -->
+    <section class="oi-panel" id="oi-overview" role="tabpanel" aria-labelledby="oi-tab-overview" data-tab-panel="overview">
         <header class="oi-head">
             <div><p class="oi-kicker">@L("Overview", "نظرة عامة")</p><h2>@L("Your procurement intelligence at a glance", "ذكاء مشترياتك في لمحة")</h2>
-                <p class="oi-lead" data-ov-lead></p></div>
+                <p class="oi-lead" id="ov-lead"></p></div>
         </header>
-        <div class="oi-kpis" data-ov-kpis></div>
+        @* renderOverviewKpis *@
+        <div class="oi-kpis" id="ov-kpis"></div>
         <div class="oi-ov-grid">
             <article class="rd-card oi-lifecycle-card">
-                <header><div><h3>@L("Tender Lifecycle", "دورة حياة العطاء")</h3><p data-ov-life-note></p></div><button type="button" class="rd-link" data-tab-jump="tenders">@L("Open Tenders", "فتح العطاءات")</button></header>
-                <ol class="oi-funnel" data-ov-funnel></ol>
+                <header><div><h3>@L("Tender Lifecycle", "دورة حياة العطاء")</h3><p id="ov-life-note"></p></div><button type="button" class="rd-link" data-tab-jump="tenders">@L("Open Tenders", "فتح العطاءات")</button></header>
+                @* renderOverviewFunnel *@
+                <ol class="oi-funnel" id="ov-funnel"></ol>
             </article>
             <article class="rd-card oi-attention">
                 <header><div><h3>@L("Worth your attention", "يستحق انتباهك")</h3><p>@L("From the records in your scope · each item links to its evidence", "من السجلات في نطاقك · كل بند مرتبط بدليله")</p></div></header>
-                <ul class="oi-attention-list" data-ov-attention></ul>
+                @* renderOverviewAttention *@
+                <ul class="oi-attention-list" id="ov-attention"></ul>
             </article>
         </div>
-        <nav class="oi-shortcuts" aria-label="@L("Workspaces", "مساحات العمل")" data-ov-shortcuts></nav>
+        @* renderOverviewShortcuts *@
+        <nav class="oi-shortcuts" aria-label="@L("Workspaces", "مساحات العمل")" id="ov-shortcuts"></nav>
     </section>
 
-    <!-- ===== 2. Suppliers (signature view) ===== -->
-    <section class="oi-panel oi-suppliers" id="oi-suppliers" role="tabpanel" aria-labelledby="oi-tab-suppliers" data-tab-panel="suppliers">
+    <!-- ===== 2. Suppliers (intelligence-suppliers.js -> GET /Intelligence/Suppliers) ===== -->
+    <section class="oi-panel oi-suppliers" id="oi-suppliers" role="tabpanel" aria-labelledby="oi-tab-suppliers" data-tab-panel="suppliers" hidden>
         <header class="oi-head">
             <div class="oi-head-title"><span class="oi-head-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-4 3.2-6 6.5-6s5.9 2 6.5 6M16 4.8a3.3 3.3 0 0 1 0 6.4M18.5 14.4c1.8.8 2.8 2.7 3 5.6" /></svg></span>
                 <div><h2>@L("Supplier Intelligence", "ذكاء الموردين")</h2><p class="oi-lead">@L("Explore your supplier ecosystem, participation and relationships.", "استكشف منظومة مورديك ومشاركتهم وعلاقاتهم.")</p></div></div>
+            @* Changing a filter calls loadSuppliers() again with the new query string. *@
             <div class="oi-filters" role="group" aria-label="@L("Supplier filters", "مرشحات الموردين")">
-                <label class="oi-select"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12l9-8 9 8M5 10v10h14V10" /></svg><select data-sup-filter="department" aria-label="@L("Department", "الجهة")"></select></label>
-                <label class="oi-select"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4zM3 12l9 4 9-4M3 17l9 4 9-4" /></svg><select data-sup-filter="category" aria-label="@L("Category", "الفئة")"></select></label>
-                <label class="oi-select"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg><select data-sup-filter="activity" aria-label="@L("Activity", "النشاط")">
+                <label class="oi-select"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12l9-8 9 8M5 10v10h14V10" /></svg><select id="sup-department" aria-label="@L("Department", "الجهة")"></select></label>
+                <label class="oi-select"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4zM3 12l9 4 9-4M3 17l9 4 9-4" /></svg><select id="sup-category" aria-label="@L("Category", "الفئة")"></select></label>
+                <label class="oi-select"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg><select id="sup-activity" aria-label="@L("Activity", "النشاط")">
                     <option value="all">@L("All suppliers", "جميع الموردين")</option><option value="active">@L("Submitted offers", "قدّموا عروضاً")</option><option value="silent">@L("No offer yet", "دون عروض")</option><option value="approved">@L("Approved only", "المعتمدون فقط")</option></select></label>
             </div>
         </header>
 
-        <div class="oi-kpis oi-kpis-sup" data-sup-kpis></div>
+        @* renderSupplierKpis *@
+        <div class="oi-kpis oi-kpis-sup" id="sup-kpis"></div>
 
-        <article class="oi-snapshot" aria-label="@L("Market snapshot", "لمحة السوق")">
-            <div class="oi-snap-title"><h3>@L("Market snapshot", "لمحة السوق")</h3><p>@L("Category mix and participation over time", "مزيج الفئات والمشاركة عبر الزمن")</p></div>
-            <div class="oi-snap-donut" data-chart="snapCats" role="img" aria-label="@L("Suppliers by category", "الموردون حسب الفئة")"></div>
-            <ul class="oi-snap-legend" data-snap-legend></ul>
-            <div class="oi-snap-trend"><p class="oi-snap-sub" data-snap-trend-title>@L("Suppliers submitting offers, per month", "الموردون المقدمون للعروض شهرياً")</p><div data-chart="snapTrend" role="img" aria-label="@L("Participation trend", "اتجاه المشاركة")"></div></div>
-        </article>
-
-        <!-- The Supplier Universe: real authorized suppliers on a slowly orbiting 3D sphere. -->
-        <div class="oi-universe" data-universe data-mode="universe">
-            <div class="oi-uni-stage" data-uni-stage role="application" tabindex="0" aria-roledescription="@L("3D supplier universe", "عالم الموردين ثلاثي الأبعاد")"
-                 aria-label="@L("Supplier universe. Drag to rotate, wheel to zoom, arrow keys move between suppliers, Enter selects, Space pauses, Escape returns.", "عالم الموردين. اسحب للتدوير، العجلة للتكبير، الأسهم للتنقل، Enter للاختيار، المسافة للإيقاف، Esc للعودة.")">
-                <canvas data-uni-canvas aria-hidden="true"></canvas>
-                <div class="oi-uni-labels" data-uni-labels aria-hidden="true"></div>
-                <div class="oi-uni-tip" data-uni-tip role="tooltip" hidden></div>
-            </div>
-
-            <div class="oi-uni-panel" role="group" aria-label="@L("Universe controls", "أدوات العالم")">
-                <h3>@L("Supplier Universe", "عالم الموردين")</h3>
-                <p class="oi-uni-desc" data-uni-desc></p>
-                <p class="oi-field-label" id="oi-uni-mode-label">@L("Arrangement", "الترتيب")</p>
-                <div class="oi-modes" role="radiogroup" aria-labelledby="oi-uni-mode-label" data-uni-modes>
-                    <button type="button" role="radio" aria-checked="true" data-uni-mode="universe"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><ellipse cx="12" cy="12" rx="3.6" ry="8.5" /><path d="M3.5 12h17" /></svg>@L("Universe", "العالم")</button>
-                    <button type="button" role="radio" aria-checked="false" data-uni-mode="category"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="8" r="3.5" /><circle cx="17" cy="8" r="3.5" /><circle cx="12" cy="17" r="3.5" /></svg>@L("Category", "الفئة")</button>
-                    <button type="button" role="radio" aria-checked="false" data-uni-mode="competition"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z" /></svg>@L("Competition", "المنافسة")</button>
-                    <button type="button" role="radio" aria-checked="false" data-uni-mode="tender"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM14 3v4h4" /></svg>@L("Tender", "العطاء")</button>
+        @* The 3D Supplier Universe (renderSupplierUniverse -> orange-intelligence-universe.js draws it) next to the
+           details panel (openSupplierDetails -> GET /Intelligence/SupplierDetails). The data-uni-* elements are filled by the 3D engine. *@
+        <div class="oi-explorer">
+            <article class="oi-universe" id="sup-universe" data-mode="universe" aria-labelledby="uni-title"
+                     data-three="@Url.Content("~/lib/three/three.module.min.js")">
+                <div class="oi-uni-stage" data-uni-stage role="application" tabindex="0" aria-roledescription="@L("3D supplier universe", "عالم الموردين ثلاثي الأبعاد")"
+                     aria-label="@L("Supplier universe. Arrow keys move between suppliers, Enter opens details, Space pauses, plus and minus zoom.", "عالم الموردين. الأسهم للتنقل بين الموردين، Enter لفتح التفاصيل، المسافة للإيقاف، + و - للتكبير.")">
+                    <canvas data-uni-canvas aria-hidden="true"></canvas>
+                    <div class="oi-uni-labels" data-uni-labels aria-hidden="true"></div>
+                    <div class="oi-uni-tip" data-uni-tip role="tooltip" hidden></div>
                 </div>
-                <label class="oi-field" data-uni-tender-field hidden><span>@L("Tender", "العطاء")</span><select data-uni-tender aria-label="@L("Tender context", "سياق العطاء")"></select></label>
-                <label class="oi-field"><span>@L("Find a supplier", "ابحث عن مورد")</span><input type="search" list="oi-uni-list" data-uni-search placeholder="@L("Name or category", "الاسم أو الفئة")" autocomplete="off" /><datalist id="oi-uni-list" data-uni-list></datalist></label>
-                <label class="oi-switch"><input type="checkbox" data-uni-opt="labels" checked /><span>@L("Show labels", "إظهار الأسماء")</span></label>
-                <label class="oi-switch"><input type="checkbox" data-uni-opt="links" checked /><span>@L("Show relationships", "إظهار العلاقات")</span></label>
+                <div class="oi-uni-panel" data-uni-panel>
+                    <p class="oi-uni-kicker"><span aria-hidden="true">✦</span> @L("Market map · 3D", "خريطة السوق · ثلاثي الأبعاد")</p>
+                    <h3 id="uni-title">@L("Supplier Universe", "عالم الموردين")</h3>
+                    <p class="oi-uni-desc" data-uni-desc></p>
+                    <div class="oi-modes" role="radiogroup" aria-label="@L("Universe view", "عرض العالم")">
+                        <button type="button" role="radio" aria-checked="true" data-uni-mode="universe"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><ellipse cx="12" cy="12" rx="3.6" ry="8.5" /><path d="M3.5 12h17" /></svg>@L("Universe", "العالم")</button>
+                        <button type="button" role="radio" aria-checked="false" data-uni-mode="category"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="8" r="3.5" /><circle cx="17" cy="8" r="3.5" /><circle cx="12" cy="17" r="3.5" /></svg>@L("Categories", "الفئات")</button>
+                        <button type="button" role="radio" aria-checked="false" data-uni-mode="competition"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="2.5" /><circle cx="18" cy="17" r="2.5" /><circle cx="12" cy="6" r="2.5" /><path d="M7.8 15.2 10.6 8M13.4 8l2.8 7.2M8.5 17h7" /></svg>@L("Competition", "المنافسة")</button>
+                    </div>
+                </div>
                 <div class="oi-uni-legend" data-uni-legend></div>
-            </div>
-
-            <div class="oi-uni-tools" role="toolbar" aria-label="@L("View controls", "أدوات العرض")">
-                <button type="button" data-uni-tool="motion" aria-pressed="false" title="@L("Pause motion (Space)", "إيقاف الحركة (مسافة)")" aria-label="@L("Pause motion", "إيقاف الحركة")"><svg viewBox="0 0 24 24" aria-hidden="true" data-icon-pause><path d="M8 5v14M16 5v14" /></svg><svg viewBox="0 0 24 24" aria-hidden="true" data-icon-play hidden><path d="M7 4l13 8-13 8z" /></svg></button>
-                <button type="button" data-uni-tool="reset" title="@L("Reset view", "إعادة ضبط العرض")" aria-label="@L("Reset view", "إعادة ضبط العرض")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" /></svg></button>
-                <span class="oi-tools-sep" aria-hidden="true"></span>
-                <button type="button" data-uni-tool="3d" aria-pressed="true" class="oi-tool-text">3D</button>
-                <button type="button" data-uni-tool="2d" aria-pressed="false" class="oi-tool-text" title="@L("2D network with path and replay", "شبكة ثنائية الأبعاد مع المسار والإعادة")">2D</button>
-                <button type="button" data-uni-tool="table" aria-pressed="false" title="@L("Supplier table", "جدول الموردين")" aria-label="@L("Supplier table", "جدول الموردين")"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M9 10v9" /></svg></button>
-                <button type="button" data-uni-tool="fullscreen" title="@L("Full screen", "ملء الشاشة")" aria-label="@L("Full screen", "ملء الشاشة")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
-            </div>
-
-            <aside class="oi-inspector" data-uni-inspector aria-labelledby="oi-insp-title" hidden>
-                <header>
-                    <span class="oi-insp-icon" aria-hidden="true" data-insp-icon><svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M4 21h16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg></span>
-                    <div><h3 id="oi-insp-title" data-insp-title tabindex="-1"></h3><p data-insp-sub></p></div>
-                    <span class="oi-pill" data-insp-status></span>
-                    <button type="button" class="rd-icon-btn" data-insp-close aria-label="@L("Close supplier details", "إغلاق تفاصيل المورد")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
-                </header>
-                <div class="oi-insp-tabs" role="tablist" aria-label="@L("Supplier details", "تفاصيل المورد")" data-insp-tabs>
-                    <button type="button" role="tab" aria-selected="true" data-insp-tab="overview">@L("Overview", "نظرة عامة")</button>
-                    <button type="button" role="tab" aria-selected="false" data-insp-tab="participation">@L("Participation", "المشاركة")</button>
-                    <button type="button" role="tab" aria-selected="false" data-insp-tab="pricing">@L("Pricing", "الأسعار")</button>
-                    <button type="button" role="tab" aria-selected="false" data-insp-tab="relationships">@L("Relationships", "العلاقات")</button>
+                <div class="oi-uni-focus" data-uni-focus aria-live="polite" hidden></div>
+                <div class="oi-uni-tools" data-uni-tools>
+                    <button type="button" data-uni-tool="motion" aria-pressed="false" title="@L("Pause motion (Space)", "إيقاف الحركة (مسافة)")" aria-label="@L("Pause motion", "إيقاف الحركة")"><svg viewBox="0 0 24 24" aria-hidden="true" data-icon-pause><path d="M8 5v14M16 5v14" /></svg><svg viewBox="0 0 24 24" aria-hidden="true" data-icon-play hidden><path d="M7 4l13 8-13 8z" /></svg></button>
+                    <button type="button" data-uni-tool="zoom-in" title="@L("Zoom in", "تكبير")" aria-label="@L("Zoom in", "تكبير")"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5M8 11h6M11 8v6" /></svg></button>
+                    <button type="button" data-uni-tool="zoom-out" title="@L("Zoom out", "تصغير")" aria-label="@L("Zoom out", "تصغير")"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5M8 11h6" /></svg></button>
+                    <button type="button" data-uni-tool="labels" aria-pressed="true" title="@L("Show names", "إظهار الأسماء")" aria-label="@L("Show names", "إظهار الأسماء")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5h16v2M9 19h6M12 5v14" /></svg></button>
+                    <button type="button" data-uni-tool="reset" title="@L("Reset view", "إعادة ضبط العرض")" aria-label="@L("Reset view", "إعادة ضبط العرض")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" /></svg></button>
+                    <button type="button" data-uni-tool="fullscreen" title="@L("Full screen", "ملء الشاشة")" aria-label="@L("Full screen", "ملء الشاشة")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
                 </div>
-                <div class="oi-insp-body" data-insp-body role="tabpanel"></div>
-                <footer class="oi-insp-foot" data-insp-foot></footer>
+                <p class="oi-uni-caption" data-uni-caption aria-live="polite"></p>
+                <p class="oi-uni-hint" data-uni-hint hidden>@L("Click the universe first, then scroll to zoom (or hold Ctrl)", "انقر على العالم أولاً ثم مرّر للتكبير (أو اضغط Ctrl)")</p>
+                <div class="oi-uni-empty" data-uni-empty hidden></div>
+                <div class="oi-uni-fallback" data-uni-fallback hidden>
+                    <b>@L("3D view unavailable", "العرض ثلاثي الأبعاد غير متاح")</b>
+                    <span>@L("This browser or device cannot show WebGL. Every supplier is still in the directory below.", "لا يدعم هذا المتصفح أو الجهاز WebGL. كل الموردين ما زالوا في الدليل أدناه.")</span>
+                </div>
+            </article>
+
+            <aside class="oi-details" aria-labelledby="sup-details-title">
+                <div class="oi-details-empty" id="sup-details-empty">
+                    <span class="oi-insp-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M4 21h16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg></span>
+                    <b>@L("Choose a supplier", "اختر مورداً")</b>
+                    <span>@L("Select a supplier in the universe or a row of the directory to see its profile, bidding history, prices and competitors.", "اختر مورداً في العالم أو صفاً من الدليل لعرض ملفه وسجل عطاءاته وأسعاره ومنافسيه.")</span>
+                </div>
+                <div class="oi-details-content" id="sup-details-content" hidden>
+                    <header>
+                        <span class="oi-insp-icon" aria-hidden="true" id="sup-details-icon"><svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M4 21h16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg></span>
+                        <div><h3 id="sup-details-title" tabindex="-1"></h3><p id="sup-details-sub"></p></div>
+                        <span class="oi-pill" id="sup-details-status"></span>
+                        <button type="button" class="rd-icon-btn" id="sup-details-close" aria-label="@L("Close supplier details", "إغلاق تفاصيل المورد")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
+                    </header>
+                    <div class="oi-insp-tabs" role="tablist" aria-label="@L("Supplier details", "تفاصيل المورد")">
+                        <button type="button" role="tab" aria-selected="true" data-details-tab="overview">@L("Overview", "نظرة عامة")</button>
+                        <button type="button" role="tab" aria-selected="false" data-details-tab="participation">@L("Participation", "المشاركة")</button>
+                        <button type="button" role="tab" aria-selected="false" data-details-tab="pricing">@L("Pricing", "الأسعار")</button>
+                        <button type="button" role="tab" aria-selected="false" data-details-tab="relationships">@L("Relationships", "العلاقات")</button>
+                    </div>
+                    <div class="oi-insp-body" id="sup-details-body" role="tabpanel"></div>
+                    <footer class="oi-insp-foot">
+                        <button type="button" class="rd-btn" id="sup-ask-ai"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z" /></svg>@L("Ask AI", "اسأل الذكاء")</button>
+                        <button type="button" class="rd-btn" id="sup-compare-offers">@L("Compare offers", "قارن العروض")</button>
+                    </footer>
+                </div>
             </aside>
-
-            <div class="oi-uni-table" data-uni-table hidden></div>
-            <div class="oi-uni-empty" data-uni-empty hidden></div>
-            <p class="oi-uni-caption" data-uni-caption aria-live="polite"></p>
-
-            <!-- 2D fallback: the full network engine (path, replay, PNG). -->
-            <div class="oi-net2d" data-net2d hidden>
-                <div class="oi-net2d-head"><div><h3 data-net-title>@L("The supplier market", "سوق الموردين")</h3><p data-net-caption></p></div><p class="rd-net-counts" data-net-counts aria-live="polite"></p></div>
-                <div class="rd-net-shell" data-net-stage>
-                    <div class="rd-net-head" role="toolbar" aria-label="@L("Network controls", "أدوات الشبكة")">
-                        <div class="rd-seg rd-seg-views" role="radiogroup" aria-label="@L("Network view", "عرض الشبكة")" data-net-views>
-                            <button type="button" role="radio" aria-checked="true" data-net-view="category">@L("Category", "الفئة")</button>
-                            <button type="button" role="radio" aria-checked="false" data-net-view="competition">@L("Competition", "المنافسة")</button>
-                            <button type="button" role="radio" aria-checked="false" data-net-view="tender">@L("Tender", "المناقصة")</button>
-                        </div>
-                        <label class="rd-search">
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
-                            <input type="search" list="rd-net-suggest" placeholder="@L("Find a supplier or category", "ابحث عن مورد أو فئة")" data-net-search aria-label="@L("Find a supplier or category in the network", "ابحث عن مورد أو فئة في الشبكة")" autocomplete="off" />
-                            <datalist id="rd-net-suggest" data-net-suggest></datalist>
-                        </label>
-                        <span class="rd-toolbar-spacer"></span>
-                        <div class="rd-tools">
-                            <button type="button" class="rd-tool" data-net-tool="filters" aria-expanded="false" aria-controls="rd-net-filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg><span>@L("Filters", "مرشحات")</span><b class="rd-tool-badge" data-net-filter-badge hidden></b></button>
-                            <button type="button" class="rd-tool" data-net-tool="path"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="18" r="2.5" /><circle cx="19" cy="6" r="2.5" /><path d="M7 16.5C10 14 9 9 12 9s3 0 5-1.5" /></svg><span>@L("Path", "المسار")</span></button>
-                            <button type="button" class="rd-tool" data-net-tool="replay" aria-expanded="false" aria-controls="rd-replay"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2" /></svg><span>@L("Replay", "إعادة")</span></button>
-                            <button type="button" class="rd-tool" data-net-tool="table" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M9 10v9" /></svg><span>@L("Table", "جدول")</span></button>
-                            <button type="button" class="rd-tool rd-tool-icon" data-net-tool="png" aria-label="@L("Export network as PNG", "تصدير الشبكة كصورة")" title="PNG"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg></button>
-                            <button type="button" class="rd-tool rd-tool-icon" data-net-tool="fullscreen" aria-label="@L("Full screen", "ملء الشاشة")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
-                        </div>
-                    </div>
-                    <div class="rd-net-filters" id="rd-net-filters" data-net-filter-panel hidden>
-                        <fieldset class="rd-filter-wide"><legend>@L("Links shown", "الروابط المعروضة")</legend><div class="rd-chips" data-net-rel role="group"></div></fieldset>
-                        <fieldset class="rd-filter-wide"><legend>@L("Categories", "الفئات")</legend><div class="rd-check-grid" data-net-cats></div></fieldset>
-                        <fieldset><legend>@L("Suppliers", "الموردون")</legend>
-                            <label><input type="checkbox" data-net-opt="inactive" checked /> @L("Include not-approved suppliers", "تضمين غير المعتمدين")</label>
-                            <label><input type="checkbox" data-net-opt="isolated" checked /> @L("Include suppliers with no link", "تضمين الموردين بلا روابط")</label>
-                        </fieldset>
-                        <fieldset><legend>@L("Competition", "المنافسة")</legend>
-                            <label>@L("Link after", "اربط بعد") <select data-net-opt="competition-min"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select> @L("shared bidding cycles", "دورات عطاء مشتركة")</label>
-                        </fieldset>
-                        <button type="button" class="rd-link" data-net-tool="clear-filters">@L("Reset filters", "إعادة ضبط المرشحات")</button>
-                    </div>
-                    <div class="rd-net-body">
-                        <div class="rd-net-canvas" data-net-canvas>
-                            <div class="rd-cy" data-cy role="application" tabindex="0" aria-roledescription="@L("network", "شبكة")" aria-label="@L("Supplier network. Drag to pan, wheel to zoom, Space pauses motion, Escape steps back.", "شبكة الموردين.")"></div>
-                            <nav class="rd-crumbs" data-net-crumbs aria-label="@L("Network focus", "تركيز الشبكة")" hidden></nav>
-                            <div class="rd-selection" data-net-selection aria-live="polite"></div>
-                            <div class="rd-net-replaying" data-net-replaying hidden></div>
-                            <div class="rd-empty" data-net-empty hidden></div>
-                        </div>
-                        <aside class="rd-inspector" data-inspector aria-labelledby="rd-inspector-title" hidden>
-                            <header>
-                                <div><p class="rd-kicker" data-inspector-kicker></p><h3 id="rd-inspector-title" data-inspector-title tabindex="-1"></h3></div>
-                                <button type="button" class="rd-icon-btn" data-inspector-close aria-label="@L("Close inspector", "إغلاق المفتش")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
-                            </header>
-                            <div class="rd-inspector-body" data-inspector-body></div>
-                        </aside>
-                    </div>
-                    <div class="rd-net-foot">
-                        <div class="rd-groups" data-net-groups role="group" aria-label="@L("Groups in this view", "المجموعات في هذا العرض")"></div>
-                        <div class="rd-legend" data-net-legend aria-label="@L("Legend", "دليل الرموز")"></div>
-                        <div class="rd-zoom" role="group" aria-label="@L("Motion and zoom", "الحركة والتكبير")">
-                            <button type="button" class="rd-motion" data-net-tool="motion" aria-pressed="false"><i aria-hidden="true"></i><span data-motion-label>Live</span></button>
-                            <button type="button" data-net-tool="zoom-out" aria-label="@L("Zoom out", "تصغير")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg></button>
-                            <button type="button" data-net-tool="zoom-in" aria-label="@L("Zoom in", "تكبير")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
-                            <button type="button" data-net-tool="fit" aria-label="@L("Fit to view", "ملاءمة العرض")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
-                            <button type="button" data-net-tool="reset" aria-label="@L("Reset layout", "إعادة ضبط التخطيط")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" /></svg></button>
-                        </div>
-                    </div>
-                    <div class="rd-replay" id="rd-replay" data-replay hidden aria-label="@L("Historical replay", "الإعادة التاريخية")">
-                        <button type="button" class="rd-icon-btn rd-replay-play" data-timeline="play" aria-label="@L("Play historical replay", "تشغيل الإعادة التاريخية")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" /></svg></button>
-                        <button type="button" class="rd-icon-btn" data-timeline="reset" aria-label="@L("Show all history", "إظهار كل التاريخ")"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5" /></svg></button>
-                        <select data-timeline-speed aria-label="@L("Replay speed", "سرعة الإعادة")"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
-                        <div class="rd-track"><canvas data-timeline-canvas height="48" aria-hidden="true"></canvas><input type="range" min="0" max="1000" value="1000" data-timeline-range aria-label="@L("Replay date", "تاريخ الإعادة")" /></div>
-                        <output data-timeline-date>All history</output>
-                    </div>
-                </div>
-                <div class="rd-net-table" data-net-table hidden></div>
-            </div>
         </div>
 
+        @* renderSupplierSnapshot: donut of categories (click = category filter) + monthly participation line *@
+        <article class="oi-snapshot" aria-label="@L("Market snapshot", "لمحة السوق")">
+            <div class="oi-snap-title"><h3>@L("Market snapshot", "لمحة السوق")</h3><p>@L("Category mix and participation over time", "مزيج الفئات والمشاركة عبر الزمن")</p></div>
+            <div class="oi-snap-donut" id="chart-sup-categories" role="img" aria-label="@L("Suppliers by category", "الموردون حسب الفئة")"></div>
+            <ul class="oi-snap-legend" id="sup-category-legend"></ul>
+            <div class="oi-snap-trend"><p class="oi-snap-sub">@L("Suppliers submitting offers, per month", "الموردون المقدمون للعروض شهرياً")</p><div id="chart-sup-trend" role="img" aria-label="@L("Participation trend", "اتجاه المشاركة")"></div></div>
+        </article>
+
+        @* Supplier directory (renderSupplierTable): a row opens the same details panel as a dot of the universe *@
+        <article class="rd-card oi-directory">
+            <header>
+                <div><h3>@L("Supplier directory", "دليل الموردين")</h3><p id="sup-table-note"></p></div>
+                <label class="oi-find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
+                    <input type="search" id="sup-search" placeholder="@L("Name or category", "الاسم أو الفئة")" aria-label="@L("Find a supplier", "ابحث عن مورد")" autocomplete="off" /></label>
+            </header>
+            <div class="oi-directory-table" id="sup-table"></div>
+        </article>
+
+        @* renderSupplierInsights: two charts (switch with the two insight tabs) + key takeaways *@
         <section class="oi-insights" aria-labelledby="oi-insights-title">
             <header class="oi-insights-head">
                 <span class="oi-insights-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 18v-4m7 4V6m7 12v-8" /></svg></span>
-                <div><h3 id="oi-insights-title">@L("Supplier Performance Analytics", "تحليلات أداء الموردين")</h3><p>@L("AI-powered insights into supplier participation, pricing, and competitive positioning.", "رؤى ذكية حول مشاركة الموردين وأسعارهم وموقعهم التنافسي.")</p></div>
-                <span class="oi-insights-badge">✦ &nbsp;@L("AI Procurement Intelligence", "ذكاء المشتريات")</span>
+                <div><h3 id="oi-insights-title">@L("Supplier Performance Analytics", "تحليلات أداء الموردين")</h3><p>@L("Insights into supplier participation, pricing, and competitive positioning, calculated from recorded offers.", "رؤى حول مشاركة الموردين وأسعارهم وموقعهم التنافسي، محسوبة من العروض المسجلة.")</p></div>
+                <span class="oi-insights-badge">✦ &nbsp;@L("Procurement Intelligence", "ذكاء المشتريات")</span>
             </header>
             <div class="oi-insight-tabs" role="tablist" aria-label="@L("Supplier insights", "رؤى الموردين")">
                 <button type="button" role="tab" id="oi-insight-landscape-tab" aria-controls="oi-insight-landscape" aria-selected="false" tabindex="-1" data-insight-tab="landscape"><span aria-hidden="true">✣</span>@L("Participation vs Response Rate", "المشاركة مقابل معدل الاستجابة")</button>
                 <button type="button" role="tab" id="oi-insight-positions-tab" aria-controls="oi-insight-positions" aria-selected="true" data-insight-tab="positions"><span aria-hidden="true">⌁</span>@L("Price Position Over Time", "موقع السعر عبر الزمن")</button>
             </div>
             <div class="oi-insight-context" aria-live="polite">
-                <span><b>@L("Suppliers", "الموردون")</b><span data-insight-suppliers>@L("All in scope", "جميع الموردين في النطاق")</span></span>
-                <span><b>@L("Category", "الفئة")</b><span data-insight-category>@L("All categories", "جميع الفئات")</span></span>
-                <span><b>@L("Date range", "الفترة")</b><span data-insight-period>@L("All history", "كل الفترات")</span></span>
-                <span><b>@L("Compare", "المقارنة")</b><span data-insight-compare>@L("vs. bidding cycle median", "مقابل وسيط دورة العطاء")</span></span>
+                <span><b>@L("Suppliers", "الموردون")</b><span id="ins-suppliers">@L("All in scope", "جميع الموردين في النطاق")</span></span>
+                <span><b>@L("Category", "الفئة")</b><span id="ins-category">@L("All categories", "جميع الفئات")</span></span>
+                <span><b>@L("Date range", "الفترة")</b><span id="ins-period">@L("All history", "كل الفترات")</span></span>
+                <span><b>@L("Compare", "المقارنة")</b><span id="ins-compare">@L("vs. bidding cycle median", "مقابل وسيط دورة العطاء")</span></span>
             </div>
-            <p class="rd-focus-bar" data-market-focus aria-live="polite"></p>
             <div class="oi-insight-panels">
                 <article class="rd-card" id="oi-insight-landscape" role="tabpanel" aria-labelledby="oi-insight-landscape-tab" data-insight-panel="landscape" hidden>
-                    <header><div><h3 data-landscape-title>@L("Participation and success", "المشاركة والنجاح")</h3><p data-landscape-note></p></div><button type="button" class="rd-link" data-table="landscape">@L("Table", "جدول")</button></header>
-                    <div class="rd-chart" data-chart="landscape" role="img" aria-label="@L("Supplier landscape chart", "مخطط خريطة الموردين")"></div>
+                    <header><div><h3 id="ins-landscape-title">@L("Participation and success", "المشاركة والنجاح")</h3><p id="ins-landscape-note"></p></div><button type="button" class="rd-link" data-table-for="landscape">@L("Table", "جدول")</button></header>
+                    <div class="rd-chart" id="chart-sup-landscape" role="img" aria-label="@L("Supplier landscape chart", "مخطط خريطة الموردين")"></div>
                 </article>
                 <article class="rd-card" id="oi-insight-positions" role="tabpanel" aria-labelledby="oi-insight-positions-tab" data-insight-panel="positions">
-                    <header><div><h3>@L("Price position over time", "موقع السعر عبر الزمن")</h3><p>@L("Each offer vs. its bidding cycle median, same currency · below 0 = cheaper", "كل عرض مقابل وسيط دورة عطائه · أقل من 0 = أرخص")</p></div><button type="button" class="rd-link" data-table="positions">@L("Table", "جدول")</button></header>
-                    <div class="rd-chart" data-chart="positions" role="img" aria-label="@L("Relative price position chart", "مخطط موقع السعر النسبي")"></div>
+                    <header><div><h3>@L("Price position over time", "موقع السعر عبر الزمن")</h3><p>@L("Each offer vs. its bidding cycle median, same currency · below 0 = cheaper", "كل عرض مقابل وسيط دورة عطائه · أقل من 0 = أرخص")</p></div><button type="button" class="rd-link" data-table-for="positions">@L("Table", "جدول")</button></header>
+                    <div class="rd-chart" id="chart-sup-positions" role="img" aria-label="@L("Relative price position chart", "مخطط موقع السعر النسبي")"></div>
                 </article>
             </div>
-            <div class="oi-insight-takeaways" data-insight-takeaways aria-live="polite"></div>
+            <div class="oi-insight-takeaways" id="ins-takeaways" aria-live="polite"></div>
         </section>
-        <section class="oi-comparison" data-offer-comparison aria-labelledby="oi-comparison-title">
+
+        @* renderSupplierRelationships: who competes with whom (shared closed bidding cycles) *@
+        <section class="oi-relationships rd-card" aria-labelledby="oi-rel-title">
+            <header><div><h3 id="oi-rel-title">@L("Market relationships", "علاقات السوق")</h3><p id="rel-note"></p></div></header>
+            <div class="oi-rel-grid">
+                <div class="oi-directory-table" id="rel-pairs"></div>
+                <div><p class="rd-section-title">@L("Competition groups", "مجموعات المنافسة")</p><div id="rel-groups"></div></div>
+            </div>
+        </section>
+
+        @* Supplier offer comparison (loadComparison -> GET /Intelligence/CompareSuppliers) *@
+        <section class="oi-comparison" id="cmp-section" aria-labelledby="oi-comparison-title">
             <header class="oi-comparison-head">
                 <span class="oi-insights-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 18h16M4 6v12M8 9h7M8 14h11" /></svg></span>
                 <div><h3 id="oi-comparison-title">@L("Supplier Offer Comparison", "مقارنة عروض الموردين")</h3><p>@L("Compare two suppliers' financial offers and submission activity within a selected tender.", "قارن العروض المالية ونشاط تقديم العروض لموردين ضمن عطاء محدد.")</p></div>
             </header>
             <div class="oi-comparison-controls">
-                <label>@L("First supplier", "المورد الأول")<select data-comparison-supplier="a" disabled></select></label>
-                <label>@L("Second supplier", "المورد الثاني")<select data-comparison-supplier="b" disabled></select></label>
-                <label>@L("Tender", "العطاء")<select data-comparison-tender disabled></select></label>
+                <label>@L("First supplier", "المورد الأول")<select id="cmp-supplier-a" disabled></select></label>
+                <label>@L("Second supplier", "المورد الثاني")<select id="cmp-supplier-b" disabled></select></label>
+                <label>@L("Tender", "العطاء")<select id="cmp-tender" disabled></select></label>
             </div>
-            <p class="oi-comparison-status" data-comparison-status role="status">@L("Loading authorized suppliers…", "جارٍ تحميل الموردين المصرح بهم…")</p>
-            <div data-comparison-result hidden></div>
+            <p class="oi-comparison-status" id="cmp-status" role="status">@L("Loading authorized suppliers…", "جارٍ تحميل الموردين المصرح بهم…")</p>
+            <div id="cmp-result" hidden></div>
         </section>
-        <details class="rd-card oi-fold oi-whatif">
+
+        @* What-if scenario (runSimulation -> POST /Intelligence/Simulate) *@
+        <details class="rd-card oi-fold oi-whatif" id="sim-fold">
             <summary><span><b>@L("What-if: market dependency", "ماذا لو: الاعتماد على السوق")</b><small>@L("Replay recorded history without chosen suppliers. Hypothetical, never a forecast.", "إعادة التاريخ دون موردين مختارين. افتراضي وليس توقعاً.")</small></span></summary>
-            <div class="rd-scenario-pick" data-scenario-pick></div>
-            <button type="button" class="rd-btn rd-btn-primary" data-action="simulate">@L("Run scenario", "تشغيل السيناريو")</button>
-            <div class="rd-scenario-result" data-scenario-result></div>
+            <div class="rd-scenario-pick" id="sim-pick"></div>
+            <button type="button" class="rd-btn rd-btn-primary" id="sim-run">@L("Run scenario", "تشغيل السيناريو")</button>
+            <div class="rd-scenario-result" id="sim-result"></div>
         </details>
     </section>
 
-    <!-- ===== 3. Tenders ===== -->
+    <!-- ===== 3. Tenders (intelligence-tenders.js -> GET /Intelligence/Tenders and /Intelligence/TenderDetails) ===== -->
     <section class="oi-panel" id="oi-tenders" role="tabpanel" aria-labelledby="oi-tab-tenders" data-tab-panel="tenders" hidden>
         <header class="oi-head">
             <div class="oi-head-title"><span class="oi-head-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5" /></svg></span>
                 <div><h2>@L("Tender Intelligence", "ذكاء العطاءات")</h2><p class="oi-lead">@L("Pick any tender in your scope: lifecycle, offers, outcome and report.", "اختر أي عطاء في نطاقك: دورة الحياة والعروض والنتيجة والتقرير.")</p></div></div>
-            <div class="oi-filters"><label class="oi-select oi-select-wide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z" /></svg><select data-tender-pick aria-label="@L("Choose a tender", "اختر عطاءً")"></select></label></div>
+            <div class="oi-filters"><label class="oi-select oi-select-wide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z" /></svg><select id="ten-pick" aria-label="@L("Choose a tender", "اختر عطاءً")"></select></label></div>
         </header>
         <div class="oi-tender-layout">
+            @* renderTenderList *@
             <aside class="oi-tender-list" aria-label="@L("Tenders in scope", "العطاءات في النطاق")">
-                <div class="oi-tender-list-head"><h3>@L("All tenders", "كل العطاءات")</h3><span data-tender-count></span></div>
-                <ul data-tender-list></ul>
+                <div class="oi-tender-list-head"><h3>@L("All tenders", "كل العطاءات")</h3><span id="ten-count"></span></div>
+                <label class="oi-find oi-tender-find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
+                    <input type="search" id="ten-search" placeholder="@L("Find a tender", "ابحث عن عطاء")" aria-label="@L("Find a tender", "ابحث عن عطاء")" autocomplete="off" /></label>
+                <ul id="ten-list"></ul>
             </aside>
-            <div class="oi-tender-main" data-tender-main>
-                <div class="oi-tender-hero" data-tender-hero></div>
-                <div class="oi-kpis" data-tender-kpis></div>
+            @* renderTenderDetails *@
+            <div class="oi-tender-main" id="ten-main">
+                <div class="oi-tender-hero" id="ten-hero"></div>
+                <div class="oi-kpis" id="ten-kpis"></div>
                 <article class="rd-card">
                     <header><div><h3>@L("Tender Lifecycle", "دورة حياة العطاء")</h3><p>@L("Recorded timestamps only · missing milestones say so", "طوابع زمنية مسجلة فقط · المراحل غير المسجلة موضحة")</p></div></header>
-                    <ol class="oi-timeline" data-tender-timeline></ol>
+                    <ol class="oi-timeline" id="ten-timeline"></ol>
                 </article>
                 <div class="oi-tender-actions">
-                    <button type="button" class="rd-btn" data-export="tender-lifecycle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("Export lifecycle (Excel)", "تصدير دورة الحياة (إكسل)")</button>
-                    <button type="button" class="rd-btn" data-export="tender-pdf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("PDF report", "تقرير PDF")</button>
+                    <button type="button" class="rd-btn" id="ten-export-lifecycle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("Export lifecycle (Excel)", "تصدير دورة الحياة (إكسل)")</button>
+                    <button type="button" class="rd-btn" id="ten-export-pdf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>@L("PDF report", "تقرير PDF")</button>
                 </div>
             </div>
         </div>
-        <section class="oi-offers" data-tender-offers-section aria-labelledby="oi-offers-title">
+        @* renderTenderOffers: offers of one closed bidding cycle and one comparable group *@
+        <section class="oi-offers" id="off-section" aria-labelledby="oi-offers-title">
             <header class="oi-offers-head">
                 <span class="oi-insights-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 18v-4m7 4V6m7 12v-8" /></svg></span>
-                <div><h3 id="oi-offers-title">@L("Financial Offers by Bidding Cycle", "العروض المالية حسب دورة العطاء")</h3><p>@L("Compare submitted financial offers within a closed bidding cycle.", "قارن العروض المالية المقدمة ضمن دورة عطاء مغلقة.")</p></div>
-                <div class="oi-offers-actions"><button type="button" class="rd-btn" data-offer-table-toggle>@L("Table", "الجدول")</button><button type="button" class="rd-btn" data-export="tender-offers">@L("Excel", "إكسل")</button></div>
+                <div><h3 id="oi-offers-title">@L("Offers by Bidding Cycle", "العروض حسب دورة العطاء")</h3><p>@L("Compare submitted financial offers within a closed bidding cycle.", "قارن العروض المالية المقدمة ضمن دورة عطاء مغلقة.")</p></div>
+                <div class="oi-offers-actions"><button type="button" class="rd-btn" id="off-table-toggle">@L("Table", "الجدول")</button><button type="button" class="rd-btn" id="off-export">@L("Excel", "إكسل")</button></div>
             </header>
-            <div class="oi-offers-strip" data-tender-offer-summary></div>
-            <div class="oi-offers-picks"><label>@L("Closed bidding cycle", "دورة العطاء المغلقة") <select data-offer-round aria-label="@L("Choose a closed bidding cycle", "اختر دورة عطاء مغلقة")"></select></label><label data-offer-group-wrap hidden>@L("Comparable offers", "العروض القابلة للمقارنة") <select data-offer-group aria-label="@L("Choose comparable group", "اختر مجموعة قابلة للمقارنة")"></select></label></div>
-            <p class="oi-offers-note" data-tender-offers-note></p>
-            <div class="rd-chart" data-chart="tenderOffers" role="img" aria-label="@L("Offers in the selected closed bidding cycle", "العروض في دورة العطاء المغلقة المختارة")"></div>
-            <p class="oi-offers-insight" data-tender-offer-insight></p>
-            <div class="oi-offers-extremes" data-tender-offer-extremes></div>
-            <div class="oi-offer-detail" data-tender-offer-detail hidden></div>
-            <details class="oi-offers-table" data-tender-offers-table><summary>@L("View offer table", "عرض جدول العروض")</summary><div data-offer-table-content></div></details>
+            <div class="oi-offers-strip" id="off-summary"></div>
+            <div class="oi-offers-picks"><label>@L("Closed bidding cycle", "دورة العطاء المغلقة") <select id="off-round" aria-label="@L("Choose a closed bidding cycle", "اختر دورة عطاء مغلقة")"></select></label><label id="off-group-wrap" hidden>@L("Comparable offers", "العروض القابلة للمقارنة") <select id="off-group" aria-label="@L("Choose comparable group", "اختر مجموعة قابلة للمقارنة")"></select></label></div>
+            <p class="oi-offers-note" id="off-note"></p>
+            <div class="rd-chart" id="chart-ten-offers" role="img" aria-label="@L("Offers in the selected closed bidding cycle", "العروض في دورة العطاء المغلقة المختارة")"></div>
+            <p class="oi-offers-insight" id="off-insight"></p>
+            <div class="oi-offers-extremes" id="off-extremes"></div>
+            <div class="oi-offer-detail" id="off-detail" hidden></div>
+            <details class="oi-offers-table" id="off-table"><summary id="off-table-summary">@L("View offer table", "عرض جدول العروض")</summary><div id="off-table-content"></div></details>
         </section>
+        @* renderTenderMarket: participation per cycle, departments, competitor pairs, official awards *@
         <section class="oi-market-strip" aria-labelledby="oi-comp-title">
             <article class="rd-card rd-card-feature">
-                <header><div><h3 id="oi-comp-title">@L("Supplier Participation by Bidding Cycle", "مشاركة الموردين حسب دورة العطاء")</h3><p>@L("Submitted offers inside the invited field · dashed line = minimum offers · select a bidding cycle to open its tender", "العروض ضمن المدعوين · الخط المتقطع = الحد الأدنى · اختر دورة لفتح عطائها")</p></div><button type="button" class="rd-link" data-table="competition">@L("Table", "جدول")</button></header>
-                <div class="rd-chart rd-chart-lg" data-chart="competition" role="img" aria-label="@L("Supplier participation by bidding cycle chart", "مخطط مشاركة الموردين حسب دورة العطاء")"></div>
+                <header><div><h3 id="oi-comp-title">@L("Supplier Participation by Bidding Cycle", "مشاركة الموردين حسب دورة العطاء")</h3><p>@L("Submitted offers inside the invited field · dashed line = minimum offers · select a bidding cycle to open its tender", "العروض ضمن المدعوين · الخط المتقطع = الحد الأدنى · اختر دورة لفتح عطائها")</p></div><button type="button" class="rd-link" data-table-for="competition">@L("Table", "جدول")</button></header>
+                <div class="rd-chart rd-chart-lg" id="chart-ten-competition" role="img" aria-label="@L("Supplier participation by bidding cycle chart", "مخطط مشاركة الموردين حسب دورة العطاء")"></div>
             </article>
             <div class="oi-two">
                 <article class="rd-card">
                     <header><div><h3>@L("By department", "حسب الجهة")</h3><p>@L("Average offers per bidding cycle", "متوسط العروض لكل دورة عطاء")</p></div></header>
-                    <div class="rd-chart rd-chart-sm" data-chart="groups" role="img" aria-label="@L("Average offers by department", "متوسط العروض حسب الجهة")"></div>
-                    <div class="rd-pairs" data-pairs></div>
+                    <div class="rd-chart rd-chart-sm" id="chart-ten-departments" role="img" aria-label="@L("Average offers by department", "متوسط العروض حسب الجهة")"></div>
+                    <div class="rd-pairs" id="ten-pairs"></div>
                 </article>
-                <article class="rd-card">
-                    <header><div><h3>@L("Official awards", "الترسيات الرسمية")</h3><p data-award-note></p></div><button type="button" class="rd-link" data-table="awards">@L("Table", "جدول")</button></header>
-                    <div class="rd-chart" data-chart="awards" role="img" aria-label="@L("Award distribution chart", "مخطط توزيع الترسيات")"></div>
+                <article class="rd-card" id="ten-awards-card">
+                    <header><div><h3>@L("Official awards", "الترسيات الرسمية")</h3><p id="ten-award-note"></p></div><button type="button" class="rd-link" data-table-for="awards">@L("Table", "جدول")</button></header>
+                    <div class="rd-chart" id="chart-ten-awards" role="img" aria-label="@L("Award distribution chart", "مخطط توزيع الترسيات")"></div>
                 </article>
             </div>
         </section>
@@ -352,11 +326,23 @@ draw them. The AI Studio tab (Gemini) has three features: supplier summary, text
 
         <div class="ais" data-studio
              data-url-summary="@U("SupplierSummary")" data-url-ask="@U("AskSupplier")" data-url-voice="@U("StartVoice")">
+          <div class="ais-layout">
+            @* Supplier list (intelligence-studio-picker.js). The hidden <select> is still the real choice:
+               intelligence-ai.js fills and reads it, intelligence-audio.js reads it. *@
+            <aside class="ais-picker" data-studio-picker aria-labelledby="ais-picker-title">
+                <header class="ais-picker-head">
+                    <span class="ais-picker-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M4 21h16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg></span>
+                    <div><h3 id="ais-picker-title">@L("Choose a supplier", "اختر مورداً")</h3><p data-picker-count aria-live="polite"></p></div>
+                </header>
+                <label class="ais-picker-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
+                    <input type="search" data-picker-search placeholder="@L("Search name or category", "ابحث بالاسم أو الفئة")" aria-label="@L("Search suppliers", "ابحث في الموردين")" aria-controls="ais-picker-list" autocomplete="off" /></label>
+                <ul class="ais-picker-list" id="ais-picker-list" role="listbox" tabindex="0" aria-labelledby="ais-picker-title" data-picker-list></ul>
+                <select data-studio-supplier hidden aria-hidden="true" tabindex="-1"><option value="">@L("Choose a supplier…", "اختر مورداً…")</option></select>
+            </aside>
+
+            <div class="ais-main">
             <div class="ais-bar">
-                <label class="oi-select oi-select-wide ais-supplier">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5l8-3 8 3v16M4 21h16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" /></svg>
-                    <select data-studio-supplier aria-label="@L("Choose a supplier", "اختر مورداً")"><option value="">@L("Choose a supplier…", "اختر مورداً…")</option></select>
-                </label>
+                <div class="ais-current" data-picker-selected aria-live="polite"></div>
                 <div class="ais-modes" role="tablist" aria-label="@L("AI Studio mode", "وضع الاستوديو")">
                     <button type="button" role="tab" aria-selected="true" data-studio-mode="summary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7zM10 12h5M10 16h5" /></svg>@L("Summary", "ملخص")</button>
                     <button type="button" role="tab" aria-selected="false" data-studio-mode="chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z" /></svg>@L("Text Chat", "محادثة نصية")</button>
@@ -387,35 +373,41 @@ draw them. The AI Studio tab (Gemini) has three features: supplier summary, text
 
             <!-- C. Live voice call -->
             <div class="ais-panel ais-voice" data-studio-panel="voice" data-voice-panel data-state="idle" hidden>
-                <!-- Voice orb: the panel's data-state (idle | connecting | listening | thinking | speaking) picks the CSS animation;
-                     --level (0..1, live audio energy) is set by intelligence-audio.js. -->
-                <div class="ais-orb" data-voice-orb aria-hidden="true">
-                    <span class="ais-orb-halo"></span>
-                    <span class="ais-orb-ring"></span><span class="ais-orb-ring"></span><span class="ais-orb-ring"></span>
-                    <span class="ais-orb-wave"></span>
-                    <span class="ais-orb-core">
-                        <svg class="ais-orb-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
-                        <span class="ais-orb-bars"><i></i><i></i><i></i><i></i><i></i></span>
-                    </span>
+                <!-- Voice orb (intelligence-voice-visual.js draws the canvas). It follows the panel's data-state
+                     (idle | connecting | listening | thinking | speaking, set by intelligence-audio.js) and the real audio analysers. -->
+                <div class="ais-voice-stage" aria-hidden="true">
+                    <canvas class="ais-voice-canvas" data-voice-canvas></canvas>
+                    <span class="ais-voice-mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg></span>
                 </div>
                 <p class="ais-voice-status" role="status"><i aria-hidden="true"></i><span data-voice-status>@L("Ready", "جاهز")</span></p>
+                <p class="ais-voice-activity" data-voice-activity aria-hidden="true"></p>
                 <div class="ais-voice-actions">
                     <button type="button" class="rd-btn rd-btn-primary" data-voice-start>@L("Start Call", "بدء المكالمة")</button>
                     <button type="button" class="rd-btn ais-end" data-voice-end hidden>@L("End Call", "إنهاء المكالمة")</button>
                 </div>
                 <p class="ais-hint">@L("Speak naturally in Arabic or English. You can interrupt Gemini while it is speaking.", "تحدث بشكل طبيعي بالعربية أو الإنجليزية. يمكنك مقاطعة Gemini أثناء حديثه.")</p>
             </div>
+            </div>
+          </div>
         </div>
     </section>
 
-    <div class="rd-toast" data-toast role="status" aria-live="polite" hidden></div>
+    @* showToast (intelligence-page.js) *@
+    <div class="rd-toast" id="page-toast" role="status" aria-live="polite" hidden></div>
 </div>
 
 @section Scripts {
+    @* ECharts draws the charts. The four intelligence-*.js files are ordinary scripts: their functions are global,
+       so they can call each other and can be tried in the browser console (F12). The page starts on DOMContentLoaded.
+       orange-intelligence-universe.js only defines window.SupplierUniverse; it loads Three.js itself when the Suppliers tab first draws. *@
     <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
-    <script src="~/js/orange-radar-network.js" asp-append-version="true"></script>
-    <script src="~/js/orange-radar.js" asp-append-version="true"></script>
-    <script type="module" src="~/js/orange-intelligence-universe.js" asp-append-version="true"></script>
+    <script src="~/js/orange-intelligence-universe.js" asp-append-version="true"></script>
+    <script src="~/js/intelligence-page.js" asp-append-version="true"></script>
+    <script src="~/js/intelligence-overview.js" asp-append-version="true"></script>
+    <script src="~/js/intelligence-suppliers.js" asp-append-version="true"></script>
+    <script src="~/js/intelligence-tenders.js" asp-append-version="true"></script>
     <script src="~/js/intelligence-ai.js" asp-append-version="true"></script>
+    <script src="~/js/intelligence-studio-picker.js" asp-append-version="true"></script>
+    <script src="~/js/intelligence-voice-visual.js" asp-append-version="true"></script>
     <script type="module" src="~/js/intelligence-audio.js" asp-append-version="true"></script>
 }

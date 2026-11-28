@@ -271,21 +271,27 @@
     var wzDept = await Records.PurchaseRequests.AsNoTracking().Where(r => r.Id == wzPr).Select(r => r.Department.Name).FirstOrDefaultAsync() ?? "";
     var wzApproved = w?.State == WeightState.Approved || lowestPrice;
     var wzPublished = status != TenderStatus.Draft;
+    var wzClosing = round?.Deadline;
+    var wzBiddingOpen = status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open;
+    var wzCanInvite = wzBiddingOpen && wzClosing > Model.UtcNow && w?.State == WeightState.Approved;
+    var wzNeedsDeadline = wzBiddingOpen && wzClosing == null && s == null && w?.State == WeightState.Approved;
+    var wzStartBidding = status == TenderStatus.Draft && wzApproved;
+
     var wzClosed = closedRound || s != null || status is TenderStatus.Evaluation or TenderStatus.OfficerReview or TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded;
     var wzResults = Model.Ranking.Count > 0 && (s != null && (s.State is SessionState.ReportDraft or SessionState.Finalized or SessionState.ManagerApproved or SessionState.Awarded) || status is TenderStatus.OfficerReview or TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded);
     var wzSent = status is TenderStatus.ManagerReview or TenderStatus.TopCommitteeReview or TenderStatus.Awarded;
     var wzDone = new[] { false, true, true, wzApproved, wzPublished, wzClosed && (s != null || status != TenderStatus.Bidding), wzResults, wzResults && status is not TenderStatus.Evaluation, wzSent };
-    var wzOpen = new[] { false, true, true, true, wzApproved, wzPublished, wzClosed, wzResults, wzResults };
+    var wzOpen = new[] { false, true, true, true, wzApproved, wzPublished, wzClosed && !closedRound, wzResults, wzResults };
     var wzCurrent = 8; for (var n = 3; n <= 8; n++) if (!wzDone[n]) { wzCurrent = n; break; }
     if (!wzOpen[wzCurrent]) wzCurrent = Enumerable.Range(1, 8).Where(n => wzOpen[n]).Max();
-    var wzTitles = new[] { "", L("Requirements", "المتطلبات"), L("Committee", "اللجنة"), L("Tender Settings", "إعدادات المناقصة"), L("Publish", "النشر"), L("Bids", "العروض"), L("Evaluation", "التقييم"), L("Results", "النتائج"), L("Send to Manager", "إرسال للمدير") };
-    var wzClosing = round?.Deadline;
+    if (Model.IsOfficer && (wzNeedsDeadline || (wzCanInvite && !canCloseBidding))) wzCurrent = 4;
+    var wzTitles = new[] { "", L("Requirements", "المتطلبات"), L("Committee", "اللجنة"), L("Evaluation Weights", "أوزان التقييم"), L("Bidding & Invitations", "تقديم العروض والدعوات"), L("Supplier Bids", "عروض الموردين"), L("Evaluation", "التقييم"), L("Results", "النتائج"), L("Send to Manager", "إرسال للمدير") };
     var wzSpecs = (wzItem?.Specifications ?? "").Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
     var wzTop1 = Model.Ranking.OrderBy(x => x.Rank).FirstOrDefault();
     var wzWinner = rv?.Report.RecommendedBidId is int wzBid ? Model.Ranking.FirstOrDefault(x => x.BidId == wzBid) : wzTop1;
     var wzSignatures = rv?.Signatures.Count(x => x.Stage == ReportSigningStage.Evaluation && x.InvalidatedAt == null) ?? 0;
     var wzFw = finW; var wzTw = tecW;
-    var wzReasons = new[] { "", "", "", "", L("Approve the evaluation weights first.", "اعتمد أوزان التقييم أولاً."), L("Publish the tender first.", "انشر المناقصة أولاً."), L("Close bidding and send the offers to the committee first.", "أغلق العروض وأرسلها إلى اللجنة أولاً."), L("Wait until the committee finishes the evaluation.", "انتظر حتى تنهي اللجنة التقييم."), L("Wait until the committee signs the report.", "انتظر حتى توقّع اللجنة على التقرير.") };
+    var wzReasons = new[] { "", "", "", "", L("Approve the evaluation weights first.", "اعتمد أوزان التقييم أولاً."), L("Open bidding first.", "افتح باب تقديم العروض أولاً."), L("Close bidding and schedule the evaluation first.", "أغلق باب تقديم العروض وجدول التقييم أولاً."), L("Wait until the committee finishes the evaluation.", "انتظر حتى تنهي اللجنة التقييم."), L("Wait until the committee signs the report.", "انتظر حتى توقّع اللجنة على التقرير.") };
     string WzTime(DateTime? t) => t == null ? "—" : t.Value.ToJordan("d MMM yyyy, HH:mm");
 }
 @if (wz)
@@ -355,10 +361,10 @@
                     </div>
                 }
                 else { <ul class="wz-people">@foreach (var m in evalMembers) { <li><span class="wz-avatar">@Initial(Who(m.UserId))</span><div><strong>@Who(m.UserId)</strong><small>@WeightRole(m.Responsibility)</small></div><i aria-hidden="true">&#10003;</i></li> }</ul> }</div></section>
-        @* 3 — Tender settings: weights and closing date *@
-        <section class="wz-panel" data-wz-panel="3">
+        @* 3 — Evaluation weights *@
+        <section class="wz-panel" data-wz-panel="3" data-wz-next-label="@L("Set Bidding Deadline", "تحديد آخر موعد لتقديم العروض")">
             <div class="wz-art-side"><div class="wz-ring" style="--a:@((wzFw ?? 0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%"><b>@(wzFw != null ? "100%" : "—")</b><small>@L("Total Weight", "إجمالي الوزن")</small></div></div>
-            <div class="wz-main"><h3>@L("Evaluation Weights & Closing Date", "أوزان التقييم وموعد الإغلاق")</h3>
+            <div class="wz-main"><h3>@L("Evaluation Weights", "أوزان التقييم")</h3>
                 @if (lowestPrice) { <p class="wz-lead">@L("This tender is evaluated 100% on the lowest compliant price: no committee weights are needed.", "تُقيَّم هذه المناقصة بنسبة ١٠٠٪ على أقل سعر مطابق: لا حاجة لأوزان اللجنة.")</p> }
                 else
                 {
@@ -378,17 +384,9 @@
                         </dl>
                     }
                 }
-                <h4>@L("Tender Closing Date & Time", "تاريخ ووقت إغلاق المناقصة")</h4>
-                @if (status == TenderStatus.Draft)
-                {
-                    <div class="wz-deadline"><select class="wz-select" data-wz-preset aria-label="@L("Days from now", "عدد الأيام من الآن")"><option value="">@L("Choose number of days…", "اختر عدد الأيام…")</option><option value="1">@L("In 1 day", "خلال يوم")</option><option value="2">@L("In 2 days", "خلال يومين")</option><option value="3">@L("In 3 days", "خلال ٣ أيام")</option><option value="5">@L("In 5 days", "خلال ٥ أيام")</option><option value="7">@L("In 1 week", "خلال أسبوع")</option><option value="14">@L("In 2 weeks", "خلال أسبوعين")</option><option value="21">@L("In 3 weeks", "خلال ٣ أسابيع")</option><option value="30">@L("In 1 month", "خلال شهر")</option></select>
-                        <input type="datetime-local" class="wz-select" data-wz-deadline aria-label="@L("Bidding deadline", "الموعد النهائي")" @(Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeeded && wzNeeded.Date > Model.UtcNow.AddHours(3).Date ? Html.Raw("max=\"" + wzNeeded.ToString("yyyy-MM-dd") + "T23:59\"") : null) /></div>
-                    @if (Model.Tender.PurchaseRequest?.NeededBy is DateTime wzNeededBy) { <p class="wz-muted">@(wzNeededBy.Date > Model.UtcNow.AddHours(3).Date ? L("The department needs the items by", "تحتاج الجهة الطالبة المواد بحلول") + " " + wzNeededBy.ToString("d MMM yyyy") + ". " + L("The closing date cannot be later.", "ولا يمكن أن يكون موعد الإغلاق بعد ذلك.") : L("The department's needed-by date", "تاريخ حاجة الجهة الطالبة") + " (" + wzNeededBy.ToString("d MMM yyyy") + ") " + L("is today or has passed, so you can choose any closing date.", "هو اليوم أو انتهى، فيمكنك اختيار أي موعد إغلاق."))</p> }
-                }
-                else { <p class="wz-strong">@WzTime(wzClosing)</p> }
                 @if (!lowestPrice)
                 {
-                    @if (!wzApproved && status == TenderStatus.Draft && !(Model.CanApproveWeights && w?.State == WeightState.AwaitingApproval)) { <p class="wz-callout" role="status"><b aria-hidden="true">&#9203;</b> @(w == null ? L("Next step: send the tender to the committee so each member proposes the weights.", "الخطوة التالية: أرسل المناقصة إلى اللجنة ليقترح كل عضو الأوزان.") : w.State == WeightState.Proposals ? L($"Next step: the committee proposes the weights ({votedMembers} of {evalMembers.Count} so far). \"Continue\" opens when the weights are approved.", $"الخطوة التالية: تقترح اللجنة الأوزان ({votedMembers} من {evalMembers.Count} حتى الآن). يُفتح \"متابعة\" عند اعتماد الأوزان.") : L("Next step: approve the average of the proposals to unlock \"Continue\".", "الخطوة التالية: اعتمد متوسط المقترحات لفتح \"متابعة\".")) </p> }
+                    @if (!wzApproved && status == TenderStatus.Draft && !(Model.CanApproveWeights && w?.State == WeightState.AwaitingApproval)) { <p class="wz-callout" role="status"><b aria-hidden="true">&#9203;</b> @(w == null ? L("Next step: send the tender to the committee so each member proposes the weights.", "الخطوة التالية: أرسل المناقصة إلى اللجنة ليقترح كل عضو الأوزان.") : w.State == WeightState.Proposals ? L($"Next step: the committee proposes the weights ({votedMembers} of {evalMembers.Count} so far). You can open bidding once the weights are approved.", $"الخطوة التالية: تقترح اللجنة الأوزان ({votedMembers} من {evalMembers.Count} حتى الآن). يمكنك فتح باب تقديم العروض بعد اعتماد الأوزان.") : L("Next step: approve the average of the proposals to open bidding.", "الخطوة التالية: اعتمد متوسط المقترحات لفتح باب تقديم العروض.")) </p> }
                     <div class="wz-actions wz-inline wz-approve">
                         @if (w == null && status == TenderStatus.Draft) { <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="RequestWeights" asp-route-id="@id" method="post" class="wp-form"><button class="wz-primary">@L("Send to Committee", "إرسال إلى اللجنة") <span aria-hidden="true">&rarr;</span></button></form> }
                         @if (Model.CanApproveWeights && w != null && w.State == WeightState.AwaitingApproval) { <partial name="_ApproveTechnicalWeights" model='(w!, Model.Tender.Items.AsEnumerable())' />
@@ -402,57 +400,120 @@
                     </div>
                 }
             </div></section>
-        @* 4 — Publish *@
-        <section class="wz-panel" data-wz-panel="4">
+        @* 4 — Bidding deadline and supplier invitations *@
+        <section class="wz-panel" data-wz-panel="4" data-wz-next-label="@L("Track Supplier Bids", "متابعة عروض الموردين")">
             <div class="wz-art-side" aria-hidden="true"><span>&#128227;</span></div>
-            <div class="wz-main" data-wz-publish-main><h3>@L("Publish Tender", "نشر المناقصة")</h3><div data-wz-summary><p class="wz-lead">@L("Send the tender to registered suppliers.", "أرسل المناقصة إلى الموردين المسجّلين.")</p>
-                <dl class="wz-rows">
-                    <div><dt>@L("Tender", "المناقصة")</dt><dd>T-@id.ToString("0000")</dd></div>
-                    <div><dt>@L("Item", "المادة")</dt><dd>@(wzItem?.Name) × @(wzItem?.Quantity.ToString("0.###"))</dd></div>
-                    <div><dt>@L("Closing Date", "تاريخ الإغلاق")</dt><dd data-wz-deadline-echo>@(status == TenderStatus.Draft ? "—" : WzTime(wzClosing))</dd></div>
-                    <div><dt>@L("Evaluation Weights", "أوزان التقييم")</dt><dd>@(lowestPrice ? L("100% financial", "١٠٠٪ مالي") : $"{L("Technical", "فني")} {wzTw?.ToString("0.##")}% · {L("Financial", "مالي")} {wzFw?.ToString("0.##")}%")</dd></div>
-                    <div><dt>@L("Invited Suppliers", "الموردون المدعوون")</dt><dd>@(round?.Invitations.Count ?? 0)</dd></div>
-                </dl>
-                <div class="wz-actions">
-                    @if (status == TenderStatus.Draft && wzApproved) { <form id="wz-open-form" asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="OpenBidding" asp-route-id="@id" method="post" class="wp-form"><input type="hidden" name="deadline" data-wz-deadline-utc /><button class="wz-primary" data-wz-publish>&#128227; @L("Publish to Suppliers", "نشر للموردين")</button><small data-wz-publish-hint>@L("Choose the closing date in the Tender Settings stage first.", "اختر تاريخ الإغلاق في مرحلة إعدادات المناقصة أولاً.")</small><small class="wz-bad" data-wz-deadline-error hidden>@L("The closing time must be at least one hour from now.", "يجب أن يكون وقت الإغلاق بعد ساعة على الأقل من الآن.")</small></form> }
-                    @if (status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open && inviteable is { Count: > 0 })
+            <div class="wz-main" data-wz-invitations>
+                <h3>@L("Bidding & Supplier Invitations", "تقديم العروض ودعوة الموردين")</h3>
+                <div data-wz-summary>
+                    @if (wzStartBidding)
                     {
-                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form">@foreach (var sp in inviteable) { <input type="hidden" name="supplierIds" value="@sp.Id" /> }<button class="wz-primary" data-confirm="@L("Send tender invitations to all eligible suppliers?", "هل تريد إرسال دعوات المناقصة لجميع الموردين المؤهلين؟")">@L($"Invite {inviteable.Count} eligible supplier(s)", $"دعوة {inviteable.Count} من الموردين المؤهلين")</button></form>
-                        <button type="button" class="wz-ghost" data-wz-picker-open>@L("Choose suppliers manually", "اختيار الموردين يدوياً")</button>
+                        <p class="wz-lead">@L("Set the bid submission deadline and open bidding. You can then invite suppliers here.", "حدّد آخر موعد لتقديم العروض وافتح باب التقديم. ستظهر أزرار دعوة الموردين هنا.")</p>
                     }
-                </div></div>
-                <div class="wz-picker" data-wz-picker hidden><p><button type="button" class="wz-ghost wz-small" data-wz-picker-close>&larr; @L("Back to the summary", "العودة إلى الملخص")</button></p>
-        @if (Model.IsOfficer && status == TenderStatus.Bidding && round?.Status == TenderRoundStatus.Open && w?.State == WeightState.Approved)
-        {
-            <div class="wp-actions">
-                @if (approvedSuppliers is { Count: > 0 })
-                {
-                    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form wp-picker" data-picker>
-                        <div class="wp-cols">
-                            <label>Search suppliers<input type="search" data-supplier-search placeholder="Company name" /></label>
-                            <label>Category<select data-supplier-category><option value="">All categories (@approvedSuppliers.Count)</option>@foreach (var category in SupplierCategories.All) { <option value="@category">@category (@approvedSuppliers.Count(x => x.Category == category))@(tenderCategories.Contains(category) ? " · in this tender" : "")</option> }</select></label>
-                            <label>Documents<select data-supplier-docs><option value="">Any</option><option value="verified">Verified, not expired</option><option value="clean">No expired or pending documents</option></select></label>
-                            <label>History<select data-supplier-history><option value="">Any</option><option value="offers">Has submitted offers before</option><option value="awards">Has won a tender before</option><option value="new">No earlier offers</option></select></label>
+                    else if (wzCanInvite)
+                    {
+                        <p class="wz-lead">@L("Bidding is open. Invite suppliers to submit their offers by the deadline below.", "باب تقديم العروض مفتوح. ادعُ الموردين لتقديم عروضهم قبل الموعد أدناه.")</p>
+                    }
+                    <dl class="wz-rows">
+                        <div><dt>@L("Tender", "المناقصة")</dt><dd>T-@id.ToString("0000")</dd></div>
+                        <div><dt>@L("Item", "المادة")</dt><dd>@(wzItem?.Name) × @(wzItem?.Quantity.ToString("0.###"))</dd></div>
+                        @if (wzClosing.HasValue)
+                        {
+                            <div><dt>@L("Bid Submission Deadline (Jordan Time)", "آخر موعد لتقديم العروض (بتوقيت الأردن)")</dt><dd>@WzTime(wzClosing)</dd></div>
+                        }
+                        <div><dt>@L("Evaluation Weights", "أوزان التقييم")</dt><dd>@(lowestPrice ? L("100% financial", "١٠٠٪ مالي") : $"{L("Technical", "فني")} {wzTw?.ToString("0.##")}% · {L("Financial", "مالي")} {wzFw?.ToString("0.##")}%")</dd></div>
+                        <div><dt>@L("Invited Suppliers", "الموردون المدعوون")</dt><dd>@(round?.Invitations.Count ?? 0)</dd></div>
+                    </dl>
+                    @if (wzStartBidding || wzNeedsDeadline)
+                    {
+                        var neededBy = Model.Tender.PurchaseRequest?.NeededBy;
+                        var wzNowJordan = Model.UtcNow.ToJordan();
+                        var lastAllowed = Model.UtcNow.AddYears(1).ToJordan();
+                        var departmentLimit = wzStartBidding && neededBy?.Date > wzNowJordan.Date;
+                        if (departmentLimit && neededBy is DateTime departmentDate && departmentDate.Date < lastAllowed.Date)
+                        {
+                            lastAllowed = departmentDate.Date.AddHours(23).AddMinutes(59);
+                        }
+                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="@(wzStartBidding ? "OpenBidding" : "SetMissingDeadline")" asp-route-id="@id" method="post" class="wp-form">
+                            <label for="wz-bid-deadline-@id">@L("Bid Submission Deadline (Jordan Time)", "آخر موعد لتقديم العروض (بتوقيت الأردن)")</label>
+                            <div class="wz-deadline">
+                                <select class="wz-select" data-wz-preset aria-label="@L("Days from now", "عدد الأيام من الآن")"><option value="">@L("Choose number of days…", "اختر عدد الأيام…")</option><option value="1">@L("In 1 day", "خلال يوم")</option><option value="2">@L("In 2 days", "خلال يومين")</option><option value="3">@L("In 3 days", "خلال ٣ أيام")</option><option value="5">@L("In 5 days", "خلال ٥ أيام")</option><option value="7">@L("In 1 week", "خلال أسبوع")</option><option value="14">@L("In 2 weeks", "خلال أسبوعين")</option><option value="21">@L("In 3 weeks", "خلال ٣ أسابيع")</option><option value="30">@L("In 1 month", "خلال شهر")</option></select>
+                                <input id="wz-bid-deadline-@id" type="datetime-local" class="wz-select" data-wz-deadline data-wz-lead-hours="@(wzStartBidding ? 1 : 0)" max="@(wzStartBidding ? lastAllowed.ToString("yyyy-MM-ddTHH:mm", System.Globalization.CultureInfo.InvariantCulture) : null)" aria-describedby="wz-bid-deadline-help-@id" required />
+                            </div>
+                            <small id="wz-bid-deadline-help-@id">
+                                @if (departmentLimit)
+                                {
+                                    @L($"Department needed-by date: {neededBy:d MMM yyyy}. Bidding must close by that date.", $"تاريخ حاجة الجهة الطالبة: {neededBy:d MMM yyyy}. يجب أن يُغلق باب تقديم العروض في هذا التاريخ أو قبله.")
+                                }
+                                else
+                                {
+                                    @(wzStartBidding ? L("Choose a deadline more than one hour from now and within one year.", "اختر موعدًا بعد أكثر من ساعة من الآن وخلال سنة.") : L("This round is missing a deadline. Set one before inviting suppliers.", "هذه الجولة بلا موعد إغلاق. حدّد موعدًا قبل دعوة الموردين."))
+                                }
+                            </small>
+                            <input type="hidden" name="deadline" data-wz-deadline-utc />
+                            <small class="wz-bad" data-wz-deadline-error role="status" hidden>@(wzStartBidding
+                                ? L("Choose a deadline more than one hour from now and within the allowed date range.", "اختر موعدًا بعد أكثر من ساعة من الآن وضمن الفترة المسموح بها.")
+                                : L("Choose a future deadline.", "اختر موعدًا في المستقبل."))</small>
+                            <div><button class="wz-primary" data-wz-open-bidding disabled>@(wzStartBidding ? L("Open Bidding", "فتح باب تقديم العروض") : L("Save Bid Submission Deadline", "حفظ آخر موعد لتقديم العروض"))</button></div>
+                        </form>
+                    }
+                    @if (wzCanInvite)
+                    {
+                        <h4>@L("Invite Suppliers", "دعوة الموردين")</h4>
+                        <div class="wz-actions">
+                            @if (inviteable is { Count: > 0 })
+                            {
+                                <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form">@foreach (var sp in inviteable) { <input type="hidden" name="supplierIds" value="@sp.Id" /> }<button class="wz-primary" data-confirm="@L("Send tender invitations to all eligible suppliers?", "هل تريد إرسال دعوات المناقصة لجميع الموردين المؤهلين؟")">@L($"Invite {inviteable.Count} eligible supplier(s)", $"دعوة {inviteable.Count} من الموردين المؤهلين")</button></form>
+                                <button type="button" class="wz-ghost" data-wz-picker-open>@L("Choose suppliers manually", "اختيار الموردين يدوياً")</button>
+                            }
+                            else
+                            {
+                                <p class="wz-muted">@(approvedSuppliers is { Count: > 0 }
+                                    ? L("All eligible suppliers have already been invited to this round.", "تمت دعوة جميع الموردين المؤهلين لهذه الجولة.")
+                                    : L("There are no approved suppliers with an active, verified account.", "لا يوجد موردون معتمدون لديهم حساب نشط ومتحقق منه."))</p>
+                            }
                         </div>
-                        <p class="wp-hint">Only approved suppliers with an active, verified account are listed.@(tenderCategories.Count > 0 ? " Tender item categories: " + string.Join(", ", tenderCategories) + "." : "") <button type="button" class="wp-ghost" data-supplier-reset>Clear filters</button></p>
-                        @if (inviteable is { Count: 0 }) { <p class="wp-empty">All eligible suppliers have already been invited to this round.</p> }
-                        <div class="wp-pick-head"><label class="wp-check"><input type="checkbox" data-select-all @(inviteable is { Count: > 0 } ? null : "disabled") /> Select all</label><span class="wp-pick-count" data-count>0 selected</span></div>
-                        <ul class="wp-pick" data-fv-group-required data-fv-label="suppliers" data-fv-msg="Please select at least one supplier to invite." data-fv-msg-ar="يرجى اختيار مورد واحد على الأقل لدعوته.">@foreach (var sp in approvedSuppliers) { var done = invitedIds.Contains(sp.Id); <li class="@(done ? "is-invited" : null)" data-supplier-name="@sp.CompanyName.ToLowerInvariant()" data-supplier-category="@sp.Category" data-verified="@sp.Verified" data-issues="@(sp.Expired + sp.Pending)" data-offers="@sp.Offers" data-awards="@sp.Awards"><label class="wp-check"><input type="checkbox" name="supplierIds" value="@sp.Id" @(done ? "checked disabled" : null) /><span>@sp.CompanyName <small>@sp.Category · @sp.Verified verified doc(s)@(sp.Expired > 0 ? $" · {sp.Expired} expired" : "")@(sp.Pending > 0 ? $" · {sp.Pending} pending review" : "") · @sp.Offers earlier offer(s) · @sp.Awards award(s)</small></span>@if (done) { <em>Invited</em> }</label></li> }</ul>
-                        <p class="wp-empty" role="status" data-supplier-empty hidden>No eligible suppliers match these filters. Clear the filters to see all eligible suppliers.</p>
-                        <button class="wp-primary" data-pick-btn disabled data-confirm="Send tender invitations to the selected suppliers? Each one is notified and can accept or decline.">Invite selected</button>
-                        <small>Each invited supplier gets a notification, accepts, and sends an offer from their own portal.</small>
-                    </form>
-                }
-                else
+                        <details class="wp-opt">
+                            <summary>@L("Invite an unregistered company", "دعوة شركة غير مسجّلة")</summary>
+                            <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteExternal" asp-route-id="@id" method="post" class="wp-form">
+                                <div class="wp-cols">
+                                    <label>@L("Company", "الشركة")<input name="companyName" maxlength="200" required data-fv-label="Company name" /></label>
+                                    <label>@L("Email", "البريد الإلكتروني")<input name="email" type="email" maxlength="256" required /></label>
+                                    <label>@L("Phone (optional)", "الهاتف (اختياري)")<input name="phone" type="tel" maxlength="40" /></label>
+                                </div>
+                                <button>@L("Send registration invitation", "إرسال دعوة للتسجيل")</button>
+                                <small>@L("The company can submit a bid after its registration is approved.", "يمكن للشركة تقديم عرض بعد اعتماد تسجيلها.")</small>
+                            </form>
+                        </details>
+                    }
+                    else if (wzBiddingOpen && wzClosing <= Model.UtcNow)
+                    {
+                        <p class="wz-muted">@L("The bid submission deadline has passed. Open Supplier Bids to review the offers and close bidding.", "انتهى موعد تقديم العروض. افتح صفحة عروض الموردين لمراجعتها وإغلاق باب التقديم.")</p>
+                    }
+                </div>
+                @if (wzCanInvite && inviteable is { Count: > 0 } && approvedSuppliers != null)
                 {
-                    <p class="wp-empty">No eligible suppliers are available. Suppliers can be selected once their company is approved and they have an active account with a verified email address.</p>
-                }
-                <details class="wp-opt"><summary>Invite a company that is not registered</summary>
-                    <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteExternal" asp-route-id="@id" method="post" class="wp-form"><div class="wp-cols"><label>Company<input name="companyName" maxlength="200" required data-fv-label="Company name" /></label><label>Email<input name="email" type="email" maxlength="256" required /></label><label>Phone (optional)<input name="phone" type="tel" maxlength="40" /></label></div><button>Send invitation</button><small>They receive a registration invitation first; an offer still needs an approved registration.</small></form></details>
-            </div>
-        }
+                    <div class="wz-picker" data-wz-picker hidden>
+                        <p><button type="button" class="wz-ghost wz-small" data-wz-picker-close>&larr; @L("Back to the summary", "العودة إلى الملخص")</button></p>
 
-                </div></section>
+                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="InviteAll" asp-route-id="@id" method="post" class="wp-form wp-picker" data-picker>
+                            <div class="wp-cols">
+                                <label>Search suppliers<input type="search" data-supplier-search placeholder="Company name" /></label>
+                                <label>Category<select data-supplier-category><option value="">All categories (@approvedSuppliers.Count)</option>@foreach (var category in SupplierCategories.All) { <option value="@category">@category (@approvedSuppliers.Count(x => x.Category == category))@(tenderCategories.Contains(category) ? " · in this tender" : "")</option> }</select></label>
+                                <label>Documents<select data-supplier-docs><option value="">Any</option><option value="verified">Verified, not expired</option><option value="clean">No expired or pending documents</option></select></label>
+                                <label>History<select data-supplier-history><option value="">Any</option><option value="offers">Has submitted offers before</option><option value="awards">Has won a tender before</option><option value="new">No earlier offers</option></select></label>
+                            </div>
+                            <p class="wp-hint">Only approved suppliers with an active, verified account are listed.@(tenderCategories.Count > 0 ? " Tender item categories: " + string.Join(", ", tenderCategories) + "." : "") <button type="button" class="wp-ghost" data-supplier-reset>Clear filters</button></p>
+                            <div class="wp-pick-head"><label class="wp-check"><input type="checkbox" data-select-all /> Select all</label><span class="wp-pick-count" data-count>0 selected</span></div>
+                            <ul class="wp-pick" data-fv-group-required data-fv-label="suppliers" data-fv-msg="Please select at least one supplier to invite." data-fv-msg-ar="يرجى اختيار مورد واحد على الأقل لدعوته.">@foreach (var sp in approvedSuppliers) { var done = invitedIds.Contains(sp.Id); <li class="@(done ? "is-invited" : null)" data-supplier-name="@sp.CompanyName.ToLowerInvariant()" data-supplier-category="@sp.Category" data-verified="@sp.Verified" data-issues="@(sp.Expired + sp.Pending)" data-offers="@sp.Offers" data-awards="@sp.Awards"><label class="wp-check"><input type="checkbox" name="supplierIds" value="@sp.Id" @(done ? "checked disabled" : null) /><span>@sp.CompanyName <small>@sp.Category · @sp.Verified verified doc(s)@(sp.Expired > 0 ? $" · {sp.Expired} expired" : "")@(sp.Pending > 0 ? $" · {sp.Pending} pending review" : "") · @sp.Offers earlier offer(s) · @sp.Awards award(s)</small></span>@if (done) { <em>Invited</em> }</label></li> }</ul>
+                            <p class="wp-empty" role="status" data-supplier-empty hidden>No eligible suppliers match these filters. Clear the filters to see all eligible suppliers.</p>
+                            <button class="wp-primary" data-pick-btn disabled data-confirm="@L("Send invitations to the selected suppliers?", "هل تريد إرسال الدعوات إلى الموردين المحددين؟")">@L("Invite selected suppliers", "دعوة الموردين المحددين")</button>
+                            <small>Each invited supplier gets a notification, accepts, and sends an offer from their own portal.</small>
+                        </form>
+                    </div>
+                }
+            </div>
+        </section>
         @* 5 — Bids *@
         <section class="wz-panel" data-wz-panel="5">
             <div class="wz-art-side" aria-hidden="true"><span>&#128203;</span></div>
@@ -532,11 +593,15 @@
                 }
                 @if (supplierBidRows.Count == 0) { <tr><td colspan="5" class="wz-empty">@L("No suppliers have been invited yet.", "لم تتم دعوة أي مورد بعد.")</td></tr> }
                 </tbody></table></div>
-                <p class="wz-muted">@submittedSupplierCount @L("offer(s) received", "عرض/عروض مستلمة") · @L("closing", "الإغلاق") @WzTime(wzClosing)</p>
+                <p class="wz-muted">@submittedSupplierCount @L("offer(s) received", "عرض/عروض مستلمة") · @L("Bid submission deadline (Jordan time)", "آخر موعد لتقديم العروض (بتوقيت الأردن)") @WzTime(wzClosing)</p>
                 <div class="wz-actions">
-                    @if (round?.Status == TenderRoundStatus.Open && status == TenderStatus.Bidding)
+                    @if (wzCanInvite || wzNeedsDeadline)
                     {
-                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post" class="wp-form" data-close-bidding><button class="wz-primary" disabled="@(!canCloseBidding)">@L("Close bidding & continue", "إغلاق العروض والمتابعة") <span aria-hidden="true">&rarr;</span></button>@if (!canCloseBidding) { <small>@L("Available when 3 suppliers submit, everyone answers, or the deadline passes.", "متاح عند تقديم 3 موردين أو رد الجميع أو انتهاء الموعد.")</small> }</form>
+                        <button type="button" class="wz-ghost" data-wz-jump="4">@(wzCanInvite ? L("Invite Suppliers", "دعوة الموردين") : L("Set Bid Submission Deadline", "تحديد آخر موعد لتقديم العروض"))</button>
+                    }
+                    @if (wzBiddingOpen)
+                    {
+                        <form asp-area="SourcingOfficer" asp-controller="Workflow" asp-action="CloseBidding" asp-route-id="@id" method="post" class="wp-form" data-close-bidding><button class="wz-primary" disabled="@(!canCloseBidding)">@L("Close Bid Submission", "إغلاق باب تقديم العروض") <span aria-hidden="true">&rarr;</span></button>@if (!canCloseBidding) { <small>@L("Available when 3 suppliers submit, everyone answers, or the deadline passes.", "متاح عند تقديم 3 موردين أو رد الجميع أو انتهاء الموعد.")</small> }</form>
                     }
                 </div>
                 }
@@ -610,7 +675,7 @@
         <div class="wz-dots" aria-hidden="true">@for (var n = 1; n <= 8; n++) { <i class="@(n <= wzCurrent ? "is-on" : null)"></i> }</div>
         <span class="wz-lockhint" data-wz-lockhint role="status"></span>
         <span class="wz-stepno" data-wz-stepno>@L("Step", "الخطوة") @wzCurrent @L("of", "من") 8</span>
-        <button type="button" class="wz-primary" data-wz-next>@L("Continue", "متابعة") <span aria-hidden="true">&rarr;</span></button>
+        <button type="button" class="wz-primary" data-wz-next data-wz-label="@L("Continue", "متابعة")"><span data-wz-next-text>@L("Continue", "متابعة")</span> <span aria-hidden="true">&rarr;</span></button>
     </footer>
     }
 </div>

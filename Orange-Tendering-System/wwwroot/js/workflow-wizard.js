@@ -12,18 +12,31 @@
         var server = Number(root.dataset.wzCurrent), current = server;
         try { var saved = JSON.parse(sessionStorage.getItem(key(root)) || 'null'); if (saved && saved.server === server) current = saved.view; } catch (e) { /* storage may be unavailable */ }
         var back = root.querySelector('[data-wz-back]'), next = root.querySelector('[data-wz-next]'), stepNo = root.querySelector('[data-wz-stepno]'), dots = root.querySelectorAll('.wz-dots i');
-        var hint = root.querySelector('[data-wz-lockhint]'), body = root.querySelector('.wz-body');
+        var hint = root.querySelector('[data-wz-lockhint]'), nextText = root.querySelector('[data-wz-next-text]');
+        var invitations = root.querySelector('[data-wz-invitations]');
+        var summary = invitations && invitations.querySelector('[data-wz-summary]');
+        var picker = invitations && invitations.querySelector('[data-wz-picker]');
+        function togglePicker(open) {
+            if (!picker || !summary) return;
+            summary.hidden = open;
+            picker.hidden = !open;
+            root.classList.toggle('wz-picking', open);
+            window.dispatchEvent(new Event('resize'));
+        }
         function open(n) { var b = root.querySelector('[data-wz-go="' + n + '"]'); return !!b && !b.disabled; }
         if (!open(current)) current = server;
 
         function show(n, animate) {
+            if (n !== current && picker && !picker.hidden) togglePicker(false);
             current = n;
+            var panel = panels.find(function (p) { return Number(p.dataset.wzPanel) === n; });
             panels.forEach(function (p) { var on = Number(p.dataset.wzPanel) === n; p.classList.toggle('is-current', on); if (on && animate) { p.classList.remove('is-enter'); void p.offsetWidth; p.classList.add('is-enter'); } });
             root.querySelectorAll('[data-wz-go]').forEach(function (b) { var on = Number(b.dataset.wzGo) === n; b.classList.toggle('is-view', on); if (on) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
             if (stepNo) stepNo.textContent = stepNo.textContent.replace(/\d+/, String(n));
             dots.forEach(function (d, i) { d.classList.toggle('is-on', i < n); });
             if (back) back.disabled = n <= 1;
             if (next) next.disabled = n >= total || !open(n + 1);
+            if (nextText && next) nextText.textContent = panel && panel.dataset.wzNextLabel || next.dataset.wzLabel;
             // A locked "Continue" always says why (the same reason is on the locked stage pill).
             var nextPill = root.querySelector('[data-wz-go="' + (n + 1) + '"]');
             var reason = next && next.disabled && nextPill && nextPill.dataset.wzReason ? '🔒 ' + nextPill.dataset.wzReason : '';
@@ -33,22 +46,27 @@
         }
         root.addEventListener('click', function (e) {
             var go = e.target.closest('[data-wz-go]'); if (go && !go.disabled) { show(Number(go.dataset.wzGo), true); return; }
+            var jump = e.target.closest('[data-wz-jump]');
+            if (jump && open(Number(jump.dataset.wzJump))) { show(Number(jump.dataset.wzJump), true); return; }
+            if (e.target.closest('[data-wz-picker-open]')) { togglePicker(true); return; }
+            if (e.target.closest('[data-wz-picker-close]')) { togglePicker(false); return; }
             if (e.target.closest('[data-wz-next]') && open(current + 1)) show(current + 1, true);
             else if (e.target.closest('[data-wz-back]') && current > 1) show(current - 1, true);
         });
 
-        // Closing date chosen in "Tender Settings" feeds the Publish form (same form attribute), so Publish stays a single real action.
-        var deadline = root.querySelector('input[data-wz-deadline]'), utc = root.querySelector('input[data-wz-deadline-utc]'), echo = root.querySelector('[data-wz-deadline-echo]');
-        var publish = root.querySelector('[data-wz-publish]'), publishHint = root.querySelector('[data-wz-publish-hint]'), badHint = root.querySelector('[data-wz-deadline-error]');
+        var deadline = root.querySelector('input[data-wz-deadline]');
+        var utc = root.querySelector('input[data-wz-deadline-utc]');
+        var openBidding = root.querySelector('[data-wz-open-bidding]');
+        var badHint = root.querySelector('[data-wz-deadline-error]');
         function sync() {
-            if (!deadline) return;
-            var has = !!deadline.value, instant = has ? new Date(deadline.value + (deadline.value.length === 16 ? ':00' : '') + '+03:00') : null; // the system works in Jordan time (UTC+3)
-            var valid = !!instant && !isNaN(instant) && instant.getTime() >= Date.now() + 3600 * 1000;
-            if (echo) echo.textContent = has ? new Date(deadline.value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '\u2014';
-            if (utc) utc.value = valid ? instant.toISOString() : '';
-            if (publish) publish.disabled = !valid;
-            if (publishHint) publishHint.hidden = has;
-            if (badHint) badHint.hidden = !has || valid;
+            var value = deadline.value;
+            // The input is Jordan time. Submit a UTC instant regardless of the browser's local time zone.
+            var instant = value ? new Date(value + (value.length === 16 ? ':00' : '') + '+03:00') : null;
+            var earliest = Date.now() + Number(deadline.dataset.wzLeadHours) * 3600000;
+            var valid = !!instant && instant.getTime() > earliest && deadline.validity.valid;
+            utc.value = valid ? instant.toISOString() : '';
+            openBidding.disabled = !valid;
+            badHint.hidden = !value || valid;
         }
         if (deadline) {
             ['input', 'change'].forEach(function (n) { deadline.addEventListener(n, sync); });
@@ -59,7 +77,7 @@
                 var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Amman', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d), p = {};
                 parts.forEach(function (x) { p[x.type] = x.value; });
                 var value = p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
-                if (deadline.max && value > deadline.max) value = deadline.max; // only while the department's needed-by date is still ahead
+                if (deadline.max && value > deadline.max) value = deadline.max;
                 deadline.value = value;
                 sync();
             });
@@ -70,16 +88,6 @@
     function init() {
         document.querySelectorAll('.wz[data-wz]').forEach(setup);
     }
-    // Manual supplier selection lives inside the Publish stage: it replaces the summary until the Officer goes back.
-    document.addEventListener('click', function (e) {
-        var openBtn = e.target.closest('[data-wz-picker-open]'), closeBtn = e.target.closest('[data-wz-picker-close]');
-        if (!openBtn && !closeBtn) return;
-        var main = (openBtn || closeBtn).closest('[data-wz-publish-main]'); if (!main) return;
-        var summary = main.querySelector('[data-wz-summary]'), picker = main.querySelector('[data-wz-picker]');
-        summary.hidden = !!openBtn; picker.hidden = !openBtn;
-        var root = main.closest('.wz'); if (root) root.classList.toggle('wz-picking', !!openBtn);
-        window.dispatchEvent(new Event('resize'));
-    });
     init();
     new MutationObserver(function () { init(); }).observe(document.body, { childList: true, subtree: true });
 }());
